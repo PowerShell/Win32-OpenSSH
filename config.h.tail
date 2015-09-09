@@ -1,0 +1,90 @@
+#define WIN32_LEAN_AND_MEAN 1
+#define _CRT_SECURE_NO_DEPRECATE 1
+#define _CRT_NONSTDC_NO_DEPRECATE 1
+#define WIN32_FIXME 1
+#undef USE_NTCREATETOKEN
+
+/* Define if you must implement a startup_needs function for your platform */
+#define HAVE_STARTUP_NEEDS 1
+
+/* Define if your platform uses Winsock instead of BSD sockets (yeah, there are a lot of platforms like this :) */
+#define HAVE_WINSOCK 1
+
+#define snprintf _snprintf
+
+#define BROKEN_READV_COMPARISON
+
+/* Override detection of some headers and functions on MinGW */
+#undef BROKEN_SNPRINTF
+#define GETPGRP_VOID 1
+#undef HAVE_CRYPT_H
+#define HAVE_DAEMON 1
+#undef HAVE_ENDIAN_H
+#undef HAVE_FCNTL_H
+#define HAVE_FREEADDRINFO 1
+#define HAVE_GAI_STRERROR 1
+#define HAVE_GETADDRINFO 1
+#define HAVE_GETGROUPLIST 1
+#define HAVE_GETNAMEINFO 1
+#undef HAVE_ID_IN_UTMPX
+#define HAVE_INET_ATON 1
+#define HAVE_INET_NTOA 1
+#define HAVE_INNETGR 1
+#undef HAVE_LIBCRYPT
+#define HAVE_MKDTEMP 1
+#define HAVE_NANOSLEEP 1
+#undef HAVE_PATHS_H
+#undef HAVE_POLL_H
+#undef HAVE_PROC_PID
+#undef HAVE_PTY_H
+#define HAVE_NANOSLEEP 1
+#define HAVE_READPASSPHRASE 1
+#define HAVE_REALPATH 1
+#undef HAVE_SIG_ATOMIC_T
+#define HAVE_SIZE_T 1
+#undef HAVE_STRERROR
+#define HAVE_STRMODE 1
+#undef __USE_W32_SOCKETS
+
+#ifdef __MINGW32__ /* FIXME: Use autoconf to set this correctly */
+/* Define to 1 if you have the `strcasecmp' function. */
+#define HAVE_STRCASECMP 1
+
+/* Define to 1 if you have the `strncasecmp' function. */
+#define HAVE_STRNCASECMP 1
+#endif
+
+#define HAVE_STRUCT_IN6_ADDR 1
+#define HAVE_STRUCT_SOCKADDR_IN6 1
+#define HAVE_STRUCT_TIMEVAL 1
+#undef HAVE_SYS_CDEFS_H
+#undef HAVE_SYS_SYSMACROS_H
+#undef HAVE_SYS_MMAN_H
+#undef HAVE_SYS_UN_H
+
+#define HAVE_TCGETPGRP 1
+
+#undef HAVE_TIME
+
+#define HAVE_TRUNCATE 1
+
+#define HAVE_VIS_H 1
+
+#define MISSING_FD_MASK 1
+#define MISSING_HOWMANY 1
+#define MISSING_NFDBITS 1
+
+#undef SSH_PRIVSEP_USER
+
+#define HAVE_OPENPTY 1
+
+/* Fixes for loginrec.c */
+#undef CONF_UTMP_FILE
+#undef CONF_WTMPX_FILE
+#undef CONF_WTMP_FILE
+#undef CONF_UTMPX_FILE
+#undef CONF_LASTLOG_FILE
+
+#define BROKEN_SYS_TERMIO_H
+
+#define strerror strerror_win32

@@ -1,0 +1,42 @@
+# $Id $
+
+sysconfdir=@sysconfdir@
+piddir=@piddir@
+srcdir=@srcdir@
+top_srcdir=@top_srcdir@
+
+VPATH=@srcdir@
+CC=@CC@
+LD=@LD@
+CFLAGS=@CFLAGS@
+CPPFLAGS=-I. -I../../.. -I$(srcdir) -I$(top_srcdir) -I$(srcdir)/includes @CPPFLAGS@ @DEFS@
+LIBS=@LIBS@
+AR=@AR@
+RANLIB=@RANLIB@
+INSTALL=@INSTALL@
+LDFLAGS=-L. @LDFLAGS@
+
+WIN32COMPATFILES = daemon.o gettimeofday.o homedirhelp.o pwd.o sfds.o \
+	socket.o startupneeds.o strcasecmp.o syslog.o lsalogon.o lsastring.o \
+	stringhelp.o deskright.o win32auth.o kerberos.o
+
+WIN32COMPATLIB=@LIBWIN32COMPAT@
+
+.c.o:
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+
+all: $(WIN32COMPATLIB)
+
+install:
+
+clean:
+	rm -f *.o *.a core
+
+distclean: clean
+	rm -f Makefile *~
+
+$(WIN32COMPATFILES): ../../../config.h
+
+$(WIN32COMPATLIB): $(WIN32COMPATFILES)
+	$(AR) rv $@ $(WIN32COMPATFILES)
+	$(RANLIB) $@

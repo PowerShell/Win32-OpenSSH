@@ -1,0 +1,92 @@
+#/*
+# * Author: NoMachine <developers@nomachine.com>
+# *
+# * Copyright (c) 2009, 2013 NoMachine
+# * All rights reserved
+# *
+# * Support functions and system calls' replacements needed to let the
+# * software run on Win32 based operating systems.
+# *
+# * Redistribution and use in source and binary forms, with or without
+# * modification, are permitted provided that the following conditions
+# * are met:
+# *
+# * 1. Redistributions of source code must retain the above copyright
+# * notice, this list of conditions and the following disclaimer.
+# * 2. Redistributions in binary form must reproduce the above copyright
+# * notice, this list of conditions and the following disclaimer in the
+# * documentation and/or other materials provided with the distribution.
+# *
+# * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+# * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+# * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+# * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+# * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+# * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# */
+
+#
+# Library name.
+#
+
+LIBRARY = ssh-lsa
+
+#
+# Sources list.
+#
+
+CXXSRC = Ssh-lsa.cpp LsaString.cpp Debug.cpp KeyAuth.cpp PopBinary.cpp \
+         Base64.cpp Utils.cpp Key.cpp DeskRight.cpp
+
+#
+# If You use Cygwin insead of pure MinGW tools, You need to ensure, that
+# propertly OpenSSL libs are used (i.e. compiled for MinGW64 target).
+#
+
+LIBS = -L$(LIBSSL_PATH) -static -lstdc++ -lUserenv -lshlwapi -lssl \
+       -lcrypto -lws2_32 -lgdi32
+
+CXXOBJ = $(CXXSRC:.cpp=.o)
+
+#
+# Compilation flags.
+#
+
+CXX = x86_64-w64-mingw32-g++
+
+CXXDEFINES =
+
+CXXFLAGS = -g -O3 -fstrength-reduce -fno-rtti -fno-exceptions \
+           -Wall -Wpointer-arith -Werror -Wl,--kill-at \
+           -I$(LIBSSL_PATH)/include
+
+#
+# Make library by linking objects.
+#
+
+$(LIBRARY).dll: $(CXXOBJ)
+	$(CXX) -shared $(CXXFLAGS) $(CXXOBJ) -o $@ $(LIBS)
+
+#
+# Make objects from sources.
+#
+
+.SUFFIXES: .cpp.c
+
+.cpp.o:
+	$(CXX) -c $(CXXFLAGS) $(CXXDEFINES) $<
+
+#
+# Clean.
+#
+
+clean:
+	rm -f *.o
+	rm -f *.dll
+	rm -f *.a
+
+.PHONY: clean

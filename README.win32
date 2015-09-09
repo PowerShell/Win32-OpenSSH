@@ -1,0 +1,180 @@
+README.win32
+
+openssh-5.9p1-win32-3
+
+- Added the INSTALL.win32 to the package. It provides installation
+  instructions for the OpenSSH win32 port.
+
+openssh-5.9p1-win32-2
+
+- Adjusted sources to compile with mingw-gcc 4.7.
+
+openssh-5.9p1-win32-1
+
+Implemented:
+
+- Ported statvfs and fstatvfs extensions in sftp-server on
+   Windows.
+
+- Added support for Windows domain accounts.
+
+- Added support for network logon if interactive one failed on Windows.
+
+- Implemented Kerberos authentication using MIT/Kerberos and native
+   SSPI/Kerberos.
+
+- Disabled stdin echo while reading password on Windows.
+
+- sshd doesn't need lsa, when target user is owner of sshd
+   process on Windows.
+
+- integrated ssh-lsa with openssh tree.
+
+Bug fixes:
+
+- Fixed resource leaks in sshd on Windows.
+
+- Fixed possible hang up in ssh on Windows.
+
+- Fixed clean up of Winsta0 DACL on server side.
+
+- Added 'PamLibrary' option to sshd_config. This option changes
+   default path to libpam.so. if no specified default path is used.
+
+- Ported -oAuthorizedKeysFile to Windows.
+
+- Fixed path expanding under SYSTEM account on Windows.
+
+- Fixed block issue when the same socket used for stdin and stdout in
+   sftp-server on Windows.
+
+- Fixed possible heap corruption on file copying in sftp-server.
+
+- Fixed possible connection drop, when copying big files in
+   sftp-server on Windows.
+
+- Removed one redundant code page conversion in sftp-server on Windows.
+
+- Fixed access to root directory in sftp-server on Windows.
+
+- Fixed wrong exit code in SERVICE_CONTROL_STOP handler on Windows.
+
+- Changed encoding local characters while formatting error messages on
+   Windows.
+
+- Speeded up retreving HANDLE's type, when socket used on Windows.
+
+- Set stdout to binary mode as default if pipe is used in ssh on
+   Windows.
+
+openssh-5.9p1-win32
+
+- Updated to OpenSSH version 5.9p1.
+
+- The openSSH SFTP client has been ported to Win 32.
+
+openssh-4.7p1-win32-1
+
+- The following tools have been ported to Win32: ssh-agent, ssh-add,
+  sftp-server program and ssh-keygen. All the basic functionalities
+  related to the creation of the key-pairs are fully supported. The
+  managing of the known_hosts file is missing.
+
+- Added support to SSH client for MIT Kerberos for Windows and for
+  authorization based on smartcard devices.
+
+- Updated SSH server to support login also when the account doesn't
+  have administrative privileges.
+
+- Added support for native RSA/DSA key authorization via ssh-lsa.
+  Installing this tool requires administrative privileges and
+  a reboot of the machine.
+
+- The ProxyCommand option is now supported on Win32.
+
+- Added support for installing SSHD as a service by means of sc.exe
+  command line tool for Windows. Since command line parameters are not
+  passed to the SSHD process, a default sshd_config file is searched
+  in the following locations: in the installation directory where
+  sshd.exe is located (e.g. C:\sshd); the directory 'etc' under
+  the installation directory (e.g. C:\sshd\etc), and the directory 'etc'  
+  in the installation directory (e.g C:\etc).
+
+- Improved SSH server to be fully operative on Windows Vista. SSHD can
+  work on Windows XP without SP1.
+
+- Improved logging facilities of SSHD: now all instances of the SSH
+  server log to the same file and SSHD creates a minidump file if a
+  crash occurs.
+
+- Solved problem with processes that may be left running when the SSHD
+  service is stopped or after an abnormal closure of the SSH session.
+
+- Fixed some memory leaks.
+
+- Fixed possible crashes of SSHD when a great number of connections is
+  established.
+
+- Fixed possible hanging of the SSHD service that may occurr when the
+  SSH session is closing and when reading a passphrase.
+
+- Fixed logging behavior of SSH client. Now when the client is run in
+  debug mode, output of packet dumps can be redirected to a file.
+  Solved other issues occurring when packet dumps when standard error
+  is redirected.
+
+- Fixed a problem related to the inheritance of handles in SSHD.
+
+- Fixed a bug in the session_get() function causing a segmentation
+  fault of SSHD.
+
+- Fixed the closure of startup pipes. This solves a problem which was
+  limiting the number of sessions to 10.
+
+- Fixed a problem causing a delay in establishing the connection when
+  SSHD is started as a Win32 service. Speeded-up login.
+
+- Disabled the privilege separation on Win32.
+
+- Solved issues preventing the correct detection of home directory
+  either on Windows 7 and when the user domain is set to NULL.
+
+- Fixed a segmentation fault of SSHD on Windows 7 at 64bit.
+
+- Added the setting of the USERPROFILE variable to the value detected
+  just after a successful login.
+
+openssh-5.4p1-win32
+
+- Updated to OpenSSH version 5.4p1.
+
+openssh-4.7p1-win32
+
+- Added the Win32 compat layer.
+
+- The Win32 layer provides support for: User identity and password
+  management functions like getuid(),setuid(),getpw*() and others;
+  string management functions like strcasecmp(), strncasecmp() and
+  other functions such as gettimeofday() and gethomedir(); management
+  of file descriptors, file handlers and sockets in an unified way;
+  file descriptor and sockets functions such as fstat(), fdopen(),
+  open(), dup(),dup2(), pipe(),create(),shutdown(),accept(),read(),
+  write(),close(), socket(), setsockopt(),getsockopt(), getpeername(),
+  getsockname(), ioctlsocket(), listen(),bind(),connect(), and others;
+  the select() function which can work on sockets, files, pipes and
+  console handlers; Windows users authentication.
+
+- Introduced some changes to the OpenSSH code for: supporting the
+  CreateProcess() function replacing fork() and allowing compilation
+  on Win32 platform.
+
+- Open Issues: SSHD cannot be installed as a Windows service by means
+  of Win32 administrative tools; if SSHD is running as a Windows
+  service, it requires that property 'Allow service to interact with
+  desktop' is set; to allow the connecting user to be authenticated by
+  SSHD, it is necessary that the user belongs to the 'Administrators'
+  group; if the connecting user has been authorized with public key
+  authentication, the GetUserName() function always returns 'SYSTEM'
+  instead of the username; possible crashes may occur during autho-
+  rization phase when SSHD is running on Vista; port of the ssh-keygen
+  tool is not available in this version.
