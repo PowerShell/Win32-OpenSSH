@@ -14,7 +14,7 @@ ln x86_64-w64-mingw32-dlltool.exe    dlltool
 ln x86_64-w64-mingw32-dllwrap.exe    dllwrap
 ln x86_64-w64-mingw32-elfedit.exe    elfedit
 ln x86_64-w64-mingw32-g++.exe        g++
-ln x86_64-w64-mingw32-gcc-4.7.3.exe  gcc-4.7.3
+ln x86_64-w64-mingw32-gcc-4.9.2.exe  gcc-4.7.3
 ln x86_64-w64-mingw32-gcc-ar.exe     gcc-ar
 ln x86_64-w64-mingw32-gcc-nm.exe     gcc-nm
 ln x86_64-w64-mingw32-gcc-ranlib.exe gcc-ranlib
