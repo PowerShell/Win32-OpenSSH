@@ -3829,8 +3829,7 @@ if test -z "$disable_shadow" ; then
 #include <shadow.h>
 struct spwd sp;
 		]], [[ sp.sp_expire = sp.sp_lstchg = sp.sp_inact = 0; ]])],
-		[ sp_expire_available=yes ], [
-	])
+		[ sp_expire_available=yes ])
 
 	if test "x$sp_expire_available" = "xyes" ; then
 		AC_MSG_RESULT([yes])
