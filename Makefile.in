@@ -29,6 +29,7 @@ SSH_PKCS11_HELPER=$(libexecdir)/ssh-pkcs11-helper
 PRIVSEP_PATH=@PRIVSEP_PATH@
 SSH_PRIVSEP_USER=@SSH_PRIVSEP_USER@
 STRIP_OPT=@STRIP_OPT@
+TEST_SHELL=@TEST_SHELL@
 
 PATHS= -DSSHDIR=\"$(sysconfdir)\" \
 	-D_PATH_SSH_PROGRAM=\"$(SSH_PROGRAM)\" \
@@ -37,13 +38,15 @@ PATHS= -DSSHDIR=\"$(sysconfdir)\" \
 	-D_PATH_SSH_KEY_SIGN=\"$(SSH_KEYSIGN)\" \
 	-D_PATH_SSH_PKCS11_HELPER=\"$(SSH_PKCS11_HELPER)\" \
 	-D_PATH_SSH_PIDDIR=\"$(piddir)\" \
-	-D_PATH_PRIVSEP_CHROOT_DIR=\"$(PRIVSEP_PATH)\" \
+	-D_PATH_PRIVSEP_CHROOT_DIR=\"$(PRIVSEP_PATH)\"
 
 CC=@CC@
 LD=@LD@
 CFLAGS=@CFLAGS@
 CPPFLAGS=-I. -I$(srcdir) @CPPFLAGS@ $(PATHS) @DEFS@
 LIBS=@LIBS@
+K5LIBS=@K5LIBS@
+GSSLIBS=@GSSLIBS@
 SSHLIBS=@SSHLIBS@
 SSHDLIBS=@SSHDLIBS@
 LIBEDIT=@LIBEDIT@
@@ -61,17 +64,35 @@ MANFMT=@MANFMT@
 
 TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT)
 
-LIBSSH_OBJS=acss.o authfd.o authfile.o bufaux.o bufbn.o buffer.o \
-	canohost.o channels.o cipher.o cipher-acss.o cipher-aes.o \
+LIBOPENSSH_OBJS=\
+	ssh_api.o \
+	ssherr.o \
+	sshbuf.o \
+	sshkey.o \
+	sshbuf-getput-basic.o \
+	sshbuf-misc.o \
+	sshbuf-getput-crypto.o \
+	krl.o \
+	bitmap.o
+
+LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
+	authfd.o authfile.o bufaux.o bufbn.o bufec.o buffer.o \
+	canohost.o channels.o cipher.o cipher-aes.o cipher-aesctr.o \
 	cipher-bf1.o cipher-ctr.o cipher-3des1.o cleanup.o \
-	compat.o compress.o crc32.o deattack.o fatal.o hostfile.o \
-	log.o match.o md-sha256.o moduli.o nchan.o packet.o \
+	compat.o crc32.o deattack.o fatal.o hostfile.o \
+	log.o match.o md-sha256.o moduli.o nchan.o packet.o opacket.o \
 	readpass.o rsa.o ttymodes.o xmalloc.o addrmatch.o \
-	atomicio.o key.o dispatch.o kex.o mac.o uidswap.o uuencode.o misc.o \
+	atomicio.o key.o dispatch.o mac.o uidswap.o uuencode.o misc.o \
 	monitor_fdpass.o rijndael.o ssh-dss.o ssh-ecdsa.o ssh-rsa.o dh.o \
-	kexdh.o kexgex.o kexdhc.o kexgexc.o bufec.o kexecdh.o kexecdhc.o \
-	msg.o progressmeter.o dns.o entropy.o gss-genr.o umac.o jpake.o \
-	schnorr.o ssh-pkcs11.o kerberos-sspi.o
+	msg.o progressmeter.o dns.o entropy.o gss-genr.o umac.o umac128.o \
+	ssh-pkcs11.o smult_curve25519_ref.o \
+	poly1305.o chacha.o cipher-chachapoly.o \
+	ssh-ed25519.o digest-openssl.o digest-libc.o hmac.o \
+	sc25519.o ge25519.o fe25519.o ed25519.o verify.o hash.o blocks.o \
+	kex.o kexdh.o kexgex.o kexecdh.o kexc25519.o \
+	kexdhc.o kexgexc.o kexecdhc.o kexc25519c.o \
+	kexdhs.o kexgexs.o kexecdhs.o kexc25519s.o \
+	kerberos-sspi.o schnorr.o jpake.o
 
 SSHOBJS= ssh.o readconf.o clientloop.o sshtty.o \
 	sshconnect.o sshconnect1.o sshconnect2.o mux.o \
@@ -83,14 +104,15 @@ SSHDOBJS=sshd.o auth-rhosts.o auth-passwd.o auth-rsa.o auth-rh-rsa.o \
 	auth.o auth1.o auth2.o auth-options.o session.o \
 	auth-chall.o auth2-chall.o groupaccess.o \
 	auth-skey.o auth-bsdauth.o auth2-hostbased.o auth2-kbdint.o \
-	auth2-none.o auth2-passwd.o auth2-pubkey.o auth2-jpake.o \
-	monitor_mm.o monitor.o monitor_wrap.o kexdhs.o kexgexs.o kexecdhs.o \
-	auth-krb5.o \
+	auth2-none.o auth2-passwd.o auth2-pubkey.o \
+	monitor_mm.o monitor.o monitor_wrap.o auth-krb5.o \
 	auth2-gss.o gss-serv.o gss-serv-krb5.o \
 	loginrec.o auth-pam.o auth-shadow.o auth-sia.o md5crypt.o \
 	sftp-server.o sftp-common.o \
 	roaming_common.o roaming_serv.o \
-	sandbox-null.o sandbox-rlimit.o sandbox-systrace.o sandbox-darwin.o pam.o
+	sandbox-null.o sandbox-rlimit.o sandbox-systrace.o sandbox-darwin.o \
+	sandbox-seccomp-filter.o sandbox-capsicum.o \
+	pam.o kexdhs.o kexgexs.o kexecdhs.o 
 
 MANPAGES	= moduli.5.out scp.1.out ssh-add.1.out ssh-agent.1.out ssh-keygen.1.out ssh-keyscan.1.out ssh.1.out sshd.8.out sftp-server.8.out sftp.1.out ssh-keysign.8.out ssh-pkcs11-helper.8.out sshd_config.5.out ssh_config.5.out
 MANPAGES_IN	= moduli.5 scp.1 ssh-add.1 ssh-agent.1 ssh-keygen.1 ssh-keyscan.1 ssh.1 sshd.8 sftp-server.8 sftp.1 ssh-keysign.8 ssh-pkcs11-helper.8 sshd_config.5 ssh_config.5
@@ -109,6 +131,7 @@ PATHSUBS	= \
 	-e 's|/etc/ssh/ssh_host_ecdsa_key|$(sysconfdir)/ssh_host_ecdsa_key|g' \
 	-e 's|/etc/ssh/ssh_host_dsa_key|$(sysconfdir)/ssh_host_dsa_key|g' \
 	-e 's|/etc/ssh/ssh_host_rsa_key|$(sysconfdir)/ssh_host_rsa_key|g' \
+	-e 's|/etc/ssh/ssh_host_ed25519_key|$(sysconfdir)/ssh_host_ed25519_key|g' \
 	-e 's|/var/run/sshd.pid|$(piddir)/sshd.pid|g' \
 	-e 's|/etc/moduli|$(sysconfdir)/moduli|g' \
 	-e 's|/etc/ssh/moduli|$(sysconfdir)/moduli|g' \
@@ -118,6 +141,8 @@ PATHSUBS	= \
 	-e 's|/usr/bin:/bin:/usr/sbin:/sbin|@user_path@|g'
 
 FIXPATHSCMD	= $(SED) $(PATHSUBS)
+FIXALGORITHMSCMD= $(SHELL) $(srcdir)/fixalgorithms $(SED) \
+		     @UNSUPPORTED_ALGORITHMS@
 
 all: $(CONFIGFILES) $(MANPAGES) $(TARGETS)
 
@@ -146,9 +171,6 @@ ssh$(EXEEXT): $(LIBCOMPAT) libssh.a @LIBWIN32COMPATDEPEND@ $(SSHOBJS)
 
 sshd$(EXEEXT): libssh.a @LIBWIN32COMPATDEPEND@ $(LIBCOMPAT) $(SSHDOBJS)
 	$(LD) -o $@ $(SSHDOBJS) $(LDFLAGS) ./libssh.a -lopenbsd-compat @LINKWIN32COMPAT@ $(SSHDLIBS) $(LIBS)
-
-scp$(EXEEXT): $(LIBCOMPAT) libssh.a scp.o progressmeter.o @LIBWIN32COMPATDEPEND@
-	$(LD) -o $@ scp.o progressmeter.o bufaux.o $(LDFLAGS) ./libssh.a -lopenbsd-compat @LINKWIN32COMPAT@ $(LIBS)
 
 ssh-add$(EXEEXT): $(LIBCOMPAT) libssh.a ssh-add.o @LIBWIN32COMPATDEPEND@
 	$(LD) -o $@ ssh-add.o $(LDFLAGS) ./libssh.a -lopenbsd-compat @LINKWIN32COMPAT@ $(LIBS)
@@ -197,6 +219,13 @@ $(CONFIGFILES): $(CONFIGFILES_IN)
 # fake rule to stop make trying to compile moduli.o into a binary "moduli.o"
 moduli:
 	echo
+
+# special case target for umac128
+umac128.o:	umac.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o umac128.o -c $(srcdir)/umac.c \
+	    -DUMAC_OUTPUT_LEN=16 -Dumac_new=umac128_new \
+	    -Dumac_update=umac128_update -Dumac_final=umac128_final \
+	    -Dumac_delete=umac128_delete
 
 clean:	regressclean
 	rm -f *.o *.a $(TARGETS) logintest config.cache config.log
@@ -329,6 +358,11 @@ host-key: ssh-keygen$(EXEEXT)
 		else \
 			./ssh-keygen -t rsa -f $(sysconfdir)/ssh_host_rsa_key -N "" ; \
 		fi ; \
+		if [ -f $(sysconfdir)/ssh_host_ed25519_key ] ; then \
+			echo "$(sysconfdir)/ssh_host_ed25519_key already exists, skipping." ; \
+		else \
+			./ssh-keygen -t ed25519 -f $(sysconfdir)/ssh_host_ed25519_key -N "" ; \
+		fi ; \
 		if [ -z "@COMMENT_OUT_ECC@" ] ; then \
 		    if [ -f $(sysconfdir)/ssh_host_ecdsa_key ] ; then \
 			echo "$(sysconfdir)/ssh_host_ecdsa_key already exists, skipping." ; \
@@ -342,6 +376,7 @@ host-key-force: ssh-keygen$(EXEEXT)
 	./ssh-keygen -t rsa1 -f $(DESTDIR)$(sysconfdir)/ssh_host_key -N ""
 	./ssh-keygen -t dsa -f $(DESTDIR)$(sysconfdir)/ssh_host_dsa_key -N ""
 	./ssh-keygen -t rsa -f $(DESTDIR)$(sysconfdir)/ssh_host_rsa_key -N ""
+	./ssh-keygen -t ed25519 -f $(DESTDIR)$(sysconfdir)/ssh_host_ed25519_key -N ""
 	test -z "@COMMENT_OUT_ECC@" && ./ssh-keygen -t ecdsa -f $(DESTDIR)$(sysconfdir)/ssh_host_ecdsa_key -N ""
 
 uninstallall:	uninstall
