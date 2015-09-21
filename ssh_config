@@ -45,3 +45,4 @@
 #   PermitLocalCommand no
 #   VisualHostKey no
 #   ProxyCommand ssh -q -W %h:%p gateway.example.com
+#UsePrivilegeSeparation no

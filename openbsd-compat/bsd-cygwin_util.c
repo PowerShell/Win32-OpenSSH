@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2001, 2011 Corinna Vinschen <vinschen@redhat.com>
+ * Copyright (c) 2000, 2001, 2011, 2013 Corinna Vinschen <vinschen@redhat.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,20 +27,15 @@
  * binary mode on Windows systems.
  */
 
+#define NO_BINARY_OPEN	/* Avoid redefining open to binary_open for this file */
 #include "includes.h"
 
 #ifdef HAVE_CYGWIN
 
-#if defined(open) && open == binary_open
-# undef open
-#endif
-
 #include <sys/types.h>
-
 #include <fcntl.h>
-#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
-#include <windows.h>
 
 #include "xmalloc.h"
 
@@ -62,6 +57,22 @@ check_ntsec(const char *filename)
 	return (pathconf(filename, _PC_POSIX_PERMISSIONS));
 }
 
+const char *
+cygwin_ssh_privsep_user()
+{
+  static char cyg_privsep_user[DNLEN + UNLEN + 2];
+
+  if (!cyg_privsep_user[0])
+    {
+#ifdef CW_CYGNAME_FROM_WINNAME
+      if (cygwin_internal (CW_CYGNAME_FROM_WINNAME, "sshd", cyg_privsep_user,
+			   sizeof cyg_privsep_user) != 0)
+#endif
+	strlcpy(cyg_privsep_user, "sshd", sizeof(cyg_privsep_user));
+    }
+  return cyg_privsep_user;
+}
+
 #define NL(x) x, (sizeof (x) - 1)
 #define WENV_SIZ (sizeof (wenv_arr) / sizeof (wenv_arr[0]))
 
@@ -76,6 +87,7 @@ static struct wenv {
 	{ NL("OS=") },
 	{ NL("PATH=") },
 	{ NL("PATHEXT=") },
+	{ NL("PROGRAMFILES=") },
 	{ NL("SYSTEMDRIVE=") },
 	{ NL("SYSTEMROOT=") },
 	{ NL("WINDIR=") }
@@ -101,7 +113,7 @@ fetch_windows_environment(void)
 void
 free_windows_environment(char **p)
 {
-	xfree(p);
+	free(p);
 }
 
 #endif /* HAVE_CYGWIN */

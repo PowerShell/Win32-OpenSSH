@@ -458,7 +458,7 @@ void input_sspi_kerberos_token(int type, u_int32_t plen, void *ctxt)
     error("ERROR: Cannot process SSH2_MSG_USERAUTH_GSSAPI_TOKEN packet.");
   }
   
-  xfree(buf);
+  free(buf);
   
   debug3("<- input_sspi_kerberos_token()...");
 }
@@ -497,8 +497,8 @@ void input_sspi_kerberos_error(int type, u_int32_t plen, void *ctxt)
 
   packet_check_eom();
 
-  xfree(msg);
-  xfree(lang);
+  free(msg);
+  free(lang);
 
   debug3("<- input_sspi_kerberos_error()...");
 }
@@ -855,7 +855,7 @@ void input_sspi_kerberos_response(int type, u_int32_t plen, void *ctxt)
     userauth(auth, NULL);
   }  
 
-  xfree(oid);
+  free(oid);
   
   debug3("<- input_sspi_kerberos_response()...");
 }

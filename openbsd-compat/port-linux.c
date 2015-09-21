@@ -1,4 +1,4 @@
-/* $Id: port-linux.c,v 1.16 2011/08/29 06:09:57 djm Exp $ */
+/* $Id: port-linux.c,v 1.18 2013/06/01 22:07:32 dtucker Exp $ */
 
 /*
  * Copyright (c) 2005 Daniel Walsh <dwalsh@redhat.com>
@@ -60,7 +60,7 @@ ssh_selinux_enabled(void)
 static security_context_t
 ssh_selinux_getctxbyname(char *pwname)
 {
-	security_context_t sc;
+	security_context_t sc = NULL;
 	char *sename = NULL, *lvl = NULL;
 	int r;
 
@@ -86,6 +86,7 @@ ssh_selinux_getctxbyname(char *pwname)
 		case 0:
 			error("%s: Failed to get default SELinux security "
 			    "context for %s", __func__, pwname);
+			sc = NULL;
 			break;
 		default:
 			fatal("%s: Failed to get default SELinux security "
@@ -95,13 +96,11 @@ ssh_selinux_getctxbyname(char *pwname)
 	}
 
 #ifdef HAVE_GETSEUSERBYNAME
-	if (sename != NULL)
-		xfree(sename);
-	if (lvl != NULL)
-		xfree(lvl);
+	free(sename);
+	free(lvl);
 #endif
 
-	return (sc);
+	return sc;
 }
 
 /* Set the execution context to the default for the specified user */
@@ -216,8 +215,8 @@ ssh_selinux_change_context(const char *newname)
 	if (setcon(newctx) < 0)
 		switchlog("%s: setcon %s from %s failed with %s", __func__,
 		    newctx, oldctx, strerror(errno));
-	xfree(oldctx);
-	xfree(newctx);
+	free(oldctx);
+	free(newctx);
 }
 
 void
@@ -279,7 +278,7 @@ oom_adjust_setup(void)
 					verbose("error writing %s: %s",
 					   oom_adj_path, strerror(errno));
 				else
-					verbose("Set %s from %d to %d",
+					debug("Set %s from %d to %d",
 					   oom_adj_path, oom_adj_save, value);
 			}
 			fclose(fp);
@@ -303,7 +302,7 @@ oom_adjust_restore(void)
 	if (fprintf(fp, "%d\n", oom_adj_save) <= 0)
 		verbose("error writing %s: %s", oom_adj_path, strerror(errno));
 	else
-		verbose("Set %s to %d", oom_adj_path, oom_adj_save);
+		debug("Set %s to %d", oom_adj_path, oom_adj_save);
 
 	fclose(fp);
 	return;

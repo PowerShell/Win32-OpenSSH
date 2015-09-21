@@ -1,4 +1,4 @@
-/* $OpenBSD: roaming_client.c,v 1.3 2010/01/18 01:50:27 dtucker Exp $ */
+/* $OpenBSD: roaming_client.c,v 1.9 2015/01/27 12:54:06 okan Exp $ */
 /*
  * Copyright (c) 2004-2009 AppGate Network Security AB
  *
@@ -21,15 +21,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#ifdef HAVE_INTTYPES_H
-#include <inttypes.h>
-#endif
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
-
-#include <openssl/crypto.h>
-#include <openssl/sha.h>
 
 #include "xmalloc.h"
 #include "buffer.h"
@@ -48,6 +42,7 @@
 #include "roaming.h"
 #include "ssh2.h"
 #include "sshconnect.h"
+#include "digest.h"
 
 /* import */
 extern Options options;
@@ -72,7 +67,7 @@ roaming_reply(int type, u_int32_t seq, void *ctxt)
 	cookie = packet_get_int64();
 	key1 = oldkey1 = packet_get_int64();
 	key2 = oldkey2 = packet_get_int64();
-	set_out_buffer_size(packet_get_int() +  get_snd_buf_size());
+	set_out_buffer_size(packet_get_int() + get_snd_buf_size());
 	roaming_enabled = 1;
 }
 
@@ -90,10 +85,8 @@ request_roaming(void)
 static void
 roaming_auth_required(void)
 {
-	u_char digest[SHA_DIGEST_LENGTH];
-	EVP_MD_CTX md;
+	u_char digest[SSH_DIGEST_MAX_LENGTH];
 	Buffer b;
-	const EVP_MD *evp_md = EVP_sha1();
 	u_int64_t chall, oldchall;
 
 	chall = packet_get_int64();
@@ -107,14 +100,13 @@ roaming_auth_required(void)
 	buffer_init(&b);
 	buffer_put_int64(&b, cookie);
 	buffer_put_int64(&b, chall);
-	EVP_DigestInit(&md, evp_md);
-	EVP_DigestUpdate(&md, buffer_ptr(&b), buffer_len(&b));
-	EVP_DigestFinal(&md, digest, NULL);
+	if (ssh_digest_buffer(SSH_DIGEST_SHA1, &b, digest, sizeof(digest)) != 0)
+		fatal("%s: ssh_digest_buffer failed", __func__);
 	buffer_free(&b);
 
 	packet_start(SSH2_MSG_KEX_ROAMING_AUTH);
 	packet_put_int64(key1 ^ get_recv_bytes());
-	packet_put_raw(digest, sizeof(digest));
+	packet_put_raw(digest, ssh_digest_bytes(SSH_DIGEST_SHA1));
 	packet_send();
 
 	oldkey1 = key1;
@@ -187,10 +179,10 @@ roaming_resume(void)
 		debug("server doesn't allow resume");
 		goto fail;
 	}
-	xfree(str);
+	free(str);
 	for (i = 1; i < PROPOSAL_MAX; i++) {
 		/* kex algorithm taken care of so start with i=1 and not 0 */
-		xfree(packet_get_string(&len));
+		free(packet_get_string(&len));
 	}
 	i = packet_get_char(); /* first_kex_packet_follows */
 	if (i && (c = strchr(kexlist, ',')))
@@ -226,8 +218,7 @@ roaming_resume(void)
 	return 0;
 
 fail:
-	if (kexlist)
-		xfree(kexlist);
+	free(kexlist);
 	if (packet_get_connection_in() == packet_get_connection_out())
 		close(packet_get_connection_in());
 	else {
@@ -262,10 +253,10 @@ wait_for_roaming_reconnect(void)
 		if (c != '\n' && c != '\r')
 			continue;
 
-		if (ssh_connect(host, &hostaddr, options.port,
+		if (ssh_connect(host, NULL, &hostaddr, options.port,
 		    options.address_family, 1, &timeout_ms,
-		    options.tcp_keep_alive, options.use_privileged_port,
-		    options.proxy_command) == 0 && roaming_resume() == 0) {
+		    options.tcp_keep_alive, options.use_privileged_port) == 0 &&
+		    roaming_resume() == 0) {
 			packet_restore_state();
 			reenter_guard = 0;
 			fprintf(stderr, "[connection resumed]\n");

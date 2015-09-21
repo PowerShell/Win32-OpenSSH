@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-passwd.c,v 1.43 2007/09/21 08:15:29 djm Exp $ */
+/* $OpenBSD: auth-passwd.c,v 1.44 2014/07/15 15:54:14 millert Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -37,6 +37,7 @@
  */
 
 #include "includes.h"
+
 #include "xmalloc.h"
 
 /*
@@ -58,6 +59,7 @@
 #include "packet.h"
 #include "buffer.h"
 #include "log.h"
+#include "misc.h"
 #include "servconf.h"
 #include "key.h"
 #include "hostfile.h"
@@ -197,6 +199,7 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 		return (auth_close(as));
 	}
 }
+
 #elif defined(WIN32_FIXME)
 int sys_auth_passwd(Authctxt *authctxt, const char *password)
 {
@@ -247,7 +250,7 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
   if (0 == MultiByteToWideChar(CP_UTF8, 0, authctxt -> user,
                                    -1, user_UTF16, buffer_size))
   {
-    xfree(user_UTF16);
+    free(user_UTF16);
 
     return 0;
   }
@@ -270,7 +273,7 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
   if (0 == MultiByteToWideChar(CP_UTF8, 0, password, -1, 
                                    password_UTF16 , buffer_size))
   {
-    xfree(password_UTF16 );
+    free(password_UTF16 );
 
     return 0;
   }
@@ -308,8 +311,8 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
     }                                  
   }
   
-  xfree(user_UTF16);
-  xfree(password_UTF16);
+  free(user_UTF16);
+  free(password_UTF16);
   
   /*
    * If login still fails, go out.
@@ -369,6 +372,7 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 	 * Authentication is accepted if the encrypted passwords
 	 * are identical.
 	 */
-	return (strcmp(encrypted_password, pw_password) == 0);
+	return encrypted_password != NULL &&
+	    strcmp(encrypted_password, pw_password) == 0;
 }
 #endif

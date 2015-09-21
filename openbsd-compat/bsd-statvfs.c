@@ -1,7 +1,7 @@
-/* $Id: bsd-statvfs.c,v 1.1 2008/06/08 17:32:29 dtucker Exp $ */
+/* $Id: bsd-statvfs.c,v 1.2 2014/01/17 07:10:59 dtucker Exp $ */
 
 /*
- * Copyright (c) 2008 Darren Tucker <dtucker@zip.com.au>
+ * Copyright (c) 2008,2014 Darren Tucker <dtucker@zip.com.au>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,12 +18,40 @@
 
 #include "includes.h"
 
+#if !defined(HAVE_STATVFS) || !defined(HAVE_FSTATVFS)
+
+#include <sys/param.h>
+#ifdef HAVE_SYS_MOUNT_H
+# include <sys/mount.h>
+#endif
+
 #include <errno.h>
 
-#ifndef HAVE_STATVFS
+static void
+copy_statfs_to_statvfs(struct statvfs *to, struct statfs *from)
+{
+#ifdef WIN32_FIXME
+//PRAGMA:TODO
+#else /* WIN32_FIXME */
+
+	to->f_bsize = from->f_bsize;
+	to->f_frsize = from->f_bsize;	/* no exact equivalent */
+	to->f_blocks = from->f_blocks;
+	to->f_bfree = from->f_bfree;
+	to->f_bavail = from->f_bavail;
+	to->f_files = from->f_files;
+	to->f_ffree = from->f_ffree;
+	to->f_favail = from->f_ffree;	/* no exact equivalent */
+	to->f_fsid = 0;			/* XXX fix me */
+	to->f_flag = from->f_flags;
+	to->f_namemax = MNAMELEN;
+#endif /* !WIN32_FIXME */
+}
+
+# ifndef HAVE_STATVFS
 int statvfs(const char *path, struct statvfs *buf)
 {
-  #ifdef WIN32_FIXME
+#ifdef WIN32_FIXME
   
   DWORD sectorsPerCluster;
   DWORD bytesPerSector;
@@ -62,19 +90,40 @@ int statvfs(const char *path, struct statvfs *buf)
     return -1;
   }
   
-  #else /* WIN32_FIXME */
-  
+#else /* WIN32_FIXME */
+
+#  ifdef HAVE_STATFS
+	struct statfs fs;
+
+	memset(&fs, 0, sizeof(fs));
+	if (statfs(path, &fs) == -1)
+		return -1;
+	copy_statfs_to_statvfs(buf, &fs);
+	return 0;
+#  else
 	errno = ENOSYS;
 	return -1;
-  
-  #endif /* !WIN32_FIXME */
+#  endif
+#endif /* !WIN32_FIXME */
 }
-#endif
+# endif
 
-#ifndef HAVE_FSTATVFS
+# ifndef HAVE_FSTATVFS
 int fstatvfs(int fd, struct statvfs *buf)
 {
+#  ifdef HAVE_FSTATFS
+	struct statfs fs;
+
+	memset(&fs, 0, sizeof(fs));
+	if (fstatfs(fd, &fs) == -1)
+		return -1;
+	copy_statfs_to_statvfs(buf, &fs);
+	return 0;
+#  else
 	errno = ENOSYS;
 	return -1;
+#  endif
 }
+# endif
+
 #endif

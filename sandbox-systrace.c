@@ -1,4 +1,4 @@
-/* $OpenBSD: sandbox-systrace.c,v 1.4 2011/07/29 14:42:45 djm Exp $ */
+/* $OpenBSD: sandbox-systrace.c,v 1.17 2015/07/27 16:29:23 guenther Exp $ */
 /*
  * Copyright (c) 2011 Damien Miller <djm@mindrot.org>
  *
@@ -20,21 +20,23 @@
 #ifdef SANDBOX_SYSTRACE
 
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 
 #include <dev/systrace.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "atomicio.h"
 #include "log.h"
@@ -48,46 +50,56 @@ struct sandbox_policy {
 
 /* Permitted syscalls in preauth. Unlisted syscalls get SYSTR_POLICY_KILL */
 static const struct sandbox_policy preauth_policy[] = {
-	{ SYS_open, SYSTR_POLICY_NEVER },
-
-	{ SYS___sysctl, SYSTR_POLICY_PERMIT },
+	{ SYS_clock_gettime, SYSTR_POLICY_PERMIT },
 	{ SYS_close, SYSTR_POLICY_PERMIT },
 	{ SYS_exit, SYSTR_POLICY_PERMIT },
+#ifdef SYS_getentropy
+	/* OpenBSD 5.6 and newer use getentropy(2) to seed arc4random(3). */
+	{ SYS_getentropy, SYSTR_POLICY_PERMIT },
+#else
+	/* Previous releases used sysctl(3)'s kern.arnd variable. */
+	{ SYS___sysctl, SYSTR_POLICY_PERMIT },
+#endif
 	{ SYS_getpid, SYSTR_POLICY_PERMIT },
+	{ SYS_getpgid, SYSTR_POLICY_PERMIT },
 	{ SYS_gettimeofday, SYSTR_POLICY_PERMIT },
+#ifdef SYS_kbind
+	{ SYS_kbind, SYSTR_POLICY_PERMIT },
+#endif
 	{ SYS_madvise, SYSTR_POLICY_PERMIT },
 	{ SYS_mmap, SYSTR_POLICY_PERMIT },
 	{ SYS_mprotect, SYSTR_POLICY_PERMIT },
-	{ SYS_poll, SYSTR_POLICY_PERMIT },
+	{ SYS_mquery, SYSTR_POLICY_PERMIT },
 	{ SYS_munmap, SYSTR_POLICY_PERMIT },
+	{ SYS_open, SYSTR_POLICY_NEVER },
+	{ SYS_poll, SYSTR_POLICY_PERMIT },
 	{ SYS_read, SYSTR_POLICY_PERMIT },
 	{ SYS_select, SYSTR_POLICY_PERMIT },
+#ifdef SYS_sendsyslog
+ 	{ SYS_sendsyslog, SYSTR_POLICY_PERMIT },
+#endif
+	{ SYS_shutdown, SYSTR_POLICY_PERMIT },
 	{ SYS_sigprocmask, SYSTR_POLICY_PERMIT },
 	{ SYS_write, SYSTR_POLICY_PERMIT },
 	{ -1, -1 }
 };
 
 struct ssh_sandbox {
-	int child_sock;
-	int parent_sock;
 	int systrace_fd;
 	pid_t child_pid;
+	void (*osigchld)(int);
 };
 
 struct ssh_sandbox *
-ssh_sandbox_init(void)
+ssh_sandbox_init(struct monitor *monitor)
 {
 	struct ssh_sandbox *box;
-	int s[2];
 
 	debug3("%s: preparing systrace sandbox", __func__);
 	box = xcalloc(1, sizeof(*box));
-	if (socketpair(AF_UNIX, SOCK_STREAM, 0, s) == -1)
-		fatal("%s: socketpair: %s", __func__, strerror(errno));
-	box->child_sock = s[0];
-	box->parent_sock = s[1];
 	box->systrace_fd = -1;
 	box->child_pid = 0;
+	box->osigchld = signal(SIGCHLD, SIG_IGN);
 
 	return box;
 }
@@ -95,35 +107,38 @@ ssh_sandbox_init(void)
 void
 ssh_sandbox_child(struct ssh_sandbox *box)
 {
-	char whatever = 0;
-
-	close(box->parent_sock);
-	/* Signal parent that we are ready */
 	debug3("%s: ready", __func__);
-	if (atomicio(vwrite, box->child_sock, &whatever, 1) != 1)
-		fatal("%s: write: %s", __func__, strerror(errno));
-	/* Wait for parent to signal for us to go */
-	if (atomicio(read, box->child_sock, &whatever, 1) != 1)
-		fatal("%s: read: %s", __func__, strerror(errno));
+	signal(SIGCHLD, box->osigchld);
+	if (kill(getpid(), SIGSTOP) != 0)
+		fatal("%s: kill(%d, SIGSTOP)", __func__, getpid());
 	debug3("%s: started", __func__);
-	close(box->child_sock);
 }
 
 static void
 ssh_sandbox_parent(struct ssh_sandbox *box, pid_t child_pid,
     const struct sandbox_policy *allowed_syscalls)
 {
-	int dev_systrace, i, j, found;
-	char whatever = 0;
+	int dev_systrace, i, j, found, status;
+	pid_t pid;
 	struct systrace_policy policy;
 
+	/* Wait for the child to send itself a SIGSTOP */
 	debug3("%s: wait for child %ld", __func__, (long)child_pid);
+	do {
+		pid = waitpid(child_pid, &status, WUNTRACED);
+	} while (pid == -1 && errno == EINTR);
+	signal(SIGCHLD, box->osigchld);
+	if (!WIFSTOPPED(status)) {
+		if (WIFSIGNALED(status))
+			fatal("%s: child terminated with signal %d",
+			    __func__, WTERMSIG(status));
+		if (WIFEXITED(status))
+			fatal("%s: child exited with status %d",
+			    __func__, WEXITSTATUS(status));
+		fatal("%s: child not stopped", __func__);
+	}
+	debug3("%s: child %ld stopped", __func__, (long)child_pid);
 	box->child_pid = child_pid;
-	close(box->child_sock);
-	/* Wait for child to signal that it is ready */
-	if (atomicio(read, box->parent_sock, &whatever, 1) != 1)
-		fatal("%s: read: %s", __func__, strerror(errno));
-	debug3("%s: child %ld ready", __func__, (long)child_pid);
 
 	/* Set up systracing of child */
 	if ((dev_systrace = open("/dev/systrace", O_RDONLY)) == -1)
@@ -139,7 +154,7 @@ ssh_sandbox_parent(struct ssh_sandbox *box, pid_t child_pid,
 		    box->systrace_fd, child_pid, strerror(errno));
 
 	/* Allocate and assign policy */
-	bzero(&policy, sizeof(policy));
+	memset(&policy, 0, sizeof(policy));
 	policy.strp_op = SYSTR_POLICY_NEW;
 	policy.strp_maxents = SYS_MAXSYSCALL;
 	if (ioctl(box->systrace_fd, STRIOCPOLICY, &policy) == -1)
@@ -174,9 +189,8 @@ ssh_sandbox_parent(struct ssh_sandbox *box, pid_t child_pid,
 
 	/* Signal the child to start running */
 	debug3("%s: start child %ld", __func__, (long)child_pid);
-	if (atomicio(vwrite, box->parent_sock, &whatever, 1) != 1)
-		fatal("%s: write: %s", __func__, strerror(errno));
-	close(box->parent_sock);
+	if (kill(box->child_pid, SIGCONT) != 0)
+		fatal("%s: kill(%d, SIGCONT)", __func__, box->child_pid);
 }
 
 void

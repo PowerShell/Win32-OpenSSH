@@ -1,4 +1,4 @@
-/* $OpenBSD: atomicio.c,v 1.26 2010/09/22 22:58:51 djm Exp $ */
+/* $OpenBSD: atomicio.c,v 1.27 2015/01/16 06:40:12 deraadt Exp $ */
 /*
  * Copyright (c) 2006 Damien Miller. All rights reserved.
  * Copyright (c) 2005 Anil Madhavapeddy. All rights reserved.
@@ -41,6 +41,7 @@
 #endif
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "atomicio.h"
 
@@ -56,8 +57,10 @@ atomicio6(ssize_t (*f) (int, void *, size_t), int fd, void *_s, size_t n,
 	ssize_t res;
 	struct pollfd pfd;
 
+#ifndef BROKEN_READ_COMPARISON
 	pfd.fd = fd;
 	pfd.events = f == read ? POLLIN : POLLOUT;
+#endif
 	while (n > pos) {
 		res = (f) (fd, s + pos, n - pos);
 		switch (res) {
@@ -65,7 +68,9 @@ atomicio6(ssize_t (*f) (int, void *, size_t), int fd, void *_s, size_t n,
 			if (errno == EINTR)
 				continue;
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+#ifndef BROKEN_READ_COMPARISON
 				(void)poll(&pfd, 1, -1);
+#endif
 				continue;
 			}
 			return 0;

@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-rhosts.c,v 1.44 2010/03/07 11:57:13 dtucker Exp $ */
+/* $OpenBSD: auth-rhosts.c,v 1.46 2014/12/23 22:42:48 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -43,12 +43,12 @@
 #include "uidswap.h"
 #include "pathnames.h"
 #include "log.h"
+#include "misc.h"
 #include "servconf.h"
 #include "canohost.h"
 #include "key.h"
 #include "hostfile.h"
 #include "auth.h"
-#include "misc.h"
 
 /* import */
 extern ServerOptions options;
@@ -67,7 +67,8 @@ check_rhosts_file(const char *filename, const char *hostname,
 {
 #ifndef WIN32_FIXME
 	FILE *f;
-	char buf[1024];	/* Must not be larger than host, user, dummy below. */
+#define RBUFLN 1024
+	char buf[RBUFLN];/* Must not be larger than host, user, dummy below. */
 	int fd;
 	struct stat st;
 
@@ -90,8 +91,9 @@ check_rhosts_file(const char *filename, const char *hostname,
 		return 0;
 	}
 	while (fgets(buf, sizeof(buf), f)) {
-		/* All three must be at least as big as buf to avoid overflows. */
-		char hostbuf[1024], userbuf[1024], dummy[1024], *host, *user, *cp;
+		/* All three must have length >= buf to avoid overflows. */
+		char hostbuf[RBUFLN], userbuf[RBUFLN], dummy[RBUFLN];
+		char *host, *user, *cp;
 		int negated;
 
 		for (cp = buf; *cp == ' ' || *cp == '\t'; cp++)
@@ -150,8 +152,8 @@ check_rhosts_file(const char *filename, const char *hostname,
 		/* Check for empty host/user names (particularly '+'). */
 		if (!host[0] || !user[0]) {
 			/* We come here if either was '+' or '-'. */
-			auth_debug_add("Ignoring wild host/user names in %.100s.",
-			    filename);
+			auth_debug_add("Ignoring wild host/user names "
+			    "in %.100s.", filename);
 			continue;
 		}
 		/* Verify that host name matches. */
@@ -159,7 +161,8 @@ check_rhosts_file(const char *filename, const char *hostname,
 			if (!innetgr(host + 1, hostname, NULL, NULL) &&
 			    !innetgr(host + 1, ipaddr, NULL, NULL))
 				continue;
-		} else if (strcasecmp(host, hostname) && strcmp(host, ipaddr) != 0)
+		} else if (strcasecmp(host, hostname) &&
+		    strcmp(host, ipaddr) != 0)
 			continue;	/* Different hostname. */
 
 		/* Verify that user name matches. */
@@ -185,6 +188,7 @@ check_rhosts_file(const char *filename, const char *hostname,
 	/* Authentication using this file denied. */
 	fclose(f);
 	return 0;
+
 #else
   return 1;
 #endif
@@ -221,7 +225,8 @@ auth_rhosts2_raw(struct passwd *pw, const char *client_user, const char *hostnam
 	/* Switch to the user's uid. */
 	temporarily_use_uid(pw);
 	/*
-	 * Quick check: if the user has no .shosts or .rhosts files, return
+	 * Quick check: if the user has no .shosts or .rhosts files and
+	 * no system hosts.equiv/shosts.equiv files exist then return
 	 * failure immediately without doing costly lookups from name
 	 * servers.
 	 */
@@ -236,27 +241,38 @@ auth_rhosts2_raw(struct passwd *pw, const char *client_user, const char *hostnam
 	/* Switch back to privileged uid. */
 	restore_uid();
 
-	/* Deny if The user has no .shosts or .rhosts file and there are no system-wide files. */
+	/*
+	 * Deny if The user has no .shosts or .rhosts file and there
+	 * are no system-wide files.
+	 */
 	if (!rhosts_files[rhosts_file_index] &&
 	    stat(_PATH_RHOSTS_EQUIV, &st) < 0 &&
-	    stat(_PATH_SSH_HOSTS_EQUIV, &st) < 0)
+	    stat(_PATH_SSH_HOSTS_EQUIV, &st) < 0) {
+		debug3("%s: no hosts access files exist", __func__);
 		return 0;
+	}
 
-	/* If not logging in as superuser, try /etc/hosts.equiv and shosts.equiv. */
-	if (pw->pw_uid != 0) {
+	/*
+	 * If not logging in as superuser, try /etc/hosts.equiv and
+	 * shosts.equiv.
+	 */
+	if (pw->pw_uid == 0)
+		debug3("%s: root user, ignoring system hosts files", __func__);
+	else {
 		if (check_rhosts_file(_PATH_RHOSTS_EQUIV, hostname, ipaddr,
 		    client_user, pw->pw_name)) {
-			auth_debug_add("Accepted for %.100s [%.100s] by /etc/hosts.equiv.",
-			    hostname, ipaddr);
+			auth_debug_add("Accepted for %.100s [%.100s] by "
+			    "/etc/hosts.equiv.", hostname, ipaddr);
 			return 1;
 		}
 		if (check_rhosts_file(_PATH_SSH_HOSTS_EQUIV, hostname, ipaddr,
 		    client_user, pw->pw_name)) {
-			auth_debug_add("Accepted for %.100s [%.100s] by %.100s.",
-			    hostname, ipaddr, _PATH_SSH_HOSTS_EQUIV);
+			auth_debug_add("Accepted for %.100s [%.100s] by "
+			    "%.100s.", hostname, ipaddr, _PATH_SSH_HOSTS_EQUIV);
 			return 1;
 		}
 	}
+
 	/*
 	 * Check that the home directory is owned by root or the user, and is
 	 * not group or world writable.
@@ -303,20 +319,25 @@ auth_rhosts2_raw(struct passwd *pw, const char *client_user, const char *hostnam
 			auth_debug_add("Bad file modes for %.200s", buf);
 			continue;
 		}
-		/* Check if we have been configured to ignore .rhosts and .shosts files. */
+		/*
+		 * Check if we have been configured to ignore .rhosts
+		 * and .shosts files.
+		 */
 		if (options.ignore_rhosts) {
-			auth_debug_add("Server has been configured to ignore %.100s.",
-			    rhosts_files[rhosts_file_index]);
+			auth_debug_add("Server has been configured to "
+			    "ignore %.100s.", rhosts_files[rhosts_file_index]);
 			continue;
 		}
 		/* Check if authentication is permitted by the file. */
-		if (check_rhosts_file(buf, hostname, ipaddr, client_user, pw->pw_name)) {
+		if (check_rhosts_file(buf, hostname, ipaddr,
+		    client_user, pw->pw_name)) {
 			auth_debug_add("Accepted by %.100s.",
 			    rhosts_files[rhosts_file_index]);
 			/* Restore the privileged uid. */
 			restore_uid();
-			auth_debug_add("Accepted host %s ip %s client_user %s server_user %s",
-				hostname, ipaddr, client_user, pw->pw_name);
+			auth_debug_add("Accepted host %s ip %s client_user "
+			    "%s server_user %s", hostname, ipaddr,
+			    client_user, pw->pw_name);
 			return 1;
 		}
 	}

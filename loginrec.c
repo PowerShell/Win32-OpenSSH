@@ -180,10 +180,6 @@
 # include <util.h>
 #endif
 
-#ifdef HAVE_LIBUTIL_H
-# include <libutil.h>
-#endif
-
 /**
  ** prototypes for helper functions in this file
  **/
@@ -314,16 +310,19 @@ login_get_lastlog(struct logininfo *li, const uid_t uid)
 		fatal("%s: Cannot find account for uid %ld", __func__,
 		    (long)uid);
 
-	/* No MIN_SIZEOF here - we absolutely *must not* truncate the
-	 * username (XXX - so check for trunc!) */
-	strlcpy(li->username, pw->pw_name, sizeof(li->username));
+	if (strlcpy(li->username, pw->pw_name, sizeof(li->username)) >=
+	    sizeof(li->username)) {
+		error("%s: username too long (%lu > max %lu)", __func__,
+		    (unsigned long)strlen(pw->pw_name),
+		    (unsigned long)sizeof(li->username) - 1);
+		return NULL;
+	}
 
 	if (getlast_entry(li))
 		return (li);
 	else
 		return (NULL);
 }
-
 
 /*
  * login_alloc_entry(int, char*, char*, char*)    - Allocate and initialise
@@ -351,7 +350,7 @@ logininfo *login_alloc_entry(pid_t pid, const char *username,
 void
 login_free_entry(struct logininfo *li)
 {
-	xfree(li);
+	free(li);
 }
 
 
@@ -788,12 +787,12 @@ construct_utmpx(struct logininfo *li, struct utmpx *utx)
 	/* this is just a 128-bit IPv6 address */
 	if (li->hostaddr.sa.sa_family == AF_INET6) {
 		sa6 = ((struct sockaddr_in6 *)&li->hostaddr.sa);
-		memcpy(ut->ut_addr_v6, sa6->sin6_addr.s6_addr, 16);
+		memcpy(utx->ut_addr_v6, sa6->sin6_addr.s6_addr, 16);
 		if (IN6_IS_ADDR_V4MAPPED(&sa6->sin6_addr)) {
-			ut->ut_addr_v6[0] = ut->ut_addr_v6[3];
-			ut->ut_addr_v6[1] = 0;
-			ut->ut_addr_v6[2] = 0;
-			ut->ut_addr_v6[3] = 0;
+			utx->ut_addr_v6[0] = utx->ut_addr_v6[3];
+			utx->ut_addr_v6[1] = 0;
+			utx->ut_addr_v6[2] = 0;
+			utx->ut_addr_v6[3] = 0;
 		}
 	}
 # endif

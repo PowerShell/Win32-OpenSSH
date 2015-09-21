@@ -59,7 +59,7 @@ LDFLAGS=-L. -Lopenbsd-compat/ -Lcontrib/win32/win32compat @LDFLAGS@
 EXEEXT=@EXEEXT@
 MANFMT=@MANFMT@
 
-TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT)
+TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT)
 
 LIBSSH_OBJS=acss.o authfd.o authfile.o bufaux.o bufbn.o buffer.o \
 	canohost.o channels.o cipher.o cipher-acss.o cipher-aes.o \

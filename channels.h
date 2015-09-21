@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.h,v 1.105 2011/06/22 22:08:42 djm Exp $ */
+/* $OpenBSD: channels.h,v 1.118 2015/07/01 02:26:31 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -55,7 +55,12 @@
 #define SSH_CHANNEL_ZOMBIE		14	/* Almost dead. */
 #define SSH_CHANNEL_MUX_LISTENER	15	/* Listener for mux conn. */
 #define SSH_CHANNEL_MUX_CLIENT		16	/* Conn. to mux slave */
-#define SSH_CHANNEL_MAX_TYPE		17
+#define SSH_CHANNEL_ABANDONED		17	/* Abandoned session, eg mux */
+#define SSH_CHANNEL_UNIX_LISTENER	18	/* Listening on a domain socket. */
+#define SSH_CHANNEL_RUNIX_LISTENER	19	/* Listening to a R-style domain socket. */
+#define SSH_CHANNEL_MAX_TYPE		20
+
+#define CHANNEL_CANCEL_PORT_STATIC	-1
 
 struct Channel;
 typedef struct Channel Channel;
@@ -100,14 +105,17 @@ struct Channel {
 	int     sock;		/* sock fd */
 	int     ctl_chan;	/* control channel (multiplexed connections) */
 	int     isatty;		/* rfd is a tty */
+#ifdef _AIX
 	int     wfd_isatty;	/* wfd is a tty */
+#endif
 	int	client_tty;	/* (client) TTY has been requested */
 	int     force_drain;	/* force close on iEOF */
+	time_t	notbefore;	/* Pause IO until deadline (time_t) */
 	int     delayed;	/* post-select handlers for newly created
 				 * channels are delayed until the first call
-				 * to a matching pre-select handler. 
+				 * to a matching pre-select handler.
 				 * this way post-select handlers are not
-				 * accidenly called if a FD gets reused */
+				 * accidentally called if a FD gets reused */
 	Buffer  input;		/* data read from socket, to be sent over
 				 * encrypted connection */
 	Buffer  output;		/* data received over encrypted connection for
@@ -116,6 +124,7 @@ struct Channel {
 	char    *path;
 		/* path for unix domain sockets, or host name for forwards */
 	int     listening_port;	/* port being listened for forwards */
+	char   *listening_addr;	/* addr being listened for forwards */
 	int     host_port;	/* remote port to connect for forwards */
 	char   *remote_name;	/* remote hostname */
 
@@ -221,21 +230,22 @@ void	 channel_send_window_changes(void);
 
 /* protocol handler */
 
-void	 channel_input_close(int, u_int32_t, void *);
-void	 channel_input_close_confirmation(int, u_int32_t, void *);
-void	 channel_input_data(int, u_int32_t, void *);
-void	 channel_input_extended_data(int, u_int32_t, void *);
-void	 channel_input_ieof(int, u_int32_t, void *);
-void	 channel_input_oclose(int, u_int32_t, void *);
-void	 channel_input_open_confirmation(int, u_int32_t, void *);
-void	 channel_input_open_failure(int, u_int32_t, void *);
-void	 channel_input_port_open(int, u_int32_t, void *);
-void	 channel_input_window_adjust(int, u_int32_t, void *);
-void	 channel_input_status_confirm(int, u_int32_t, void *);
+int	 channel_input_close(int, u_int32_t, void *);
+int	 channel_input_close_confirmation(int, u_int32_t, void *);
+int	 channel_input_data(int, u_int32_t, void *);
+int	 channel_input_extended_data(int, u_int32_t, void *);
+int	 channel_input_ieof(int, u_int32_t, void *);
+int	 channel_input_oclose(int, u_int32_t, void *);
+int	 channel_input_open_confirmation(int, u_int32_t, void *);
+int	 channel_input_open_failure(int, u_int32_t, void *);
+int	 channel_input_port_open(int, u_int32_t, void *);
+int	 channel_input_window_adjust(int, u_int32_t, void *);
+int	 channel_input_status_confirm(int, u_int32_t, void *);
 
 /* file descriptor handling (read/write) */
 
-void	 channel_prepare_select(fd_set **, fd_set **, int *, u_int*, int);
+void	 channel_prepare_select(fd_set **, fd_set **, int *, u_int*,
+	     time_t*, int);
 void     channel_after_select(fd_set *, fd_set *);
 void     channel_output_poll(void);
 
@@ -246,33 +256,41 @@ char	*channel_open_message(void);
 int	 channel_find_open(void);
 
 /* tcp forwarding */
+struct Forward;
+struct ForwardOptions;
 void	 channel_set_af(int af);
 void     channel_permit_all_opens(void);
 void	 channel_add_permitted_opens(char *, int);
 int	 channel_add_adm_permitted_opens(char *, int);
+void	 channel_disable_adm_local_opens(void);
+void	 channel_update_permitted_opens(int, int);
 void	 channel_clear_permitted_opens(void);
 void	 channel_clear_adm_permitted_opens(void);
 void 	 channel_print_adm_permitted_opens(void);
-int      channel_input_port_forward_request(int, int);
-Channel	*channel_connect_to(const char *, u_short, char *, char *);
+int      channel_input_port_forward_request(int, struct ForwardOptions *);
+Channel	*channel_connect_to_port(const char *, u_short, char *, char *);
+Channel *channel_connect_to_path(const char *, char *, char *);
 Channel	*channel_connect_stdio_fwd(const char*, u_short, int, int);
-Channel	*channel_connect_by_listen_address(u_short, char *, char *);
-int	 channel_request_remote_forwarding(const char *, u_short,
-	     const char *, u_short);
-int	 channel_setup_local_fwd_listener(const char *, u_short,
-	     const char *, u_short, int);
-void	 channel_request_rforward_cancel(const char *host, u_short port);
-int	 channel_setup_remote_fwd_listener(const char *, u_short, int *, int);
-int	 channel_cancel_rport_listener(const char *, u_short);
+Channel	*channel_connect_by_listen_address(const char *, u_short,
+	     char *, char *);
+Channel	*channel_connect_by_listen_path(const char *, char *, char *);
+int	 channel_request_remote_forwarding(struct Forward *);
+int	 channel_setup_local_fwd_listener(struct Forward *, struct ForwardOptions *);
+int	 channel_request_rforward_cancel(struct Forward *);
+int	 channel_setup_remote_fwd_listener(struct Forward *, int *, struct ForwardOptions *);
+int	 channel_cancel_rport_listener(struct Forward *);
+int	 channel_cancel_lport_listener(struct Forward *, int, struct ForwardOptions *);
+int	 permitopen_port(const char *);
 
 /* x11 forwarding */
 
+void	 channel_set_x11_refuse_time(u_int);
 int	 x11_connect_display(void);
 int	 x11_create_display_inet(int, int, int, u_int *, int **);
-void     x11_input_open(int, u_int32_t, void *);
+int      x11_input_open(int, u_int32_t, void *);
 void	 x11_request_forwarding_with_spoofing(int, const char *, const char *,
 	     const char *, int);
-void	 deny_input_open(int, u_int32_t, void *);
+int	 deny_input_open(int, u_int32_t, void *);
 
 /* agent forwarding */
 

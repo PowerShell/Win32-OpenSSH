@@ -55,6 +55,7 @@
 #define getdtablesize() FD_SETSIZE
 #endif
 
+
 #if 0
 __unused static const char rcsid[] = "$Sudo: closefrom.c,v 1.11 2006/08/17 15:26:54 millert Exp $";
 #endif /* lint */
@@ -102,7 +103,6 @@ closefrom(int lowfd)
 #else
 	maxfd = getdtablesize();
 #endif /* HAVE_SYSCONF */
-
 	if (maxfd < 0)
 	    maxfd = OPEN_MAX;
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-pkcs11-helper.c,v 1.3 2010/02/24 06:12:53 djm Exp $ */
+/* $OpenBSD: ssh-pkcs11-helper.c,v 1.11 2015/08/20 22:32:42 deraadt Exp $ */
 /*
  * Copyright (c) 2010 Markus Friedl.  All rights reserved.
  *
@@ -79,7 +79,7 @@ del_keys_by_name(char *name)
 		nxt = TAILQ_NEXT(ki, next);
 		if (!strcmp(ki->providername, name)) {
 			TAILQ_REMOVE(&pkcs11_keylist, ki, next);
-			xfree(ki->providername);
+			free(ki->providername);
 			key_free(ki->key);
 			free(ki);
 		}
@@ -127,18 +127,19 @@ process_add(void)
 		buffer_put_char(&msg, SSH2_AGENT_IDENTITIES_ANSWER);
 		buffer_put_int(&msg, nkeys);
 		for (i = 0; i < nkeys; i++) {
-			key_to_blob(keys[i], &blob, &blen);
+			if (key_to_blob(keys[i], &blob, &blen) == 0)
+				continue;
 			buffer_put_string(&msg, blob, blen);
 			buffer_put_cstring(&msg, name);
-			xfree(blob);
+			free(blob);
 			add_key(keys[i], name);
 		}
-		xfree(keys);
+		free(keys);
 	} else {
 		buffer_put_char(&msg, SSH_AGENT_FAILURE);
 	}
-	xfree(pin);
-	xfree(name);
+	free(pin);
+	free(name);
 	send_msg(&msg);
 	buffer_free(&msg);
 }
@@ -157,8 +158,8 @@ process_del(void)
 		 buffer_put_char(&msg, SSH_AGENT_SUCCESS);
 	else
 		 buffer_put_char(&msg, SSH_AGENT_FAILURE);
-	xfree(pin);
-	xfree(name);
+	free(pin);
+	free(name);
 	send_msg(&msg);
 	buffer_free(&msg);
 }
@@ -168,16 +169,19 @@ process_sign(void)
 {
 	u_char *blob, *data, *signature = NULL;
 	u_int blen, dlen, slen = 0;
-	int ok = -1, flags, ret;
+	int ok = -1;
 	Key *key, *found;
 	Buffer msg;
 
 	blob = get_string(&blen);
 	data = get_string(&dlen);
-	flags = get_int(); /* XXX ignore */
+	(void)get_int(); /* XXX ignore flags */
 
 	if ((key = key_from_blob(blob, blen)) != NULL) {
 		if ((found = lookup_key(key)) != NULL) {
+#ifdef WITH_OPENSSL
+			int ret;
+
 			slen = RSA_size(key->rsa);
 			signature = xmalloc(slen);
 			if ((ret = RSA_private_encrypt(dlen, data, signature,
@@ -185,6 +189,7 @@ process_sign(void)
 				slen = ret;
 				ok = 0;
 			}
+#endif /* WITH_OPENSSL */
 		}
 		key_free(key);
 	}
@@ -195,10 +200,9 @@ process_sign(void)
 	} else {
 		buffer_put_char(&msg, SSH_AGENT_FAILURE);
 	}
-	xfree(data);
-	xfree(blob);
-	if (signature != NULL)
-		xfree(signature);
+	free(data);
+	free(blob);
+	free(signature);
 	send_msg(&msg);
 	buffer_free(&msg);
 }
@@ -274,7 +278,6 @@ main(int argc, char **argv)
 	LogLevel log_level = SYSLOG_LEVEL_ERROR;
 	char buf[4*4096];
 
-	extern char *optarg;
 	extern char *__progname;
 
 	TAILQ_INIT(&pkcs11_keylist);
@@ -298,8 +301,8 @@ main(int argc, char **argv)
 	buffer_init(&oqueue);
 
 	set_size = howmany(max + 1, NFDBITS) * sizeof(fd_mask);
-	rset = (fd_set *)xmalloc(set_size);
-	wset = (fd_set *)xmalloc(set_size);
+	rset = xmalloc(set_size);
+	wset = xmalloc(set_size);
 
 	for (;;) {
 		memset(rset, 0, set_size);

@@ -88,3 +88,15 @@
 #define BROKEN_SYS_TERMIO_H
 
 #define strerror strerror_win32
+
+#define strerror strerror_win32
+
+// PRAGMA SYS PORT
+#define WITH_OPENSSL 1
+#define HAVE_KRB5_GET_ERROR_MESSAGE 1
+#define HAVE_KRB5_FREE_ERROR_MESSAGE 1
+#define HAVE_DECL_NFDBITS 0
+#define HAVE_DECL_HOWMANY 0
+
+//#define HAVE_ARC4RANDOM_UNIFORM 1
+

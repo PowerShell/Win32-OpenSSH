@@ -53,7 +53,6 @@ get_saved_tio(void)
   #ifdef WIN32_FIXME
   DebugBreak();
   #endif
-  
 	return _in_raw_mode ? &_saved_tio : NULL;
 }
 

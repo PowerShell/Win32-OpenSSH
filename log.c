@@ -1,4 +1,4 @@
-/* $OpenBSD: log.c,v 1.42 2011/06/17 21:44:30 djm Exp $ */
+/* $OpenBSD: log.c,v 1.46 2015/07/08 19:04:21 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -38,6 +38,7 @@
 
 #include <sys/types.h>
 
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,11 +46,10 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <errno.h>
-#if defined(HAVE_STRNVIS) && defined(HAVE_VIS_H)
+#if defined(HAVE_STRNVIS) && defined(HAVE_VIS_H) && !defined(BROKEN_STRNVIS)
 # include <vis.h>
 #endif
 
-#include "xmalloc.h"
 #include "log.h"
 
 #ifdef WIN32_FIXME
@@ -63,6 +63,7 @@
 
 static LogLevel log_level = SYSLOG_LEVEL_INFO;
 static int log_on_stderr = 1;
+static int log_stderr_fd = STDERR_FILENO;
 static int log_facility = LOG_AUTH;
 static char *argv0;
 static log_handler_fn *log_handler;
@@ -338,6 +339,35 @@ log_init(char *av0, LogLevel level, SyslogFacility facility, int on_stderr)
 #endif
 }
 
+void
+log_change_level(LogLevel new_log_level)
+{
+	/* no-op if log_init has not been called */
+	if (argv0 == NULL)
+		return;
+	log_init(argv0, new_log_level, log_facility, log_on_stderr);
+}
+
+int
+log_is_on_stderr(void)
+{
+	return log_on_stderr;
+}
+
+/* redirect what would usually get written to stderr to specified file */
+void
+log_redirect_stderr_to(const char *logfile)
+{
+	int fd;
+
+	if ((fd = open(logfile, O_WRONLY|O_CREAT|O_APPEND, 0600)) == -1) {
+		fprintf(stderr, "Couldn't open logfile %s: %s\n", logfile,
+		     strerror(errno));
+		exit(1);
+	}
+	log_stderr_fd = fd;
+}
+
 #define MSGBUFSIZ 1024
 
 void
@@ -413,7 +443,6 @@ do_log(LogLevel level, const char *fmt, va_list args)
 	} else {
 		vsnprintf(msgbuf, sizeof(msgbuf), fmt, args);
 	}
-
 #ifdef WIN32_FIXME
   strncpy(fmtbuf, msgbuf, sizeof(fmtbuf));
 #else
@@ -428,15 +457,16 @@ do_log(LogLevel level, const char *fmt, va_list args)
 		log_handler = NULL;
 		tmp_handler(level, fmtbuf, log_handler_ctx);
 		log_handler = tmp_handler;
-	} else
-#endif
-    if (log_on_stderr) {
-		snprintf(msgbuf, sizeof msgbuf, "%s\n", fmtbuf);
-    #ifdef WIN32_FIXME
+	} else 
+#endif	
+	if (log_on_stderr) {
+		snprintf(msgbuf, sizeof msgbuf, "%s\r\n", fmtbuf);
+#ifdef WIN32_FIXME
     _write(STDERR_FILENO, msgbuf, strlen(msgbuf));
-    #else  
-		write(STDERR_FILENO, msgbuf, strlen(msgbuf));
-    #endif
+#else  
+	(void)write(log_stderr_fd, msgbuf, strlen(msgbuf));
+#endif
+		
 	} else {
 
   #ifdef WIN32_FIXME
@@ -457,7 +487,6 @@ do_log(LogLevel level, const char *fmt, va_list args)
     }
  
   #else 
-  
 #if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
 		openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);
 		syslog_r(pri, &sdata, "%.500s", fmtbuf);
@@ -467,8 +496,7 @@ do_log(LogLevel level, const char *fmt, va_list args)
 		syslog(pri, "%.500s", fmtbuf);
 		closelog();
 #endif
-
-  #endif
+#endif
 	}
 	errno = saved_errno;
 }

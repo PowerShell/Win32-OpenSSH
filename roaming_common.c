@@ -1,4 +1,4 @@
-/* $OpenBSD: roaming_common.c,v 1.8 2010/01/12 00:59:29 djm Exp $ */
+/* $OpenBSD: roaming_common.c,v 1.13 2015/01/27 12:54:06 okan Exp $ */
 /*
  * Copyright (c) 2004-2009 AppGate Network Security AB
  *
@@ -31,9 +31,6 @@
 #include <sys/uio.h>
 
 #include <errno.h>
-#ifdef HAVE_INTTYPES_H
-#include <inttypes.h>
-#endif
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
@@ -45,6 +42,7 @@
 #include "cipher.h"
 #include "buffer.h"
 #include "roaming.h"
+#include "digest.h"
 
 #ifdef WIN32_FIXME
 
@@ -65,7 +63,7 @@ int roaming_enabled = 0;
 int resume_in_progress = 0;
 
 int
-get_snd_buf_size()
+get_snd_buf_size(void)
 {
 	int fd = packet_get_connection_out();
 	int optval;
@@ -77,7 +75,7 @@ get_snd_buf_size()
 }
 
 int
-get_recv_buf_size()
+get_recv_buf_size(void)
 {
 	int fd = packet_get_connection_in();
 	int optval;
@@ -91,6 +89,8 @@ get_recv_buf_size()
 void
 set_out_buffer_size(size_t size)
 {
+	if (size == 0 || size > MAX_ROAMBUF)
+		fatal("%s: bad buffer size %lu", __func__, (u_long)size);
 	/*
 	 * The buffer size can only be set once and the buffer will live
 	 * as long as the session lives.
@@ -239,9 +239,7 @@ resend_bytes(int fd, u_int64_t *offset)
 void
 calculate_new_key(u_int64_t *key, u_int64_t cookie, u_int64_t challenge)
 {
-	const EVP_MD *md = EVP_sha1();
-	EVP_MD_CTX ctx;
-	char hash[EVP_MAX_MD_SIZE];
+	u_char hash[SSH_DIGEST_MAX_LENGTH];
 	Buffer b;
 
 	buffer_init(&b);
@@ -249,12 +247,11 @@ calculate_new_key(u_int64_t *key, u_int64_t cookie, u_int64_t challenge)
 	buffer_put_int64(&b, cookie);
 	buffer_put_int64(&b, challenge);
 
-	EVP_DigestInit(&ctx, md);
-	EVP_DigestUpdate(&ctx, buffer_ptr(&b), buffer_len(&b));
-	EVP_DigestFinal(&ctx, hash, NULL);
+	if (ssh_digest_buffer(SSH_DIGEST_SHA1, &b, hash, sizeof(hash)) != 0)
+		fatal("%s: digest_buffer failed", __func__);
 
 	buffer_clear(&b);
-	buffer_append(&b, hash, EVP_MD_size(md));
+	buffer_append(&b, hash, ssh_digest_bytes(SSH_DIGEST_SHA1));
 	*key = buffer_get_int64(&b);
 	buffer_free(&b);
 }

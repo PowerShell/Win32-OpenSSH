@@ -24,6 +24,8 @@
 
 #include "includes.h"
 
+#ifdef WITH_OPENSSL
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #ifdef HAVE_SYS_UN_H
@@ -42,6 +44,8 @@
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+
+#include "openbsd-compat/openssl-compat.h"
 
 #include "ssh.h"
 #include "misc.h"
@@ -209,11 +213,7 @@ seed_rng(void)
 #ifndef OPENSSL_PRNG_ONLY
 	unsigned char buf[RANDOM_SEED_SIZE];
 #endif
-	/*
-	 * OpenSSL version numbers: MNNFFPPS: major minor fix patch status
-	 * We match major, minor, fix and status (not patch)
-	 */
-	if ((SSLeay() ^ OPENSSL_VERSION_NUMBER) & ~0xff0L)
+	if (!ssh_compatible_openssl(OPENSSL_VERSION_NUMBER, SSLeay()))
 		fatal("OpenSSL version mismatch. Built against %lx, you "
 		    "have %lx", (u_long)OPENSSL_VERSION_NUMBER, SSLeay());
 
@@ -232,3 +232,13 @@ seed_rng(void)
 	if (RAND_status() != 1)
 		fatal("PRNG is not seeded");
 }
+
+#else /* WITH_OPENSSL */
+
+/* Handled in arc4random() */
+void
+seed_rng(void)
+{
+}
+
+#endif /* WITH_OPENSSL */
