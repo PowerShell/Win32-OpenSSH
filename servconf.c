@@ -98,7 +98,11 @@ initialize_server_options(ServerOptions *options)
 	options->server_key_bits = -1;
 	options->login_grace_time = -1;
 	options->key_regeneration_time = -1;
-	options->permit_root_login = PERMIT_NOT_SET;
+#ifndef WIN32_FIXME
+	options->permit_root_login = PERMIT_NOT_SET;	
+#else
+	options->permit_root_login = PERMIT_YES;
+#endif	
 	options->ignore_rhosts = -1;
 	options->ignore_user_known_hosts = -1;
 	options->print_motd = -1;
