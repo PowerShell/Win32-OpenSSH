@@ -307,9 +307,10 @@ userauth_pubkey(Authctxt *authctxt)
 			auth2_record_userkey(authctxt, key);
 			key = NULL; /* Don't free below */
 		}
-   #endif /* else #ifdef WIN32_FIXME. */
 		buffer_free(&b);
 		free(sig);
+   #endif /* else #ifdef WIN32_FIXME. */
+
 	} else {
 		debug("test whether pkalg/pkblob are acceptable");
 		packet_check_eom();
@@ -860,6 +861,7 @@ match_principals_command(struct passwd *user_pw, struct sshkey_cert *cert)
  * Checks whether key is allowed in authorized_keys-format file,
  * returns 1 if the key is allowed or 0 otherwise.
  */
+
 static int
 check_authkeys_file(FILE *f, char *file, Key* key, struct passwd *pw)
 {
