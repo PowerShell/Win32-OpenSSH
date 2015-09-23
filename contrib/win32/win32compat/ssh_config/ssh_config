@@ -46,3 +46,5 @@
 #   VisualHostKey no
 #   ProxyCommand ssh -q -W %h:%p gateway.example.com
 #UsePrivilegeSeparation no
+PubkeyAcceptedKeyTypes ssh-ed25519*,ssh-rsa*,ssh-dss*,ecdsa-sha2*
+
