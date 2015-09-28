@@ -72,6 +72,7 @@ static fd_set write_sfd_set;
 
 int PassInputFd  = STDIN_FILENO;
 int PassOutputFd = STDOUT_FILENO;
+int PassErrorFd = STDERR_FILENO;
 
 /*
  * We store cookies for authorize 

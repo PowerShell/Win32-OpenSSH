@@ -54,6 +54,7 @@
   
   extern int PassInputFd;
   extern int PassOutputFd;
+  extern int PassErrorFd;
 
 #endif
 
@@ -334,110 +335,40 @@ read_passphrase(const char *prompt, int flags)
    * Show prompt for user.
    */
 
-  _write(PassOutputFd, prompt, strlen(prompt));
-
-  /*
-   * Disable stdin echo.
-   */
-   
-  GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode);
-    
-  SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode & (~ENABLE_ECHO_INPUT));
-  
-  /*
-   * Read pass from stdin socket.
-   */
+  _write(PassErrorFd, prompt, strlen(prompt));
 
   len = retr = 0;
-  
-  do
-  {
-    retr = _read(PassInputFd, buf + len, sizeof(buf) - 1 - len);
-    
-    /*
-     * If read error.
-     */
-    
-    if (retr == -1)
-    {
-      int winerr = GetLastError();
-      
-      /*
-       * Non fatal. Only write message and try again.
-       */
-      
-      if (errno == EINTR || errno == EAGAIN ||
-              winerr == WSAENOTSOCK || winerr == WSAEWOULDBLOCK)
-      {
-        debug("ERROR. read_passphrase() : [errno = %d, winerr = %d], "
-                  "trying again...\n", errno, winerr);
-      
-        fflush(stderr);        
-      }
-      
-      /*
-       * Fatal error. Break loop with empty string.
-       */
+  int bufsize = sizeof(buf);
 
-      else
-      {
-        error("ERROR. read_passphrase() : fatal error"
-                  " [errno = %d, winerr = %d]...\n", errno, winerr);
-      
-        fflush(stderr);
-      
-        buf[0] = 0;
-      
-        len = 1;
-      
-        break;
-      }  
-    }
+	while (_kbhit())
+		_getch();
 
-    /*
-     * No error.
-     */
-    
-    else
-    {
-      len += retr;
-    }
-  } while (len < sizeof(buf) - 1 && buf[len] == '\r');
+	while ( len < bufsize ) {
 
-  /*
-   * Put zero at string end.
-   */
+	 	buf[len] = (unsigned char) _getch() ;
 
-  if (len > 0)
-  {
-    buf[len - 1] = '\0';
-  }
-  else
-  {
-    buf[0] = '\0';
-  }
-  
-  _write(PassOutputFd, "\n", strlen("\n"));
 
-  len = strlen(buf);
-  
-  while (len > 0 && buf[len - 1] == 0xa || buf[len - 1] == 0xd)
-  {
-    buf[len - 1] = 0;
-    
-    len --;
-  }
-  
-  /*
-   * Set stdin echo back.
-   */
-   
-  SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode | ENABLE_ECHO_INPUT);
-  
-  /*
-   * Return copy of pass readed from stdin.
-   */
-  
+		if ( buf[len] == '\r' ) {
+			if (_kbhit() )
+				_getch(); // read linefeed if its there
+			break;
+		}
+		else if ( buf[len] == '\n' ) {
+			break;
+		}
+		else if ( buf[len] == '\b' ) { // backspace
+			if (len > 0 )
+				len--; // overwrite last character
+		}
+		else {
+
+			_putch( (int) '*' ); // show a star in place of what is typed
+			len++; // keep reading in the loop
+		}
+	}
+
+	buf[len] = '\0' ; // get rid of the cr/lf
+
   ret = xstrdup(buf);
 
   memset(buf, 'x', sizeof(buf));
