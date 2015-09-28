@@ -368,6 +368,7 @@ read_passphrase(const char *prompt, int flags)
 	}
 
 	buf[len] = '\0' ; // get rid of the cr/lf
+	_write(PassErrorFd,"\n", strlen("\n")); // show a newline as we do not echo password or the line
 
   ret = xstrdup(buf);
 
