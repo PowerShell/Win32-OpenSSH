@@ -1,28 +1,36 @@
-#	$OpenBSD: try-ciphers.sh,v 1.12 2011/08/02 01:23:41 djm Exp $
+#	$OpenBSD: try-ciphers.sh,v 1.25 2015/03/24 20:22:17 markus Exp $
 #	Placed in the Public Domain.
 
 tid="try ciphers"
 
-ciphers="aes128-cbc 3des-cbc blowfish-cbc cast128-cbc 
-	arcfour128 arcfour256 arcfour 
-	aes192-cbc aes256-cbc rijndael-cbc@lysator.liu.se
-	aes128-ctr aes192-ctr aes256-ctr"
-macs="hmac-sha1 hmac-md5 umac-64@openssh.com hmac-sha1-96 hmac-md5-96"
-config_defined HAVE_EVP_SHA256 &&
-    macs="$macs hmac-sha2-256 hmac-sha2-256-96 hmac-sha2-512 hmac-sha2-512-96"
+cp $OBJ/sshd_proxy $OBJ/sshd_proxy_bak
 
-for c in $ciphers; do
-	for m in $macs; do
+for c in `${SSH} -Q cipher`; do
+	n=0
+	for m in `${SSH} -Q mac`; do
 		trace "proto 2 cipher $c mac $m"
 		verbose "test $tid: proto 2 cipher $c mac $m"
+		cp $OBJ/sshd_proxy_bak $OBJ/sshd_proxy
+		echo "Ciphers=$c" >> $OBJ/sshd_proxy
+		echo "MACs=$m" >> $OBJ/sshd_proxy
 		${SSH} -F $OBJ/ssh_proxy -2 -m $m -c $c somehost true
 		if [ $? -ne 0 ]; then
 			fail "ssh -2 failed with mac $m cipher $c"
 		fi
+		# No point trying all MACs for AEAD ciphers since they
+		# are ignored.
+		if ${SSH} -Q cipher-auth | grep "^${c}\$" >/dev/null 2>&1 ; then
+			break
+		fi
+		n=`expr $n + 1`
 	done
 done
 
-ciphers="3des blowfish"
+if ssh_version 1; then
+	ciphers="3des blowfish"
+else
+	ciphers=""
+fi
 for c in $ciphers; do
 	trace "proto 1 cipher $c"
 	verbose "test $tid: proto 1 cipher $c"
@@ -32,20 +40,3 @@ for c in $ciphers; do
 	fi
 done
 
-if ${SSH} -oCiphers=acss@openssh.org 2>&1 | grep "Bad SSH2 cipher" >/dev/null
-then
-	:
-else
-
-echo "Ciphers acss@openssh.org" >> $OBJ/sshd_proxy
-c=acss@openssh.org
-for m in $macs; do
-	trace "proto 2 $c mac $m"
-	verbose "test $tid: proto 2 cipher $c mac $m"
-	${SSH} -F $OBJ/ssh_proxy -2 -m $m -c $c somehost true
-	if [ $? -ne 0 ]; then
-		fail "ssh -2 failed with mac $m cipher $c"
-	fi
-done
-
-fi

@@ -1,11 +1,9 @@
-#	$OpenBSD: dynamic-forward.sh,v 1.9 2011/06/03 00:29:52 dtucker Exp $
+#	$OpenBSD: dynamic-forward.sh,v 1.11 2015/03/03 22:35:19 markus Exp $
 #	Placed in the Public Domain.
 
 tid="dynamic forwarding"
 
 FWDPORT=`expr $PORT + 1`
-
-DATA=/bin/ls${EXEEXT}
 
 if have_prog nc && nc -h 2>&1 | grep "proxy address" >/dev/null; then
 	proxycmd="nc -x 127.0.0.1:$FWDPORT -X"
@@ -19,7 +17,7 @@ trace "will use ProxyCommand $proxycmd"
 
 start_sshd
 
-for p in 1 2; do
+for p in ${SSH_PROTOCOLS}; do
 	n=0
 	error="1"
 	trace "start dynamic forwarding, fork to background"

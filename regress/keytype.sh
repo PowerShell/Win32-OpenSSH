@@ -1,9 +1,9 @@
-#	$OpenBSD: keytype.sh,v 1.1 2010/09/02 16:12:55 markus Exp $
+#	$OpenBSD: keytype.sh,v 1.4 2015/07/10 06:23:25 markus Exp $
 #	Placed in the Public Domain.
 
 tid="login with different key types"
 
-TIME=`which time` 2>/dev/null
+TIME=`which time 2>/dev/null`
 if test ! -x "$TIME"; then
 	TIME=""
 fi
@@ -11,10 +11,16 @@ fi
 cp $OBJ/sshd_proxy $OBJ/sshd_proxy_bak
 cp $OBJ/ssh_proxy $OBJ/ssh_proxy_bak
 
-ktypes="dsa-1024 rsa-2048 rsa-3072"
-if test "$TEST_SSH_ECC" = "yes"; then
-	ktypes="$ktypes ecdsa-256 ecdsa-384 ecdsa-521"
-fi
+# Traditional and builtin key types.
+ktypes="dsa-1024 rsa-2048 rsa-3072 ed25519-512"
+# Types not present in all OpenSSL versions.
+for i in `$SSH -Q key`; do
+	case "$i" in
+		ecdsa-sha2-nistp256)	ktypes="$ktypes ecdsa-256" ;;
+		ecdsa-sha2-nistp384)	ktypes="$ktypes ecdsa-384" ;;
+		ecdsa-sha2-nistp521)	ktypes="$ktypes ecdsa-521" ;;
+	esac
+done
 
 for kt in $ktypes; do 
 	rm -f $OBJ/key.$kt
@@ -30,17 +36,29 @@ for ut in $ktypes; do
 	htypes=$ut
 	#htypes=$ktypes
 	for ht in $htypes; do 
+		case $ht in
+		dsa-1024)	t=ssh-dss;;
+		ecdsa-256)	t=ecdsa-sha2-nistp256;;
+		ecdsa-384)	t=ecdsa-sha2-nistp384;;
+		ecdsa-521)	t=ecdsa-sha2-nistp521;;
+		ed25519-512)	t=ssh-ed25519;;
+		rsa-*)		t=ssh-rsa;;
+		esac
 		trace "ssh connect, userkey $ut, hostkey $ht"
 		(
 			grep -v HostKey $OBJ/sshd_proxy_bak
 			echo HostKey $OBJ/key.$ht 
+			echo PubkeyAcceptedKeyTypes $t
+			echo HostKeyAlgorithms $t
 		) > $OBJ/sshd_proxy
 		(
 			grep -v IdentityFile $OBJ/ssh_proxy_bak
 			echo IdentityFile $OBJ/key.$ut 
+			echo PubkeyAcceptedKeyTypes $t
+			echo HostKeyAlgorithms $t
 		) > $OBJ/ssh_proxy
 		(
-			echon 'localhost-with-alias,127.0.0.1,::1 '
+			printf 'localhost-with-alias,127.0.0.1,::1 '
 			cat $OBJ/key.$ht.pub
 		) > $OBJ/known_hosts
 		cat $OBJ/key.$ut.pub > $OBJ/authorized_keys_$USER

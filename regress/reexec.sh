@@ -1,12 +1,10 @@
-#	$OpenBSD: reexec.sh,v 1.5 2004/10/08 02:01:50 djm Exp $
+#	$OpenBSD: reexec.sh,v 1.8 2015/03/03 22:35:19 markus Exp $
 #	Placed in the Public Domain.
 
 tid="reexec tests"
 
-DATA=/bin/ls${EXEEXT}
-COPY=${OBJ}/copy
-SSHD_ORIG=$SSHD${EXEEXT}
-SSHD_COPY=$OBJ/sshd${EXEEXT}
+SSHD_ORIG=$SSHD
+SSHD_COPY=$OBJ/sshd
 
 # Start a sshd and then delete it
 start_sshd_copy ()
@@ -21,7 +19,7 @@ start_sshd_copy ()
 copy_tests ()
 {
 	rm -f ${COPY}
-	for p in 1 2; do
+	for p in ${SSH_PROTOCOLS} ; do
 		verbose "$tid: proto $p"
 		${SSH} -nqo "Protocol=$p" -F $OBJ/ssh_config somehost \
 		    cat ${DATA} > ${COPY}
@@ -46,6 +44,9 @@ rm -f $PIDFILE
 
 cp $OBJ/sshd_config.orig $OBJ/sshd_config
 
+# cygwin can't fork a deleted binary
+if [ "$os" != "cygwin" ]; then
+
 verbose "test reexec fallback"
 
 start_sshd_copy
@@ -69,4 +70,4 @@ copy_tests
 $SUDO kill `$SUDO cat $PIDFILE`
 rm -f $PIDFILE
 
-
+fi
