@@ -20,3 +20,4 @@
 # conditions for Win32-OpenSSH
 *.sh text eol=lf
 config.sub text eol=lf
+fixalgorithms text eol=lf
