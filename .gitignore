@@ -224,7 +224,7 @@ pip-log.txt
 *.exe
 *.out
 *.a
-Makefile
+#Makefile
 config.status
 openssh.xml
 opensshd.init
