@@ -193,7 +193,9 @@ kex_tests(void)
 #ifdef OPENSSL_HAS_ECC
 	do_kex("ecdh-sha2-nistp256");
 	do_kex("ecdh-sha2-nistp384");
+#ifndef WIN32_FIXME
 	do_kex("ecdh-sha2-nistp521");
+#endif
 #endif
 	do_kex("diffie-hellman-group-exchange-sha256");
 	do_kex("diffie-hellman-group-exchange-sha1");

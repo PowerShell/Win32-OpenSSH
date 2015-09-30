@@ -1,7 +1,7 @@
-MODULI(5)                 OpenBSD Programmer's Manual                MODULI(5)
+MODULI(5)                     File Formats Manual                    MODULI(5)
 
 NAME
-     moduli - Diffie-Hellman moduli
+     moduli M-bM-^@M-^S Diffie-Hellman moduli
 
 DESCRIPTION
      The /etc/moduli file contains prime numbers and generators for use by
@@ -25,7 +25,7 @@ DESCRIPTION
 
                         0     Unknown, not tested.
                         2     "Safe" prime; (p-1)/2 is also prime.
-                        4     Sophie Germain; (p+1)*2 is also prime.
+                        4     Sophie Germain; 2p+1 is also prime.
 
                         Moduli candidates initially produced by ssh-keygen(1)
                         are Sophie Germain primes (type 4).  Further primality
@@ -38,7 +38,7 @@ DESCRIPTION
                         bitmask of the following values:
 
                         0x00  Not tested.
-                        0x01  Composite number - not prime.
+                        0x01  Composite number M-bM-^@M-^S not prime.
                         0x02  Sieve of Eratosthenes.
                         0x04  Probabilistic Miller-Rabin primality tests.
 
@@ -66,7 +66,9 @@ DESCRIPTION
 SEE ALSO
      ssh-keygen(1), sshd(8)
 
-     Diffie-Hellman Group Exchange for the Secure Shell (SSH) Transport Layer
-     Protocol, RFC 4419, 2006.
+STANDARDS
+     M. Friedl, N. Provos, and W. Simpson, Diffie-Hellman Group Exchange for
+     the Secure Shell (SSH) Transport Layer Protocol, RFC 4419, March 2006,
+     2006.
 
-OpenBSD 5.0                    October 14, 2010                    OpenBSD 5.0
+OpenBSD 5.8                   September 26, 2012                   OpenBSD 5.8

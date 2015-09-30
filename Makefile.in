@@ -151,7 +151,7 @@ $(SSHOBJS): Makefile.in config.h
 $(SSHDOBJS): Makefile.in config.h
 
 .c.o:
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 LIBWIN32COMPAT=contrib/win32/win32compat/@LIBWIN32COMPAT@
 $(LIBWIN32COMPAT): always
@@ -207,9 +207,10 @@ $(MANPAGES): $(MANPAGES_IN)
 		manpage=$(srcdir)/`echo $@ | sed 's/\.out$$//'`; \
 	fi; \
 	if test "$(MANTYPE)" = "man"; then \
-		$(FIXPATHSCMD) $${manpage} | $(AWK) -f $(srcdir)/mdoc2man.awk > $@; \
+		$(FIXPATHSCMD) $${manpage} | $(FIXALGORITHMSCMD) | \
+		    $(AWK) -f $(srcdir)/mdoc2man.awk > $@; \
 	else \
-		$(FIXPATHSCMD) $${manpage} > $@; \
+		$(FIXPATHSCMD) $${manpage} | $(FIXALGORITHMSCMD) > $@; \
 	fi
 
 $(CONFIGFILES): $(CONFIGFILES_IN)
@@ -230,6 +231,18 @@ umac128.o:	umac.c
 clean:	regressclean
 	rm -f *.o *.a $(TARGETS) logintest config.cache config.log
 	rm -f *.out core survey
+	rm -f regress/unittests/test_helper/*.a
+	rm -f regress/unittests/test_helper/*.o
+	rm -f regress/unittests/sshbuf/*.o
+	rm -f regress/unittests/sshbuf/test_sshbuf
+	rm -f regress/unittests/sshkey/*.o
+	rm -f regress/unittests/sshkey/test_sshkey
+	rm -f regress/unittests/bitmap/*.o
+	rm -f regress/unittests/bitmap/test_bitmap
+	rm -f regress/unittests/hostkeys/*.o
+	rm -f regress/unittests/hostkeys/test_hostkeys
+	rm -f regress/unittests/kex/*.o
+	rm -f regress/unittests/kex/test_kex
 	(cd openbsd-compat && $(MAKE) clean)
 	if test -f contrib/win32/win32compat/Makefile ; then \
 		(cd contrib/win32/win32compat && $(MAKE) clean) \
@@ -239,8 +252,20 @@ distclean:	regressclean
 	rm -f *.o *.a $(TARGETS) logintest config.cache config.log
 	rm -f *.out core opensshd.init openssh.xml
 	rm -f Makefile buildpkg.sh config.h config.status
-	rm -f survey.sh openbsd-compat/regress/Makefile *~
+	rm -f survey.sh openbsd-compat/regress/Makefile *~ 
 	rm -rf autom4te.cache
+	rm -f regress/unittests/test_helper/*.a
+	rm -f regress/unittests/test_helper/*.o
+	rm -f regress/unittests/sshbuf/*.o
+	rm -f regress/unittests/sshbuf/test_sshbuf
+	rm -f regress/unittests/sshkey/*.o
+	rm -f regress/unittests/sshkey/test_sshkey
+	rm -f regress/unittests/bitmap/*.o
+	rm -f regress/unittests/bitmap/test_bitmap
+	rm -f regress/unittests/hostkeys/*.o
+	rm -f regress/unittests/hostkeys/test_hostkeys
+	rm -f regress/unittests/kex/*.o
+	rm -f regress/unittests/kex/test_kex
 	(cd openbsd-compat && $(MAKE) distclean)
 	if test -f contrib/win32/win32compat/Makefile ; then \
 		(cd contrib/win32/win32compat && $(MAKE) distclean) \
@@ -416,12 +441,117 @@ uninstall:
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-pkcs11-helper.8
 	-rm -f $(DESTDIR)$(mandir)/$(mansubdir)1/slogin.1
 
-tests interop-tests:	$(TARGETS)
+regress-prep:
+	[ -d `pwd`/regress ] || mkdir -p `pwd`/regress
+	[ -d `pwd`/regress/unittests ] || mkdir -p `pwd`/regress/unittests
+	[ -d `pwd`/regress/unittests/test_helper ] || \
+		mkdir -p `pwd`/regress/unittests/test_helper
+	[ -d `pwd`/regress/unittests/sshbuf ] || \
+		mkdir -p `pwd`/regress/unittests/sshbuf
+	[ -d `pwd`/regress/unittests/sshkey ] || \
+		mkdir -p `pwd`/regress/unittests/sshkey
+	[ -d `pwd`/regress/unittests/bitmap ] || \
+		mkdir -p `pwd`/regress/unittests/bitmap
+	[ -d `pwd`/regress/unittests/hostkeys ] || \
+		mkdir -p `pwd`/regress/unittests/hostkeys
+	[ -d `pwd`/regress/unittests/kex ] || \
+		mkdir -p `pwd`/regress/unittests/kex
+	[ -f `pwd`/regress/Makefile ] || \
+	    ln -s `cd $(srcdir) && pwd`/regress/Makefile `pwd`/regress/Makefile
+
+regress/modpipe$(EXEEXT): $(srcdir)/regress/modpipe.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $? \
+	$(LDFLAGS) ./libssh.a -lopenbsd-compat @LINKWIN32COMPAT@ $(LIBS)
+
+regress/setuid-allowed$(EXEEXT): $(srcdir)/regress/setuid-allowed.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $? \
+	$(LDFLAGS) ./libssh.a -lopenbsd-compat @LINKWIN32COMPAT@ $(LIBS)
+
+regress/netcat$(EXEEXT): $(srcdir)/regress/netcat.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $? \
+	$(LDFLAGS) ./libssh.a -lopenbsd-compat @LINKWIN32COMPAT@ $(LIBS)
+
+UNITTESTS_TEST_HELPER_OBJS=\
+	regress/unittests/test_helper/test_helper.o \
+	regress/unittests/test_helper/fuzz.o
+
+regress/unittests/test_helper/libtest_helper.a: ${UNITTESTS_TEST_HELPER_OBJS}
+	$(AR) rv $@ $(UNITTESTS_TEST_HELPER_OBJS)
+	$(RANLIB) $@
+
+UNITTESTS_TEST_SSHBUF_OBJS=\
+	regress/unittests/sshbuf/tests.o \
+	regress/unittests/sshbuf/test_sshbuf.o \
+	regress/unittests/sshbuf/test_sshbuf_getput_basic.o \
+	regress/unittests/sshbuf/test_sshbuf_getput_crypto.o \
+	regress/unittests/sshbuf/test_sshbuf_misc.o \
+	regress/unittests/sshbuf/test_sshbuf_fuzz.o \
+	regress/unittests/sshbuf/test_sshbuf_getput_fuzz.o \
+	regress/unittests/sshbuf/test_sshbuf_fixed.o
+
+regress/unittests/sshbuf/test_sshbuf$(EXEEXT): ${UNITTESTS_TEST_SSHBUF_OBJS} \
+    regress/unittests/test_helper/libtest_helper.a libssh.a
+	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHBUF_OBJS) \
+	    regress/unittests/test_helper/libtest_helper.a \
+		./libssh.a -lopenbsd-compat -lwin32compat $(LIBS)
+
+UNITTESTS_TEST_SSHKEY_OBJS=\
+	regress/unittests/sshkey/test_fuzz.o \
+	regress/unittests/sshkey/tests.o \
+	regress/unittests/sshkey/common.o \
+	regress/unittests/sshkey/test_file.o \
+	regress/unittests/sshkey/test_sshkey.o
+
+regress/unittests/sshkey/test_sshkey$(EXEEXT): ${UNITTESTS_TEST_SSHKEY_OBJS} \
+    regress/unittests/test_helper/libtest_helper.a libssh.a
+	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHKEY_OBJS) \
+	    regress/unittests/test_helper/libtest_helper.a \
+	    ./libssh.a -lopenbsd-compat -lwin32compat $(LIBS)
+
+UNITTESTS_TEST_BITMAP_OBJS=\
+	regress/unittests/bitmap/tests.o
+
+regress/unittests/bitmap/test_bitmap$(EXEEXT): ${UNITTESTS_TEST_BITMAP_OBJS} \
+    regress/unittests/test_helper/libtest_helper.a libssh.a
+	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_BITMAP_OBJS) \
+	    regress/unittests/test_helper/libtest_helper.a \
+	    ./libssh.a -lopenbsd-compat -lwin32compat $(LIBS)
+
+UNITTESTS_TEST_KEX_OBJS=\
+	regress/unittests/kex/tests.o \
+	regress/unittests/kex/test_kex.o \
+	roaming_dummy.o
+
+regress/unittests/kex/test_kex$(EXEEXT): ${UNITTESTS_TEST_KEX_OBJS} \
+    regress/unittests/test_helper/libtest_helper.a libssh.a
+	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_KEX_OBJS) \
+	    regress/unittests/test_helper/libtest_helper.a \
+	    ./libssh.a -lopenbsd-compat -lwin32compat $(LIBS)
+
+UNITTESTS_TEST_HOSTKEYS_OBJS=\
+	regress/unittests/hostkeys/tests.o \
+	regress/unittests/hostkeys/test_iterate.o
+
+regress/unittests/hostkeys/test_hostkeys$(EXEEXT): \
+    ${UNITTESTS_TEST_HOSTKEYS_OBJS} \
+    regress/unittests/test_helper/libtest_helper.a libssh.a
+	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_HOSTKEYS_OBJS) \
+	    regress/unittests/test_helper/libtest_helper.a \
+	    ./libssh.a -lopenbsd-compat -lwin32compat $(LIBS)
+
+REGRESS_BINARIES=\
+	regress/modpipe$(EXEEXT) \
+	regress/setuid-allowed$(EXEEXT) \
+	regress/netcat$(EXEEXT) \
+	regress/unittests/sshbuf/test_sshbuf$(EXEEXT) \
+	regress/unittests/sshkey/test_sshkey$(EXEEXT) \
+	regress/unittests/bitmap/test_bitmap$(EXEEXT) \
+	regress/unittests/hostkeys/test_hostkeys$(EXEEXT) \
+	regress/unittests/kex/test_kex$(EXEEXT)
+
+tests interop-tests t-exec: regress-prep $(TARGETS) $(REGRESS_BINARIES)
 	BUILDDIR=`pwd`; \
-	[ -d `pwd`/regress ]  ||  mkdir -p `pwd`/regress; \
-	[ -f `pwd`/regress/Makefile ]  || \
-	    ln -s `cd $(srcdir) && pwd`/regress/Makefile `pwd`/regress/Makefile ; \
-	TEST_SHELL="@TEST_SHELL@"; \
+	TEST_SSH_SCP="$${BUILDDIR}/scp"; \
 	TEST_SSH_SSH="$${BUILDDIR}/ssh"; \
 	TEST_SSH_SSHD="$${BUILDDIR}/sshd"; \
 	TEST_SSH_SSHAGENT="$${BUILDDIR}/ssh-agent"; \
@@ -436,7 +566,6 @@ tests interop-tests:	$(TARGETS)
 	TEST_SSH_CONCH="conch"; \
 	TEST_SSH_IPV6="@TEST_SSH_IPV6@" ; \
 	TEST_SSH_ECC="@TEST_SSH_ECC@" ; \
-	TEST_SSH_SHA256="@TEST_SSH_SHA256@" ; \
 	cd $(srcdir)/regress || exit $$?; \
 	$(MAKE) \
 		.OBJDIR="$${BUILDDIR}/regress" \
@@ -444,7 +573,8 @@ tests interop-tests:	$(TARGETS)
 		BUILDDIR="$${BUILDDIR}" \
 		OBJ="$${BUILDDIR}/regress/" \
 		PATH="$${BUILDDIR}:$${PATH}" \
-		TEST_SHELL="$${TEST_SHELL}" \
+		TEST_ENV=MALLOC_OPTIONS="@TEST_MALLOC_OPTIONS@" \
+		TEST_SSH_SCP="$${TEST_SSH_SCP}" \
 		TEST_SSH_SSH="$${TEST_SSH_SSH}" \
 		TEST_SSH_SSHD="$${TEST_SSH_SSHD}" \
 		TEST_SSH_SSHAGENT="$${TEST_SSH_SSHAGENT}" \
@@ -459,7 +589,7 @@ tests interop-tests:	$(TARGETS)
 		TEST_SSH_CONCH="$${TEST_SSH_CONCH}" \
 		TEST_SSH_IPV6="$${TEST_SSH_IPV6}" \
 		TEST_SSH_ECC="$${TEST_SSH_ECC}" \
-		TEST_SSH_SHA256="$${TEST_SSH_SHA256}" \
+		TEST_SHELL="${TEST_SHELL}" \
 		EXEEXT="$(EXEEXT)" \
 		$@ && echo all tests passed
 

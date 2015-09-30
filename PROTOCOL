@@ -40,8 +40,8 @@ http://www.openssh.com/txt/draft-miller-secsh-compression-delayed-00.txt
      "ecdsa-sha2-nistp521-cert-v01@openssh.com"
 
 OpenSSH introduces new public key algorithms to support certificate
-authentication for users and hostkeys. These methods are documented in
-the file PROTOCOL.certkeys
+authentication for users and host keys. These methods are documented
+in the file PROTOCOL.certkeys
 
 1.4. transport: Elliptic Curve cryptography
 
@@ -50,6 +50,57 @@ specified in RFC5656. Only the ecdsa-sha2-nistp256, ecdsa-sha2-nistp384
 and ecdsa-sha2-nistp521 curves over GF(p) are supported. Elliptic
 curve points encoded using point compression are NOT accepted or
 generated.
+
+1.5 transport: Protocol 2 Encrypt-then-MAC MAC algorithms
+
+OpenSSH supports MAC algorithms, whose names contain "-etm", that
+perform the calculations in a different order to that defined in RFC
+4253. These variants use the so-called "encrypt then MAC" ordering,
+calculating the MAC over the packet ciphertext rather than the
+plaintext. This ordering closes a security flaw in the SSH transport
+protocol, where decryption of unauthenticated ciphertext provided a
+"decryption oracle" that could, in conjunction with cipher flaws, reveal
+session plaintext.
+
+Specifically, the "-etm" MAC algorithms modify the transport protocol
+to calculate the MAC over the packet ciphertext and to send the packet
+length unencrypted. This is necessary for the transport to obtain the
+length of the packet and location of the MAC tag so that it may be
+verified without decrypting unauthenticated data.
+
+As such, the MAC covers:
+
+      mac = MAC(key, sequence_number || packet_length || encrypted_packet)
+
+where "packet_length" is encoded as a uint32 and "encrypted_packet"
+contains:
+
+      byte      padding_length
+      byte[n1]  payload; n1 = packet_length - padding_length - 1
+      byte[n2]  random padding; n2 = padding_length
+
+1.6 transport: AES-GCM
+
+OpenSSH supports the AES-GCM algorithm as specified in RFC 5647.
+Because of problems with the specification of the key exchange
+the behaviour of OpenSSH differs from the RFC as follows:
+
+AES-GCM is only negotiated as the cipher algorithms
+"aes128-gcm@openssh.com" or "aes256-gcm@openssh.com" and never as
+an MAC algorithm. Additionally, if AES-GCM is selected as the cipher
+the exchanged MAC algorithms are ignored and there doesn't have to be
+a matching MAC.
+
+1.7 transport: chacha20-poly1305@openssh.com authenticated encryption
+
+OpenSSH supports authenticated encryption using ChaCha20 and Poly1305
+as described in PROTOCOL.chacha20poly1305.
+
+1.8 transport: curve25519-sha256@libssh.org key exchange algorithm
+
+OpenSSH supports the use of ECDH in Curve25519 for key exchange as
+described at:
+http://git.libssh.org/users/aris/libssh.git/plain/doc/curve25519-sha256@libssh.org.txt?h=curve25519
 
 2. Connection protocol changes
 
@@ -124,7 +175,7 @@ whitelisted to receive this message upon request.
 
 OpenSSH supports layer 2 and layer 3 tunnelling via the "tun@openssh.com"
 channel type. This channel type supports forwarding of network packets
-with datagram boundaries intact between endpoints equipped with 
+with datagram boundaries intact between endpoints equipped with
 interfaces like the BSD tun(4) device. Tunnel forwarding channels are
 requested by the client with the following packet:
 
@@ -180,6 +231,102 @@ The contents of the "data" field for layer 2 packets is:
 
 The "frame" field contains an IEEE 802.3 Ethernet frame, including
 header.
+
+2.4. connection: Unix domain socket forwarding
+
+OpenSSH supports local and remote Unix domain socket forwarding
+using the "streamlocal" extension.  Forwarding is initiated as per
+TCP sockets but with a single path instead of a host and port.
+
+Similar to direct-tcpip, direct-streamlocal is sent by the client
+to request that the server make a connection to a Unix domain socket.
+
+	byte		SSH_MSG_CHANNEL_OPEN
+	string		"direct-streamlocal@openssh.com"
+	uint32		sender channel
+	uint32		initial window size
+	uint32		maximum packet size
+	string		socket path
+
+Similar to forwarded-tcpip, forwarded-streamlocal is sent by the
+server when the client has previously send the server a streamlocal-forward
+GLOBAL_REQUEST.
+
+	byte		SSH_MSG_CHANNEL_OPEN
+	string		"forwarded-streamlocal@openssh.com"
+	uint32		sender channel
+	uint32		initial window size
+	uint32		maximum packet size
+	string		socket path
+	string		reserved for future use
+
+The reserved field is not currently defined and is ignored on the
+remote end.  It is intended to be used in the future to pass
+information about the socket file, such as ownership and mode.
+The client currently sends the empty string for this field.
+
+Similar to tcpip-forward, streamlocal-forward is sent by the client
+to request remote forwarding of a Unix domain socket.
+
+	byte		SSH2_MSG_GLOBAL_REQUEST
+	string		"streamlocal-forward@openssh.com"
+	boolean		TRUE
+	string		socket path
+
+Similar to cancel-tcpip-forward, cancel-streamlocal-forward is sent
+by the client cancel the forwarding of a Unix domain socket.
+
+	byte		SSH2_MSG_GLOBAL_REQUEST
+	string		"cancel-streamlocal-forward@openssh.com"
+	boolean		FALSE
+	string		socket path
+
+2.5. connection: hostkey update and rotation "hostkeys-00@openssh.com"
+and "hostkeys-prove-00@openssh.com"
+
+OpenSSH supports a protocol extension allowing a server to inform
+a client of all its protocol v.2 host keys after user-authentication
+has completed.
+
+	byte		SSH_MSG_GLOBAL_REQUEST
+	string		"hostkeys-00@openssh.com"
+	string[]	hostkeys
+
+Upon receiving this message, a client should check which of the
+supplied host keys are present in known_hosts. For keys that are
+not present, it should send a "hostkeys-prove@openssh.com" message
+to request the server prove ownership of the private half of the
+key.
+
+	byte		SSH_MSG_GLOBAL_REQUEST
+	string		"hostkeys-prove-00@openssh.com"
+	char		1 /* want-reply */
+	string[]	hostkeys
+
+When a server receives this message, it should generate a signature
+using each requested key over the following:
+
+	string		"hostkeys-prove-00@openssh.com"
+	string		session identifier
+	string		hostkey
+
+These signatures should be included in the reply, in the order matching
+the hostkeys in the request:
+
+	byte		SSH_MSG_REQUEST_SUCCESS
+	string[]	signatures
+
+When the client receives this reply (and not a failure), it should
+validate the signatures and may update its known_hosts file, adding keys
+that it has not seen before and deleting keys for the server host that
+are no longer offered.
+
+These extensions let a client learn key types that it had not previously
+encountered, thereby allowing it to potentially upgrade from weaker
+key algorithms to better ones. It also supports graceful key rotation:
+a server may offer multiple keys of the same type for a period (to
+give clients an opportunity to learn them using this extension) before
+removing the deprecated key from those offered.
 
 3. SFTP protocol changes
 
@@ -291,4 +438,18 @@ link(oldpath, newpath) and will respond with a SSH_FXP_STATUS message.
 This extension is advertised in the SSH_FXP_VERSION hello with version
 "1".
 
-$OpenBSD: PROTOCOL,v 1.17 2010/12/04 00:18:01 djm Exp $
+10. sftp: Extension request "fsync@openssh.com"
+
+This request asks the server to call fsync(2) on an open file handle.
+
+	uint32		id
+	string		"fsync@openssh.com"
+	string		handle
+
+One receiving this request, a server will call fsync(handle_fd) and will
+respond with a SSH_FXP_STATUS message.
+
+This extension is advertised in the SSH_FXP_VERSION hello with version
+"1".
+
+$OpenBSD: PROTOCOL,v 1.29 2015/07/17 03:09:19 djm Exp $

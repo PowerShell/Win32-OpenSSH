@@ -30,6 +30,9 @@
 static void err(int, const char *, ...) __attribute__((format(printf, 2, 3)));
 static void errx(int, const char *, ...) __attribute__((format(printf, 2, 3)));
 
+#ifdef WIN32_FIXME
+void fatal(const char *fmt,...) {/*stub*/}
+#endif
 static void
 err(int r, const char *fmt, ...)
 {

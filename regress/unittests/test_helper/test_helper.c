@@ -116,6 +116,12 @@ static void *onerror_ctx = NULL;
 static const char *data_dir = NULL;
 static char subtest_info[512];
 
+#ifndef WIN32_FIXME
+void fatal(const char *fmt,...) {/*stub*/}
+void logit(const char *fmt,...) {/*stub*/}
+void debug3(const char *fmt,...) {/*stub*/}
+#endif
+
 int
 main(int argc, char **argv)
 {
@@ -165,7 +171,7 @@ main(int argc, char **argv)
 		printf(" %u tests ok\n", test_number);
 	return 0;
 }
-
+#ifndef WIN32_FIXME
 const char *
 test_data_file(const char *name)
 {
@@ -182,6 +188,7 @@ test_data_file(const char *name)
 	}
 	return ret;
 }
+#endif
 
 void
 test_info(char *s, size_t len)

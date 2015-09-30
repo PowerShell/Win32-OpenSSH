@@ -102,13 +102,19 @@ sshkey_load_file(int fd, struct sshbuf *blob)
 	struct stat st;
 	int r;
 
+#ifndef WIN32_FIXME		
 	if (fstat(fd, &st) < 0)
 		return SSH_ERR_SYSTEM_ERROR;
 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
 	    st.st_size > MAX_KEY_FILE_SIZE)
 		return SSH_ERR_INVALID_FORMAT;
+#endif
 	for (;;) {
+#ifdef WIN32_FIXME
+		if ((len = atomicio(_read, fd, buf, sizeof(buf))) == 0) {
+#else
 		if ((len = atomicio(read, fd, buf, sizeof(buf))) == 0) {
+#endif
 			if (errno == EPIPE)
 				break;
 			r = SSH_ERR_SYSTEM_ERROR;

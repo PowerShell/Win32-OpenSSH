@@ -1,10 +1,10 @@
-SFTP(1)                    OpenBSD Reference Manual                    SFTP(1)
+SFTP(1)                     General Commands Manual                    SFTP(1)
 
 NAME
-     sftp - secure file transfer program
+     sftp M-bM-^@M-^S secure file transfer program
 
 SYNOPSIS
-     sftp [-1246Cpqrv] [-B buffer_size] [-b batchfile] [-c cipher]
+     sftp [-1246aCfpqrv] [-B buffer_size] [-b batchfile] [-c cipher]
           [-D sftp_server_path] [-F ssh_config] [-i identity_file] [-l limit]
           [-o ssh_option] [-P port] [-R num_requests] [-S program]
           [-s subsystem | sftp_server] host
@@ -44,6 +44,11 @@ DESCRIPTION
 
      -6      Forces sftp to use IPv6 addresses only.
 
+     -a      Attempt to continue interrupted transfers rather than overwriting
+             existing partial or complete copies of files.  If the partial
+             contents differ from those being transferred, then the resultant
+             file is likely to be corrupt.
+
      -B buffer_size
              Specify the size of the buffer that sftp uses when transferring
              files.  Larger buffers require fewer round trips at the cost of
@@ -53,12 +58,13 @@ DESCRIPTION
              Batch mode reads a series of commands from an input batchfile
              instead of stdin.  Since it lacks user interaction it should be
              used in conjunction with non-interactive authentication.  A
-             batchfile of `-' may be used to indicate standard input.  sftp
+             batchfile of M-bM-^@M-^X-M-bM-^@M-^Y may be used to indicate standard input.  sftp
              will abort if any of the following commands fail: get, put,
-             rename, ln, rm, mkdir, chdir, ls, lchdir, chmod, chown, chgrp,
-             lpwd, df, symlink, and lmkdir.  Termination on error can be
-             suppressed on a command by command basis by prefixing the command
-             with a `-' character (for example, -rm /tmp/blah*).
+             reget, reput, rename, ln, rm, mkdir, chdir, ls, lchdir, chmod,
+             chown, chgrp, lpwd, df, symlink, and lmkdir.  Termination on
+             error can be suppressed on a command by command basis by
+             prefixing the command with a M-bM-^@M-^X-M-bM-^@M-^Y character (for example, -rm
+             /tmp/blah*).
 
      -C      Enables compression (via ssh's -C flag).
 
@@ -73,6 +79,10 @@ DESCRIPTION
      -F ssh_config
              Specifies an alternative per-user configuration file for ssh(1).
              This option is directly passed to ssh(1).
+
+     -f      Requests that files be flushed to disk immediately after
+             transfer.  When uploading files, this feature is only enabled if
+             the server implements the "fsync@openssh.com" extension.
 
      -i identity_file
              Selects the file from which the identity (private key) for public
@@ -93,6 +103,11 @@ DESCRIPTION
                    AddressFamily
                    BatchMode
                    BindAddress
+                   CanonicalDomains
+                   CanonicalizeFallbackLocal
+                   CanonicalizeHostname
+                   CanonicalizeMaxDots
+                   CanonicalizePermittedCNAMEs
                    ChallengeResponseAuthentication
                    CheckHostIP
                    Cipher
@@ -103,18 +118,21 @@ DESCRIPTION
                    ConnectTimeout
                    ControlMaster
                    ControlPath
+                   ControlPersist
                    GlobalKnownHostsFile
                    GSSAPIAuthentication
                    GSSAPIDelegateCredentials
                    HashKnownHosts
                    Host
                    HostbasedAuthentication
+                   HostbasedKeyTypes
                    HostKeyAlgorithms
                    HostKeyAlias
                    HostName
                    IdentityFile
                    IdentitiesOnly
                    IPQoS
+                   KbdInteractiveAuthentication
                    KbdInteractiveDevices
                    KexAlgorithms
                    LogLevel
@@ -136,6 +154,7 @@ DESCRIPTION
                    ServerAliveCountMax
                    StrictHostKeyChecking
                    TCPKeepAlive
+                   UpdateHostKeys
                    UsePrivilegedPort
                    User
                    UserKnownHostsFile
@@ -176,7 +195,7 @@ INTERACTIVE COMMANDS
      those of ftp(1).  Commands are case insensitive.  Pathnames that contain
      spaces must be enclosed in quotes.  Any special characters contained
      within pathnames that are recognized by glob(3) must be escaped with
-     backslashes (`\').
+     backslashes (M-bM-^@M-^X\M-bM-^@M-^Y).
 
      bye     Quit sftp.
 
@@ -203,17 +222,26 @@ INTERACTIVE COMMANDS
              the capacity information will be displayed using "human-readable"
              suffixes.  The -i flag requests display of inode information in
              addition to capacity information.  This command is only supported
-             on servers that implement the ``statvfs@openssh.com'' extension.
+             on servers that implement the M-bM-^@M-^\statvfs@openssh.comM-bM-^@M-^] extension.
 
      exit    Quit sftp.
 
-     get [-Ppr] remote-path [local-path]
+     get [-afPpr] remote-path [local-path]
              Retrieve the remote-path and store it on the local machine.  If
              the local path name is not specified, it is given the same name
              it has on the remote machine.  remote-path may contain glob(3)
              characters and may match multiple files.  If it does and
              local-path is specified, then local-path must specify a
              directory.
+
+             If the -a flag is specified, then attempt to resume partial
+             transfers of existing files.  Note that resumption assumes that
+             any partial copy of the local file matches the remote copy.  If
+             the remote file contents differ from the partial local copy then
+             the resultant file is likely to be corrupt.
+
+             If the -f flag is specified, then fsync(2) will be called after
+             the file transfer has completed to flush the file to disk.
 
              If either the -P or -p flag is specified, then full file
              permissions and access times are copied too.
@@ -253,7 +281,7 @@ INTERACTIVE COMMANDS
 
              -1      Produce single columnar output.
 
-             -a      List files beginning with a dot (`.').
+             -a      List files beginning with a dot (M-bM-^@M-^X.M-bM-^@M-^Y).
 
              -f      Do not sort the listing.  The default sort order is
                      lexicographical.
@@ -285,13 +313,24 @@ INTERACTIVE COMMANDS
      progress
              Toggle display of progress meter.
 
-     put [-Ppr] local-path [remote-path]
+     put [-afPpr] local-path [remote-path]
              Upload local-path and store it on the remote machine.  If the
              remote path name is not specified, it is given the same name it
              has on the local machine.  local-path may contain glob(3)
              characters and may match multiple files.  If it does and
              remote-path is specified, then remote-path must specify a
              directory.
+
+             If the -a flag is specified, then attempt to resume partial
+             transfers of existing files.  Note that resumption assumes that
+             any partial copy of the remote file matches the local copy.  If
+             the local file contents differ from the remote local copy then
+             the resultant file is likely to be corrupt.
+
+             If the -f flag is specified, then a request will be sent to the
+             server to call fsync(2) after the file has been transferred.
+             Note that this is only supported by servers that implement the
+             "fsync@openssh.com" extension.
 
              If either the -P or -p flag is specified, then full file
              permissions and access times are copied too.
@@ -303,6 +342,14 @@ INTERACTIVE COMMANDS
      pwd     Display remote working directory.
 
      quit    Quit sftp.
+
+     reget [-Ppr] remote-path [local-path]
+             Resume download of remote-path.  Equivalent to get with the -a
+             flag set.
+
+     reput [-Ppr] [local-path] remote-path
+             Resume upload of [local-path].  Equivalent to put with the -a
+             flag set.
 
      rename oldpath newpath
              Rename remote file from oldpath to newpath.
@@ -330,8 +377,7 @@ SEE ALSO
      ftp(1), ls(1), scp(1), ssh(1), ssh-add(1), ssh-keygen(1), glob(3),
      ssh_config(5), sftp-server(8), sshd(8)
 
-     T. Ylonen and S. Lehtinen, SSH File Transfer Protocol,
-     draft-ietf-secsh-filexfer-00.txt, January 2001, work in progress
-     material.
+     T. Ylonen and S. Lehtinen, SSH File Transfer Protocol, draft-ietf-secsh-
+     filexfer-00.txt, January 2001, work in progress material.
 
-OpenBSD 5.0                     August 7, 2011                     OpenBSD 5.0
+OpenBSD 5.8                    January 30, 2015                    OpenBSD 5.8

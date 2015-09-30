@@ -1,0 +1,20 @@
+Host *
+	Protocol		2
+	Hostname		127.0.0.1
+	HostKeyAlias		localhost-with-alias
+	Port			4242
+	User			Administrator
+	GlobalKnownHostsFile	/cygdrive/c/openssh/Win32-OpenSSH/regress/known_hosts
+	UserKnownHostsFile	/cygdrive/c/openssh/Win32-OpenSSH/regress/known_hosts
+	RSAAuthentication	yes
+	PubkeyAuthentication	yes
+	ChallengeResponseAuthentication	no
+	HostbasedAuthentication	no
+	PasswordAuthentication	no
+	RhostsRSAAuthentication	no
+	BatchMode		yes
+	StrictHostKeyChecking	yes
+	LogLevel		DEBUG3
+IdentityFile /cygdrive/c/openssh/Win32-OpenSSH/regress/rsa
+IdentityFile /cygdrive/c/openssh/Win32-OpenSSH/regress/ed25519
+proxycommand sh /cygdrive/c/openssh/Win32-OpenSSH/regress/sshd-log-wrapper.sh /cygdrive/c/openssh/Win32-OpenSSH/regress/sshd.log /cygdrive/c/openssh/Win32-OpenSSH/sshd -i -f /cygdrive/c/openssh/Win32-OpenSSH/regress/sshd_proxy

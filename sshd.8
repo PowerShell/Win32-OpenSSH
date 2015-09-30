@@ -33,8 +33,8 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: sshd.8,v 1.263 2011/08/02 01:22:11 djm Exp $
-.Dd $Mdocdate: August 2 2011 $
+.\" $OpenBSD: sshd.8,v 1.280 2015/07/03 03:49:45 djm Exp $
+.Dd $Mdocdate: July 3 2015 $
 .Dt SSHD 8
 .Os
 .Sh NAME
@@ -47,6 +47,7 @@
 .Op Fl b Ar bits
 .Op Fl C Ar connection_spec
 .Op Fl c Ar host_certificate_file
+.Op Fl E Ar log_file
 .Op Fl f Ar config_file
 .Op Fl g Ar login_grace_time
 .Op Fl h Ar host_key_file
@@ -59,10 +60,7 @@
 .Nm
 (OpenSSH Daemon) is the daemon program for
 .Xr ssh 1 .
-Together these programs replace
-.Xr rlogin 1
-and
-.Xr rsh 1 ,
+Together these programs replace rlogin and rsh,
 and provide secure encrypted communications between two untrusted hosts
 over an insecure network.
 .Pp
@@ -114,6 +112,8 @@ The connection parameters are supplied as keyword=value pairs.
 The keywords are
 .Dq user ,
 .Dq host ,
+.Dq laddr ,
+.Dq lport ,
 and
 .Dq addr .
 All are required and may be supplied in any order, either with multiple
@@ -144,10 +144,12 @@ Multiple
 .Fl d
 options increase the debugging level.
 Maximum is 3.
+.It Fl E Ar log_file
+Append debug logs to
+.Ar log_file
+instead of the system log.
 .It Fl e
-When this option is specified,
-.Nm
-will send the output to the standard error instead of the system log.
+Write debug logs to standard error instead of the system log.
 .It Fl f Ar config_file
 Specifies the name of the configuration file.
 The default is
@@ -170,7 +172,8 @@ The default is
 .Pa /etc/ssh/ssh_host_key
 for protocol version 1, and
 .Pa /etc/ssh/ssh_host_dsa_key ,
-.Pa /etc/ssh/ssh_host_ecdsa_key
+.Pa /etc/ssh/ssh_host_ecdsa_key .
+.Pa /etc/ssh/ssh_host_ed25519_key
 and
 .Pa /etc/ssh/ssh_host_rsa_key
 for protocol version 2.
@@ -181,15 +184,12 @@ Specifies that
 .Nm
 is being run from
 .Xr inetd 8 .
+If SSH protocol 1 is enabled,
 .Nm
-is normally not run
+should not  normally be run
 from inetd because it needs to generate the server key before it can
-respond to the client, and this may take tens of seconds.
-Clients would have to wait too long if the key was regenerated every time.
-However, with small key sizes (e.g. 512) using
-.Nm
-from inetd may
-be feasible.
+respond to the client, and this may take some time.
+Clients may have to wait too long if the key was regenerated every time.
 .It Fl k Ar key_gen_time
 Specifies how often the ephemeral protocol version 1 server key is
 regenerated (default 3600 seconds, or one hour).
@@ -275,7 +275,7 @@ though this can be changed via the
 .Cm Protocol
 option in
 .Xr sshd_config 5 .
-Protocol 2 supports DSA, ECDSA and RSA keys;
+Protocol 2 supports DSA, ECDSA, Ed25519 and RSA keys;
 protocol 1 only supports RSA keys.
 For both protocols,
 each host has a host-specific key,
@@ -284,7 +284,7 @@ used to identify the host.
 .Pp
 Forward security for protocol 1 is provided through
 an additional server key,
-normally 768 bits,
+normally 1024 bits,
 generated when the server starts.
 This key is normally regenerated every hour if it has been used, and
 is never stored on disk.
@@ -314,7 +314,7 @@ The client selects the encryption algorithm
 to use from those offered by the server.
 Additionally, session integrity is provided
 through a cryptographic message authentication code
-(hmac-md5, hmac-sha1, umac-64, hmac-ripemd160,
+(hmac-md5, hmac-sha1, umac-64, umac-128, hmac-ripemd160,
 hmac-sha2-256 or hmac-sha2-512).
 .Pp
 Finally, the server and the client enter an authentication dialog.
@@ -405,7 +405,10 @@ Changes to user's home directory.
 .It
 If
 .Pa ~/.ssh/rc
-exists, runs it; else if
+exists and the
+.Xr sshd_config 5
+.Cm PermitUserRC
+option is set, runs it; else if
 .Pa /etc/ssh/sshrc
 exists, runs
 it; otherwise runs xauth.
@@ -418,6 +421,8 @@ See
 below.
 .It
 Runs user's shell or command.
+All commands are run under the user's login shell as specified in the
+system password database.
 .El
 .Sh SSHRC
 If the file
@@ -489,6 +494,7 @@ For protocol version 2 the keytype is
 .Dq ecdsa-sha2-nistp256 ,
 .Dq ecdsa-sha2-nistp384 ,
 .Dq ecdsa-sha2-nistp521 ,
+.Dq ssh-ed25519 ,
 .Dq ssh-dss
 or
 .Dq ssh-rsa .
@@ -501,6 +507,7 @@ You don't want to type them in; instead, copy the
 .Pa identity.pub ,
 .Pa id_dsa.pub ,
 .Pa id_ecdsa.pub ,
+.Pa id_ed25519.pub ,
 or the
 .Pa id_rsa.pub
 file and edit it.
@@ -562,9 +569,7 @@ is enabled.
 Specifies that in addition to public key authentication, either the canonical
 name of the remote host or its IP address must be present in the
 comma-separated list of patterns.
-See
-.Sx PATTERNS
-in
+See PATTERNS in
 .Xr ssh_config 5
 for more information on patterns.
 .Pp
@@ -598,16 +603,19 @@ Disables execution of
 Forbids X11 forwarding when this key is used for authentication.
 Any X11 forward requests by the client will return an error.
 .It Cm permitopen="host:port"
-Limit local
-.Li ``ssh -L''
-port forwarding such that it may only connect to the specified host and
-port.
+Limit local port forwarding with
+.Xr ssh 1
+.Fl L
+such that it may only connect to the specified host and port.
 IPv6 addresses can be specified by enclosing the address in square brackets.
 Multiple
 .Cm permitopen
 options may be applied separated by commas.
 No pattern matching is performed on the specified hostnames,
 they must be literal domains or addresses.
+A port specification of
+.Cm *
+matches any port.
 .It Cm principals="principals"
 On a
 .Cm cert-authority
@@ -799,8 +807,8 @@ secret, but the recommended permissions are read/write/execute for the user,
 and not accessible by others.
 .Pp
 .It Pa ~/.ssh/authorized_keys
-Lists the public keys (DSA/ECDSA/RSA) that can be used for logging in
-as this user.
+Lists the public keys (DSA, ECDSA, Ed25519, RSA)
+that can be used for logging in as this user.
 The format of this file is described above.
 The content of the file is not highly sensitive, but the recommended
 permissions are read/write for the user, and not accessible by others.
@@ -842,12 +850,6 @@ the user's home directory becomes accessible.
 This file should be writable only by the user, and need not be
 readable by anyone else.
 .Pp
-.It Pa /etc/hosts.allow
-.It Pa /etc/hosts.deny
-Access controls that should be enforced by tcp-wrappers are defined here.
-Further details are described in
-.Xr hosts_access 5 .
-.Pp
 .It Pa /etc/hosts.equiv
 This file is for host-based authentication (see
 .Xr ssh 1 ) .
@@ -880,8 +882,9 @@ rlogin/rsh.
 .It Pa /etc/ssh/ssh_host_key
 .It Pa /etc/ssh/ssh_host_dsa_key
 .It Pa /etc/ssh/ssh_host_ecdsa_key
+.It Pa /etc/ssh/ssh_host_ed25519_key
 .It Pa /etc/ssh/ssh_host_rsa_key
-These three files contain the private parts of the host keys.
+These files contain the private parts of the host keys.
 These files should only be owned by root, readable only by root, and not
 accessible to others.
 Note that
@@ -891,8 +894,9 @@ does not start if these files are group/world-accessible.
 .It Pa /etc/ssh/ssh_host_key.pub
 .It Pa /etc/ssh/ssh_host_dsa_key.pub
 .It Pa /etc/ssh/ssh_host_ecdsa_key.pub
+.It Pa /etc/ssh/ssh_host_ed25519_key.pub
 .It Pa /etc/ssh/ssh_host_rsa_key.pub
-These three files contain the public parts of the host keys.
+These files contain the public parts of the host keys.
 These files should be world-readable but writable only by
 root.
 Their contents should match the respective private parts.
@@ -949,7 +953,6 @@ The content of this file is not sensitive; it can be world-readable.
 .Xr ssh-keygen 1 ,
 .Xr ssh-keyscan 1 ,
 .Xr chroot 2 ,
-.Xr hosts_access 5 ,
 .Xr login.conf 5 ,
 .Xr moduli 5 ,
 .Xr sshd_config 5 ,
@@ -966,14 +969,3 @@ Markus Friedl contributed the support for SSH
 protocol versions 1.5 and 2.0.
 Niels Provos and Markus Friedl contributed support
 for privilege separation.
-.Sh CAVEATS
-System security is not improved unless
-.Nm rshd ,
-.Nm rlogind ,
-and
-.Nm rexecd
-are disabled (thus completely disabling
-.Xr rlogin
-and
-.Xr rsh
-into the machine).

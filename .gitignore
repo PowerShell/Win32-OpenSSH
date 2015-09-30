@@ -232,3 +232,5 @@ survey.sh
 buildpkg.sh
 config.h.in
 
+
+config.h

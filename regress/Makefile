@@ -1,6 +1,7 @@
 #	$OpenBSD: Makefile,v 1.81 2015/05/21 06:44:25 djm Exp $
 
-REGRESS_TARGETS=	unit t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t-exec
+#REGRESS_TARGETS=	unit t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t-exec
+REGRESS_TARGETS=	unit t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
 tests:		prep $(REGRESS_TARGETS)
 
 # Interop tests are not run by default
@@ -116,77 +117,82 @@ TEST_SSH_SSHKEYGEN?=ssh-keygen
 
 CPPFLAGS=-I..
 
+.WIN32_CURDIR = $(shell sed -e 's/\/cygdrive\/c/c:/g' <<< ${.CURDIR})
+.WIN32_OBJDIR = $(shell sed -e 's/\/cygdrive\/c/c:/g' <<< ${.OBJDIR})
+WIN32_OBJ = $(shell sed -e 's/\/cygdrive\/c/c:/g' <<< ${OBJ})
+WIN32_PWD = $(shell sed -e 's/\/cygdrive\/c/c:/g' <<< $@)
+
 t1:
-	${TEST_SSH_SSHKEYGEN} -if ${.CURDIR}/rsa_ssh2.prv | diff - ${.CURDIR}/rsa_openssh.prv
-	tr '\n' '\r' <${.CURDIR}/rsa_ssh2.prv > ${.OBJDIR}/rsa_ssh2_cr.prv
-	${TEST_SSH_SSHKEYGEN} -if ${.OBJDIR}/rsa_ssh2_cr.prv | diff - ${.CURDIR}/rsa_openssh.prv
-	awk '{print $$0 "\r"}' ${.CURDIR}/rsa_ssh2.prv > ${.OBJDIR}/rsa_ssh2_crnl.prv
-	${TEST_SSH_SSHKEYGEN} -if ${.OBJDIR}/rsa_ssh2_crnl.prv | diff - ${.CURDIR}/rsa_openssh.prv
+	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_CURDIR}/rsa_ssh2.prv | diff -w - ${.WIN32_CURDIR}/rsa_openssh.prv
+	tr '\n' '\r' <${.WIN32_CURDIR}/rsa_ssh2.prv > ${.WIN32_OBJDIR}/rsa_ssh2_cr.prv
+	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_OBJDIR}/rsa_ssh2_cr.prv | diff -w - ${.WIN32_CURDIR}/rsa_openssh.prv
+	awk '{print $$0 "\r"}' ${.WIN32_CURDIR}/rsa_ssh2.prv > ${.WIN32_OBJDIR}/rsa_ssh2_crnl.prv
+	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_OBJDIR}/rsa_ssh2_crnl.prv | diff - ${.WIN32_CURDIR}/rsa_openssh.prv
 
 t2:
-	cat ${.CURDIR}/rsa_openssh.prv > $(OBJ)/t2.out
+	cat ${.WIN32_CURDIR}/rsa_openssh.prv > $(WIN32_OBJ)/t2.out
 	chmod 600 $(OBJ)/t2.out
-	${TEST_SSH_SSHKEYGEN} -yf $(OBJ)/t2.out | diff - ${.CURDIR}/rsa_openssh.pub
+	${TEST_SSH_SSHKEYGEN} -yf $(WIN32_OBJ)/t2.out | diff -w - ${.WIN32_CURDIR}/rsa_openssh.pub
 
 t3:
-	${TEST_SSH_SSHKEYGEN} -ef ${.CURDIR}/rsa_openssh.pub >$(OBJ)/t3.out
-	${TEST_SSH_SSHKEYGEN} -if $(OBJ)/t3.out | diff - ${.CURDIR}/rsa_openssh.pub
+	${TEST_SSH_SSHKEYGEN} -ef ${.WIN32_CURDIR}/rsa_openssh.pub >$(OBJ)/t3.out
+	${TEST_SSH_SSHKEYGEN} -if $(WIN32_OBJ)/t3.out | diff -w - ${.WIN32_CURDIR}/rsa_openssh.pub
 
 t4:
-	${TEST_SSH_SSHKEYGEN} -E md5 -lf ${.CURDIR}/rsa_openssh.pub |\
-		awk '{print $$2}' | diff - ${.CURDIR}/t4.ok
+	${TEST_SSH_SSHKEYGEN} -E md5 -lf ${.WIN32_CURDIR}/rsa_openssh.pub |\
+		awk '{print $$2}' | diff -w - ${.WIN32_CURDIR}/t4.ok
 
 t5:
-	${TEST_SSH_SSHKEYGEN} -Bf ${.CURDIR}/rsa_openssh.pub |\
-		awk '{print $$2}' | diff - ${.CURDIR}/t5.ok
+	${TEST_SSH_SSHKEYGEN} -Bf ${.WIN32_CURDIR}/rsa_openssh.pub |\
+		awk '{print $$2}' | diff -w - ${.WIN32_CURDIR}/t5.ok
 
 t6:
-	${TEST_SSH_SSHKEYGEN} -if ${.CURDIR}/dsa_ssh2.prv > $(OBJ)/t6.out1
-	${TEST_SSH_SSHKEYGEN} -if ${.CURDIR}/dsa_ssh2.pub > $(OBJ)/t6.out2
+	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_CURDIR}/dsa_ssh2.prv > $(OBJ)/t6.out1
+	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_CURDIR}/dsa_ssh2.pub > $(OBJ)/t6.out2
 	chmod 600 $(OBJ)/t6.out1
-	${TEST_SSH_SSHKEYGEN} -yf $(OBJ)/t6.out1 | diff - $(OBJ)/t6.out2
+	${TEST_SSH_SSHKEYGEN} -yf $(WIN32_OBJ)/t6.out1 | diff -w - $(OBJ)/t6.out2
 
 $(OBJ)/t7.out:
-	${TEST_SSH_SSHKEYGEN} -q -t rsa -N '' -f $@
+	${TEST_SSH_SSHKEYGEN} -q -t rsa -N '' -f $(WIN32_PWD)
 
 t7: $(OBJ)/t7.out
-	${TEST_SSH_SSHKEYGEN} -lf $(OBJ)/t7.out > /dev/null
-	${TEST_SSH_SSHKEYGEN} -Bf $(OBJ)/t7.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -lf $(WIN32_OBJ)/t7.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -Bf $(WIN32_OBJ)/t7.out > /dev/null
 
 $(OBJ)/t8.out:
-	${TEST_SSH_SSHKEYGEN} -q -t dsa -N '' -f $@
+	${TEST_SSH_SSHKEYGEN} -q -t dsa -N '' -f $(WIN32_PWD)
 
 t8: $(OBJ)/t8.out
-	${TEST_SSH_SSHKEYGEN} -lf $(OBJ)/t8.out > /dev/null
-	${TEST_SSH_SSHKEYGEN} -Bf $(OBJ)/t8.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -lf $(WIN32_OBJ)/t8.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -Bf $(WIN32_OBJ)/t8.out > /dev/null
 
 $(OBJ)/t9.out:
 	test "${TEST_SSH_ECC}" != yes || \
-	${TEST_SSH_SSHKEYGEN} -q -t ecdsa -N '' -f $@
+	${TEST_SSH_SSHKEYGEN} -q -t ecdsa -N '' -f $(WIN32_PWD)
 
 t9: $(OBJ)/t9.out
 	test "${TEST_SSH_ECC}" != yes || \
-	${TEST_SSH_SSHKEYGEN} -lf $(OBJ)/t9.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -lf $(WIN32_OBJ)/t9.out > /dev/null
 	test "${TEST_SSH_ECC}" != yes || \
-	${TEST_SSH_SSHKEYGEN} -Bf $(OBJ)/t9.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -Bf $(WIN32_OBJ)/t9.out > /dev/null
 
 
 $(OBJ)/t10.out:
-	${TEST_SSH_SSHKEYGEN} -q -t ed25519 -N '' -f $@
+	${TEST_SSH_SSHKEYGEN} -q -t ed25519 -N '' -f $(WIN32_PWD)
 
 t10: $(OBJ)/t10.out
-	${TEST_SSH_SSHKEYGEN} -lf $(OBJ)/t10.out > /dev/null
-	${TEST_SSH_SSHKEYGEN} -Bf $(OBJ)/t10.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -lf $(WIN32_OBJ)/t10.out > /dev/null
+	${TEST_SSH_SSHKEYGEN} -Bf $(WIN32_OBJ)/t10.out > /dev/null
 
 t11:
-	${TEST_SSH_SSHKEYGEN} -E sha256 -lf ${.CURDIR}/rsa_openssh.pub |\
-		awk '{print $$2}' | diff - ${.CURDIR}/t11.ok
+	${TEST_SSH_SSHKEYGEN} -E sha256 -lf ${.WIN32_CURDIR}/rsa_openssh.pub |\
+		awk '{print $$2}' | diff - ${.WIN32_CURDIR}/t11.ok
 
 $(OBJ)/t12.out:
-	${TEST_SSH_SSHKEYGEN} -q -t ed25519 -N '' -C 'test-comment-1234' -f $@
+	${TEST_SSH_SSHKEYGEN} -q -t ed25519 -N '' -C 'test-comment-1234' -f $(WIN32_PWD)
 
 t12: $(OBJ)/t12.out
-	${TEST_SSH_SSHKEYGEN} -lf $(OBJ)/t12.out.pub | grep test-comment-1234 >/dev/null
+	${TEST_SSH_SSHKEYGEN} -lf $(WIN32_OBJ)/t12.out.pub | grep test-comment-1234 >/dev/null
 
 t-exec:	${LTESTS:=.sh}
 	@if [ "x$?" = "x" ]; then exit 0; fi; \

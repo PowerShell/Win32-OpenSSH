@@ -50,6 +50,20 @@ put_opt(struct sshbuf *b, const char *name, const char *value)
 	sshbuf_free(sect);
 }
 
+#ifdef WIN32_FIXME
+const char *
+test_data_file(const char *name)
+{
+	static char ret[PATH_MAX];
+	snprintf(ret, sizeof(ret), "c:/openssh/Win32-OpenSSH/regress/unittests/sshkey/testdata/%s", name);
+	if (access(ret, F_OK) != 0) {
+		fprintf(stderr, "Cannot access data file %s: %s\n",
+		    ret, strerror(errno));
+		exit(1);
+	}
+	return ret;
+}
+#endif
 static void
 build_cert(struct sshbuf *b, const struct sshkey *k, const char *type,
     const struct sshkey *sign_key, const struct sshkey *ca_key)
@@ -484,6 +498,7 @@ sshkey_tests(void)
 	TEST_DONE();
 
 #ifdef OPENSSL_HAS_ECC
+#ifndef WIN32_FIXME
 	TEST_START("sign and verify ECDSA");
 	k1 = get_private("ecdsa_1");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("ecdsa_2.pub"), &k2,
@@ -492,6 +507,7 @@ sshkey_tests(void)
 	sshkey_free(k1);
 	sshkey_free(k2);
 	TEST_DONE();
+#endif
 #endif
 
 	TEST_START("sign and verify ED25519");

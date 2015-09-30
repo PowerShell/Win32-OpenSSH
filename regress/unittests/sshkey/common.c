@@ -43,7 +43,12 @@ load_file(const char *name)
 	struct sshbuf *ret;
 
 	ASSERT_PTR_NE(ret = sshbuf_new(), NULL);
+	
+#ifdef WIN32_FIXME
+	ASSERT_INT_NE(fd = _open(test_data_file(name), O_RDONLY), -1);
+#else	
 	ASSERT_INT_NE(fd = open(test_data_file(name), O_RDONLY), -1);
+#endif	
 	ASSERT_INT_EQ(sshkey_load_file(fd, ret), 0);
 	close(fd);
 	return ret;

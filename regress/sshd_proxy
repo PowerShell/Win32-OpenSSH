@@ -1,0 +1,15 @@
+	StrictModes		no
+	Port			4242
+	Protocol		2
+	AddressFamily		inet
+	ListenAddress		127.0.0.1
+	#ListenAddress		::1
+	PidFile			/cygdrive/c/openssh/Win32-OpenSSH/regress/pidfile
+	AuthorizedKeysFile	/cygdrive/c/openssh/Win32-OpenSSH/regress/authorized_keys_%u
+	LogLevel		DEBUG3
+	AcceptEnv		_XXX_TEST_*
+	AcceptEnv		_XXX_TEST
+	Subsystem	sftp	/cygdrive/c/openssh/Win32-OpenSSH/sftp-server
+StrictModes no
+HostKey /cygdrive/c/openssh/Win32-OpenSSH/regress/rsa
+HostKey /cygdrive/c/openssh/Win32-OpenSSH/regress/ed25519
