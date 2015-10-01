@@ -746,12 +746,12 @@ process_open(u_int32_t id)
 	char *name;
 	int r, handle, fd, flags, mode, status = SSH2_FX_FAILURE;
 	
-	#ifdef WIN32_FIXME
-	name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
+//	#ifdef WIN32_FIXME
+//	name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
+//#else
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0 )
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif /* WIN32_FIXME */
+//#endif /* WIN32_FIXME */
 
 	if ((r = sshbuf_get_u32(iqueue, &pflags)) != 0 || /* portable flags */
 	    (r = decode_attrib(iqueue, &a)) != 0)
@@ -900,7 +900,8 @@ process_do_stat(u_int32_t id, int do_lstat)
   
   #ifdef WIN32_FIXME
   
-  name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
+  if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
   
   if (realpathWin32(name, resolvedname))
   {
@@ -923,7 +924,7 @@ process_do_stat(u_int32_t id, int do_lstat)
 	debug3("request %u: %sstat", id, do_lstat ? "l" : "");
 	verbose("%sstat name \"%s\"", do_lstat ? "l" : "", name);
 	r = do_lstat ? lstat(name, &st) : stat(name, &st);
-	#endif /* WIN32_FIXME */
+  #endif /* WIN32_FIXME */
 	if (r < 0) {
 		status = errno_to_portable(errno);
 	} else {
@@ -993,12 +994,8 @@ process_setstat(u_int32_t id)
 	char *name;
 	int r, status = SSH2_FX_OK;
 	
-#ifdef WIN32_FIXME
-  name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0 )
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
 
 	if ((r = decode_attrib(iqueue, &a)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
@@ -1119,13 +1116,8 @@ process_opendir(u_int32_t id)
 	char *path;
 	int r, handle, status = SSH2_FX_FAILURE;
 	
-#ifdef WIN32_FIXME
-  path = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 	if ((r = sshbuf_get_cstring(iqueue, &path, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
-
 	
 
 	debug3("request %u: opendir", id);
@@ -1225,13 +1217,9 @@ process_remove(u_int32_t id)
 {
 	char *name;
 	int r, status = SSH2_FX_FAILURE;
-#ifdef WIN32_FIXME
-  name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
+
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-
-#endif
 	
 	debug3("request %u: remove", id);
 	logit("remove name \"%s\"", name);
@@ -1248,12 +1236,8 @@ process_mkdir(u_int32_t id)
 	char *name;
 	int r, mode, status = SSH2_FX_FAILURE;
 	
-	#ifdef WIN32_FIXME
-  name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0 )
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
 
 	if ((r = decode_attrib(iqueue, &a)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
@@ -1274,14 +1258,8 @@ process_rmdir(u_int32_t id)
 	char *name;
 	int r, status;
 	
-	#ifdef WIN32_FIXME
-  name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
-
-	
 
 	debug3("request %u: rmdir", id);
 	logit("rmdir name \"%s\"", name);
@@ -1297,12 +1275,12 @@ process_realpath(u_int32_t id)
 	char resolvedname[PATH_MAX];
 	char *path;
 	int r;
-#ifdef WIN32_FIXME
-  path = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
+//#ifdef WIN32_FIXME
+  //path = buffer_get_string_local8_from_utf8(&iqueue, NULL);
+//#else
 	if ((r = sshbuf_get_cstring(iqueue, &path, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
+//#endif
 
 	
 
@@ -1330,15 +1308,9 @@ process_rename(u_int32_t id)
 	int r, status;
 	struct stat sb;
 	
-	#ifdef WIN32_FIXME
-  oldpath = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-  newpath = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 if ((r = sshbuf_get_cstring(iqueue, &oldpath, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(iqueue, &newpath, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-
-#endif
 
 	
 	debug3("request %u: rename", id);
@@ -1496,16 +1468,10 @@ process_extended_posix_rename(u_int32_t id)
 	char *oldpath, *newpath;
 	int r, status;
 	
-	#ifdef WIN32_FIXME
-  oldpath = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-  newpath = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 	if ((r = sshbuf_get_cstring(iqueue, &oldpath, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(iqueue, &newpath, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
 
-	
 
 	debug3("request %u: posix-rename", id);
 	logit("posix-rename old \"%s\" new \"%s\"", oldpath, newpath);
@@ -1653,13 +1619,8 @@ process_extended_statvfs(u_int32_t id)
 	
 	int r;
 	
-	#ifdef WIN32_FIXME
-  path = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 	if ((r = sshbuf_get_cstring(iqueue, &path, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
-
 	
 	debug3("request %u: statvfs", id);
 	logit("statvfs \"%s\"", path);
@@ -1706,15 +1667,9 @@ process_extended_hardlink(u_int32_t id)
 	char *oldpath, *newpath;
 	int r, status;
 	
-	#ifdef WIN32_FIXME
-  oldpath = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-  newpath = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-#else
 if ((r = sshbuf_get_cstring(iqueue, &oldpath, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(iqueue, &newpath, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-#endif
-
 	
 
 	debug3("request %u: hardlink", id);
@@ -1876,6 +1831,17 @@ sftp_server_usage(void)
 	exit(1);
 }
 
+#ifdef WIN32_FIXME
+DWORD select_in_handle( HANDLE in_handle)
+{
+	DWORD bytesavail = 0 ;
+	//rc = WaitForSingleObject (in_handle, 0);
+
+	PeekNamedPipe(in_handle, NULL,0, NULL, &bytesavail, NULL );
+	return bytesavail;
+}
+#endif
+
 int
 sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 {
@@ -1934,8 +1900,9 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	__progname = ssh_get_progname(argv[0]);
 	log_init(__progname, log_level, log_facility, log_stderr);
 
+  #endif
 	pw = pwcopy(user_pw);
-#endif
+
 
 	while (!skipargs && (ch = getopt(argc, argv,
 	    "d:f:l:P:p:Q:u:cehR")) != -1) {
@@ -2039,10 +2006,16 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	out = STDOUT_FILENO;
 
 #ifdef WIN32_FIXME
-  in  = GetStdHandle(STD_INPUT_HANDLE);
-  out = GetStdHandle(STD_OUTPUT_HANDLE);
-  setmode(in, O_BINARY);
-  setmode(out, O_BINARY);
+  //in  = GetStdHandle(STD_INPUT_HANDLE);
+  //out = GetStdHandle(STD_OUTPUT_HANDLE);
+  //setmode(in, O_BINARY);
+  //setmode(out, O_BINARY);
+	in = STDIN_FILENO;
+	out = STDOUT_FILENO;
+	_setmode(in,O_BINARY); // avoid CrLf translations of text mode
+	_setmode(out,O_BINARY); // avoid CrLf translation
+
+  HANDLE in_handle = (HANDLE) _get_osfhandle (in);
 #else
 #ifdef HAVE_CYGWIN
 	setmode(in, O_BINARY);
@@ -2061,8 +2034,8 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	if ((oqueue = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 #ifdef WIN32_FIXME
-  rset = (fd_set *)xmalloc(sizeof(fd_set));
-  wset = (fd_set *)xmalloc(sizeof(fd_set));
+  //rset = (fd_set *)xmalloc(sizeof(fd_set));
+  //wset = (fd_set *)xmalloc(sizeof(fd_set));
 #else
 	set_size = howmany(max + 1, NFDBITS) * sizeof(fd_mask);
 	rset = xmalloc(set_size);
@@ -2078,16 +2051,10 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	}
 
 	for (;;) {
-	#ifdef WIN32_FIXME
-    
-    FD_ZERO(rset);
-    FD_ZERO(wset);
-    
-#else
+	#ifndef WIN32_FIXME
+   
 		memset(rset, 0, set_size);
 		memset(wset, 0, set_size);
-	
-#endif
 
 		/*
 		 * Ensure that we can read a full buffer and handle
@@ -2101,83 +2068,64 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 		else if (r != SSH_ERR_NO_BUFFER_SPACE)
 			fatal("%s: sshbuf_check_reserve failed: %s",
 			    __func__, ssh_err(r));
-
+	#endif
+	
 #ifdef WIN32_FIXME
   
-    /*
-     * FIXME: Change to wrapper to save compatibility
-     *        with non-socket handles.
-     */ 
-     
-    olen = buffer_len(&oqueue);
+		int select_read = 0;
+		if ((r = sshbuf_check_reserve(iqueue, sizeof(buf))) == 0 &&
+		    (r = sshbuf_check_reserve(oqueue,
+		    SFTP_MAX_MSG_LENGTH)) == 0)
+			select_read = 1;
+		else if (r != SSH_ERR_NO_BUFFER_SPACE)
+			fatal("%s: sshbuf_check_reserve failed: %s",
+			    __func__, ssh_err(r));
 
-    if (olen > 0)
-    {
-      FD_SET(out, wset);
-    }  
+				
+		/* send oqueue to stdout */
+		olen = sshbuf_len(oqueue);
 
-    if (select(max+1, rset, wset, NULL, NULL) < 0) 
-    {
-      if (errno == EINTR)
-      continue;
+		if (olen > 0) {
+			len = _write(out, sshbuf_ptr(oqueue), olen);
+			if (len < 0) {
+				error("write: %s", strerror(errno));
+				sftp_server_cleanup_exit(1);
+			} else if ((r = sshbuf_consume(oqueue, len)) != 0) {
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
+			}
+		}
 
-      error("select: %s", strerror(errno));
-    
-      sftp_server_cleanup_exit(2);
-    }
+		/* copy stdin to iqueue */
+		if ( select_read ) {
+		 if (  select_in_handle(in_handle) || ( sshbuf_len(iqueue) <= 0)) {
+			len = _read(in, buf, sizeof buf);
+			if (len == 0) {
+				debug("read eof");
+				sftp_server_cleanup_exit(0);
+			} else if (len < 0) {
+				error("read: %s", strerror(errno));
+				sftp_server_cleanup_exit(1);
+			} else if ((r = sshbuf_put(iqueue, buf, len)) != 0) {
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
+			}
+		 }
+		}
 
-    /* copy stdin to iqueue */
-    if (FD_ISSET(in, rset)) 
-    {
-      len = recv(in, buf, sizeof buf, 0);
-    
-      if (len == 0) 
-      {
-        debug("read eof");
-      
-        sftp_server_cleanup_exit(0);
-      } 
-      else if (len < 0) 
-      {
-       error("read: %s", strerror(errno));
-      
-        sftp_server_cleanup_exit(1);
-      } 
-      else 
-      {
-        buffer_append(&iqueue, buf, len);
-      }
-    }
-  
-    /* send oqueue to stdout */
-  
-    if (FD_ISSET(out, wset)) 
-    {
-      len = send(out, buffer_ptr(&oqueue), olen, 0);
-    
-      if (len < 0) 
-      {
-        error("write: %s", strerror(errno));
-      
-        sftp_server_cleanup_exit(1);
-      } 
-      else 
-      {
-        buffer_consume(&oqueue, len);
-      }
-    }
-  
-    /*
-     * Process requests from client if we can fit the results
-     * into the output buffer, otherwise stop processing input
-     * and let the output queue drain.
-     */
-   
-    if (buffer_check_alloc(&oqueue, SFTP_MAX_MSG_LENGTH))
-    {
-      process();
-    }  
-  }
+
+		/*
+		 * Process requests from client if we can fit the results
+		 * into the output buffer, otherwise stop processing input
+		 * and let the output queue drain.
+		 */
+		r = sshbuf_check_reserve(oqueue, SFTP_MAX_MSG_LENGTH);
+		if (r == 0)
+			process();
+		else if (r != SSH_ERR_NO_BUFFER_SPACE)
+			fatal("%s: sshbuf_check_reserve: %s",
+			    __func__, ssh_err(r));
+	}
 #else /* WIN32_FIXME */
 
 		olen = sshbuf_len(oqueue);

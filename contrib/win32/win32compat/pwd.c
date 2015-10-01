@@ -93,6 +93,7 @@ static char pw_gecos[UNLEN + 1]    = {'\0'};
 static char pw_username[UNLEN + 1] = {'\0'};
 static char pw_passwd[UNLEN + 1]   = {'\0'};
 static wchar_t pw_homedir[MAX_PATH]   = {L'\0'};
+static char pw_homedir_ascii[MAX_PATH]   = {'\0'};
 static char pw_password[MAX_PATH]  = {'\0'};
 static char pw_shellpath[MAX_PATH] = {'\0'};
 
@@ -226,7 +227,7 @@ struct passwd *getpwuid(uid_t uid)
   pw.pw_passwd = pw_password;
   pw.pw_gecos = pw_gecos;
   pw.pw_shell = pw_shellpath;
-  pw.pw_dir = pw_homedir;
+  pw.pw_dir = pw_homedir_ascii;
 
   /*
    * Get the current user's name.
@@ -275,19 +276,31 @@ struct passwd *getpwuid(uid_t uid)
 
   debug3("getpwuid: homedir [%ls]", homedir_w);
     
-  wcsncpy(pw_homedir, homedir_w, sizeof(pw_homedir));
-        
+  //wcsncpy(pw_homedir, homedir_w, sizeof(pw_homedir));
+  // convert to ascii from widechar(unicode)
+  int rc = WideCharToMultiByte( CP_UTF8, // UTF8/ANSI Code Page
+		0, // No special handling of unmapped chars
+		homedir_w, // wide-character string to be converted
+		-1, // Unicode src str len, -1 means calc it
+		pw_homedir_ascii, 
+		sizeof(pw_homedir_ascii),
+		NULL, NULL ); // Unrepresented char replacement - Use Default
+ 
   free(homedir_w);
 
+  if ( rc == 0 ) {
+	  debug3("Could not convert homedirectory [%ls]from unicode to utf8", homedir_w);
+  }
+  
   /*
    * Point to the username static variable.
    */
   
-  pw.pw_name   = pw_username;
-  pw.pw_passwd = pw_passwd;
-  pw.pw_gecos  = pw_gecos;
-  pw.pw_shell  = pw_shellpath;
-  pw.pw_dir    = pw_homedir;
+  //pw.pw_name   = pw_username;
+  //pw.pw_passwd = pw_passwd;
+  //pw.pw_gecos  = pw_gecos;
+  //pw.pw_shell  = pw_shellpath;
+  //pw.pw_dir    = pw_homedir;
 
   return &pw;
 }
