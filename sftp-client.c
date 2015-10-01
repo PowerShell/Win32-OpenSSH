@@ -1313,7 +1313,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
  #ifdef WIN32_FIXME
 
   local_fd = _open(local_path, 
-		O_WRONLY | O_CREAT | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
+		O_WRONLY | O_CREAT | O_BINARY | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
 
   #else
 	  local_fd = open(local_path,
@@ -1704,7 +1704,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 
 	  #ifdef WIN32_FIXME
 
-  if ((local_fd = _open(local_path, O_RDONLY, 0)) == -1) {
+  if ((local_fd = _open(local_path, O_RDONLY | O_BINARY, 0)) == -1) {
 
   #else
 
