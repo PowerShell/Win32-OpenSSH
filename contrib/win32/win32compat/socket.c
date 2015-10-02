@@ -1994,6 +1994,13 @@ int WSHELPAddChildToWatch ( HANDLE processtowatch)
 	return 0;
 }
 
+int WSHELPDelChildToWatch ( HANDLE processtowatch)
+{
+	if ( ChildToWatch == processtowatch )
+		ChildToWatch = NULL ;
+	return 0;
+}
+
 int WSHELPselect(int fds, fd_set* readsfds, fd_set* writesfds,
                      fd_set* exceptsfds, const struct timeval* timeout)
 {

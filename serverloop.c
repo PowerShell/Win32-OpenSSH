@@ -879,6 +879,8 @@ collect_children(void)
         session_close_by_pid(s->pid, status);
         
         CloseHandle(process);
+		int WSHELPDelChildToWatch (HANDLE processtowatch);
+		WSHELPDelChildToWatch (process); // take the process off from watch list in select mux
       }
     }
   } while (i > 0);
