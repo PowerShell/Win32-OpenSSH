@@ -1986,6 +1986,13 @@ int cleanSelectThread(int thread_no)
   return 1;
 }
 
+// Add a Child process to be added to select mux so thyat we know when it has exited
+HANDLE ChildToWatch = NULL;
+int WSHELPAddChildToWatch ( HANDLE processtowatch)
+{
+	ChildToWatch = processtowatch;
+	return 0;
+}
 
 int WSHELPselect(int fds, fd_set* readsfds, fd_set* writesfds,
                      fd_set* exceptsfds, const struct timeval* timeout)
@@ -2288,6 +2295,12 @@ int WSHELPselect(int fds, fd_set* readsfds, fd_set* writesfds,
   DBG_MSG("WSHELPselect(fds = %d) : Waiting for signal from threads...\n", fds);
 
   DBG_MSG("i_sem = %d\n", i_sem);
+ 
+  // add a child process handle to the mux if it was registered
+  if ( ChildToWatch ) {
+	semaphores[i_sem] = ChildToWatch ;
+	i_sem++;
+  }
   
   dwWaitResult = WaitForMultipleObjects(i_sem, semaphores, FALSE, ms);
 
@@ -2536,8 +2549,8 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
 
         if (sfd != 2)
         {
-          error("write to socket sfd [%d] failed with error code [%d]",
-                    sfd, GetLastError());
+          //error("write to socket sfd [%d] failed with error code [%d]",
+          //          sfd, GetLastError());
 
           DBG_MSG("<- WSHELPwrite(sfd = %d, ret = -1)...\n", sfd);
         }

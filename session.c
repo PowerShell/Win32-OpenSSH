@@ -834,6 +834,10 @@ do_exec_no_pty(Session *s, const char *command)
    
   s -> pid = pi.hProcess;
   s -> processId = pi.dwProcessId;
+  
+  // Add the child process created to select mux so that during our select data call we know if the process has exited
+  int WSHELPAddChildToWatch ( HANDLE processtowatch);
+  WSHELPAddChildToWatch ( pi.hProcess);
 
   /* 
    * Set interactive/non-interactive mode. 
