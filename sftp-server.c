@@ -1730,6 +1730,10 @@ process_extended(u_int32_t id)
 
 /* stolen from ssh-agent */
 
+#ifdef WIN32_FIXME
+int readsomemore=0;
+#endif
+
 static void
 process(void)
 {
@@ -1741,9 +1745,18 @@ process(void)
 	int i, r;
 	u_int32_t id;
 
+	#ifdef WIN32_FIXME
+	// we use to tell our caller to read more data if a message is not complete
+	readsomemore=0;
+	#endif
+	
 	buf_len = sshbuf_len(iqueue);
-	if (buf_len < 5)
+	if (buf_len < 5) {
+		#ifdef WIN32_FIXME
+		readsomemore =1;
+		#endif
 		return;		/* Incomplete message. */
+	}
 	cp = sshbuf_ptr(iqueue);
 	msg_len = get_u32(cp);
 	if (msg_len > SFTP_MAX_MSG_LENGTH) {
@@ -1751,8 +1764,12 @@ process(void)
 		    client_addr, pw->pw_name);
 		sftp_server_cleanup_exit(11);
 	}
-	if (buf_len < msg_len + 4)
+	if (buf_len < msg_len + 4) {
+		#ifdef WIN32_FIXME
+		readsomemore =1;
+		#endif
 		return;
+	}
 	if ((r = sshbuf_consume(iqueue, 4)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	buf_len -= 4;
@@ -1834,9 +1851,13 @@ sftp_server_usage(void)
 #ifdef WIN32_FIXME
 DWORD select_in_handle( HANDLE in_handle)
 {
-	DWORD bytesavail = 0 ;
-	//rc = WaitForSingleObject (in_handle, 0);
+	//DWORD rc = WaitForSingleObject (in_handle, 0);
+	//if (rc == WAIT_OBJECT_0)
+	//	return 1;
+	//else
+	//	return 0;
 
+	DWORD bytesavail = 0 ;
 	PeekNamedPipe(in_handle, NULL,0, NULL, &bytesavail, NULL );
 	return bytesavail;
 }
@@ -2098,7 +2119,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 
 		/* copy stdin to iqueue */
 		if ( select_read ) {
-		 if (  select_in_handle(in_handle) || ( sshbuf_len(iqueue) <= 0)) {
+		 if (  readsomemore || ( sshbuf_len(iqueue) <= 0)) {
 			len = _read(in, buf, sizeof buf);
 			if (len == 0) {
 				debug("read eof");
