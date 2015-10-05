@@ -2563,6 +2563,7 @@ client_session2_setup(int id, int want_tty, int want_subsystem,
 		tty_make_modes(-1, tiop);
 		
 #else
+		packet_put_cstring(term != NULL ? term : "");
 		packet_put_int((u_int) 80 /*ws.ws_col*/);
 		packet_put_int((u_int) 25 /*ws.ws_row*/);
 		packet_put_int((u_int) 640 /*ws.ws_xpixel*/);

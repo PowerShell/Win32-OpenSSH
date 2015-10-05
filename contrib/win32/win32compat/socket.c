@@ -227,11 +227,11 @@ int WSHELPisatty(int sfd)
    * We can only do this for console fds.
    */
   
-  if (sfd_is_console(sfd) && sfd > 0)
+  if (sfd_is_console(sfd) && sfd >= 0)
   {
-    ret = _isatty(sfd_to_fd(sfd));
+    //ret = _isatty(sfd_to_fd(sfd));
 
-    return ret;
+    return 1 ; //ret;
   }
 
   /*
@@ -2825,7 +2825,11 @@ void allocate_standard_descriptor(int fd)
 {
   DBG_MSG("-> allocate_standard_descriptor(fd = %d)...\n", fd);
   
-  allocate_sfd(fd);
+  int asfd = allocate_sfd(fd);
+
+  void sfd_set_to_console(int sfd);
+  if (asfd >= 0)
+	  sfd_set_to_console(asfd);
   
   DBG_MSG("<- allocate_standard_descriptor()...");
 }

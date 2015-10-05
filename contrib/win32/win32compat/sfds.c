@@ -264,6 +264,12 @@ int sfd_to_fd(int sfd)
   return sfd_map[sfd].fd;
 }
 
+// set the sfd type to console. GetFileType() in Windows seem to return wrong type for a console returning PIPE (3) in place of CHARTYPE (2)
+void sfd_set_to_console(int sfd)
+{
+	sfd_map[sfd].type = SFD_TYPE_CONSOLE;
+}
+
 /*
  * For an sfd, get the real handle behind it 
  */

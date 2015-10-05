@@ -1205,7 +1205,8 @@ do_exec_pty(Session *s, const char *command)
    * Win32 code.
    */
    
-  return 0;
+  //return 0;
+  return do_exec_pty(s, command);
 
 #endif 
 }
