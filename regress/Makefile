@@ -127,7 +127,7 @@ t1:
 	tr '\n' '\r' <${.WIN32_CURDIR}/rsa_ssh2.prv > ${.WIN32_OBJDIR}/rsa_ssh2_cr.prv
 	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_OBJDIR}/rsa_ssh2_cr.prv | diff -w - ${.WIN32_CURDIR}/rsa_openssh.prv
 	awk '{print $$0 "\r"}' ${.WIN32_CURDIR}/rsa_ssh2.prv > ${.WIN32_OBJDIR}/rsa_ssh2_crnl.prv
-	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_OBJDIR}/rsa_ssh2_crnl.prv | diff - ${.WIN32_CURDIR}/rsa_openssh.prv
+	${TEST_SSH_SSHKEYGEN} -if ${.WIN32_OBJDIR}/rsa_ssh2_crnl.prv | diff -w - ${.WIN32_CURDIR}/rsa_openssh.prv
 
 t2:
 	cat ${.WIN32_CURDIR}/rsa_openssh.prv > $(WIN32_OBJ)/t2.out
@@ -186,7 +186,7 @@ t10: $(OBJ)/t10.out
 
 t11:
 	${TEST_SSH_SSHKEYGEN} -E sha256 -lf ${.WIN32_CURDIR}/rsa_openssh.pub |\
-		awk '{print $$2}' | diff - ${.WIN32_CURDIR}/t11.ok
+		awk '{print $$2}' | diff -w - ${.WIN32_CURDIR}/t11.ok
 
 $(OBJ)/t12.out:
 	${TEST_SSH_SSHKEYGEN} -q -t ed25519 -N '' -C 'test-comment-1234' -f $(WIN32_PWD)
