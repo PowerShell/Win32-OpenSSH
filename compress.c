@@ -22,7 +22,9 @@
 #include "buffer.h"
 #include "compress.h"
 
+#ifndef WIN32_ZLIB_NO
 #include <zlib.h>
+#endif
 
 z_stream incoming_stream;
 z_stream outgoing_stream;

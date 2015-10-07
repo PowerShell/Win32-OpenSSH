@@ -74,7 +74,9 @@
 #include "zlib.h"
 #define TARGET_OS_MAC 1
 #else
+#ifndef WIN32_ZLIB_NO
 #include "zlib.h"
+#endif
 #endif
 #include "monitor.h"
 #ifdef GSSAPI
@@ -95,8 +97,10 @@
 
 /* Imports */
 extern int compat20;
+#ifndef WIN32_ZLIB_NO
 extern z_stream incoming_stream;
 extern z_stream outgoing_stream;
+#endif
 extern struct monitor *pmonitor;
 extern Buffer loginmsg;
 extern ServerOptions options;

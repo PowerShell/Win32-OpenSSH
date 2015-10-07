@@ -7,7 +7,6 @@
 WARNINGS=Yes
 
 DEBUG=-g
-CFLAGS+=	-fstack-protector-all
 CDIAGFLAGS=	-Wall
 CDIAGFLAGS+=	-Wextra
 CDIAGFLAGS+=	-Werror

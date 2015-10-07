@@ -249,3 +249,9 @@ regress/t8.out.pub
 regress/t9.out.pub
 regress/t6.out1
 regress/t10.out.pub
+regress/t10.out.pub
+regress/t6.out1
+Makefile
+openbsd-compat/Makefile
+openbsd-compat/regress/Makefile
+contrib/win32/win32compat/Makefile

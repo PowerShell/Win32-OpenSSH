@@ -160,42 +160,42 @@ if test "$GCC" = "yes" || test "$GCC" = "egcs"; then
 	# -fstack-protector-all doesn't always work for some GCC versions
 	# and/or platforms, so we test if we can.  If it's not supported
 	# on a given platform gcc will emit a warning so we use -Werror.
-	if test "x$use_stack_protector" = "x1"; then
-	    for t in -fstack-protector-all -fstack-protector; do
-		AC_MSG_CHECKING([if $CC supports $t])
-		saved_CFLAGS="$CFLAGS"
-		saved_LDFLAGS="$LDFLAGS"
-		CFLAGS="$CFLAGS $t -Werror"
-		LDFLAGS="$LDFLAGS $t -Werror"
-		AC_LINK_IFELSE(
-			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
-			[[
-	char x[256];
-	snprintf(x, sizeof(x), "XXX");
-			 ]])],
-		    [ AC_MSG_RESULT([yes])
-		      CFLAGS="$saved_CFLAGS $t"
-		      LDFLAGS="$saved_LDFLAGS $t"
-		      AC_MSG_CHECKING([if $t works])
-		      AC_RUN_IFELSE(
-			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
-			[[
-	char x[256];
-	snprintf(x, sizeof(x), "XXX");
-			]])],
-			[ AC_MSG_RESULT([yes])
-			  break ],
-			[ AC_MSG_RESULT([no]) ],
-			[ AC_MSG_WARN([cross compiling: cannot test])
-			  break ]
-		      )
-		    ],
-		    [ AC_MSG_RESULT([no]) ]
-		)
-		CFLAGS="$saved_CFLAGS"
-		LDFLAGS="$saved_LDFLAGS"
-	    done
-	fi
+#	if test "x$use_stack_protector" = "x1"; then
+#	    for t in -fstack-protector-all -fstack-protector; do
+#		AC_MSG_CHECKING([if $CC supports $t])
+#		saved_CFLAGS="$CFLAGS"
+#		saved_LDFLAGS="$LDFLAGS"
+#		CFLAGS="$CFLAGS $t -Werror"
+#		LDFLAGS="$LDFLAGS $t -Werror"
+#		AC_LINK_IFELSE(
+#			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
+#			[[
+#	char x[256];
+#	snprintf(x, sizeof(x), "XXX");
+#			 ]])],
+#		    [ AC_MSG_RESULT([yes])
+#		      CFLAGS="$saved_CFLAGS $t"
+#		      LDFLAGS="$saved_LDFLAGS $t"
+#		      AC_MSG_CHECKING([if $t works])
+#		      AC_RUN_IFELSE(
+#			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
+#			[[
+#	char x[256];
+#	snprintf(x, sizeof(x), "XXX");
+#			]])],
+#			[ AC_MSG_RESULT([yes])
+#			  break ],
+#			[ AC_MSG_RESULT([no]) ],
+#			[ AC_MSG_WARN([cross compiling: cannot test])
+#			  break ]
+#		      )
+#		    ],
+#		    [ AC_MSG_RESULT([no]) ]
+#		)
+#		CFLAGS="$saved_CFLAGS"
+#		LDFLAGS="$saved_LDFLAGS"
+#	    done
+#	fi
 
 	if test -z "$have_llong_max"; then
 		# retry LLONG_MAX with -std=gnu99, needed on some Linuxes
