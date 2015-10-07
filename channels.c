@@ -2395,8 +2395,9 @@ channel_output_poll(void)
 		}
 	}
 }
-
-
+#ifdef WIN32_FIXME
+int lftocrlf = 0;
+#endif
 /* -- protocol input */
 
 /* ARGSUSED */
@@ -2452,6 +2453,17 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 		}
 		c->local_window -= win_len;
 	}
+
+	#ifdef WIN32_FIXME
+	if ( (c->client_tty) && (data_len >= 5) ) {
+		if ( data[0] == '\033' ) { // escape char octal 33, decimal 27
+			if ( (data[1] == '[') && (data[2]== '2') && (data[3]== '0') && ( data[4]== 'h' )) {
+				lftocrlf = 1;
+			}
+		}
+	}
+	#endif
+
 	if (c->datagram)
 		buffer_put_string(&c->output, data, data_len);
 	else
