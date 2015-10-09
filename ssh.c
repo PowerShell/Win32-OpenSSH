@@ -126,6 +126,8 @@
   extern int PassInputFd;
   extern int PassOutputFd;
 
+  char dotsshdir[MAX_PATH];
+
 #endif /* WIN32_FIXME */
 
 extern char *__progname;
@@ -587,6 +589,7 @@ main(int ac, char **av)
 	char cname[NI_MAXHOST];
 	struct stat st;
 	struct passwd *pw;
+
 	int timeout_ms;
 	extern int optind, optreset;
 	extern char *optarg;
@@ -811,7 +814,7 @@ main(int ac, char **av)
 				    strerror(errno));
 				break;
 			}
-			add_identity_file(&options, NULL, optarg, 1);
+			add_identity_file(&options, NULL, optarg, 1, pw);
 			break;
 		case 'I':
 #ifdef ENABLE_PKCS11
@@ -1055,6 +1058,10 @@ main(int ac, char **av)
       PassOutputFd = _open_osfhandle(options.passOutputHandle_, O_WRONLY);
     }
 
+ 	// create various Windows user home directory based file names
+    sprintf(dotsshdir,"%s\\%s", pw->pw_dir, _PATH_SSH_USER_DIR );
+    _mkdir(dotsshdir); //this base directory for the user is needed
+
   #endif
 
 	/* Check that we got a host name. */
@@ -1189,7 +1196,11 @@ main(int ac, char **av)
 	}
 
 	/* Fill configuration defaults. */
+	#ifndef WIN32_FIXME
 	fill_default_options(&options);
+	#else
+	fill_default_options(&options, pw);
+	#endif
 
 	if (options.port == 0)
 		options.port = default_ssh_port();

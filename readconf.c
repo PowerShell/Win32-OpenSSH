@@ -294,6 +294,11 @@ static struct {
 	{ NULL, oBadOption }
 };
 
+#ifdef WIN32_FIXME
+char user_hostfile_name[MAX_PATH] ; // full path of "known_hosts"
+char user_hostfile_name2[MAX_PATH] ; // full path of "known_hosts2"
+#endif
+
 /*
  * Adds a local TCP/IP port forward to options.  Never returns if there is an
  * error.
@@ -379,7 +384,7 @@ clear_forwardings(Options *options)
 
 void
 add_identity_file(Options *options, const char *dir, const char *filename,
-    int userprovided)
+    int userprovided, struct passwd *pw)
 {
 	char *path;
 	int i;
@@ -391,7 +396,12 @@ add_identity_file(Options *options, const char *dir, const char *filename,
 	if (dir == NULL) /* no dir, filename is absolute */
 		path = xstrdup(filename);
 	else
+		#ifndef WIN32_FIXME
 		(void)xasprintf(&path, "%.100s%.100s", dir, filename);
+		#else
+		if ( strcmp(dir, "~/") == 0)
+			(void)xasprintf(&path, "%.100s\\%.100s", pw->pw_dir, filename);
+		#endif
 
 	/* Avoid registering duplicates */
 	for (i = 0; i < options->num_identity_files; i++) {
@@ -995,7 +1005,7 @@ parse_time:
 				fatal("%.200s line %d: Too many identity files specified (max %d).",
 				    filename, linenum, SSH_MAX_IDENTITY_FILES);
 			add_identity_file(options, NULL,
-			    arg, flags & SSHCONF_USERCONF);
+			    arg, flags & SSHCONF_USERCONF, pw);
 		}
 		break;
 
@@ -1748,9 +1758,18 @@ fill_default_options_for_canonicalization(Options *options)
  * Called after processing other sources of option data, this fills those
  * options for which no value has been specified with their default values.
  */
+#ifndef WIN32_FIXME
 void
 fill_default_options(Options * options)
+#else
+void fill_default_options(Options * options, struct passwd *pw)
+#endif
 {
+	#ifdef WIN32_FIXME
+	sprintf(user_hostfile_name,"%s\\%s\\known_hosts", pw->pw_dir, _PATH_SSH_USER_DIR );// SSH_USER_HOSTFILE2;
+	sprintf(user_hostfile_name2,"%s\\%s\\known_hosts2", pw->pw_dir, _PATH_SSH_USER_DIR );// SSH_USER_HOSTFILE2;
+	#endif
+
 	if (options->forward_agent == -1)
 		options->forward_agent = 0;
 	if (options->forward_x11 == -1)
@@ -1818,19 +1837,19 @@ fill_default_options(Options * options)
 	if (options->num_identity_files == 0) {
 		if (options->protocol & SSH_PROTO_1) {
 			add_identity_file(options, "~/",
-			    _PATH_SSH_CLIENT_IDENTITY, 0);
+			    _PATH_SSH_CLIENT_IDENTITY, 0, pw);
 		}
 		if (options->protocol & SSH_PROTO_2) {
 			add_identity_file(options, "~/",
-			    _PATH_SSH_CLIENT_ID_RSA, 0);
+			    _PATH_SSH_CLIENT_ID_RSA, 0, pw);
 			add_identity_file(options, "~/",
-			    _PATH_SSH_CLIENT_ID_DSA, 0);
+			    _PATH_SSH_CLIENT_ID_DSA, 0, pw);
 #ifdef OPENSSL_HAS_ECC
 			add_identity_file(options, "~/",
-			    _PATH_SSH_CLIENT_ID_ECDSA, 0);
+			    _PATH_SSH_CLIENT_ID_ECDSA, 0, pw);
 #endif
 			add_identity_file(options, "~/",
-			    _PATH_SSH_CLIENT_ID_ED25519, 0);
+			    _PATH_SSH_CLIENT_ID_ED25519, 0, pw);
 		}
 	}
 	if (options->escape_char == -1)
@@ -1843,9 +1862,17 @@ fill_default_options(Options * options)
 	}
 	if (options->num_user_hostfiles == 0) {
 		options->user_hostfiles[options->num_user_hostfiles++] =
+			#ifdef WIN32_FIXME
+			user_hostfile_name ;
+			#else
 		    xstrdup(_PATH_SSH_USER_HOSTFILE);
+			#endif
 		options->user_hostfiles[options->num_user_hostfiles++] =
+			#ifdef WIN32_FIXME
+			user_hostfile_name2 ;
+			#else
 		    xstrdup(_PATH_SSH_USER_HOSTFILE2);
+			#endif
 	}
 	if (options->log_level == SYSLOG_LEVEL_NOT_SET)
 		options->log_level = SYSLOG_LEVEL_INFO;

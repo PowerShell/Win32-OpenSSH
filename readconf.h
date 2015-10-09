@@ -189,7 +189,11 @@ typedef struct {
 #define SSH_UPDATE_HOSTKEYS_ASK	2
 
 void     initialize_options(Options *);
+#ifdef WIN32_FIXME
+void     fill_default_options(Options *, struct passwd *pw);
+#else
 void     fill_default_options(Options *);
+#endif
 void	 fill_default_options_for_canonicalization(Options *);
 int	 process_config_line(Options *, struct passwd *, const char *,
     const char *, char *, const char *, int, int *, int);
@@ -202,6 +206,6 @@ void	 dump_client_config(Options *o, const char *host);
 
 void	 add_local_forward(Options *, const struct Forward *);
 void	 add_remote_forward(Options *, const struct Forward *);
-void	 add_identity_file(Options *, const char *, const char *, int);
+void	 add_identity_file(Options *, const char *, const char *, int, struct passwd *);
 
 #endif				/* READCONF_H */
