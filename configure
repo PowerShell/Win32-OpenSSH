@@ -5847,79 +5847,42 @@ rm -f core conftest.err conftest.$ac_objext \
 	# -fstack-protector-all doesn't always work for some GCC versions
 	# and/or platforms, so we test if we can.  If it's not supported
 	# on a given platform gcc will emit a warning so we use -Werror.
-	if test "x$use_stack_protector" = "x1"; then
-	    for t in -fstack-protector-all -fstack-protector; do
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking if $CC supports $t" >&5
-$as_echo_n "checking if $CC supports $t... " >&6; }
-		saved_CFLAGS="$CFLAGS"
-		saved_LDFLAGS="$LDFLAGS"
-		CFLAGS="$CFLAGS $t -Werror"
-		LDFLAGS="$LDFLAGS $t -Werror"
-		cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
- #include <stdio.h>
-int
-main ()
-{
-
-	char x[256];
-	snprintf(x, sizeof(x), "XXX");
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-		      CFLAGS="$saved_CFLAGS $t"
-		      LDFLAGS="$saved_LDFLAGS $t"
-		      { $as_echo "$as_me:${as_lineno-$LINENO}: checking if $t works" >&5
-$as_echo_n "checking if $t works... " >&6; }
-		      if test "$cross_compiling" = yes; then :
-   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: cross compiling: cannot test" >&5
-$as_echo "$as_me: WARNING: cross compiling: cannot test" >&2;}
-			  break
-
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
- #include <stdio.h>
-int
-main ()
-{
-
-	char x[256];
-	snprintf(x, sizeof(x), "XXX");
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_run "$LINENO"; then :
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-			  break
-else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-else
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-		CFLAGS="$saved_CFLAGS"
-		LDFLAGS="$saved_LDFLAGS"
-	    done
-	fi
+#	if test "x$use_stack_protector" = "x1"; then
+#	    for t in -fstack-protector-all -fstack-protector; do
+#		AC_MSG_CHECKING([if $CC supports $t])
+#		saved_CFLAGS="$CFLAGS"
+#		saved_LDFLAGS="$LDFLAGS"
+#		CFLAGS="$CFLAGS $t -Werror"
+#		LDFLAGS="$LDFLAGS $t -Werror"
+#		AC_LINK_IFELSE(
+#			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
+#			[[
+#	char x[256];
+#	snprintf(x, sizeof(x), "XXX");
+#			 ]])],
+#		    [ AC_MSG_RESULT([yes])
+#		      CFLAGS="$saved_CFLAGS $t"
+#		      LDFLAGS="$saved_LDFLAGS $t"
+#		      AC_MSG_CHECKING([if $t works])
+#		      AC_RUN_IFELSE(
+#			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
+#			[[
+#	char x[256];
+#	snprintf(x, sizeof(x), "XXX");
+#			]])],
+#			[ AC_MSG_RESULT([yes])
+#			  break ],
+#			[ AC_MSG_RESULT([no]) ],
+#			[ AC_MSG_WARN([cross compiling: cannot test])
+#			  break ]
+#		      )
+#		    ],
+#		    [ AC_MSG_RESULT([no]) ]
+#		)
+#		CFLAGS="$saved_CFLAGS"
+#		LDFLAGS="$saved_LDFLAGS"
+#	    done
+#	fi
 
 	if test -z "$have_llong_max"; then
 		# retry LLONG_MAX with -std=gnu99, needed on some Linuxes
