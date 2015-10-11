@@ -591,6 +591,7 @@ do_exec_no_pty(Session *s, const char *command)
   si.lpDesktop = L"winsta0\\default";
 
   SetEnvironmentVariable("USER", s->pw->pw_name);
+  SetEnvironmentVariable("USERNAME", s->pw->pw_name);
   SetEnvironmentVariable("LOGNAME", s->pw->pw_name);
 
   /*
@@ -1206,7 +1207,7 @@ do_exec_pty(Session *s, const char *command)
    */
    
   //return 0;
-  return do_exec_pty(s, command);
+  return do_exec_no_pty(s, command);
 
 #endif 
 }
