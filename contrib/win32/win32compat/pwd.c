@@ -97,6 +97,23 @@ static char pw_homedir_ascii[MAX_PATH]   = {'\0'};
 static char pw_password[MAX_PATH]  = {'\0'};
 static char pw_shellpath[MAX_PATH] = {'\0'};
 
+/* given a access token, find the domain name of user account of the access token */
+int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
+{
+   UCHAR InfoBuffer[1000],username[200];
+   PTOKEN_USER pTokenUser = (PTOKEN_USER)InfoBuffer;
+   DWORD dwInfoBufferSize,dwAccountSize = 200, dwDomainSize = dwSize;
+   SID_NAME_USE snu;
+
+   domain[0] = '\0' ;
+   GetTokenInformation(*hAccessToken,TokenUser,InfoBuffer,
+						1000, &dwInfoBufferSize);
+
+   LookupAccountSid(NULL, pTokenUser->User.Sid, (LPSTR)username,
+				        &dwAccountSize,(LPSTR)domain, &dwDomainSize, &snu);
+   return 0;
+}
+
 /*
  * Retrieve user homedir from token, save it in static string
  * and return pointer to this string.
@@ -109,24 +126,30 @@ static char pw_shellpath[MAX_PATH] = {'\0'};
 
 char *GetHomeDirFromToken(char *userName, HANDLE token)
 {
-  
-  wchar_t userNameW[UNLEN + 1];
+  UCHAR domain[200];
   
   debug("-> GetHomeDirFromToken()...");
   
-  PROFILEINFOW profileInfo;
-  
-  if (MultiByteToWideChar(CP_UTF8, 0, userName, -1, userNameW, UNLEN) == 0)
-  {
-    debug("userName encoding conversion failure");
-    return NULL;
-  }
-  
-  memset(&profileInfo, 0, sizeof(profileInfo));
+  PROFILEINFO profileInfo;
 
-  profileInfo.dwSize       = sizeof(profileInfo);
-  profileInfo.lpUserName   = userNameW;
-  profileInfo.lpServerName = NULL;
+  // find the server name of the domain controller which created this token
+  GetDomainFromToken ( &token, domain, sizeof(domain));
+  //if (MultiByteToWideChar(CP_UTF8, 0, domain, -1, domainW, sizeof(domainW)) == 0)
+  //{
+    //debug("DomainServerName encoding conversion failure");
+    //return NULL;
+  //}
+
+  profileInfo.dwFlags = PI_NOUI;
+  profileInfo.lpProfilePath = NULL;
+  profileInfo.lpUserName = userName;
+  profileInfo.lpDefaultPath = NULL;
+  profileInfo.lpServerName = domain;
+  profileInfo.lpPolicyPath = NULL;
+  profileInfo.hProfile = NULL;
+  profileInfo.dwSize = sizeof(profileInfo);
+
+
   
   if (LoadUserProfile(token, &profileInfo) == FALSE)
   {
