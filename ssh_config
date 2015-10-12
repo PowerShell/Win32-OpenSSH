@@ -45,4 +45,7 @@
 #   PermitLocalCommand no
 #   VisualHostKey no
 #   ProxyCommand ssh -q -W %h:%p gateway.example.com
+HostKeyAlgorithms ssh-rsa,ssh-dss
+PubkeyAcceptedKeyTypes +ssh-dss,ecdsa-sha2-nistp256
+
 #UsePrivilegeSeparation no

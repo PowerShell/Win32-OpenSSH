@@ -119,3 +119,8 @@ Subsystem	sftp	/usr/libexec/sftp-server
 #	X11Forwarding no
 #	AllowTcpForwarding no
 #	ForceCommand cvs server
+
+PubkeyAcceptedKeyTypes +ssh-dss,ecdsa-sha2-nistp256
+
+
+
