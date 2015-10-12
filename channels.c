@@ -2459,6 +2459,8 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 		if ( data[0] == '\033' ) { // escape char octal 33, decimal 27
 			if ( (data[1] == '[') && (data[2]== '2') && (data[3]== '0') && ( data[4]== 'h' )) {
 				lftocrlf = 1;
+				data = data + 5 ; // we have processed the 5 bytes ESC sequence
+				data_len = data_len - 5;
 			}
 		}
 	}
@@ -2466,8 +2468,18 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 
 	if (c->datagram)
 		buffer_put_string(&c->output, data, data_len);
-	else
+	else {
+		#ifndef WIN32_FIXME
 		buffer_append(&c->output, data, data_len);
+		#else
+		buffer_append(&c->output, data, data_len);
+		if ( c->isatty ) {
+			buffer_append(&c->input, data, data_len); // we echo the data if it is sshd server and pty interactive mode
+			if ( (data_len ==1) && (data[0] == '\b') )
+				buffer_append(&c->input, " \b", 2); // for backspace, we need to send space and another backspace for visual erase
+		}
+		#endif
+	}
 	packet_check_eom();
 	return 0;
 }

@@ -2453,6 +2453,38 @@ int WSHELPread(int sfd, char *dst, unsigned int max)
     case SFD_TYPE_CONSOLE:
     {
       ret = _read(sfd_to_fd(sfd), dst, max);
+
+      if (FD_ISSET(sfd_to_fd(sfd), &debug_sfds))
+      {
+        if (ret > 0)
+        {
+          dst[ret] = '\0';
+
+          debug("read[%d] len %d: %s", sfd_to_fd(sfd), ret, dst);
+        }
+      }
+
+      if (ret < 0)
+      {
+        error("read from pipe/console sfd [%d] failed with error code [%d]",
+                  sfd, GetLastError());
+      }
+
+      break;
+    }
+    case 99:
+    {
+      ret = _getch();
+      if ( ( ret == 0) || (ret == 0xE0) ) {
+    	  dst[0] = ret ;
+    	  ret = _getch(); // function key or arrow key needs 2 calls, the first returning a 0 or 0xE0
+          dst[1] = ret;
+          ret = 2;
+      }
+      else {
+    	  dst[0] = ret;
+    	  ret = 1;
+      }
       
       if (FD_ISSET(sfd_to_fd(sfd), &debug_sfds))
       {

@@ -774,6 +774,21 @@ do_exec_no_pty(Session *s, const char *command)
   
   GetUserName(name, &size);
 
+  //if (!(s -> is_subsystem)) {
+	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
+	  //Channel *c=channel_by_id ( s->chanid );
+	  //buffer_append(&c->input, "\033[20h", 5);
+	  //channel_output_poll();
+  //}
+
+  //if (s ->ttyfd != -1) {
+  	  // set the channel to tty interactive type
+  //	  Channel *c=channel_by_id ( s->chanid );
+  //	  c->isatty = 1;
+  //}
+
+  if ( (s->term) && (s->term[0]) )
+		  SetEnvironmentVariable("TERM", s->term);
   /*
    * Create new process as other user using access token object.
    */
@@ -869,8 +884,11 @@ do_exec_no_pty(Session *s, const char *command)
    */
    
   if (compat20) 
-  {  
-    session_set_fds(s, sockin[1], sockout[1], sockerr[1], s -> is_subsystem, 0);
+  {
+	if ( s->ttyfd == -1)
+		session_set_fds(s, sockin[1], sockout[1], sockerr[1], s -> is_subsystem, 0);
+	else
+		session_set_fds(s, sockin[1], sockout[1], sockerr[1], s -> is_subsystem, 1); // tty interctive session
   } 
   else 
   {

@@ -91,10 +91,13 @@ pty_allocate(int *ptyfd, int *ttyfd, char *namebuf, size_t namebuflen)
 #else
 
   /*
-   * Not implemented on Win32.
+   * Simple console screen implementation in Win32 to give a Unix like pty for interactive sessions
    */
-   
-  return 0;  
+  *ttyfd = 0; // first ttyfd & ptyfd is indexed at 0
+  *ptyfd = 0;
+  strlcpy(namebuf, "console", namebuflen);
+  return 1;
+  //return 0;
    
 #endif
 }
