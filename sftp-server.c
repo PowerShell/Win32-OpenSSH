@@ -1283,11 +1283,26 @@ process_realpath(u_int32_t id)
 //#endif
 
 	
-
+#ifndef WIN32_FIXME
 	if (path[0] == '\0') {
 		free(path);
 		path = xstrdup(".");
 	}
+#else
+	if ( (path[0] == '\0') || ( strcmp(path, ".")== 0 ) ) {
+		free(path);
+		_getcwd(resolvedname, sizeof(resolvedname));
+		// convert back slashes to forward slashes to be compatibale with unix naming
+		char *cptr = resolvedname;
+		while (*cptr) {
+			if (*cptr == '\\')
+				*cptr = '/' ;
+			cptr++;
+		}
+		path = xstrdup(resolvedname);
+	}
+#endif
+
 	debug3("request %u: realpath", id);
 	verbose("realpath \"%s\"", path);
 	if (realpath(path, resolvedname) == NULL) {
