@@ -740,6 +740,11 @@ do_exec_no_pty(Session *s, const char *command)
   SetEnvironmentVariableW(L"HOME", s -> pw -> pw_dir);
   SetEnvironmentVariableW(L"USERPROFILE", s -> pw -> pw_dir);
   
+  // find the server name of the domain controller which created this token
+  GetDomainFromToken ( &hToken, buf, sizeof(buf));
+  if (buf[0])
+	  SetEnvironmentVariable("USERDOMAIN", buf );
+
   /*
    * Set SSH_CLIENT variable.
    */
