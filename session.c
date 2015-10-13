@@ -762,6 +762,12 @@ do_exec_no_pty(Session *s, const char *command)
   
   SetEnvironmentVariable("SSH_CONNECTION", buf);
 
+  // set better prompt for Windows cmd shell
+  if (!s -> is_subsystem) {
+	  snprintf(buf,sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
+	  SetEnvironmentVariable("PROMPT", buf);
+  }
+
   /*
    * Get the current user's name (associated with sshd thread).
    */
