@@ -1,4 +1,5 @@
 See http://www.openssh.com/txt/release-7.1 for the release notes.
+See https://github.com/PowerShell/Win32-OpenSSH/wiki for build/deployment information
 
 Please read http://www.openssh.com/report.html for bug reporting
 instructions and note that we do not use Github for bug reporting or
