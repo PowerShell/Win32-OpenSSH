@@ -607,6 +607,7 @@ main(int ac, char **av)
      */
   
     AllocConsole();
+    ConInit( STD_OUTPUT_HANDLE, TRUE );
 
     SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
 
