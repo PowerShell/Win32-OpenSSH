@@ -83,7 +83,7 @@
 /* #undef BSD_AUTH */
 
 /* Define if you want to specify the path to your lastlog file */
-/* #undef CONF_LASTLOG_FILE */
+#define CONF_LASTLOG_FILE "/var/log/lastlog"
 
 /* Define if you want to specify the path to your utmp file */
 #define CONF_UTMP_FILE "/var/run/utmp"
@@ -1641,6 +1641,7 @@
 #define HAVE_DECL_HOWMANY 0
 
 #define WIN32_ZLIB_NO 1
+#define USE_MSCNG 1
 
 //#define HAVE_ARC4RANDOM_UNIFORM 1
 

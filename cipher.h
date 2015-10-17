@@ -41,7 +41,9 @@
 #include <openssl/evp.h>
 #include "cipher-chachapoly.h"
 #include "cipher-aesctr.h"
-
+#ifdef USE_MSCNG
+#include "contrib/win32/win32compat/cng_cipher.h"
+#endif
 /*
  * Cipher types for SSH-1.  New types can be added, but old types should not
  * be removed for compatibility.  The maximum allowed value is 31.
@@ -70,6 +72,10 @@ struct sshcipher_ctx {
 	struct chachapoly_ctx cp_ctx; /* XXX union with evp? */
 	struct aesctr_ctx ac_ctx; /* XXX union with evp? */
 	const struct sshcipher *cipher;
+	#ifdef USE_MSCNG
+	struct ssh_cng_cipher_ctx  cng_ctx;
+	#endif
+	
 };
 
 u_int	 cipher_mask_ssh1(int);

@@ -263,3 +263,4 @@ regress/t7.out.pub
 regress/t6.out2
 config.h
 configure
+config.h
