@@ -58,7 +58,7 @@ PERL=@PERL@
 SED=@SED@
 ENT=@ENT@
 XAUTH_PATH=@XAUTH_PATH@
-LDFLAGS=-L. -Lopenbsd-compat/ -Lcontrib/win32/win32compat @LDFLAGS@ -L/cygdrive/C/cygwin-32/lib/w32api
+LDFLAGS=-L. -Lopenbsd-compat/ -Lcontrib/win32/win32compat @LDFLAGS@ -L/lib/w32api
 EXEEXT=@EXEEXT@
 MANFMT=@MANFMT@
 
