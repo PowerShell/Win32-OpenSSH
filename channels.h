@@ -226,7 +226,12 @@ void	 channel_register_status_confirm(int, channel_confirm_cb *,
     channel_confirm_abandon_cb *, void *);
 void	 channel_cancel_cleanup(int);
 int	 channel_close_fd(int *);
+#ifndef WIN32_FIXME
 void	 channel_send_window_changes(void);
+#else
+void channel_send_window_changes(int, int, int, int);
+#endif
+
 
 /* protocol handler */
 

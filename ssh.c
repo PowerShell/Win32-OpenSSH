@@ -580,6 +580,7 @@ set_addrinfo_port(struct addrinfo *addrs, int port)
 /*
  * Main program for the ssh client.
  */
+
 int
 main(int ac, char **av)
 {
@@ -605,9 +606,6 @@ main(int ac, char **av)
      * Setup exit signal handler for receiving signal, when 
      * parent server is stopped.
      */
-  
-    AllocConsole();
-    ConInit( STD_OUTPUT_HANDLE, TRUE );
 
     SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
 
@@ -1501,6 +1499,13 @@ main(int ac, char **av)
 			options.identity_keys[i] = NULL;
 		}
 	}
+
+	#ifdef WIN32_FIXME
+	if (tty_flag) {
+		//AllocConsole();
+	    ConInit( STD_OUTPUT_HANDLE, TRUE );
+	}
+	#endif
 
 	exit_status = compat20 ? ssh_session2() : ssh_session();
 	packet_close();

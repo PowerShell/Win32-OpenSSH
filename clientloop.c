@@ -119,6 +119,12 @@
 #include <sys/stat.h>
 
 #define isatty(a) WSHELPisatty(a)
+
+// Windows Console screen size change related
+extern int ScreenX;
+extern int ScrollBottom;
+int win_received_window_change_signal = 1;
+
 #endif
 
 /* import options */
@@ -561,6 +567,25 @@ client_check_window_change(void)
 		packet_put_int((u_int)ws.ws_col);
 		packet_put_int((u_int)ws.ws_xpixel);
 		packet_put_int((u_int)ws.ws_ypixel);
+		packet_send();
+	}
+#else
+
+	if (! win_received_window_change_signal)
+		return;
+	/** XXX race */
+	win_received_window_change_signal = 0;
+
+	debug2("client_check_window_change: changed");
+
+	if (compat20) {
+		channel_send_window_changes(ScreenX, ScrollBottom, 640, 480);
+	} else {
+		packet_start(SSH_CMSG_WINDOW_SIZE);
+		packet_put_int((u_int)ScreenX);
+		packet_put_int((u_int)ScrollBottom);
+		packet_put_int((u_int)640);
+		packet_put_int((u_int)480);
 		packet_send();
 	}
 #endif /* !WIN32_FIXME */
@@ -2571,11 +2596,11 @@ client_session2_setup(int id, int want_tty, int want_subsystem,
 		tty_make_modes(-1, tiop);
 		
 #else
-		packet_put_cstring(term != NULL ? term : "");
-		packet_put_int((u_int) 80 /*ws.ws_col*/);
-		packet_put_int((u_int) 25 /*ws.ws_row*/);
-		packet_put_int((u_int) 640 /*ws.ws_xpixel*/);
-		packet_put_int((u_int) 480 /*ws.ws_ypixel*/);
+		packet_put_cstring(term != NULL ? term : "vt220");
+		packet_put_int((u_int) ScreenX);
+		packet_put_int((u_int) ScrollBottom);
+		packet_put_int((u_int) 640);
+		packet_put_int((u_int) 480);
 		tty_make_modes(-1, NULL);
 #endif /* else !WIN32_FIXME */
 		packet_send();
