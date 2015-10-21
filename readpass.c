@@ -362,7 +362,7 @@ read_passphrase(const char *prompt, int flags)
 		}
 		else {
 
-			_putch( (int) '*' ); // show a star in place of what is typed
+			//_putch( (int) '*' ); // show a star in place of what is typed
 			len++; // keep reading in the loop
 		}
 	}
