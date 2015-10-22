@@ -1608,7 +1608,13 @@ SCREEN_HANDLE ConSaveScreenHandle( SCREEN_HANDLE hScreen )
     }
 
 	if ( !pScreenRec->pScreenBuf )
+	{
+		// if we allocated a screen within this scope, free it before returning
+		if ( pScreenRec != (PSCREEN_RECORD)hScreen ) {
+			free(pScreenRec);
+		}
 		return NULL;
+	}
 
 	result =  ReadConsoleOutput( hConsole,				// handle of a console screen buffer 
 							 (PCHAR_INFO)(pScreenRec->pScreenBuf),	// address of buffer that receives data 
