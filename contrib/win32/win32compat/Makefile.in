@@ -23,7 +23,7 @@ WIN32COMPATFILES = daemon.o gettimeofday.o homedirhelp.o pwd.o sfds.o \
 
 WIN32COMPATLIB=@LIBWIN32COMPAT@
 
-CNGFILES=cng_cipher.o
+CNGFILES=cng_cipher.o cng_digest.o
 
 
 .c.o:
@@ -44,6 +44,6 @@ distclean: clean
 
 $(WIN32COMPATFILES): ../../../config.h
 
-$(WIN32COMPATLIB): $(WIN32COMPATFILES)
-	$(AR) rv $@ $(WIN32COMPATFILES)
+$(WIN32COMPATLIB): $(WIN32COMPATFILES) $(CNGFILES)
+	$(AR) rv $@ $(WIN32COMPATFILES) $(CNGFILES)
 	$(RANLIB) $@
