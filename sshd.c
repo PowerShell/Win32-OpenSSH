@@ -1707,8 +1707,12 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
            
            memset(&si, 0 , sizeof(STARTUPINFO));
            
+           char remotesoc[64];
+           snprintf ( remotesoc, sizeof(remotesoc), "%d", sfd_to_handle(*newsock));
+           SetEnvironmentVariable("SSHD_REMSOC", remotesoc);
+
            si.cb = sizeof(STARTUPINFO);
-           si.hStdInput = (HANDLE) sfd_to_handle(*newsock);
+           si.hStdInput = GetStdHandle(STD_INPUT_HANDLE); //(HANDLE) sfd_to_handle(*newsock);
            si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
            si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
            si.wShowWindow = SW_HIDE;
@@ -1886,7 +1890,20 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 
   BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
   {
-    debug("Exit signal received...");
+		switch( dwCtrlType )
+		{
+		case CTRL_C_EVENT:
+			return TRUE; // control C will be passed to shell but sshd wil not exit
+
+	    case CTRL_BREAK_EVENT:
+		case CTRL_LOGOFF_EVENT:
+			break;
+
+		default:
+			break;
+		}
+
+	debug("Exit signal received...");
 
     cleanup_exit(0);
     
@@ -2776,19 +2793,22 @@ main(int ac, char **av)
       }
       else
       {
-        STARTUPINFO si;
+        //STARTUPINFO si;
 
-        memset(&si, 0 , sizeof(STARTUPINFO));
+        //memset(&si, 0 , sizeof(STARTUPINFO));
         
-        si.cb = sizeof(STARTUPINFO);
+        //si.cb = sizeof(STARTUPINFO);
 
         /* 
          * Get the stdin handle from process info to use for client 
          */
         
-        GetStartupInfo(&si);
+        //GetStartupInfo(&si);
         
-        sock_in = sock_out = newsock = allocate_sfd(si.hStdInput);
+        int remotesochandle ;
+        remotesochandle = atoi( getenv("SSHD_REMSOC") );
+
+        sock_in = sock_out = newsock = allocate_sfd(remotesochandle) ; //si.hStdInput);
 
         /*
          * We don't have a startup_pipe 

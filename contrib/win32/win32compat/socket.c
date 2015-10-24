@@ -2616,7 +2616,7 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
 
     case SFD_TYPE_FD:
     case SFD_TYPE_PIPE:
-    case SFD_TYPE_CONSOLE:
+    //case SFD_TYPE_CONSOLE:
     {
       ret = _write(sfd_to_fd(sfd), buf, max);
       
@@ -2650,7 +2650,16 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
       }
       
       break;
-    }  
+    }
+    case SFD_TYPE_CONSOLE:
+    {
+      //ret = _write(sfd_to_fd(sfd), buf, max);
+	  DWORD dwWritten = 0 ;
+	  ret = WriteToConsole(sfd_to_handle(sfd), buf, max, &dwWritten, 0) ;
+	  ret = max ;
+          
+      break;
+    }  	
   }
 
   DBG_MSG("<- WSHELPwrite(sfd = %d, ret = %d)...\n", sfd, ret);

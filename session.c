@@ -549,6 +549,7 @@ do_exec_no_pty(Session *s, const char *command)
   if (!command)
   {
     exec_command = s->pw->pw_shell;
+	//exec_command = "c:\\tools\\echoit.exe"; // temp
   }  
   else
   {
@@ -560,8 +561,21 @@ do_exec_no_pty(Session *s, const char *command)
   /*
    * Create three socket pairs for stdin, stdout and stderr 
    */
-   
-  socketpair(sockin);
+
+  HANDLE wfdtocmd = -1;
+  if ( (!s -> is_subsystem) && (s ->ttyfd != -1))
+  {
+	wfdtocmd = GetStdHandle (STD_INPUT_HANDLE) ;
+	sockin[1] = allocate_sfd((int)wfdtocmd); // put the std input handle in our global general handle table
+	if (sockin[1] >= 0)
+		  sfd_set_to_console(sockin[1]); // mark it as Console type
+
+	//allocate_standard_descriptor(STDIN_FILENO);
+    //allocate_standard_descriptor(wfdtocmd); // put the std input handle in our global general handle table
+  }
+  else
+	socketpair(sockin);
+
   socketpair(sockout);
   socketpair(sockerr);
 
@@ -569,10 +583,14 @@ do_exec_no_pty(Session *s, const char *command)
   debug3("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
   debug3("sockerr[0]: %d sockerr[1]: %d", sockerr[0], sockerr[1]);
 
-  crlf_sfd(sockin[1]);
+  if ( (s -> is_subsystem) || (s ->ttyfd == -1))
+	crlf_sfd(sockin[1]);
+
   crlf_sfd(sockout[1]);
 
-  SetHandleInformation(sfd_to_handle(sockin[1]), HANDLE_FLAG_INHERIT, 0);
+  if ( (s -> is_subsystem) || (s ->ttyfd == -1))
+	  SetHandleInformation(sfd_to_handle(sockin[1]), HANDLE_FLAG_INHERIT, 0);
+
   SetHandleInformation(sfd_to_handle(sockout[1]), HANDLE_FLAG_INHERIT, 0);
   SetHandleInformation(sfd_to_handle(sockerr[1]), HANDLE_FLAG_INHERIT, 0);
 
@@ -583,12 +601,34 @@ do_exec_no_pty(Session *s, const char *command)
   memset(&si, 0 , sizeof(STARTUPINFO));
   
   si.cb = sizeof(STARTUPINFO);
-  si.hStdInput = (HANDLE) sfd_to_handle(sockin[0]);
-  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
-  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
-  si.wShowWindow = SW_HIDE;
-  si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+  si.lpReserved       = 0;
+  si.lpTitle          = NULL; /* NULL means use exe name as title */
+  si.dwX              = 0;
+  si.dwY              = 0;
+  si.dwXSize          = 80;
+  si.dwYSize          = 25;
+  si.dwXCountChars    = 80;
+  si.dwYCountChars    = 25;
+  si.dwFillAttribute  = 0;
+  si.dwFlags          = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS; // | STARTF_USESHOWWINDOW ;
+  si.wShowWindow      = 0; // FALSE ;
+  si.cbReserved2      = 0;
+  si.lpReserved2      = 0;
+
+  if ( (!s -> is_subsystem) && (s ->ttyfd != -1) ) {
+	  si.hStdInput = GetStdHandle (STD_INPUT_HANDLE) ; // shell tty interactive session gets a console input for Win32
+	  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
+	  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
+  }
+  else {
+	  si.hStdInput = (HANDLE) sfd_to_handle(sockin[0]);
+	  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
+	  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
+  }
+  //si.wShowWindow = SW_HIDE;
+  //si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
   si.lpDesktop = L"winsta0\\default";
+
 
   SetEnvironmentVariable("USER", s->pw->pw_name);
   SetEnvironmentVariable("USERNAME", s->pw->pw_name);
@@ -785,12 +825,12 @@ do_exec_no_pty(Session *s, const char *command)
   
   GetUserName(name, &size);
 
-  //if (!(s -> is_subsystem)) {
+  if (!(s -> is_subsystem)) {
 	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
-	  //Channel *c=channel_by_id ( s->chanid );
-	  //buffer_append(&c->input, "\033[20h", 5);
-	  //channel_output_poll();
-  //}
+	  Channel *c=channel_by_id ( s->chanid );
+	  buffer_append(&c->input, "\033[20h", 5);
+	  channel_output_poll();
+  }
 
   //if (s ->ttyfd != -1) {
   	  // set the channel to tty interactive type
@@ -876,8 +916,9 @@ do_exec_no_pty(Session *s, const char *command)
   /* 
    * We are the parent.  Close the child sides of the socket pairs. 
    */
-  
-  close(sockin[0]);
+  if ( (s -> is_subsystem) || (s ->ttyfd == -1))
+	close(sockin[0]);
+
   close(sockout[0]);
   close(sockerr[0]);
 

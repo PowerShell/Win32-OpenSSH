@@ -168,7 +168,10 @@ static int escape_pending1;	/* Last character was an escape (proto1 only) */
 static int last_was_cr;		/* Last character was a newline. */
 static int exit_status;		/* Used to store the command exit status. */
 static int stdin_eof;		/* EOF has been encountered on stderr. */
-static Buffer stdin_buffer;	/* Buffer for stdin data. */
+#ifndef WIN32_FIXME
+static
+#endif
+Buffer stdin_buffer;	/* Buffer for stdin data. */
 static Buffer stdout_buffer;	/* Buffer for stdout data. */
 static Buffer stderr_buffer;	/* Buffer for stderr data. */
 static u_int buffer_high;	/* Soft max buffer size. */

@@ -296,12 +296,38 @@ static void CleanUpProxyProcess()
   }
 }
 
+extern Buffer stdin_buffer;	/* Buffer for stdin data. */
 /*
  * This function handles exit signal.
  */
 
 BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
 {
+
+  switch( dwCtrlType ) 
+  { 
+    // Handle the CTRL-C signal. 
+    case CTRL_C_EVENT: 
+	  // send CTRL_C code to the remote app via sshd server
+      //buffer_put_char(&stdin_buffer, 0x3); // control-c is decimal 3
+      //Beep( 750, 300 ); 
+      //return( TRUE ); // we have handled it. FALSE would be go to next handler
+
+    case CTRL_BREAK_EVENT: 
+ 	  // send CTRL_BREAK to the remote side ?
+	  //return TRUE;
+
+    case CTRL_CLOSE_EVENT: 
+    case CTRL_LOGOFF_EVENT: 
+    case CTRL_SHUTDOWN_EVENT: 
+	  // send SHELL_CODE_TERMINATE to the remote side
+	  //return FALSE ; // go to next handler
+
+	default:
+	   break;
+      //return FALSE;
+  }
+  
   debug("Exit signal received...");
 
   CleanUpProxyProcess();
@@ -311,6 +337,7 @@ BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
   cleanup_exit(0);
   
   return TRUE;
+
 }
 
 #endif /* WIN32_FIXME */

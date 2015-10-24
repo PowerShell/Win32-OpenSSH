@@ -19,7 +19,7 @@ LDFLAGS=-L. @LDFLAGS@ -L/lib/win32api
 
 WIN32COMPATFILES = daemon.o gettimeofday.o homedirhelp.o pwd.o sfds.o \
 	socket.o startupneeds.o strcasecmp.o syslog.o lsalogon.o lsastring.o \
-	stringhelp.o deskright.o win32auth.o kerberos.o cng_cipher.o ansiprsr.o console.o tnnet.o
+	stringhelp.o deskright.o win32auth.o kerberos.o cng_cipher.o ansiprsr.o console.o tnnet.o conio.o
 
 WIN32COMPATLIB=@LIBWIN32COMPAT@
 
