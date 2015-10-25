@@ -494,6 +494,46 @@ do_authenticated1(Authctxt *authctxt)
 #ifndef WIN32_FIXME
 #define USE_PIPES 1
 #endif
+
+#ifdef WIN32_FIXME
+HANDLE hConIn = NULL;
+HANDLE hConOut = NULL;
+HANDLE hConErr = NULL;
+
+BOOL MakeNewConsole(void)
+{
+	BOOL bRet = TRUE;
+
+	if (!(bRet = FreeConsole())) return bRet;
+	if (!(bRet = AllocConsole())) return bRet;
+	HANDLE hTemp;
+
+	hTemp = CreateFile("CONIN$",GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+	if (INVALID_HANDLE_VALUE != hTemp)
+	{
+		DuplicateHandle(GetCurrentProcess(),hTemp,GetCurrentProcess(),&hConIn, 0,TRUE,DUPLICATE_SAME_ACCESS);
+		CloseHandle(hTemp);
+	} else
+		return FALSE;
+
+	hTemp = CreateFile("CONOUT$",GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);
+	if (INVALID_HANDLE_VALUE != hTemp)
+	{
+		DuplicateHandle(GetCurrentProcess(),hTemp,GetCurrentProcess(),&hConOut, 0,TRUE,DUPLICATE_SAME_ACCESS);
+		DuplicateHandle(GetCurrentProcess(),hTemp,GetCurrentProcess(),&hConErr, 0,TRUE,DUPLICATE_SAME_ACCESS);
+		CloseHandle(hTemp);
+
+	} else
+		return FALSE;
+
+	SetStdHandle(STD_INPUT_HANDLE,hConIn);
+	SetStdHandle(STD_OUTPUT_HANDLE,hConOut);
+	SetStdHandle(STD_ERROR_HANDLE,hConErr);
+
+	return TRUE;
+
+}
+#endif
 /*
  * This is called to fork and execute a command when we have no tty.  This
  * will call do_child from the child, and server_loop from the parent after
@@ -545,6 +585,8 @@ do_exec_no_pty(Session *s, const char *command)
   char *exec_command;
   char *laddr;
   char buf[256];
+  int prot_scr_width = 80;
+  int prot_scr_height = 25;
 
   if (!command)
   {
@@ -565,10 +607,14 @@ do_exec_no_pty(Session *s, const char *command)
   HANDLE wfdtocmd = -1;
   if ( (!s -> is_subsystem) && (s ->ttyfd != -1))
   {
+	//FreeConsole();
+	//AllocConsole();
+	MakeNewConsole();
+
 	wfdtocmd = GetStdHandle (STD_INPUT_HANDLE) ;
 	sockin[1] = allocate_sfd((int)wfdtocmd); // put the std input handle in our global general handle table
-	if (sockin[1] >= 0)
-		  sfd_set_to_console(sockin[1]); // mark it as Console type
+	//if (sockin[1] >= 0)
+	//	  sfd_set_to_console(sockin[1]); // mark it as Console type
 
 	//allocate_standard_descriptor(STDIN_FILENO);
     //allocate_standard_descriptor(wfdtocmd); // put the std input handle in our global general handle table
@@ -605,10 +651,10 @@ do_exec_no_pty(Session *s, const char *command)
   si.lpTitle          = NULL; /* NULL means use exe name as title */
   si.dwX              = 0;
   si.dwY              = 0;
-  si.dwXSize          = 80;
-  si.dwYSize          = 25;
-  si.dwXCountChars    = 80;
-  si.dwYCountChars    = 25;
+  si.dwXSize          = prot_scr_width;
+  si.dwYSize          = prot_scr_height;
+  si.dwXCountChars    = prot_scr_width;
+  si.dwYCountChars    = prot_scr_height;
   si.dwFillAttribute  = 0;
   si.dwFlags          = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS; // | STARTF_USESHOWWINDOW ;
   si.wShowWindow      = 0; // FALSE ;
@@ -619,15 +665,16 @@ do_exec_no_pty(Session *s, const char *command)
 	  si.hStdInput = GetStdHandle (STD_INPUT_HANDLE) ; // shell tty interactive session gets a console input for Win32
 	  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
 	  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
+	  si.lpDesktop = NULL ; //winstadtname_w ;
   }
   else {
 	  si.hStdInput = (HANDLE) sfd_to_handle(sockin[0]);
 	  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
 	  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
+	  si.lpDesktop = NULL; //L"winsta0\\default";
   }
   //si.wShowWindow = SW_HIDE;
   //si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-  si.lpDesktop = L"winsta0\\default";
 
 
   SetEnvironmentVariable("USER", s->pw->pw_name);
@@ -853,9 +900,10 @@ do_exec_no_pty(Session *s, const char *command)
   wchar_t exec_command_w[MAX_PATH];
   
   MultiByteToWideChar(CP_UTF8, 0, exec_command, -1, exec_command_w, MAX_PATH);
+  DWORD	dwStartupFlags = CREATE_SUSPENDED ;  // 0
  
   b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
-                              CREATE_NEW_PROCESS_GROUP, NULL, s -> pw -> pw_dir,
+                              /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, s -> pw -> pw_dir,
                                   &si, &pi);
   /*
    * If CreateProcessAsUser() fails we will try CreateProcess()
@@ -865,7 +913,7 @@ do_exec_no_pty(Session *s, const char *command)
   if ((!b) && (strcmp(name, s -> pw -> pw_name) == 0))
   {
     b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE, 
-                          CREATE_NEW_PROCESS_GROUP, NULL, s -> pw -> pw_dir,
+                          /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, s -> pw -> pw_dir,
                               &si, &pi);
   }
 
@@ -886,14 +934,6 @@ do_exec_no_pty(Session *s, const char *command)
   //CloseHandle(hToken);
   
   s -> authctxt -> currentToken_ = hToken; 
-
-  /* 
-   * Close child thread and process handles so it can go away 
-   */
-   
-  CloseHandle(pi.hThread);
-  
-  // CloseHandle(pi.hProcess); 
 
   /*
    * Log the process handle (fake it as the pid) for termination lookups 
@@ -921,6 +961,16 @@ do_exec_no_pty(Session *s, const char *command)
 
   close(sockout[0]);
   close(sockerr[0]);
+
+  ResumeThread ( pi.hThread ); /* now let cmd shell main thread be active s we have closed all i/o file handle that cmd will use */
+
+  /*
+   * Close child thread handles as we do not need it. Process handle we keep so that we can know if it has died o not
+   */
+
+  CloseHandle(pi.hThread);
+
+  // CloseHandle(pi.hProcess);
 
   /*
    * Clear loginmsg, since it's the child's responsibility to display
