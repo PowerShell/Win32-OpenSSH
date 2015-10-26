@@ -605,6 +605,7 @@ do_exec_no_pty(Session *s, const char *command)
    */
 
   HANDLE wfdtocmd = -1;
+  int retcode = -1;
   if ( (!s -> is_subsystem) && (s ->ttyfd != -1))
   {
 	//FreeConsole();
@@ -622,8 +623,6 @@ do_exec_no_pty(Session *s, const char *command)
 	//if (sockin[1] >= 0)
 	//	  sfd_set_to_console(sockin[1]); // mark it as Console type
 
-	//allocate_standard_descriptor(STDIN_FILENO);
-    //allocate_standard_descriptor(wfdtocmd); // put the std input handle in our global general handle table
   }
   else
 	socketpair(sockin);
@@ -880,8 +879,9 @@ do_exec_no_pty(Session *s, const char *command)
 
   if (!(s -> is_subsystem)) {
 	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
+	  char *inittermseq = "\033[20h\033[?7h\0" ; // LFtoCRLF AUTOWRAPON
 	  Channel *c=channel_by_id ( s->chanid );
-	  buffer_append(&c->input, "\033[20h", 5);
+	  buffer_append(&c->input, inittermseq, strlen(inittermseq));
 	  channel_output_poll();
   }
 
@@ -908,6 +908,7 @@ do_exec_no_pty(Session *s, const char *command)
   MultiByteToWideChar(CP_UTF8, 0, exec_command, -1, exec_command_w, MAX_PATH);
   DWORD	dwStartupFlags = CREATE_SUSPENDED ;  // 0
  
+  SetConsoleCtrlHandler(NULL, FALSE);
   b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
                               /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, s -> pw -> pw_dir,
                                   &si, &pi);
@@ -969,6 +970,7 @@ do_exec_no_pty(Session *s, const char *command)
   close(sockerr[0]);
 
   ResumeThread ( pi.hThread ); /* now let cmd shell main thread be active s we have closed all i/o file handle that cmd will use */
+  SetConsoleCtrlHandler(NULL, TRUE);
 
   /*
    * Close child thread handles as we do not need it. Process handle we keep so that we can know if it has died o not
@@ -2726,7 +2728,9 @@ session_pty_req(Session *s)
 		pty_setowner(s->pw, s->tty);
 
 	/* Set window size from the packet. */
+	#ifndef WIN32_FIXME
 	pty_change_window_size(s->ptyfd, s->row, s->col, s->xpixel, s->ypixel);
+	#endif
 
 	packet_check_eom();
 	session_proctitle(s);

@@ -2463,11 +2463,21 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 		if ( c->client_tty )
 			telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
 		else {
-				buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-				if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode
+				if  ( ( c->isatty) && (data_len ==1) && (data[0] == '\003') ) {
+						/* send control-c to the shell process */
+						if ( GenerateConsoleCtrlEvent ( CTRL_C_EVENT, 0 ) ) {
+						}
+						else {
+							debug3("GenerateConsoleCtrlEvent failed with %d\n",GetLastError());
+						}
+				}
+				else {
+					buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
+					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode
 						buffer_append(&c->input, data, data_len);
 						if ( (data_len ==1) && (data[0] == '\b') )
 							buffer_append(&c->input, " \b", 2); // for backspace, we need to send space and another backspace for visual erase
+					}
 				}
 		}
 
