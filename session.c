@@ -610,8 +610,14 @@ do_exec_no_pty(Session *s, const char *command)
 	//FreeConsole();
 	//AllocConsole();
 	MakeNewConsole();
+	prot_scr_width = s->col;
+	prot_scr_height = s->row;
+	extern HANDLE hConsole ;
+	hConsole = GetStdHandle (STD_OUTPUT_HANDLE);
+	ConSetScreenSize( s->col, s->row );
+	s->ptyfd = hConsole ; // the pty is the Windows console output handle in our Win32 port
 
-	wfdtocmd = GetStdHandle (STD_INPUT_HANDLE) ;
+	wfdtocmd = GetStdHandle (STD_INPUT_HANDLE) ; // we use this console handle to feed input to Windows shell cmd.exe
 	sockin[1] = allocate_sfd((int)wfdtocmd); // put the std input handle in our global general handle table
 	//if (sockin[1] >= 0)
 	//	  sfd_set_to_console(sockin[1]); // mark it as Console type

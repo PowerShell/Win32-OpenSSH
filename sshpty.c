@@ -211,6 +211,10 @@ pty_change_window_size(int ptyfd, u_int row, u_int col,
 	w.ws_xpixel = xpixel;
 	w.ws_ypixel = ypixel;
 	(void) ioctl(ptyfd, TIOCSWINSZ, &w);
+#else
+	extern HANDLE hConsole ;
+	hConsole = ptyfd;
+	ConSetScreenSize( col, row );
 #endif
 }
 
