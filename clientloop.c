@@ -1348,14 +1348,14 @@ process_escapes(Channel *c, Buffer *bin, Buffer *bout, Buffer *berr,
 		 * and append it to the buffer.
 		 */
 		last_was_cr = (ch == '\r' || ch == '\n');
-		#ifdef WIN32_FIXME
-		extern int lftocrlf ; // defined in channels.c file's channel_input_data() function for now
-		if ( (lftocrlf == 1) && ( ch == '\n') ) {
+		//#ifdef WIN32_FIXME
+		//extern int lftocrlf ; // defined in channels.c file's channel_input_data() function for now
+		//if ( (lftocrlf == 1) && ( ch == '\n') ) {
 			// add a \r before \n if sshd server sent us ESC[20h during initial tty mode setting
-			buffer_put_char(bin, '\r');
-			bytes++;
-		}
-		#endif
+			//buffer_put_char(bin, '\r');
+			//bytes++;
+		//}
+		//#endif
 		buffer_put_char(bin, ch);
 		bytes++;
 	}

@@ -1530,7 +1530,9 @@ main(int ac, char **av)
 	#ifdef WIN32_FIXME
 	if (tty_flag) {
 		//AllocConsole();
-	    ConInit( STD_OUTPUT_HANDLE, TRUE );
+	    ConInputInitParams(); // init the Console input side with global parameters
+		HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
+	    ConInit( STD_OUTPUT_HANDLE, TRUE ); //init the output console surface for us to write
 	}
 	#endif
 

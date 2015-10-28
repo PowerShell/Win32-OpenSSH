@@ -55,11 +55,28 @@ unsigned char * ParseVT52(unsigned char * pszBuffer, unsigned char * pszBufferEn
 
 typedef struct _TelParams 
 {
+	int fLogging;
+	FILE *fplogfile;
+
+	char *pInputFile;
+
+	char * szDebugInputFile;
+    BOOL   fDebugWait;
+
 	int timeOut;
 	int fLocalEcho;
 	int fTreatLFasCRLF;
 	int	fSendCROnly;
 	int nReceiveCRLF;
+	//_crlftype nReceiveCRLF;
+	char	sleepChar;
+	char	menuChar;
+
+	SOCKET	Socket;
+	BOOL bVT100Mode;
+
+	char	*pAltKey;
+
 } TelParams;
 
 #endif

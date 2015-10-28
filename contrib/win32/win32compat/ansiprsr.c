@@ -51,7 +51,7 @@
 // items used from other modules
 int NetWriteString(char* pszString, size_t cbString);
 TelParams Parameters;
-extern int lftocrlf;
+int lftocrlf = 0;
 
 extern int ScreenX;
 extern  int ScreenY;

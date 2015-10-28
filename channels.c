@@ -1685,6 +1685,10 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 	if (c->rfd != -1 && (force || FD_ISSET(c->rfd, readset))) {
 		errno = 0;
 		len = read(c->rfd, buf, sizeof(buf));
+		#ifdef WIN32_FIXME
+		if (len == 0)
+			return 1; // in Win32 console read, there may be no data, but is ok
+		#endif
 		if (len < 0 && (errno == EINTR ||
 		    ((errno == EAGAIN || errno == EWOULDBLOCK) && !force)))
 			return 1;
@@ -2395,9 +2399,7 @@ channel_output_poll(void)
 		}
 	}
 }
-#ifdef WIN32_FIXME
-int lftocrlf = 0;
-#endif
+
 /* -- protocol input */
 
 /* ARGSUSED */
