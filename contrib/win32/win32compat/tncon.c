@@ -77,7 +77,7 @@ void ConInputInitParams(void)
 	Parameters.szDebugInputFile = NULL;
 	Parameters.fDebugWait= FALSE;
 	Parameters.nReceiveCRLF = ENUM_LF;
-	Parameters.fSendCROnly = TRUE; //FALSE;
+	//Parameters.fSendCROnly = TRUE; //FALSE;
 	Parameters.sleepChar = '`';
 	Parameters.menuChar = '\035'; // CTRL-]
 	Parameters.pAltKey = "\x01";		// default 
@@ -192,8 +192,8 @@ int ReadConsoleForTermEmul( HANDLE hInput, char *destin, int destinlen)
 						switch (InputRecord.Event.KeyEvent.uChar.UnicodeChar)
 						{
 						case 0xd:
-							if (pParams->fSendCROnly)
-								NetWriteString2(pParams->Socket, "\r", 1, 0);
+							if (pParams->nReceiveCRLF == ENUM_LF)
+								NetWriteString2(pParams->Socket, "\n", 1, 0);
 							else
 								NetWriteString2(pParams->Socket, "\r\n", 2, 0);
 							break;

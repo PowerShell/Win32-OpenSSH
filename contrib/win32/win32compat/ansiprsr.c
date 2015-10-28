@@ -51,7 +51,6 @@
 // items used from other modules
 int NetWriteString(char* pszString, size_t cbString);
 TelParams Parameters;
-int lftocrlf = 0;
 
 extern int ScreenX;
 extern  int ScreenY;
@@ -407,12 +406,10 @@ void ConSetExtendedMode(int iFunction, BOOL bEnable)
 		case 20:   // LNM Mode CSI 20h
 			if (bEnable){
 				VTMode |= MODE_LNM;
-				Parameters.nReceiveCRLF = ENUM_LF;
-				lftocrlf = 1;
+				Parameters.nReceiveCRLF = ENUM_CRLF;
 			}else{
 				VTMode &= ~MODE_LNM;
-				Parameters.nReceiveCRLF = ENUM_CRLF;
-				lftocrlf = 0;
+				Parameters.nReceiveCRLF = ENUM_LF;
 			}
 			break;
 		case 25:
