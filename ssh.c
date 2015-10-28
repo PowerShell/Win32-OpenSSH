@@ -1534,6 +1534,10 @@ main(int ac, char **av)
 		HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
 	    ConInit( STD_OUTPUT_HANDLE, TRUE ); //init the output console surface for us to write
 	}
+	else {
+		extern int glob_itissshclient;
+		glob_itissshclient = 1; // tell our contrib/win32/win32compat/socket.c code it is for ssh client side
+	}
 	#endif
 
 	exit_status = compat20 ? ssh_session2() : ssh_session();

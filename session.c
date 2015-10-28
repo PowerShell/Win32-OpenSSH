@@ -877,7 +877,7 @@ do_exec_no_pty(Session *s, const char *command)
   
   GetUserName(name, &size);
 
-  if (!(s -> is_subsystem)) {
+  if ( (!s -> is_subsystem) && (s ->ttyfd != -1)) {
 	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
 	  char *inittermseq = "\033[20h\033[?7h\0" ; // LFtoCRLF AUTOWRAPON
 	  Channel *c=channel_by_id ( s->chanid );
