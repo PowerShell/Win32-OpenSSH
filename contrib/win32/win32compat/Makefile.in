@@ -8,24 +8,31 @@ top_srcdir=@top_srcdir@
 VPATH=@srcdir@
 CC=@CC@
 LD=@LD@
-CFLAGS=@CFLAGS@
-CPPFLAGS=-I. -I../../.. -I$(srcdir) -I$(top_srcdir) -I$(srcdir)/includes @CPPFLAGS@ @DEFS@
-LIBS=@LIBS@
+BCRYPTFLAGS=-I/usr/include/w32api
+CFLAGS=@CFLAGS@ 
+CPPFLAGS=-I. -I../../.. -I$(srcdir) -I$(top_srcdir) -I$(srcdir)/includes @CPPFLAGS@ @DEFS@ -DUSE_MSCNG
+LIBS=@LIBS@ -lbcrypt
 AR=@AR@
 RANLIB=@RANLIB@
 INSTALL=@INSTALL@
-LDFLAGS=-L. @LDFLAGS@
+LDFLAGS=-L. @LDFLAGS@ -L/lib/win32api
 
 WIN32COMPATFILES = daemon.o gettimeofday.o homedirhelp.o pwd.o sfds.o \
 	socket.o startupneeds.o strcasecmp.o syslog.o lsalogon.o lsastring.o \
-	stringhelp.o deskright.o win32auth.o kerberos.o
+	stringhelp.o deskright.o win32auth.o kerberos.o cng_cipher.o ansiprsr.o console.o tnnet.o
 
 WIN32COMPATLIB=@LIBWIN32COMPAT@
+
+CNGFILES=cng_cipher.o
+
 
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
 
 all: $(WIN32COMPATLIB)
+
+$(CNGFILES): %.o: %.c
+	$(CC) $(CFLAGS) $(BCRYPTFLAGS) $(CPPFLAGS) -c $<
 
 install:
 

@@ -255,3 +255,12 @@ Makefile
 openbsd-compat/Makefile
 openbsd-compat/regress/Makefile
 contrib/win32/win32compat/Makefile
+config.h
+config.h
+regress/rsa_ssh2_cr.prv
+regress/rsa_ssh2_crnl.prv
+regress/t7.out.pub
+regress/t6.out2
+config.h
+configure
+config.h

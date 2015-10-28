@@ -34,7 +34,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+ 
 #include "includes.h"
 
 #include <sys/types.h>
@@ -43,6 +43,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+
 #include "cipher.h"
 #include "misc.h"
 #include "sshbuf.h"
@@ -50,6 +51,12 @@
 #include "digest.h"
 
 #include "openbsd-compat/openssl-compat.h"
+
+
+
+#ifdef USE_MSCNG
+#undef WITH_OPENSSL
+#endif
 
 #ifdef WITH_SSH1
 extern const EVP_CIPHER *evp_ssh1_bf(void);
@@ -108,9 +115,19 @@ static const struct sshcipher ciphers[] = {
 			SSH_CIPHER_SSH2, 16, 32, 12, 16, 0, 0, EVP_aes_256_gcm },
 # endif /* OPENSSL_HAVE_EVPGCM */
 #else /* WITH_OPENSSL */
+
+#ifdef USE_MSCNG
+	{ "aes128-ctr",	SSH_CIPHER_SSH2, 16, 16, 0, 0, 0, _CNG_CIPHER_AES | _CNG_MODE_CTR, NULL },
+	{ "aes192-ctr",	SSH_CIPHER_SSH2, 16, 24, 0, 0, 0, _CNG_CIPHER_AES | _CNG_MODE_CTR, NULL },
+	{ "aes256-ctr",	SSH_CIPHER_SSH2, 16, 32, 0, 0, 0, _CNG_CIPHER_AES | _CNG_MODE_CTR, NULL },
+	{ "aes128-cbc",	SSH_CIPHER_SSH2, 16, 16, 0, 0, 0, _CNG_CIPHER_AES | _CNG_MODE_CBC, NULL },
+	{ "aes192-cbc",	SSH_CIPHER_SSH2, 16, 24, 0, 0, 0, _CNG_CIPHER_AES | _CNG_MODE_CBC, NULL },
+	{ "aes256-cbc",	SSH_CIPHER_SSH2, 16, 32, 0, 0, 0, _CNG_CIPHER_AES | _CNG_MODE_CBC, NULL },	
+#else
 	{ "aes128-ctr",	SSH_CIPHER_SSH2, 16, 16, 0, 0, 0, CFLAG_AESCTR, NULL },
 	{ "aes192-ctr",	SSH_CIPHER_SSH2, 16, 24, 0, 0, 0, CFLAG_AESCTR, NULL },
 	{ "aes256-ctr",	SSH_CIPHER_SSH2, 16, 32, 0, 0, 0, CFLAG_AESCTR, NULL },
+#endif	
 	{ "none",	SSH_CIPHER_NONE, 8, 0, 0, 0, 0, CFLAG_NONE, NULL },
 #endif /* WITH_OPENSSL */
 	{ "chacha20-poly1305@openssh.com",
@@ -293,6 +310,8 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
     const u_char *key, u_int keylen, const u_char *iv, u_int ivlen,
     int do_encrypt)
 {
+
+	
 #ifdef WITH_OPENSSL
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	const EVP_CIPHER *type;
@@ -316,11 +335,25 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 		return chachapoly_init(&cc->cp_ctx, key, keylen);
 	}
 #ifndef WITH_OPENSSL
+
+#ifdef USE_MSCNG
+
+    /* cng shares cipher flag with NONE.  Make sure the NONE cipher isn't requested */
+	if ((cc->cipher->flags & CFLAG_NONE) == 0)
+	{
+
+		if (cng_cipher_init(&cc->cng_ctx,key,keylen,iv, ivlen,cc->cipher->flags))
+			return SSH_ERR_LIBCRYPTO_ERROR;
+
+		return 0;
+	}
+#else
 	if ((cc->cipher->flags & CFLAG_AESCTR) != 0) {
 		aesctr_keysetup(&cc->ac_ctx, key, 8 * keylen, 8 * ivlen);
 		aesctr_ivsetup(&cc->ac_ctx, iv);
 		return 0;
 	}
+#endif	
 	if ((cc->cipher->flags & CFLAG_NONE) != 0)
 		return 0;
 	return SSH_ERR_INVALID_ARGUMENT;
@@ -373,6 +406,7 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 	return 0;
 }
 
+
 /*
  * cipher_crypt() operates as following:
  * Copy 'aadlen' bytes (without en/decryption) from 'src' to 'dest'.
@@ -387,18 +421,44 @@ int
 cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr, u_char *dest,
    const u_char *src, u_int len, u_int aadlen, u_int authlen)
 {
+#ifdef USE_MSCNG
+	int ret = 0;
+#endif 	
+	
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
 		return chachapoly_crypt(&cc->cp_ctx, seqnr, dest, src,
 		    len, aadlen, authlen, cc->encrypt);
 	}
 #ifndef WITH_OPENSSL
-	if ((cc->cipher->flags & CFLAG_AESCTR) != 0) {
+
+#ifdef USE_MSCNG
+
+    /* cng shares cipher flag with NONE.  Make sure the NONE cipher isn't requested */
+	if ((cc->cipher->flags & CFLAG_NONE) == 0)
+	{
+		if (aadlen)
+			memcpy(dest, src, aadlen);
+		if (cc->encrypt)
+			ret = cng_cipher_encrypt(&cc->cng_ctx,dest+aadlen, len, src+aadlen,len);
+		else
+			ret = cng_cipher_decrypt(&cc->cng_ctx,dest+aadlen, len, src+aadlen, len);
+		
+		if (ret != len){
+			return SSH_ERR_LIBCRYPTO_ERROR;
+		}
+		return 0;
+	}
+#else
+		if ((cc->cipher->flags & CFLAG_AESCTR) != 0) {
 		if (aadlen)
 			memcpy(dest, src, aadlen);
 		aesctr_encrypt_bytes(&cc->ac_ctx, src + aadlen,
 		    dest + aadlen, len);
 		return 0;
 	}
+#endif 
+
+	
 	if ((cc->cipher->flags & CFLAG_NONE) != 0) {
 		memcpy(dest, src, aadlen + len);
 		return 0;
@@ -472,6 +532,10 @@ cipher_cleanup(struct sshcipher_ctx *cc)
 	else if (EVP_CIPHER_CTX_cleanup(&cc->evp) == 0)
 		return SSH_ERR_LIBCRYPTO_ERROR;
 #endif
+#ifdef USE_MSCNG
+	else
+		cng_cipher_cleanup(&cc->cng_ctx);
+#endif	
 	return 0;
 }
 

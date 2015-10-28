@@ -2454,25 +2454,16 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 		c->local_window -= win_len;
 	}
 
-	#ifdef WIN32_FIXME
-	if ( (c->client_tty) && (data_len >= 5) ) {
-		if ( data[0] == '\033' ) { // escape char octal 33, decimal 27
-			if ( (data[1] == '[') && (data[2]== '2') && (data[3]== '0') && ( data[4]== 'h' )) {
-				lftocrlf = 1;
-				data = data + 5 ; // we have processed the 5 bytes ESC sequence
-				data_len = data_len - 5;
-			}
-		}
-	}
-	#endif
-
 	if (c->datagram)
 		buffer_put_string(&c->output, data, data_len);
 	else {
 		#ifndef WIN32_FIXME
 		buffer_append(&c->output, data, data_len);
 		#else
-		buffer_append(&c->output, data, data_len);
+		if ( c->client_tty )
+			telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
+		else
+			buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
 		if ( c->isatty ) {
 			buffer_append(&c->input, data, data_len); // we echo the data if it is sshd server and pty interactive mode
 			if ( (data_len ==1) && (data[0] == '\b') )
