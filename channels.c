@@ -1685,6 +1685,10 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 	if (c->rfd != -1 && (force || FD_ISSET(c->rfd, readset))) {
 		errno = 0;
 		len = read(c->rfd, buf, sizeof(buf));
+		#ifdef WIN32_FIXME
+		if (len == 0)
+			return 1; // in Win32 console read, there may be no data, but is ok
+		#endif
 		if (len < 0 && (errno == EINTR ||
 		    ((errno == EAGAIN || errno == EWOULDBLOCK) && !force)))
 			return 1;
@@ -2395,9 +2399,7 @@ channel_output_poll(void)
 		}
 	}
 }
-#ifdef WIN32_FIXME
-int lftocrlf = 0;
-#endif
+
 /* -- protocol input */
 
 /* ARGSUSED */
@@ -2462,13 +2464,25 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 		#else
 		if ( c->client_tty )
 			telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
-		else
-			buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-		if ( c->isatty ) {
-			buffer_append(&c->input, data, data_len); // we echo the data if it is sshd server and pty interactive mode
-			if ( (data_len ==1) && (data[0] == '\b') )
-				buffer_append(&c->input, " \b", 2); // for backspace, we need to send space and another backspace for visual erase
+		else {
+				if  ( ( c->isatty) && (data_len ==1) && (data[0] == '\003') ) {
+						/* send control-c to the shell process */
+						if ( GenerateConsoleCtrlEvent ( CTRL_C_EVENT, 0 ) ) {
+						}
+						else {
+							debug3("GenerateConsoleCtrlEvent failed with %d\n",GetLastError());
+						}
+				}
+				else {
+					buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
+					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode
+						buffer_append(&c->input, data, data_len);
+						if ( (data_len ==1) && (data[0] == '\b') )
+							buffer_append(&c->input, " \b", 2); // for backspace, we need to send space and another backspace for visual erase
+					}
+				}
 		}
+
 		#endif
 	}
 	packet_check_eom();
@@ -3913,10 +3927,11 @@ channel_connect_to_path(const char *path, char *ctype, char *rname)
 	return connect_to(path, PORT_STREAMLOCAL, ctype, rname);
 }
 
+#ifndef WIN32_FIXME
 void
 channel_send_window_changes(void)
 {
-#ifndef WIN32_FIXME
+
 	u_int i;
 	struct winsize ws;
 
@@ -3933,8 +3948,29 @@ channel_send_window_changes(void)
 		packet_put_int((u_int)ws.ws_ypixel);
 		packet_send();
 	}
-#endif
 }
+
+#else // WIN32_FIXME
+void
+channel_send_window_changes(int col, int row, int xpixel, int ypixel)
+{
+	u_int i;
+	struct winsize ws;
+
+	for (i = 0; i < channels_alloc; i++) {
+		if (channels[i] == NULL || !channels[i]->client_tty ||
+		    channels[i]->type != SSH_CHANNEL_OPEN)
+			continue;
+		channel_request_start(i, "window-change", 0);
+		packet_put_int((u_int)col);
+		packet_put_int((u_int)row);
+		packet_put_int((u_int)xpixel);
+		packet_put_int((u_int)ypixel);
+		packet_send();
+	}
+}
+#endif
+
 
 /* -- X11 forwarding */
 

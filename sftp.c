@@ -292,14 +292,12 @@ help(void)
 static void
 local_do_shell(const char *args)
 {
-	 #ifdef WIN32_FIXME
+  #ifdef WIN32_FIXME
 
-  /*
-   * Not implemented on native Win32.
-   */
-  
-  fprintf(stderr, "Local shell is not implemented on Win32.\n");
-  
+	if (!*args) {
+		args = (char *)	getenv("ComSpec"); // get name of Windows cmd shell
+	}
+	system(args); // execute the shell or cmd given
   #else
   
   /*
