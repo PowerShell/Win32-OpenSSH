@@ -144,7 +144,7 @@ struct ssh_digest_ctx *
 		return NULL;
 	}
 
-	if ((hr = BCryptCreateHash(ret->cng_alg_handle, &(ret->hash_handle), NULL, 0, NULL, 0, BCRYPT_HASH_REUSABLE_FLAG)) != S_OK)
+	if ((hr = BCryptCreateHash(ret->cng_alg_handle, &(ret->hash_handle), NULL, 0, NULL, 0, 0)) != S_OK)
 	{
 		BCryptCloseAlgorithmProvider(ret->cng_alg_handle, 0);
 		free(ret);
