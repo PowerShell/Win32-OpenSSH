@@ -147,7 +147,7 @@ struct ssh_digest_ctx *
 		return NULL;
 	}
 
-	if ((hr = BCryptGetProperty(&(ret->cng_alg_handle), BCRYPT_HASH_LENGTH,(PBYTE)&cbHash,sizeof(DWORD),&cbData,0)) != S_OK){
+	if ((hr = BCryptGetProperty(ret->cng_alg_handle, BCRYPT_OBJECT_LENGTH, (PBYTE)&cbHash, sizeof(DWORD), &cbData, 0)) != S_OK){
 		free(ret);
 		return NULL;
 	}
