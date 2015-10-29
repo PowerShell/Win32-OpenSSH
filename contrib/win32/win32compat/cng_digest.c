@@ -56,6 +56,7 @@ struct ssh_digest_ctx {
 	int alg;
 	BCRYPT_ALG_HANDLE cng_alg_handle;
 	BCRYPT_HASH_HANDLE hash_handle;
+	PBYTE pHashObj;
 };
 
 struct ssh_digest {
@@ -134,6 +135,8 @@ struct ssh_digest_ctx *
 	const struct ssh_digest *digest = ssh_digest_by_alg(alg);
 	struct ssh_digest_ctx *ret;
 	HRESULT hr = S_OK;
+	DWORD cbHash = 0;
+	DWORD cbData = 0;
 
 	if (digest == NULL || ((ret = (struct ssh_digest_ctx *)malloc(sizeof(*ret))) == NULL))
 		return NULL;
@@ -144,9 +147,21 @@ struct ssh_digest_ctx *
 		return NULL;
 	}
 
-	if ((hr = BCryptCreateHash(ret->cng_alg_handle, &(ret->hash_handle), NULL, 0, NULL, 0, 0)) != S_OK)
+	if ((hr = BCryptGetProperty(&(ret->cng_alg_handle), BCRYPT_HASH_LENGTH,(PBYTE)&cbHash,sizeof(DWORD),&cbData,0)) != S_OK){
+		free(ret);
+		return NULL;
+	}
+
+	if ((ret->pHashObj = (PBYTE)malloc(cbHash)) == NULL)
+	{
+		free(ret);
+		return NULL;
+	}
+
+	if ((hr = BCryptCreateHash(ret->cng_alg_handle, &(ret->hash_handle), ret->pHashObj, cbHash, NULL, 0, 0)) != S_OK)
 	{
 		BCryptCloseAlgorithmProvider(ret->cng_alg_handle, 0);
+		free(ret->pHashObj);
 		free(ret);
 		return NULL;
 
@@ -204,6 +219,7 @@ ssh_digest_free(struct ssh_digest_ctx *ctx)
 	if (ctx != NULL) {
 		BCryptCloseAlgorithmProvider(ctx->cng_alg_handle, 0);
 		BCryptDestroyHash(ctx->hash_handle);
+		free(ctx->pHashObj);
 		explicit_bzero(ctx, sizeof(*ctx));
 		free(ctx);
 	}
