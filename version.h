@@ -2,5 +2,9 @@
 
 #define SSH_VERSION	"OpenSSH_7.1"
 
-#define SSH_PORTABLE	"p1 Microsoft Pragma Win32 port Oct 7 2015"
+#ifndef WIN32_FIXME
+#define SSH_PORTABLE	"p1"
+#else
+#define SSH_PORTABLE	"p1 Microsoft Win32 port"
+#endif
 #define SSH_RELEASE	SSH_VERSION SSH_PORTABLE

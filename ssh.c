@@ -865,8 +865,13 @@ main(int ac, char **av)
 			}
 			break;
 		case 'V':
+			#ifndef WIN32_FIXME
 			fprintf(stderr, "%s, %s\n",
 			    SSH_RELEASE,
+			#else
+			fprintf(stderr, "%s %s, %s\n",
+			    SSH_RELEASE, __DATE__ " " __TIME__ ,
+			#endif
 #ifdef WITH_OPENSSL
 			    SSLeay_version(SSLEAY_VERSION)
 #else
