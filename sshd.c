@@ -2809,6 +2809,10 @@ main(int ac, char **av)
         remotesochandle = atoi( getenv("SSHD_REMSOC") );
 
         sock_in = sock_out = newsock = allocate_sfd(remotesochandle) ; //si.hStdInput);
+		
+		// we have the socket handle, delete it for child processes we create like shell 
+		SetEnvironmentVariable("SSHD_REMSOC", NULL);
+		SetHandleInformation(remotesochandle, HANDLE_FLAG_INHERIT, 0); // make the handle not to be inherited
 
         /*
          * We don't have a startup_pipe 
