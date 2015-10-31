@@ -2532,7 +2532,14 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	}
 	debug2("channel %d: rcvd ext data %d", c->self, data_len);
 	c->local_window -= data_len;
+	#ifndef WIN32_FIXME
 	buffer_append(&c->extended, data, data_len);
+	#else
+	if ( c->client_tty )
+		telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
+	else
+		buffer_append(&c->extended, data, data_len);
+	#endif
 	free(data);
 	return 0;
 }
