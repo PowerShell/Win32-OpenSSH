@@ -286,7 +286,7 @@ unsigned int cng_cipher_init(PSSH_CNG_CIPHER_CTX x, const unsigned char *key, un
 			status = BCryptGetProperty(
 				hAlg,
 				BCRYPT_OBJECT_LENGTH,
-				(PBYTE)cbKeyObject,
+				(PBYTE)&cbKeyObject,
 				sizeof(DWORD),
 				&cbData,
 				0);
@@ -305,10 +305,14 @@ unsigned int cng_cipher_init(PSSH_CNG_CIPHER_CTX x, const unsigned char *key, un
 		}
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 
-		// if we got an error along the way, free up the iv
+		// if we got an error along the way, free up the iv and key object
 		if (status != S_OK && x->pbIV)
 		{
 			HeapFree(GetProcessHeap(), 0, x->pbIV);
+		}
+		if (status != S_OK && x->pKeyObject)
+		{
+			HeapFree(GetProcessHeap(), 0, x->pKeyObject);
 		}
 	}
 	return status;
