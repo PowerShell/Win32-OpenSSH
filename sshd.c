@@ -795,6 +795,10 @@ sshd_exchange_identification(int sock_in, int sock_out)
 	debug("Client protocol version %d.%d; client software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
+	#ifdef WIN32_FIXME
+	SetEnvironmentVariable("SSH_CLIENT_ID", remote_version);
+	#endif
+	
 	active_state->compat = compat_datafellows(remote_version);
 
 	if ((datafellows & SSH_BUG_PROBE) != 0) {
