@@ -870,7 +870,7 @@ main(int ac, char **av)
 			    SSH_RELEASE,
 			#else
 			fprintf(stderr, "%s %s, %s\n",
-			    SSH_RELEASE, __DATE__ " " __TIME__ ,
+			    SSH_RELEASE, __DATE__ ,
 			#endif
 #ifdef WITH_OPENSSL
 			    SSLeay_version(SSLEAY_VERSION)
