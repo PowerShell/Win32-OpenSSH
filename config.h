@@ -4,12 +4,11 @@
 /* Define if building universal (internal helper macro) */
 /* #undef AC_APPLE_UNIVERSAL_BUILD */
 
-/* Define if you have a getaddrinfo that fails for the all-zeros IPv6 address
+/* Define if you have a getaddrinfo that fails for the all-zeros IPv6 address
    */
 /* #undef AIX_GETNAMEINFO_HACK */
 
-/* Define if your AIX loginfailed() function takes 4 arguments (AIX >= 5.2)
-   */
+/* Define if your AIX loginfailed() function takes 4 arguments (AIX >= 5.2) */
 /* #undef AIX_LOGINFAILED_4ARG */
 
 /* System only supports IPv4 audit records */
@@ -30,7 +29,7 @@
 /* FreeBSD glob does not do what we need */
 /* #undef BROKEN_GLOB */
 
-/* Define if you system's inet_ntoa is busted (e.g. Irix gcc issue) */
+/* Define if you system's inet_ntoa is busted (e.g. Irix gcc issue) */
 /* #undef BROKEN_INET_NTOA */
 
 /* ia_uinfo routines not supported by OS yet */
@@ -39,8 +38,8 @@
 /* Ultrix mmap can't map files */
 /* #undef BROKEN_MMAP */
 
-/* Define if your struct dirent expects you to allocate extra space for
-   d_name */
+/* Define if your struct dirent expects you to allocate extra space for d_name
+   */
 /* #undef BROKEN_ONE_BYTE_DIRENT_D_NAME */
 
 /* Can't do comparisons on readv */
@@ -94,19 +93,19 @@
 /* Define if you want to specify the path to your wtmp file */
 /* #undef CONF_WTMP_FILE */
 
-/* Define if your platform needs to skip post auth file descriptor passing */
+/* Define if your platform needs to skip post auth file descriptor passing */
 #define DISABLE_FD_PASSING 1
 
 /* Define if you don't want to use lastlog */
 /* #undef DISABLE_LASTLOG */
 
-/* Define if you don't want to use your system's login() call */
+/* Define if you don't want to use your system's login() call */
 /* #undef DISABLE_LOGIN */
 
-/* Define if you don't want to use pututline() etc. to write [uw]tmp */
+/* Define if you don't want to use pututline() etc. to write [uw]tmp */
 /* #undef DISABLE_PUTUTLINE */
 
-/* Define if you don't want to use pututxline() etc. to write [uw]tmpx */
+/* Define if you don't want to use pututxline() etc. to write [uw]tmpx */
 /* #undef DISABLE_PUTUTXLINE */
 
 /* Define if you want to disable shadow passwords */
@@ -142,22 +141,22 @@
 /* Conflicting defs for getspnam */
 /* #undef GETSPNAM_CONFLICTING_DEFS */
 
-/* Define if your system glob() function has the GLOB_ALTDIRFUNC extension */
+/* Define if your system glob() function has the GLOB_ALTDIRFUNC extension */
 /* #undef GLOB_HAS_ALTDIRFUNC */
 
-/* Define if your system glob() function has gl_matchc options in glob_t */
+/* Define if your system glob() function has gl_matchc options in glob_t */
 #define GLOB_HAS_GL_MATCHC 1
 
-/* Define if your system glob() function has gl_statv options in glob_t */
+/* Define if your system glob() function has gl_statv options in glob_t */
 #define GLOB_HAS_GL_STATV 1
 
-/* Define this if you want GSSAPI support in the version 2 protocol */
+/* Define this if you want GSSAPI support in the version 2 protocol */
 #define GSSAPI 1
 
 /* Define if you want to use shadow password expire field */
 /* #undef HAS_SHADOW_EXPIRE */
 
-/* Define if your system uses access rights style file descriptor passing */
+/* Define if your system uses access rights style file descriptor passing */
 /* #undef HAVE_ACCRIGHTS_IN_MSGHDR */
 
 /* Define if you have ut_addr in utmp.h */
@@ -232,7 +231,7 @@
 /* Define if gai_strerror() returns const char * */
 /* #undef HAVE_CONST_GAI_STRERROR_PROTO */
 
-/* Define if your system uses ancillary data style file descriptor passing */
+/* Define if your system uses ancillary data style file descriptor passing */
 /* #undef HAVE_CONTROL_IN_MSGHDR */
 
 /* Define to 1 if you have the <crypto/sha2.h> header file. */
@@ -673,7 +672,7 @@
 /* Define to 1 if you have the `ogetaddrinfo' function. */
 /* #undef HAVE_OGETADDRINFO */
 
-/* Define if you have an old version of PAM which takes only one argument to
+/* Define if you have an old version of PAM which takes only one argument to
    pam_strerror */
 /* #undef HAVE_OLD_PAM */
 
@@ -683,11 +682,10 @@
 /* Define to 1 if you have the `openpty' function. */
 /* #undef HAVE_OPENPTY */
 
-/* Define if your ssl headers are included with #include <openssl/header.h>
-   */
+/* Define if your ssl headers are included with #include <openssl/header.h> */
 #define HAVE_OPENSSL 1
 
-/* Define if you have Digital Unix Security Integration Architecture */
+/* Define if you have Digital Unix Security Integration Architecture */
 /* #undef HAVE_OSF_SIA */
 
 /* Define to 1 if you have the `pam_getenvlist' function. */
@@ -780,7 +778,7 @@
 /* define if you have sa_family_t data type */
 /* #undef HAVE_SA_FAMILY_T */
 
-/* Define if you have SecureWare-based protected password database */
+/* Define if you have SecureWare-based protected password database */
 /* #undef HAVE_SECUREWARE */
 
 /* Define to 1 if you have the <security/pam_appl.h> header file. */
@@ -815,6 +813,9 @@
 
 /* Define to 1 if you have the `setluid' function. */
 /* #undef HAVE_SETLUID */
+
+/* Define to 1 if you have the `setpassent' function. */
+/* #undef HAVE_SETPASSENT */
 
 /* Define to 1 if you have the `setpcred' function. */
 /* #undef HAVE_SETPCRED */
@@ -1218,13 +1219,13 @@
 /* Define if compiler implements __func__ */
 #define HAVE___func__ 1
 
-/* Define this if you are using the Heimdal version of Kerberos V5 */
+/* Define this if you are using the Heimdal version of Kerberos V5 */
 /* #undef HEIMDAL */
 
-/* Define if you need to use IP address instead of hostname in $DISPLAY */
+/* Define if you need to use IP address instead of hostname in $DISPLAY */
 /* #undef IPADDR_IN_DISPLAY */
 
-/* Detect IPv4 in IPv6 mapped addresses and treat as IPv4 */
+/* Detect IPv4 in IPv6 mapped addresses and treat as IPv4 */
 /* #undef IPV4_IN_IPV6 */
 
 /* Define if your system choked on IP TOS setting */
@@ -1236,10 +1237,10 @@
 /* Define if pututxline updates lastlog too */
 /* #undef LASTLOG_WRITE_PUTUTXLINE */
 
-/* Define if you want TCP Wrappers support */
+/* Define if you want TCP Wrappers support */
 /* #undef LIBWRAP */
 
-/* Define to whatever link() returns for "not supported" if it doesn't return
+/* Define to whatever link() returns for "not supported" if it doesn't return
    EOPNOTSUPP. */
 /* #undef LINK_OPNOTSUPP_ERRNO */
 
@@ -1261,7 +1262,7 @@
 /* String used in /etc/passwd to denote locked account */
 /* #undef LOCKED_PASSWD_SUBSTR */
 
-/* Some versions of /bin/login need the TERM supplied on the commandline */
+/* Some versions of /bin/login need the TERM supplied on the commandline */
 /* #undef LOGIN_NEEDS_TERM */
 
 /* Some systems need a utmpx entry for /bin/login to work */
@@ -1270,7 +1271,7 @@
 /* Define if your login program cannot handle end of options ("--") */
 /* #undef LOGIN_NO_ENDOPT */
 
-/* If your header files don't define LOGIN_PROGRAM, then use this (detected)
+/* If your header files don't define LOGIN_PROGRAM, then use this (detected)
    from environment and PATH */
 #define LOGIN_PROGRAM_FALLBACK "/usr/bin/login"
 
@@ -1289,8 +1290,7 @@
 /* Need setpgrp to acquire controlling tty */
 /* #undef NEED_SETPGRP */
 
-/* Define if the concept of ports only accessible to superusers isn't known
-   */
+/* Define if the concept of ports only accessible to superusers isn't known */
 #define NO_IPPORT_RESERVED_CONCEPT 1
 
 /* Define if you don't want to use lastlog in session.c */
@@ -1329,8 +1329,8 @@
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "Portable"
 
-/* Define if you are using Solaris-derived PAM which passes pam_messages to
-   the conversation function with an extra level of indirection */
+/* Define if you are using Solaris-derived PAM which passes pam_messages to
+   the conversation function with an extra level of indirection */
 /* #undef PAM_SUN_CODEBASE */
 
 /* Work around problematic Linux PAM modules handling of PAM_TTY */
@@ -1381,20 +1381,20 @@
 /* Define if you want S/Key support */
 /* #undef SKEY */
 
-/* Define if your skeychallenge() function takes 4 arguments (NetBSD) */
+/* Define if your skeychallenge() function takes 4 arguments (NetBSD) */
 /* #undef SKEYCHALLENGE_4ARG */
 
 /* Define as const if snprintf() can declare const char *fmt */
 #define SNPRINTF_CONST const
 
-/* Define to a Set Process Title type if your system is supported by
+/* Define to a Set Process Title type if your system is supported by
    bsd-setproctitle.c */
 /* #undef SPT_TYPE */
 
-/* Define if sshd somehow reacquires a controlling TTY after setsid() */
+/* Define if sshd somehow reacquires a controlling TTY after setsid() */
 /* #undef SSHD_ACQUIRES_CTTY */
 
-/* Define if pam_chauthtok wants real uid set to the unpriv'ed user */
+/* Define if pam_chauthtok wants real uid set to the unpriv'ed user */
 /* #undef SSHPAM_CHAUTHTOK_NEEDS_RUID */
 
 /* Use audit debugging module */
@@ -1427,7 +1427,7 @@
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
-/* Define if you want a different $PATH for the superuser */
+/* Define if you want a different $PATH for the superuser */
 /* #undef SUPERUSER_PATH */
 
 /* syslog_r function is safe to use in in a signal handler */
@@ -1472,13 +1472,13 @@
 /* Define if you have Solaris projects */
 /* #undef USE_SOLARIS_PROJECTS */
 
-/* Define if you shouldn't strip 'tty' from your ttyname in [uw]tmp */
+/* Define if you shouldn't strip 'tty' from your ttyname in [uw]tmp */
 /* #undef WITH_ABBREV_NO_TTY */
 
 /* Define if you want to enable AIX4's authenticate function */
 /* #undef WITH_AIXAUTHENTICATE */
 
-/* Define if you have/want arrays (cluster-wide session managment, not C
+/* Define if you have/want arrays (cluster-wide session managment, not C
    arrays) */
 /* #undef WITH_IRIX_ARRAY */
 

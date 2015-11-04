@@ -840,7 +840,11 @@ main(int ac, char **av)
 				    strerror(errno));
 				break;
 			}
+#ifdef WIN32_FIXME
 			add_identity_file(&options, NULL, optarg, 1, pw);
+#else
+			add_identity_file(&options, NULL, optarg, 1);
+#endif
 			break;
 		case 'I':
 #ifdef ENABLE_PKCS11
@@ -1469,7 +1473,7 @@ main(int ac, char **av)
                        _PATH_SSH_USER_DIR);
 #else
 	r = snprintf(buf, sizeof buf, "%s%s%s", pw->pw_dir,
-	    strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
+		    strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
 #endif
 
 		if (r > 0 && (size_t)r < sizeof(buf) && stat(buf, &st) < 0) {
@@ -1808,9 +1812,6 @@ ssh_session(void)
 	int interactive = 0;
 	int have_tty = 0;
 	struct winsize ws;
-  #ifndef WIN32_FIXME
-  struct winsize ws;
-  #endif
 	char *cp;
 	const char *display;
 
@@ -2265,7 +2266,8 @@ load_public_identity_files(void)
 	explicit_bzero(pwdir, strlen(pwdir));
 	free(pwdir);
 }
-#ifdef SIGCHLD
+
+#ifndef WIN32_FIXME
 static void
 main_sigchld_handler(int sig)
 {
@@ -2281,3 +2283,5 @@ main_sigchld_handler(int sig)
 	errno = save_errno;
 }
 #endif
+
+

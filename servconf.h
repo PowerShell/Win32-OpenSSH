@@ -201,9 +201,10 @@ typedef struct {
 	int	fingerprint_hash;
 #ifdef WIN32_FIXME
   int i_am_a_fake_fork;
+	char *pamLibrary_;
 #endif
   
-  char *pamLibrary_;
+  
 }       ServerOptions;
 
 /* Information about the incoming connection as used by Match */
