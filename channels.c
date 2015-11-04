@@ -2410,6 +2410,9 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	const u_char *data;
 	u_int data_len, win_len;
 	Channel *c;
+	#ifdef WIN32_FIXME
+	static charinline = 0; // counts characters in a line for sshd in tty mode
+	#endif
 
 	/* Get the channel number and verify it. */
 	id = packet_get_int();
@@ -2476,9 +2479,19 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 				else {
 					buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
 					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode
-						buffer_append(&c->input, data, data_len);
-						if ( (data_len ==1) && (data[0] == '\b') )
-							buffer_append(&c->input, " \b", 2); // for backspace, we need to send space and another backspace for visual erase
+						if ( (data_len ==1) && (data[0] == '\b') ) {
+							if (charinline >0) {
+								buffer_append(&c->input, "\b \b", 3); // for backspace, we need to send space and another backspace for visual erase
+								charinline--;
+							}
+						}
+						else {
+							buffer_append(&c->input, data, data_len);
+							charinline += data_len; // one more char on the line
+						}
+						
+						if ( (data[data_len-1] == '\r') || (data[data_len-1] == '\n') )
+							charinline = 0;  // a line has ended, begin char in line count again
 					}
 				}
 		}
