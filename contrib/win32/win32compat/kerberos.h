@@ -55,21 +55,22 @@ void UninitMitKerberos();
  * needed by ssh client here.
  */
  
-#define KFW_CALL OM_uint32 KRB5_CALLCONV
 
-typedef KFW_CALL (*gss_indicate_mechs_ptr)(OM_uint32 *, gss_OID_set *);
-typedef KFW_CALL (*gss_release_buffer_ptr)(OM_uint32 *, gss_buffer_t);
+typedef OM_uint32 _stdcall KFW_CALL;
 
-typedef KFW_CALL (*gss_display_status_ptr)(OM_uint32 *, OM_uint32, int, 
+typedef  OM_uint32 (KRB5_CALLCONV *gss_indicate_mechs_ptr)(OM_uint32 *, gss_OID_set *);
+typedef OM_uint32(KRB5_CALLCONV *gss_release_buffer_ptr)(OM_uint32 *, gss_buffer_t);
+
+typedef OM_uint32(KRB5_CALLCONV *gss_display_status_ptr)(OM_uint32 *, OM_uint32, int,
                                        gss_OID, OM_uint32 *, gss_buffer_t);
 
-typedef KFW_CALL (*gss_delete_sec_context_ptr)(OM_uint32 *, gss_ctx_id_t *, 
+typedef OM_uint32(KRB5_CALLCONV *gss_delete_sec_context_ptr)(OM_uint32 *, gss_ctx_id_t *,
                                            gss_buffer_t);
 
-typedef KFW_CALL (*gss_release_name_ptr)(OM_uint32 *, gss_name_t *);
-typedef KFW_CALL (*gss_release_cred_ptr)(OM_uint32 *, gss_cred_id_t *);
+typedef OM_uint32(KRB5_CALLCONV *gss_release_name_ptr)(OM_uint32 *, gss_name_t *);
+typedef OM_uint32(KRB5_CALLCONV *gss_release_cred_ptr)(OM_uint32 *, gss_cred_id_t *);
 
-typedef KFW_CALL (*gss_init_sec_context_ptr)(OM_uint32 *, gss_cred_id_t,
+typedef OM_uint32(KRB5_CALLCONV *gss_init_sec_context_ptr)(OM_uint32 *, gss_cred_id_t,
                                          gss_ctx_id_t *, gss_name_t,
                                              gss_OID, OM_uint32, OM_uint32, 
                                                  gss_channel_bindings_t,
@@ -77,19 +78,19 @@ typedef KFW_CALL (*gss_init_sec_context_ptr)(OM_uint32 *, gss_cred_id_t,
                                                          gss_buffer_t, OM_uint32 *,
                                                              OM_uint32 *);
 
-typedef KFW_CALL (*gss_import_name_ptr)(OM_uint32 *, gss_buffer_t, 
+typedef OM_uint32(KRB5_CALLCONV *gss_import_name_ptr)(OM_uint32 *, gss_buffer_t,
                                             gss_OID, gss_name_t *);
 
-typedef OM_uint32 KRB5_CALLCONV (*gss_get_mic_ptr)(OM_uint32 *, gss_ctx_id_t, 
+typedef OM_uint32 (KRB5_CALLCONV *gss_get_mic_ptr)(OM_uint32 *, gss_ctx_id_t, 
                                                        gss_qop_t, gss_buffer_t, 
                                                            gss_buffer_t);
 
-typedef void KRB5_CALLCONV (*krb5_free_context_ptr)(krb5_context);
+typedef void (KRB5_CALLCONV *krb5_free_context_ptr)(krb5_context);
 
-typedef void KRB5_CALLCONV (*krb5_free_principal_ptr)(krb5_context,
+typedef void (KRB5_CALLCONV *krb5_free_principal_ptr)(krb5_context,
                                                           krb5_principal);
                                                           
-typedef krb5_error_code KRB5_CALLCONV (*krb5_cc_destroy_ptr)(krb5_context, 
+typedef krb5_error_code (KRB5_CALLCONV *krb5_cc_destroy_ptr)(krb5_context, 
                                                                  krb5_ccache);
 
 #endif
