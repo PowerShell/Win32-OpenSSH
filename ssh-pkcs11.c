@@ -601,7 +601,7 @@ pkcs11_add_provider(char *provider_id, char *pin, struct sshkey ***keyp)
       goto fail;
     }
 
-    getfunctionlist = GetProcAddress(handle, "C_GetFunctionList");
+    getfunctionlist = (CK_RV(*)(CK_FUNCTION_LIST **))GetProcAddress(handle, "C_GetFunctionList");
 
     if (getfunctionlist == NULL)
     {
