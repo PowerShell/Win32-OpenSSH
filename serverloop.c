@@ -824,6 +824,10 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	/* NOTREACHED */
 }
 
+#ifdef WIN32_FIXME
+Session * session_get(int *);
+#endif
+
 static void
 collect_children(void)
 {

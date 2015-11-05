@@ -105,6 +105,8 @@
 #include "sftp.h"
 
 #ifdef WIN32_FIXME
+
+char *GetHomeDirFromToken(char *userName, HANDLE token);
 /*
 FIXME: GFPZR: Function stat() may be undeclared.
 */
@@ -873,7 +875,7 @@ do_exec_no_pty(Session *s, const char *command)
   
   DWORD size = 256;
   
-  char name[size];
+  char name[256];
   
   GetUserName(name, &size);
 
