@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <OpenSSH-Src-Path>$(SolutionDir)..\..\..\</OpenSSH-Src-Path> 
+    <OpenSSH-Bin-Path>$(SolutionDir)..\..\..\bin\</OpenSSH-Bin-Path>
+    <OpenSSH-Lib-Path>$(SolutionDir)lib\</OpenSSH-Lib-Path>
+    <OpenSSL-Path>$(SolutionDir)..\..\..\..\OpenSSL\1.0.2d\VS2015\</OpenSSL-Path>
+  </PropertyGroup>
+</Project>

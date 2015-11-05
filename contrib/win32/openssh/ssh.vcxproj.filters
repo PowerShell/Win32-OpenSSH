@@ -1,0 +1,327 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="acss.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="atomicio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="audit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="authfd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="authfile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth-options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth-pam.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth-sia.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bitmap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="canohost.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="chacha.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="channels.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cipher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cipher-aesctr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cipher-chachapoly.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="clientloop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compat.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="compress.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="crc32.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="crypto_api.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="deattack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="defines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="digest.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dispatch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="dns.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="entropy.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fe25519.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ge25519.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="groupaccess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hmac.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hostfile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="includes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="jpake.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kerberos-sspi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="key.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="krl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="log.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="loginrec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mac.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="match.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="md5crypt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="misc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="monitor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="monitor_fdpass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="monitor_mm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="monitor_wrap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="msg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="myproposal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="opacket.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="packet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pam.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pathnames.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pkcs11.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="poly1305.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="progressmeter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="readconf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rijndael.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="roaming.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rsa.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sc25519.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="schnorr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="servconf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="serverloop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="session.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sftp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sftp-client.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sftp-common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssh_api.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssh1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssh2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sshbuf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sshconnect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssherr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssh-gss.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sshkey.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sshlogin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssh-pkcs11.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sshpty.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssh-sandbox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ttymodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uidswap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="umac.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="uuencode.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xmalloc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="clientloop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mux.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="readconf.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="roaming_client.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="roaming_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ssh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sshconnect.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sshconnect1.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sshconnect2.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sshtty.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

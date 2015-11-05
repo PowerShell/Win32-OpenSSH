@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ansiprsr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cng_cipher.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cng_digest.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="conio.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="console.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="daemon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="deskright.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="gettimeofday.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="homedirhelp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lsalogon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lsastring.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pwd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sfds.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="socket.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="startupneeds.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="strcasecmp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stringhelp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="syslog.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tncon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tnnet.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="win32auth.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="kerberos.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ansiprsr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cng_cipher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="console.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="deskright.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="homedirhelp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="kerberos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lsalogon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lsastring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sfds.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stringhelp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tncon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tnnet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="win32auth.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

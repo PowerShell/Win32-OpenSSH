@@ -1,0 +1,285 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="paths.targets"/>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{74E69D5E-A1EF-46EA-9173-19A412774104}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>Win32OpenSSH</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <ProjectName>ssh</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
+    <TargetName>ssh</TargetName>
+    <OutDir>$(SolutionDir)\bin\$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
+    <TargetName>ssh</TargetName>
+    <OutDir>$(SolutionDir)\bin\$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
+    <TargetName>ssh</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\$(TargetName)\</IntDir>
+    <TargetName>ssh</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level1</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x501;WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-Path)$(Platform)\$(Configuration)\include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <CompileAs>CompileAsC</CompileAs>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <ExceptionHandling>Sync</ExceptionHandling>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Path)$(Platform)\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level1</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x501;WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+       <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-Path)$(Platform)\$(Configuration)\include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <CompileAs>CompileAsC</CompileAs>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Path)$(Platform)\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level1</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x501;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-Path)$(Platform)\$(Configuration)\include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Path)$(Platform)\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level1</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x501;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-Path)$(Platform)\$(Configuration)\include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Path)$(Platform)\$(Configuration)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="$(OpenSSH-Src-Path)acss.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)atomicio.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)audit.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)auth-options.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)auth-pam.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)auth-sia.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)auth.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)authfd.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)authfile.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)bitmap.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)buffer.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)canohost.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)chacha.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)channels.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)cipher-aesctr.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)cipher-chachapoly.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)cipher.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)clientloop.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)compat.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)compress.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)crc32.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)crypto_api.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)deattack.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)defines.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)dh.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)digest.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)dispatch.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)dns.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)entropy.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)fe25519.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ge25519.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)groupaccess.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)hmac.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)hostfile.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)jpake.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)kerberos-sspi.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)kex.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)key.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)krl.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)log.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)loginrec.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)mac.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)match.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)md5crypt.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)misc.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor_fdpass.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor_mm.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor_wrap.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)msg.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)myproposal.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)opacket.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)packet.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)pam.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)pathnames.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)pkcs11.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)platform.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)poly1305.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)progressmeter.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)readconf.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)rijndael.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)roaming.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)rsa.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sc25519.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)schnorr.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)servconf.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)serverloop.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)session.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sftp-client.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sftp-common.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sftp.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh-gss.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh-pkcs11.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh-sandbox.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh1.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh2.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sshbuf.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sshconnect.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssherr.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sshkey.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sshlogin.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sshpty.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh_api.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)ttymodes.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)uidswap.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)umac.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)uuencode.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)version.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)xmalloc.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(OpenSSH-Src-Path)clientloop.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)mux.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)readconf.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)roaming_client.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)roaming_common.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)ssh.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)sshconnect.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)sshconnect1.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)sshconnect2.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)sshtty.c" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
