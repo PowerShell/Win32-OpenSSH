@@ -15,13 +15,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sftp-common.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp-common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sftp-server.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp-server-main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sftp-server-main.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp-server.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

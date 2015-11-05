@@ -15,163 +15,163 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="audit.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)audit-bsm.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="audit-bsm.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)audit-linux.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="audit-linux.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)audit.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-passwd.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-bsdauth.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-rhosts.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-chall.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-rh-rsa.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-krb5.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-rsa.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-options.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="platform.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-pam.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sshd.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-passwd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-rh-rsa.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth1.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-rhosts.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-rsa.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2-chall.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-shadow.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2-gss.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-sia.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2-hostbased.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth-skey.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2-kbdint.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2-none.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth1.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2-passwd.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2-chall.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth2-pubkey.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2-gss.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-bsdauth.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2-hostbased.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-chall.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2-kbdint.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-krb5.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2-none.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-options.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2-passwd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-pam.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2-pubkey.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-shadow.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)auth2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-sia.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)groupaccess.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="auth-skey.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)gss-serv-krb5.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="groupaccess.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)gss-serv.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gss-serv.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)kexdhs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gss-serv-krb5.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)kexecdhs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="kexdhs.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)kexgexs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="kexecdhs.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)loginrec.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="kexgexs.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)md5crypt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="loginrec.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)monitor.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="md5crypt.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)monitor_mm.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monitor.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)monitor_wrap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monitor_mm.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)pam.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="monitor_wrap.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)platform.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pam.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)roaming_common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="roaming_common.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)roaming_serv.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="roaming_serv.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-capsicum.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sandbox-capsicum.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-darwin.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sandbox-darwin.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-null.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sandbox-null.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-rlimit.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sandbox-rlimit.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-seccomp-filter.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sandbox-seccomp-filter.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-systrace.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sandbox-systrace.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)servconf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="servconf.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)serverloop.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="serverloop.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)session.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="session.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp-common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sftp-common.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sshd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sshlogin.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sshlogin.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sshpty.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sshpty.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

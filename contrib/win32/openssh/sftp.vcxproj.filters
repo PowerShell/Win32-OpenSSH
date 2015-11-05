@@ -15,19 +15,19 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="progressmeter.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)progressmeter.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sftp.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp-client.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sftp-client.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp-common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sftp-common.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp-glob.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sftp-glob.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sftp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

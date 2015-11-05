@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ssh-agent.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)ssh-agent.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ssh-pkcs11-client.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)ssh-pkcs11-client.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -15,312 +15,306 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="acss.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)acss.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="atomicio.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)atomicio.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="audit.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)audit.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="auth.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)auth-options.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="authfd.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)auth-pam.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="authfile.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)auth-sia.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="auth-options.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)auth.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="auth-pam.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)authfd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="auth-sia.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)authfile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="bitmap.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)bitmap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="buffer.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="canohost.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)canohost.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="chacha.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)chacha.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="channels.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)channels.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cipher.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)cipher-aesctr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cipher-aesctr.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)cipher-chachapoly.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cipher-chachapoly.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)cipher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="clientloop.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)clientloop.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="compat.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)compat.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="compress.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)compress.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="config.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)crc32.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="crc32.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)crypto_api.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="crypto_api.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)deattack.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="deattack.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)defines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="defines.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)dh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="dh.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)digest.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="digest.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)dispatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="dispatch.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)dns.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="dns.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)entropy.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="entropy.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)fe25519.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fe25519.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ge25519.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ge25519.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)groupaccess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="groupaccess.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)hmac.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="hmac.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)hostfile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="hostfile.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)jpake.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="includes.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)kerberos-sspi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="jpake.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)kex.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="kerberos-sspi.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)key.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="kex.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)krl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="key.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)log.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="krl.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)loginrec.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="log.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)mac.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="loginrec.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)match.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="mac.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)md5crypt.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="match.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)misc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="md5crypt.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="misc.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor_fdpass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="monitor.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor_mm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="monitor_fdpass.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)monitor_wrap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="monitor_mm.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)msg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="monitor_wrap.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)myproposal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="msg.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)opacket.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="myproposal.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)packet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="opacket.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)pam.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="packet.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)pathnames.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pam.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)pkcs11.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pathnames.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)platform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pkcs11.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)poly1305.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="platform.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)progressmeter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="poly1305.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)readconf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="progressmeter.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)rijndael.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="readconf.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)roaming.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="rijndael.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)rsa.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="roaming.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sc25519.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="rsa.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)schnorr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sc25519.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)servconf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="schnorr.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)serverloop.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="servconf.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)session.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="serverloop.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sftp-client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="session.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sftp-common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sftp.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sftp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sftp-client.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh-gss.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sftp-common.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh-pkcs11.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssh.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh-sandbox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssh_api.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssh1.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh1.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssh2.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sshbuf.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sshbuf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sshconnect.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sshconnect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssherr.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssherr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssh-gss.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sshkey.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sshkey.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sshlogin.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sshlogin.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)sshpty.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssh-pkcs11.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ssh_api.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="sshpty.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)ttymodes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ssh-sandbox.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)uidswap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ttymodes.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)umac.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="uidswap.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)uuencode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="umac.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="uuencode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="version.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="xmalloc.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)xmalloc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="clientloop.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)clientloop.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mux.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)mux.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="readconf.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)readconf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="roaming_client.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)roaming_client.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="roaming_common.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)roaming_common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ssh.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)ssh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sshconnect.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sshconnect.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sshconnect1.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sshconnect1.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sshconnect2.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sshconnect2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sshtty.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sshtty.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
