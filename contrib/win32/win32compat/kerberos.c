@@ -166,38 +166,38 @@ void UninitMitKerberos()
  * KfW libs here.
  */
 
-KFW_CALL gss_indicate_mechs(OM_uint32 *a, gss_OID_set *b)
+OM_uint32 KRB5_CALLCONV gss_indicate_mechs(OM_uint32 *a, gss_OID_set *b)
 {
   return MitDispatch.gss_indicate_mechs(a, b);
 }
 
-KFW_CALL gss_release_buffer(OM_uint32 *a, gss_buffer_t b)
+OM_uint32 KRB5_CALLCONV gss_release_buffer(OM_uint32 *a, gss_buffer_t b)
 {
   return MitDispatch.gss_release_buffer(a, b);
 }
 
-KFW_CALL gss_display_status(OM_uint32 *a, OM_uint32 b, int c, gss_OID d, 
+OM_uint32 KRB5_CALLCONV gss_display_status(OM_uint32 *a, OM_uint32 b, int c, gss_OID d,
                                 OM_uint32 *e, gss_buffer_t f)
 {
   return MitDispatch.gss_display_status(a, b, c, d, e, f);
 }
 
-KFW_CALL gss_delete_sec_context(OM_uint32 *a, gss_ctx_id_t *b, gss_buffer_t c)
+OM_uint32 KRB5_CALLCONV gss_delete_sec_context(OM_uint32 *a, gss_ctx_id_t *b, gss_buffer_t c)
 {
   return MitDispatch.gss_delete_sec_context(a, b, c);
 }
 
-KFW_CALL gss_release_name(OM_uint32 *a, gss_name_t *b)
+OM_uint32 KRB5_CALLCONV gss_release_name(OM_uint32 *a, gss_name_t *b)
 {
   return MitDispatch.gss_release_name(a, b);
 }
 
-KFW_CALL gss_release_cred(OM_uint32 *a, gss_cred_id_t *b)
+OM_uint32 KRB5_CALLCONV gss_release_cred(OM_uint32 *a, gss_cred_id_t *b)
 {
   return MitDispatch.gss_release_cred(a, b);
 }
 
-KFW_CALL gss_init_sec_context(OM_uint32 *a, gss_cred_id_t b,
+OM_uint32 KRB5_CALLCONV gss_init_sec_context(OM_uint32 *a, gss_cred_id_t b,
                                   gss_ctx_id_t *c, gss_name_t d,
                                       gss_OID e, OM_uint32 f,
                                           OM_uint32 g, gss_channel_bindings_t h,
@@ -208,12 +208,12 @@ KFW_CALL gss_init_sec_context(OM_uint32 *a, gss_cred_id_t b,
   return MitDispatch.gss_init_sec_context(a, b, c, d, e, f, g, h, i, j, k, l, m);
 }
 
-KFW_CALL gss_import_name(OM_uint32 *a, gss_buffer_t b, gss_OID c, gss_name_t *d)
+OM_uint32 KRB5_CALLCONV gss_import_name(OM_uint32 *a, gss_buffer_t b, gss_OID c, gss_name_t *d)
 {
   return MitDispatch.gss_import_name(a, b, c, d);
 }
 
-KFW_CALL gss_get_mic(OM_uint32 *a, gss_ctx_id_t b, gss_qop_t c,
+OM_uint32 KRB5_CALLCONV gss_get_mic(OM_uint32 *a, gss_ctx_id_t b, gss_qop_t c,
                          gss_buffer_t d, gss_buffer_t e)
 {
   return MitDispatch.gss_get_mic(a, b, c, d, e);

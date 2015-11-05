@@ -29,12 +29,17 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
 #include "lsalogon.h"
 #include "Debug.h"
 
 #include "includes.h"
 #include "log.h"
 #include "servconf.h"
+
+
+#define STATUS_LOGON_FAILURE             ((NTSTATUS)0xC000006DL)     // ntsubauth
+#define STATUS_NO_SUCH_PACKAGE           ((NTSTATUS)0xC00000FEL)
 
 extern ServerOptions options;
 
