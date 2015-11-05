@@ -55,7 +55,7 @@ static int sfd_map_init = 0;
 static int sfd_count = 0;
 int sfd_start = 0;
 
-
+#ifndef __MINGW32__
 void myInvalidParameterHandler(const wchar_t* expression,
 	const wchar_t* function,
 	const wchar_t* file,
@@ -64,6 +64,7 @@ void myInvalidParameterHandler(const wchar_t* expression,
 {
 	return;
 }
+#endif
 
 
 /* 
@@ -151,14 +152,17 @@ int allocate_sfd(int fd_or_handle)
 	else
 #endif
 
-
+#ifndef __MINGW32__
 	_invalid_parameter_handler oldHandler, newHandler;
 	newHandler = myInvalidParameterHandler;
 	oldHandler = _set_invalid_parameter_handler(newHandler);
+#endif
 
 
 	real_handle = (HANDLE)_get_osfhandle(fd_or_handle);
+#ifndef __MINGW32__
 	_set_invalid_parameter_handler(oldHandler);
+#endif
 
   if (real_handle == INVALID_HANDLE_VALUE)
   {
