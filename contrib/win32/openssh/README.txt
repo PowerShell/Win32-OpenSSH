@@ -7,31 +7,20 @@ All projects import this targets file, and it should be in the same directory as
 
 The custom paths are:
 
-OpenSSH-Src-Path =  The directory path of the OpenSSH root source directory (with trailing slash)
-OpenSSH-Bin-Path =  The directory path of the location to which binaries are placed.  This is the output of the binary projects
-OpenSSH-Bin-Path =  The directory path of the location to which libraries are placed.  This is the output of the libary projects
-OpenSSL-Path     =  The directory that contains OpenSSL headers and libaraies.
+OpenSSH-Src-Path            =  The directory path of the OpenSSH root source directory (with trailing slash)
+OpenSSH-Bin-Path            =  The directory path of the location to which binaries are placed.  This is the output of the binary projects
+OpenSSH-Lib-Path            =  The directory path of the location to which libraries are placed.  This is the output of the libary projects
+OpenSSL-Win32-Release-Path  =  The directory path of OpenSSL statically linked compiled for Win32-Release.  This path is used by all projects
+                               for the include path  (since includes are the same for all configurations), and for the Win32-Release library 
+							   paths 
+OpenSSL-Win32-Debug-Path    =  The directory path of OpenSSL statically linked compiled for Win32-Debug.  This path is used in the Win32-Debug
+                               library path 
+OpenSSL-x64-Release-Path    =  The directory path of OpenSSL statically linked compiled for x64-Release.  This path is used in the Win32-Release
+                               library path
+OpenSSL-x64-Debug-Path      =  The directory path of OpenSSL statically linked compiled for x64-Release.  This path is used in the Win32-Release
+                               library path
 
-Notes on OpenSSL path structure
-================================
-
-The projects anticipate that the OpenSSL directory will contain sub directorires for Platform and Configuration for example:
-
-OpenSSL -+- Win32 -+- Release -+- include
-         |         |           |
-         |         |           +- lib
-         |         |
-         |         +- Debug   -+- include
-         |                     |
-         |                     +- lib 
-         |
-         +- x64   -+- Release -+- include
-                   |           |
-                   |           +- lib
-                   |
-                   +- Debug   -+- include
-                               |
-                               +- lib 
+ 
 
 The Release/Debug OpenSSL directories output is the standard 'install' output of OpenSSL compiled under Visual Studio 2015 using static c-runtimes.
 
