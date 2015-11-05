@@ -1895,13 +1895,13 @@ void fill_default_options(Options * options, struct passwd *pw)
 	if (options->num_user_hostfiles == 0) {
 		options->user_hostfiles[options->num_user_hostfiles++] =
 			#ifdef WIN32_FIXME
-			user_hostfile_name ;
+			xstrdup(user_hostfile_name);
 			#else
 		    xstrdup(_PATH_SSH_USER_HOSTFILE);
 			#endif
 		options->user_hostfiles[options->num_user_hostfiles++] =
 			#ifdef WIN32_FIXME
-			user_hostfile_name2 ;
+			xstrdup(user_hostfile_name2);
 			#else
 		    xstrdup(_PATH_SSH_USER_HOSTFILE2);
 			#endif
