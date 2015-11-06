@@ -36,7 +36,12 @@
 #endif
 #include <sys/uio.h>
 
+#ifdef WIN32_VS
+#include "win32_dirent.h"
+#else
 #include <dirent.h>
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -1502,9 +1507,11 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 			    "server reordered requests", local_path);
 		}
 		debug("truncating at %llu", (unsigned long long)highwater);
+		#ifndef WIN32_VS
 		if (ftruncate(local_fd, highwater) == -1)
 			error("ftruncate \"%s\": %s", local_path,
 			    strerror(errno));
+		#endif
 	}
 	if (read_error) {
 		error("Couldn't read from remote file \"%s\" : %s",

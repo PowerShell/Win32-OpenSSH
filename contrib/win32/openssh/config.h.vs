@@ -1705,4 +1705,7 @@ struct iovec
 
 #define __attribute__(A)
 
+// define building with MS Visual Studio Compiler and runtime and not with MingW/gcc compiler
+#define WIN32_VS 1
+
 
