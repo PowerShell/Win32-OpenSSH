@@ -192,7 +192,6 @@ FIXME: GFPZR: Function stat() may be undeclared.
 #include <tlhelp32.h>
 
 char *fake_fork_args;
-char *start_dir;
 
 extern int logfd;
 extern int sfd_start;
@@ -1727,7 +1726,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
             */
             
            b = CreateProcess(NULL, fake_fork_args, NULL, NULL, TRUE,
-                                 CREATE_NEW_PROCESS_GROUP, NULL, start_dir,
+                                 CREATE_NEW_PROCESS_GROUP, NULL, NULL,
                                      &si, &pi);
           if (!b)
           {
@@ -2013,14 +2012,6 @@ main(int ac, char **av)
 
     fake_fork_args = create_fake_fork_args(ac, av);
 
-    {
-      int start_dir_len = GetCurrentDirectory(0, NULL);
-      
-      start_dir = xmalloc(start_dir_len + 1);
-      
-      GetCurrentDirectory(start_dir_len, start_dir);
-    }
-  
   #endif /* WIN32_FIXME */
 
 #ifndef HAVE_SETPROCTITLE
@@ -2316,6 +2307,10 @@ main(int ac, char **av)
 
     if (GetCurrentModulePath(basePath, PATH_SIZE) == 0)
     {
+
+#ifdef WIN32_FIXME
+		chdir(basePath);
+#endif
       /*
        * Try './sshd_config' first.
        */
