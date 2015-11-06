@@ -91,6 +91,7 @@
 
 #ifdef WIN32_FIXME
 #define isatty(a) WSHELPisatty(a)
+#define SFD_TYPE_CONSOLE    4
 #endif
 
 
@@ -1686,8 +1687,10 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 		errno = 0;
 		len = read(c->rfd, buf, sizeof(buf));
 		#ifdef WIN32_FIXME
-		if (len == 0)
+		if (len == 0) {
+			if ( get_sfd_type(c->rfd) == SFD_TYPE_CONSOLE)
 			return 1; // in Win32 console read, there may be no data, but is ok
+		}
 		#endif
 		if (len < 0 && (errno == EINTR ||
 		    ((errno == EAGAIN || errno == EWOULDBLOCK) && !force)))
