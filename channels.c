@@ -1686,7 +1686,7 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 		errno = 0;
 		len = read(c->rfd, buf, sizeof(buf));
 		#ifdef WIN32_FIXME
-		if ( c->isatty && len == 0 )
+		if (len == 0)
 			return 1; // in Win32 console read, there may be no data, but is ok
 		#endif
 		if (len < 0 && (errno == EINTR ||
