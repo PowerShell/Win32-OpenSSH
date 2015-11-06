@@ -265,11 +265,14 @@ regress/rsa_ssh2_crnl.prv
 regress/t7.out.pub
 regress/t6.out2
 config.h
+config.h.in
 configure
 config.h.tail
 config.sub
 config.guess
+Makefile.in
 
 
 #temp key files
 d2utmpa*
+configure
