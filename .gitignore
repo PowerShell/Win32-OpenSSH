@@ -230,10 +230,6 @@ openssh.xml
 opensshd.init
 survey.sh
 buildpkg.sh
-config.h.in
-
-
-config.h
 ssh_host_rsa_key.pub
 ssh_host_rsa_key
 ssh_host_rsa_key
@@ -270,8 +266,6 @@ regress/t7.out.pub
 regress/t6.out2
 config.h
 configure
-config.h
-confih.h.in
 config.h.tail
 config.sub
 config.guess
