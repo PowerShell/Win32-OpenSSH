@@ -2480,8 +2480,15 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 						}
 				}
 				else {
+					// avoid sending the 4 arrow keys out to remote for now "ESC[A" ..
+					if  ( (c->isatty) && (data_len ==3) && (data[0] == '\033') && (data[1] == '[')) {
+						if ( ( data[2] == 'A') ||  (data[2] == 'B') ||  (data[2] == 'C') ||  (data[2] == 'D'))
+								packet_check_eom();
+								return 0;
+					}
 					buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode
+					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode			
+					
 						if ( (data_len ==1) && (data[0] == '\b') ) {
 							if (charinline >0) {
 								buffer_append(&c->input, "\b \b", 3); // for backspace, we need to send space and another backspace for visual erase
