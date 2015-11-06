@@ -681,8 +681,13 @@ send_client_banner(int connection_out, int minor1)
 		xasprintf(&client_version_string, "SSH-%d.%d-%.100s\r\n",
 		    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION);
 		#else
+		#ifdef WIN32_VS
+		xasprintf(&client_version_string, "SSH-%d.%d-%.100sp1 Microsoft Win32 port with VS %s\r\n",
+		    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION, __DATE__ );
+		#else
 		xasprintf(&client_version_string, "SSH-%d.%d-%.100sp1 Microsoft Win32 port %s\r\n",
 		    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION, __DATE__ );
+		#endif
 		#endif
 	} else {
 		xasprintf(&client_version_string, "SSH-%d.%d-%.100s\n",
