@@ -178,7 +178,6 @@
   <ItemGroup>
     <ClCompile Include="$(OpenSSH-Src-Path)readconf.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)roaming_dummy.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)ssh-keygen.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-keysign.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

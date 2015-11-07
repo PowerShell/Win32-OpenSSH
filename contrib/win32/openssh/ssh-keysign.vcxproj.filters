@@ -21,9 +21,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)roaming_dummy.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)ssh-keygen.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-keysign.c">
       <Filter>Source Files</Filter>
     </ClCompile>
