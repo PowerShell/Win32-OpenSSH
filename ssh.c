@@ -840,7 +840,11 @@ main(int ac, char **av)
 				    strerror(errno));
 				break;
 			}
+#ifdef WIN32_FIXME
 			add_identity_file(&options, NULL, optarg, 1, pw);
+#else
+			add_identity_file(&options, NULL, optarg, 1);
+#endif
 			break;
 		case 'I':
 #ifdef ENABLE_PKCS11
@@ -865,8 +869,13 @@ main(int ac, char **av)
 			}
 			break;
 		case 'V':
+			#ifndef WIN32_FIXME
 			fprintf(stderr, "%s, %s\n",
 			    SSH_RELEASE,
+			#else
+			fprintf(stderr, "%s %s, %s\n",
+			    SSH_RELEASE, __DATE__ ,
+			#endif
 #ifdef WITH_OPENSSL
 			    SSLeay_version(SSLEAY_VERSION)
 #else
@@ -1464,7 +1473,7 @@ main(int ac, char **av)
                        _PATH_SSH_USER_DIR);
 #else
 	r = snprintf(buf, sizeof buf, "%s%s%s", pw->pw_dir,
-	    strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
+		    strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
 #endif
 
 		if (r > 0 && (size_t)r < sizeof(buf) && stat(buf, &st) < 0) {
@@ -1533,6 +1542,10 @@ main(int ac, char **av)
 	    ConInputInitParams(); // init the Console input side with global parameters
 		HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
 	    ConInit( STD_OUTPUT_HANDLE, TRUE ); //init the output console surface for us to write
+	}
+	else {
+		extern int glob_itissshclient;
+		glob_itissshclient = 1; // tell our contrib/win32/win32compat/socket.c code it is for ssh client side
 	}
 	#endif
 
@@ -1799,9 +1812,6 @@ ssh_session(void)
 	int interactive = 0;
 	int have_tty = 0;
 	struct winsize ws;
-  #ifndef WIN32_FIXME
-  struct winsize ws;
-  #endif
 	char *cp;
 	const char *display;
 
@@ -2256,7 +2266,8 @@ load_public_identity_files(void)
 	explicit_bzero(pwdir, strlen(pwdir));
 	free(pwdir);
 }
-#ifdef SIGCHLD
+
+#ifndef WIN32_FIXME
 static void
 main_sigchld_handler(int sig)
 {
@@ -2272,3 +2283,5 @@ main_sigchld_handler(int sig)
 	errno = save_errno;
 }
 #endif
+
+

@@ -192,7 +192,6 @@ FIXME: GFPZR: Function stat() may be undeclared.
 #include <tlhelp32.h>
 
 char *fake_fork_args;
-char *start_dir;
 
 extern int logfd;
 extern int sfd_start;
@@ -795,6 +794,10 @@ sshd_exchange_identification(int sock_in, int sock_out)
 	debug("Client protocol version %d.%d; client software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
+	#ifdef WIN32_FIXME
+	SetEnvironmentVariable("SSH_CLIENT_ID", remote_version);
+	#endif
+	
 	active_state->compat = compat_datafellows(remote_version);
 
 	if ((datafellows & SSH_BUG_PROBE) != 0) {
@@ -1723,7 +1726,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
             */
             
            b = CreateProcess(NULL, fake_fork_args, NULL, NULL, TRUE,
-                                 CREATE_NEW_PROCESS_GROUP, NULL, start_dir,
+                                 CREATE_NEW_PROCESS_GROUP, NULL, NULL,
                                      &si, &pi);
           if (!b)
           {
@@ -2009,14 +2012,6 @@ main(int ac, char **av)
 
     fake_fork_args = create_fake_fork_args(ac, av);
 
-    {
-      int start_dir_len = GetCurrentDirectory(0, NULL);
-      
-      start_dir = xmalloc(start_dir_len + 1);
-      
-      GetCurrentDirectory(start_dir_len, start_dir);
-    }
-  
   #endif /* WIN32_FIXME */
 
 #ifndef HAVE_SETPROCTITLE
@@ -2312,6 +2307,10 @@ main(int ac, char **av)
 
     if (GetCurrentModulePath(basePath, PATH_SIZE) == 0)
     {
+
+#ifdef WIN32_FIXME
+		chdir(basePath);
+#endif
       /*
        * Try './sshd_config' first.
        */
@@ -2809,6 +2808,10 @@ main(int ac, char **av)
         remotesochandle = atoi( getenv("SSHD_REMSOC") );
 
         sock_in = sock_out = newsock = allocate_sfd(remotesochandle) ; //si.hStdInput);
+		
+		// we have the socket handle, delete it for child processes we create like shell 
+		SetEnvironmentVariable("SSHD_REMSOC", NULL);
+		SetHandleInformation(remotesochandle, HANDLE_FLAG_INHERIT, 0); // make the handle not to be inherited
 
         /*
          * We don't have a startup_pipe 

@@ -382,7 +382,11 @@ _ssh_send_banner(struct ssh *ssh, char **bannerp)
 	char buf[256];
 	int r;
 
+	#ifndef WIN32_FIXME
 	snprintf(buf, sizeof buf, "SSH-2.0-%.100s\r\n", SSH_VERSION);
+	#else
+	snprintf(buf, sizeof buf, "SSH-2.0-%.100sp1 Microsoft Win32 port %s\r\n", SSH_VERSION, __DATE__ );
+	#endif
 	if ((r = sshbuf_put(ssh_packet_get_output(ssh), buf, strlen(buf))) != 0)
 		return r;
 	chop(buf);

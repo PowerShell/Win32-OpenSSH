@@ -33,6 +33,7 @@
 #include <io.h>
 #include "sfds.h"
 
+
 extern void debug(const char *fmt,...);
 extern void debug2(const char *fmt,...);
 extern void debug3(const char *fmt,...);
@@ -54,69 +55,114 @@ static int sfd_map_init = 0;
 static int sfd_count = 0;
 int sfd_start = 0;
 
+#ifndef __MINGW32__
+void myInvalidParameterHandler(const wchar_t* expression,
+	const wchar_t* function,
+	const wchar_t* file,
+	unsigned int line,
+	uintptr_t pReserved)
+{
+	return;
+}
+#endif
+
+
 /* 
  * store real fd in map, detect fd type and return sfd number.
  */
  
 int allocate_sfd(int fd_or_handle)
 {
-  int slot = SFD_FD_INVALID;
-  int i;
-  int real_fd;
+	int slot = SFD_FD_INVALID;
+	int i;
+	int real_fd;
 
-  HANDLE real_handle;
-  
-  DWORD handle_type;
+	HANDLE real_handle;
 
-  /*
-   * Init the map once 
-   */
-   
-  if (!sfd_map_init)
-  {
-    sfd_map_init = 1;
-    
-    for (i = 0; i < SFD_MAP_SIZE; ++i)
-    {
-      sfd_map[i].fd = SFD_FD_INVALID;
-      sfd_map[i].type = SFD_TYPE_NONE;
-    }
-  }
+	DWORD handle_type;
 
-  /*
-   * Find an open slot 
-   */
-   
-  for (i = sfd_start; i < SFD_MAP_SIZE; ++i)
-  {
-    /*
-     * Is this slot open? 
-     */
-     
-     if (sfd_map[i].fd == SFD_FD_INVALID)
-     {
-       slot = i;
-      
-       break;
-     }
-  }  
-  
-  /*
-   * Bail if no slot found 
-   */
-   
-  if (slot == SFD_FD_INVALID)
-  {
-    error("ERROR: Too many connections.");
-                    
-    return -1;
-  }
+	/*
+	 * Init the map once
+	 */
 
-  /*
-   * Detect and save real fd and real handle 
-   */
-   
-  real_handle = (HANDLE) _get_osfhandle(fd_or_handle);
+	if (!sfd_map_init)
+	{
+		sfd_map_init = 1;
+
+		for (i = 0; i < SFD_MAP_SIZE; ++i)
+		{
+			sfd_map[i].fd = SFD_FD_INVALID;
+			sfd_map[i].type = SFD_TYPE_NONE;
+		}
+	}
+
+	/*
+	 * Find an open slot
+	 */
+
+	for (i = sfd_start; i < SFD_MAP_SIZE; ++i)
+	{
+		/*
+		 * Is this slot open?
+		 */
+
+		if (sfd_map[i].fd == SFD_FD_INVALID)
+		{
+			slot = i;
+
+			break;
+		}
+	}
+
+	/*
+	 * Bail if no slot found
+	 */
+
+	if (slot == SFD_FD_INVALID)
+	{
+		error("ERROR: Too many connections.");
+
+		return -1;
+	}
+
+#if 0
+	/*
+	 * Detect and save real fd and real handle
+	 */
+	int optVal;
+	int optLen = sizeof(int);
+	BOOL bIsSocket = TRUE;
+	HRESULT hr = S_OK;
+	int ret = getsockopt(fd_or_handle,
+		SOL_SOCKET,
+		SO_DEBUG,
+		(char*)&optVal,
+		&optLen);
+
+	if (ret == SOCKET_ERROR && WSAGetLastError() == WSAENOTSOCK)
+	{
+		bIsSocket = FALSE;
+	}
+
+	// if (!bIsSocket && fd_or_handle > 600)
+   //	  bIsSocket = TRUE;
+
+	if (bIsSocket == TRUE)
+		real_handle = (HANDLE)fd_or_handle;
+	else
+#endif
+
+#ifndef __MINGW32__
+	_invalid_parameter_handler oldHandler, newHandler;
+	newHandler = myInvalidParameterHandler;
+	oldHandler = _set_invalid_parameter_handler(newHandler);
+#endif
+
+
+	real_handle = (HANDLE)_get_osfhandle(fd_or_handle);
+#ifndef __MINGW32__
+	_set_invalid_parameter_handler(oldHandler);
+#endif
 
   if (real_handle == INVALID_HANDLE_VALUE)
   {

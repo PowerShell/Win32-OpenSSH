@@ -35,6 +35,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef __MINGW32__
+#include <Crtdbg.h>
+#endif
 
 #include "sfds.h"
 
@@ -42,12 +45,19 @@
 
 #undef  DEBUG
 
+#ifdef WIN32
 #ifdef DEBUG
-  #define DBG_MSG(FMT, ARGS...) debug3(FMT, ## ARGS)
+  #define DBG_MSG(FMT, ...) debug3(FMT, ## ARGS)
 #else
-  #define DBG_MSG(FMT, ARGS...)
+  #define DBG_MSG(FMT, ...)
 #endif
-
+#else
+#ifdef DEBUG
+#define DBG_MSG(FMT, ARGS...) debug3(FMT, ## ARGS)
+#else
+#define DBG_MSG(FMT, ARGS...)
+#endif
+#endif
 extern void debug(const char *fmt,...);
 extern void debug2(const char *fmt,...);
 extern void debug3(const char *fmt,...);
@@ -70,6 +80,12 @@ static fd_set write_sfd_set;
 #define TEST_WRITE  0
 
 #define MSG_WAITALL 0x8
+
+#ifdef WIN32
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
+#endif
 
 int PassInputFd  = STDIN_FILENO;
 int PassOutputFd = STDOUT_FILENO;
@@ -462,6 +478,7 @@ int WSHELPopen(const char *pathname, int flags, ...)
    */
   
   newsfd = allocate_sfd(newfd);
+
 
   return newsfd;
 }
@@ -2408,6 +2425,7 @@ int WSHELPread(int sfd, char *dst, unsigned int max)
 {
   DBG_MSG("-> WSHELPread(sfd = %d)...\n", sfd);
 
+ 
   SOCKET sock;
 
   int ret = -1;
@@ -2490,6 +2508,7 @@ int WSHELPread(int sfd, char *dst, unsigned int max)
       {
         error("read from pipe/console sfd [%d] failed with error code [%d]",
                   sfd, GetLastError());
+
       }
 
       break;
@@ -2902,6 +2921,17 @@ void WSHELPinitialize()
    */
   
   winsock_initialized = 1;
+
+#ifndef __MINGW32__
+  _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+  _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
+  _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+  _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDOUT);
+  _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+  _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
+
+#endif
+
 
   DBG_MSG("<- WSHELPinitialize()...\n");
 }

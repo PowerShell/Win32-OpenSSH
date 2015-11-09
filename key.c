@@ -5,9 +5,7 @@
 
 #include "includes.h"
 
-#ifndef WIN32_FIXME
-#include <openbsd-compat/openssl-compat.h>
-#else
+#ifdef WIN32_FIXME
 #include "openbsd-compat/openssl-compat.h"
 #endif
 

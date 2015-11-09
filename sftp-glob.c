@@ -22,7 +22,12 @@
 # include <sys/stat.h>
 #endif
 
+#ifdef WIN32_VS
+#include "win32_dirent.h"
+#else
 #include <dirent.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdlib.h>
@@ -31,6 +36,10 @@
 #include "sftp.h"
 #include "sftp-common.h"
 #include "sftp-client.h"
+
+#ifdef WIN32_VS
+#include "win32_dirent.c"
+#endif
 
 int remote_glob(struct sftp_conn *, const char *, int,
     int (*)(const char *, int), glob_t *);

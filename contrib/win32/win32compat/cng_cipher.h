@@ -63,6 +63,7 @@ extern "C" {
 		unsigned char *		pbIV;
 		unsigned int		cbBlockSize;
 		unsigned int		flags;
+		PBYTE				pKeyObject;
 	} SSH_CNG_CIPHER_CTX, *PSSH_CNG_CIPHER_CTX;
 
 

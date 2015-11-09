@@ -216,6 +216,7 @@ unsigned int cng_cipher_init(PSSH_CNG_CIPHER_CTX x, const unsigned char *key, un
 	DWORD					cbData = 0;
 	LPCWSTR					pAlg = NULL;
 	DWORD					cbBlockLen = 0;
+	DWORD					cbKeyObject = 0;
 
 	if ((0 == (flags & _CNG_CIPHER_AES)) || (0 == (flags & (_CNG_MODE_CBC | _CNG_MODE_CTR))))
 		return STATUS_INVALID_PARAMETER;
@@ -282,21 +283,36 @@ unsigned int cng_cipher_init(PSSH_CNG_CIPHER_CTX x, const unsigned char *key, un
 
 		if (status == S_OK)
 		{
+			status = BCryptGetProperty(
+				hAlg,
+				BCRYPT_OBJECT_LENGTH,
+				(PBYTE)&cbKeyObject,
+				sizeof(DWORD),
+				&cbData,
+				0);
+		}
+
+		if ((status == S_OK) && (x->pKeyObject = (PBYTE)HeapAlloc(GetProcessHeap(),0,cbKeyObject)))
+		{
 			status = BCryptGenerateSymmetricKey(
 				hAlg,
 				&(x->hKey),
-				NULL,
-				0,
+				x->pKeyObject,
+				cbKeyObject,
 				(PBYTE)key,
 				keylen,
 				0);
 		}
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 
-		// if we got an error along the way, free up the iv
+		// if we got an error along the way, free up the iv and key object
 		if (status != S_OK && x->pbIV)
 		{
 			HeapFree(GetProcessHeap(), 0, x->pbIV);
+		}
+		if (status != S_OK && x->pKeyObject)
+		{
+			HeapFree(GetProcessHeap(), 0, x->pKeyObject);
 		}
 	}
 	return status;
@@ -310,6 +326,8 @@ void cng_cipher_cleanup(PSSH_CNG_CIPHER_CTX x)
 		HeapFree(GetProcessHeap(), 0, x->pbIV);
 	if (x->hKey)
 		BCryptDestroyKey(x->hKey);
+	if (x->pKeyObject)
+		HeapFree(GetProcessHeap(), 0, x->pKeyObject);
 }
 
 #endif

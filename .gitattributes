@@ -22,3 +22,10 @@
 config.sub text eol=lf
 fixalgorithms text eol=lf
 runconfigure text eol=lf
+configure text eol=lf
+config.guess text eol=lf
+config.sub text eol=lf
+win32_build text eol=lf
+win32_config.guess text eol=lf
+win32_config.sub text eol=lf
+

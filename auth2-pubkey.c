@@ -86,7 +86,8 @@ extern u_int session_id2_len;
 #ifdef WIN32_FIXME
   
   extern char HomeDirLsaW[MAX_PATH];
-  
+  wchar_t *GetHomeDir(char *userName);
+
 #endif
 
 

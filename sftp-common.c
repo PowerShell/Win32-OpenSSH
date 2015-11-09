@@ -234,6 +234,10 @@ ls_file(const char *name, const struct stat *st, int remote, int si_units)
 #endif
 	if (!remote) {
 		user = user_from_uid(st->st_uid, 0);
+		#ifdef WIN32_FIXME
+		snprintf(gbuf, sizeof gbuf, "%u", (u_int)st->st_gid);
+		group = gbuf;
+		#endif
 	} else {
 		snprintf(ubuf, sizeof ubuf, "%u", (u_int)st->st_uid);
 		user = ubuf;

@@ -99,7 +99,7 @@
 #define HAVE_DECL_HOWMANY 0
 
 #define WIN32_ZLIB_NO 1
-#define USE_MSCNG 1
+//#define USE_MSCNG 1
 
 //#define HAVE_ARC4RANDOM_UNIFORM 1
 

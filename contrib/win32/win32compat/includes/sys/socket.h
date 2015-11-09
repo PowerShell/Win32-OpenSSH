@@ -40,10 +40,12 @@ int WSHELPshutdown(int sfd, int how);
 int WSHELPaccept(int sfd, struct sockaddr* addr, int* addrlen);
 int WSHELPselect (int sfds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const struct timeval *timeout);
 
+
 /* Other helpers */
 void WSHELPinitialize();
 int map_standard_descriptor(int *fd);
 void allocate_standard_descriptor(int fd);
+
 
 /* Redirect callers of socket functions to use our indirection functions */
 #if NEED_FUNC_MACROS
@@ -127,30 +129,75 @@ int WSHELPclose(int sfd);
 
 
 /* Errno helpers */
+#ifndef ENETDOWN
 #define ENETDOWN		WSAENETDOWN
+#endif
+#ifndef EAFNOSUPPORT
 #define EAFNOSUPPORT            WSAEAFNOSUPPORT
+#endif
+#ifndef EINPROGRESS
 #define	EINPROGRESS		WSAEINPROGRESS
+#endif
+#ifndef EXX
 #define EXX			WSAEMFILE
+#endif
+#ifndef EXX1
 #define EXX1			WSAENOBUFS
+#endif
+#ifndef EPROTONOSUPPORT
 #define EPROTONOSUPPORT	        WSAEPROTONOSUPPORT
+#endif
+#ifndef EPROTOTYPE
 #define EPROTOTYPE		WSAEPROTOTYPE
+#endif
+#ifndef ESOCKTNOSUPPORT
 #define	ESOCKTNOSUPPORT         WSAESOCKTNOSUPPORT
+#endif
+#ifndef EADDRINUSE
 #define EADDRINUSE		WSAEADDRINUSE
-// in errno.h #define EINVAL			WSAEINVAL
+#endif
+#ifndef EISCONN
 #define EISCONN			WSAEISCONN
+#endif
+#ifndef ENOTSOCK
 #define ENOTSOCK		WSAENOTSOCK
+#endif
+#ifndef EOPNOTSUPP
 #define EOPNOTSUPP		WSAENOTSUPP
-// in errno.h #define EINTR			WSAEINTR
+#endif
+#ifndef EALREADY
 #define EALREADY		WSAEALREADY
+#endif
+#ifndef ECONNREFUSED
 #define	ECONNREFUSED	        WSAECONNREFUSED
-// in errno.h #define	EFAULT			WSAEFAULT
+#endif
+#ifndef ENOTUNREACH
 #define ENOTUNREACH		WSAENOTUNREACH
+#endif
+#ifndef EHOSTUNREACH
 #define EHOSTUNREACH	        WSAEHOSTUNREACH
+#endif
+#ifndef ETIMEDOUT
 #define ETIMEDOUT		WSAETIMEDOUT
+#endif
+#ifndef EWOULDBLOCK
 #define EWOULDBLOCK		WSAEWOULDBLOCK
+#endif
+#ifndef EACCES
 #define	EACCES			WSAEACCESS
+#endif
+#ifndef ECONNRESET
 #define ECONNRESET		WSAECONNRESET
+#endif
+#ifndef ENOPROTOOPT
 #define ENOPROTOOPT		WSAENOPROTOOPT
+#endif
+#ifndef EPFNOSUPPORT
 #define EPFNOSUPPORT	        WSAEPFNOSUPPORT
+#endif
+#ifndef ENOTCONN
 #define ENOTCONN		WSAENOTCONN
+#endif
+
+
 #endif

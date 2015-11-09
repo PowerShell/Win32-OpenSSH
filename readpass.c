@@ -146,7 +146,7 @@ ssh_askpass(char *askpass, const char *msg)
   
   int length = 8192;
   
-  CHAR command[length];
+  CHAR command[8192];
   
   char *pass = NULL;
   

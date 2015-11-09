@@ -545,7 +545,11 @@ char *
 tilde_expand_filename(const char *filename, uid_t uid)
 {
 	const char *path, *sep;
+#ifdef WIN32_FIXME
 	char user[128], ret[MAXPATHLEN], *ret2;
+#else
+	char user[128], *ret;
+#endif
 	struct passwd *pw;
 	u_int len, slash;
 
@@ -578,15 +582,9 @@ tilde_expand_filename(const char *filename, uid_t uid)
   }
 
   else if (snprintf(ret, sizeof(ret), "%ls", pw -> pw_dir) <= 0)
-#else
-	if (strlcpy(ret, pw->pw_dir, sizeof(ret)) >= sizeof(ret))
 #endif
 	/* Make sure directory has a trailing '/' */
-#ifdef WIN32_FIXME
-//  len = strlen(ret);
-//  if ((len == 0 || ret[len - 1] != '/') &&
-//      strlcat(ret, "/", sizeof(ret)) >= sizeof(ret))
-#else
+#ifndef WIN32_FIXME
 	len = strlen(pw->pw_dir);
 	if (len == 0 || pw->pw_dir[len - 1] != '/')
 		sep = "/";
@@ -598,14 +596,17 @@ tilde_expand_filename(const char *filename, uid_t uid)
 	if (path != NULL)
 		filename = path + 1;
 
-#ifdef WIN32_FIXME
-	if (xasprintf(&ret2, "%s%s", ret, filename) >= PATH_MAX)
+#ifndef WIN32_FIXME
+	if (xasprintf(&ret, "%s%s%s", pw->pw_dir, sep, filename) >= PATH_MAX)
 #else
-	if (xasprintf(&ret2, "%s%s%s", pw->pw_dir, sep, filename) >= PATH_MAX)
+	if (xasprintf(&ret2, "%s%s", ret, filename) >= PATH_MAX)
 #endif
 		fatal("tilde_expand_filename: Path too long");
-
+#ifdef WIN32_FIXME
 	return (ret2);
+#else
+	return (ret);
+#endif
 }
 
 /*

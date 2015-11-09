@@ -37,8 +37,9 @@
  */
 
 #include "includes.h"
-
+#ifdef WIN32_FIXME
 #include "xmalloc.h"
+#endif
 
 /*
  * We support only client side kerberos on Windows.

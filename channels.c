@@ -91,6 +91,7 @@
 
 #ifdef WIN32_FIXME
 #define isatty(a) WSHELPisatty(a)
+#define SFD_TYPE_CONSOLE    4
 #endif
 
 
@@ -1686,8 +1687,10 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 		errno = 0;
 		len = read(c->rfd, buf, sizeof(buf));
 		#ifdef WIN32_FIXME
-		if (len == 0)
+		if (len == 0) {
+			if ( get_sfd_type(c->rfd) == SFD_TYPE_CONSOLE)
 			return 1; // in Win32 console read, there may be no data, but is ok
+		}
 		#endif
 		if (len < 0 && (errno == EINTR ||
 		    ((errno == EAGAIN || errno == EWOULDBLOCK) && !force)))
@@ -2410,6 +2413,9 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	const u_char *data;
 	u_int data_len, win_len;
 	Channel *c;
+	#ifdef WIN32_FIXME
+	static charinline = 0; // counts characters in a line for sshd in tty mode
+	#endif
 
 	/* Get the channel number and verify it. */
 	id = packet_get_int();
@@ -2474,11 +2480,28 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 						}
 				}
 				else {
+					// avoid sending the 4 arrow keys out to remote for now "ESC[A" ..
+					if  ( (c->isatty) && (data_len ==3) && (data[0] == '\033') && (data[1] == '[')) {
+						if ( ( data[2] == 'A') ||  (data[2] == 'B') ||  (data[2] == 'C') ||  (data[2] == 'D'))
+								packet_check_eom();
+								return 0;
+					}
 					buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode
-						buffer_append(&c->input, data, data_len);
-						if ( (data_len ==1) && (data[0] == '\b') )
-							buffer_append(&c->input, " \b", 2); // for backspace, we need to send space and another backspace for visual erase
+					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode			
+					
+						if ( (data_len ==1) && (data[0] == '\b') ) {
+							if (charinline >0) {
+								buffer_append(&c->input, "\b \b", 3); // for backspace, we need to send space and another backspace for visual erase
+								charinline--;
+							}
+						}
+						else {
+							buffer_append(&c->input, data, data_len);
+							charinline += data_len; // one more char on the line
+						}
+						
+						if ( (data[data_len-1] == '\r') || (data[data_len-1] == '\n') )
+							charinline = 0;  // a line has ended, begin char in line count again
 					}
 				}
 		}
@@ -2532,7 +2555,14 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	}
 	debug2("channel %d: rcvd ext data %d", c->self, data_len);
 	c->local_window -= data_len;
+	#ifndef WIN32_FIXME
 	buffer_append(&c->extended, data, data_len);
+	#else
+	if ( c->client_tty )
+		telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
+	else
+		buffer_append(&c->extended, data, data_len);
+	#endif
 	free(data);
 	return 0;
 }

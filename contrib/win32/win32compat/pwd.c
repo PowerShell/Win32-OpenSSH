@@ -43,6 +43,8 @@
 #include "homedirhelp.h"
 
 
+char *GetHomeDirFromToken(char *userName, HANDLE token);
+
 uid_t getuid(void)
 {
   return 0;

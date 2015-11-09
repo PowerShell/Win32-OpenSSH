@@ -83,6 +83,10 @@ typedef void EditLine;
   
 #endif
 
+#ifdef WIN32_VS
+#include "win32_dirent.h"
+#endif
+
 /* File to read commands from */
 FILE* infile;
 
@@ -2117,8 +2121,10 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 		free(dir);
 	}
 
+	#ifndef WIN32_VS
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	setvbuf(infile, NULL, _IOLBF, 0);
+	#endif
 
 	interactive = !batchmode && isatty(STDIN_FILENO);
 	err = 0;
