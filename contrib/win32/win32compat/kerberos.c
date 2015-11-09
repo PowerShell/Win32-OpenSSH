@@ -166,37 +166,57 @@ void UninitMitKerberos()
  * KfW libs here.
  */
 
+#ifdef __MINGW32__
 KFW_CALL gss_indicate_mechs(OM_uint32 *a, gss_OID_set *b)
+#else
+OM_uint32 KRB5_CALLCONV  gss_indicate_mechs(OM_uint32 *a, gss_OID_set *b)
+#endif
 {
   return MitDispatch.gss_indicate_mechs(a, b);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_release_buffer(OM_uint32 *a, gss_buffer_t b)
+#else
+OM_uint32 KRB5_CALLCONV  gss_release_buffer(OM_uint32 *a, gss_buffer_t b)
+#endif
 {
   return MitDispatch.gss_release_buffer(a, b);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_display_status(OM_uint32 *a, OM_uint32 b, int c, gss_OID d, 
                                 OM_uint32 *e, gss_buffer_t f)
+#else
+OM_uint32 KRB5_CALLCONV  gss_display_status(OM_uint32 *a, OM_uint32 b, int c, gss_OID d,
+	OM_uint32 *e, gss_buffer_t f)
+#endif
 {
   return MitDispatch.gss_display_status(a, b, c, d, e, f);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_delete_sec_context(OM_uint32 *a, gss_ctx_id_t *b, gss_buffer_t c)
+#else
+OM_uint32 KRB5_CALLCONV  gss_delete_sec_context(OM_uint32 *a, gss_ctx_id_t *b, gss_buffer_t c)
+#endif
 {
   return MitDispatch.gss_delete_sec_context(a, b, c);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_release_name(OM_uint32 *a, gss_name_t *b)
+#else
+OM_uint32 KRB5_CALLCONV  gss_release_name(OM_uint32 *a, gss_name_t *b)
+#endif
 {
   return MitDispatch.gss_release_name(a, b);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_release_cred(OM_uint32 *a, gss_cred_id_t *b)
+#else
+OM_uint32 KRB5_CALLCONV  gss_release_cred(OM_uint32 *a, gss_cred_id_t *b)
+#endif
 {
   return MitDispatch.gss_release_cred(a, b);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_init_sec_context(OM_uint32 *a, gss_cred_id_t b,
                                   gss_ctx_id_t *c, gss_name_t d,
                                       gss_OID e, OM_uint32 f,
@@ -204,17 +224,33 @@ KFW_CALL gss_init_sec_context(OM_uint32 *a, gss_cred_id_t b,
                                               gss_buffer_t i, gss_OID * j,
                                                   gss_buffer_t k, OM_uint32 *l,
                                                       OM_uint32 *m)
+#else
+OM_uint32 KRB5_CALLCONV  gss_init_sec_context(OM_uint32 *a, gss_cred_id_t b,
+	gss_ctx_id_t *c, gss_name_t d,
+	gss_OID e, OM_uint32 f,
+	OM_uint32 g, gss_channel_bindings_t h,
+	gss_buffer_t i, gss_OID * j,
+	gss_buffer_t k, OM_uint32 *l,
+	OM_uint32 *m)
+#endif
 {
   return MitDispatch.gss_init_sec_context(a, b, c, d, e, f, g, h, i, j, k, l, m);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_import_name(OM_uint32 *a, gss_buffer_t b, gss_OID c, gss_name_t *d)
+#else
+OM_uint32 KRB5_CALLCONV  gss_import_name(OM_uint32 *a, gss_buffer_t b, gss_OID c, gss_name_t *d)
+#endif
 {
   return MitDispatch.gss_import_name(a, b, c, d);
 }
-
+#ifdef __MINGW32__
 KFW_CALL gss_get_mic(OM_uint32 *a, gss_ctx_id_t b, gss_qop_t c,
                          gss_buffer_t d, gss_buffer_t e)
+#else
+OM_uint32 KRB5_CALLCONV  gss_get_mic(OM_uint32 *a, gss_ctx_id_t b, gss_qop_t c,
+	gss_buffer_t d, gss_buffer_t e)
+#endif
 {
   return MitDispatch.gss_get_mic(a, b, c, d, e);
 }

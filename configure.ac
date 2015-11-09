@@ -1,4 +1,4 @@
-# $Id: configure.ac,v 1.480 2011/08/18 04:48:24 tim Exp $
+# $Id: configure.ac,v 1.583 2014/08/26 20:32:01 djm Exp $
 #
 # Copyright (c) 1999-2004 Damien Miller
 #
@@ -15,8 +15,7 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 AC_INIT([OpenSSH], [Portable], [openssh-unix-dev@mindrot.org])
-
-AC_REVISION($Revision: 1.480 $)
+AC_REVISION($Revision: 1.583 $)
 AC_CONFIG_SRCDIR([ssh.c])
 AC_LANG([C])
 
@@ -31,7 +30,7 @@ AC_PROG_CPP
 AC_PROG_RANLIB
 AC_PROG_INSTALL
 AC_PROG_EGREP
-AC_PATH_PROG([AR], [ar])
+AC_CHECK_TOOLS([AR], [ar])
 AC_PATH_PROG([CAT], [cat])
 AC_PATH_PROG([KILL], [kill])
 AC_PATH_PROGS([PERL], [perl5 perl])
@@ -117,24 +116,102 @@ AC_CHECK_DECL([RLIMIT_NPROC],
 	#include <sys/types.h>
 	#include <sys/resource.h>
 ])
+AC_CHECK_DECL([PR_SET_NO_NEW_PRIVS], [have_linux_no_new_privs=1], , [
+	#include <sys/types.h>
+	#include <linux/prctl.h>
+])
+
+openssl=yes
+ssh1=no
+AC_ARG_WITH([openssl],
+	[  --without-openssl       Disable use of OpenSSL; use only limited internal crypto **EXPERIMENTAL** ],
+	[  if test "x$withval" = "xno" ; then
+		openssl=no
+		ssh1=no
+	   fi
+	]
+)
+AC_MSG_CHECKING([whether OpenSSL will be used for cryptography])
+if test "x$openssl" = "xyes" ; then
+	AC_MSG_RESULT([yes])
+	AC_DEFINE_UNQUOTED([WITH_OPENSSL], [1], [use libcrypto for cryptography])
+else
+	AC_MSG_RESULT([no])
+fi
+
+AC_ARG_WITH([ssh1],
+	[  --without-ssh1          Enable support for SSH protocol 1],
+	[
+		if test "x$withval" = "xyes" ; then
+			if test "x$openssl" = "xno" ; then
+				AC_MSG_ERROR([Cannot enable SSH protocol 1 with OpenSSL disabled])
+			fi
+			ssh1=yes
+		elif test "x$withval" = "xno" ; then
+			ssh1=no
+		else
+			AC_MSG_ERROR([unknown --with-ssh1 argument])
+		fi
+	]
+)
+AC_MSG_CHECKING([whether SSH protocol 1 support is enabled])
+if test "x$ssh1" = "xyes" ; then
+	AC_MSG_RESULT([yes])
+	AC_DEFINE_UNQUOTED([WITH_SSH1], [1], [include SSH protocol version 1 support])
+else
+	AC_MSG_RESULT([no])
+fi
 
 use_stack_protector=1
+use_toolchain_hardening=1
 AC_ARG_WITH([stackprotect],
     [  --without-stackprotect  Don't use compiler's stack protection], [
     if test "x$withval" = "xno"; then
 	use_stack_protector=0
     fi ])
+AC_ARG_WITH([hardening],
+    [  --without-hardening     Don't use toolchain hardening flags], [
+    if test "x$withval" = "xno"; then
+	use_toolchain_hardening=0
+    fi ])
 
+# We use -Werror for the tests only so that we catch warnings like "this is
+# on by default" for things like -fPIE.
+AC_MSG_CHECKING([if $CC supports -Werror])
+saved_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
+AC_COMPILE_IFELSE([AC_LANG_SOURCE([[int main(void) { return 0; }]])],
+	[ AC_MSG_RESULT([yes])
+	  WERROR="-Werror"],
+	[ AC_MSG_RESULT([no])
+	  WERROR="" ]
+)
+CFLAGS="$saved_CFLAGS"
 
 if test "$GCC" = "yes" || test "$GCC" = "egcs"; then
+	OSSH_CHECK_CFLAG_COMPILE([-Qunused-arguments])
+	OSSH_CHECK_CFLAG_COMPILE([-Wunknown-warning-option])
 	OSSH_CHECK_CFLAG_COMPILE([-Wall])
 	OSSH_CHECK_CFLAG_COMPILE([-Wpointer-arith])
 	OSSH_CHECK_CFLAG_COMPILE([-Wuninitialized])
 	OSSH_CHECK_CFLAG_COMPILE([-Wsign-compare])
 	OSSH_CHECK_CFLAG_COMPILE([-Wformat-security])
+	OSSH_CHECK_CFLAG_COMPILE([-Wsizeof-pointer-memaccess])
 	OSSH_CHECK_CFLAG_COMPILE([-Wpointer-sign], [-Wno-pointer-sign])
 	OSSH_CHECK_CFLAG_COMPILE([-Wunused-result], [-Wno-unused-result])
 	OSSH_CHECK_CFLAG_COMPILE([-fno-strict-aliasing])
+	OSSH_CHECK_CFLAG_COMPILE([-D_FORTIFY_SOURCE=2])
+    if test "x$use_toolchain_hardening" = "x1"; then
+	OSSH_CHECK_LDFLAG_LINK([-Wl,-z,relro])
+	OSSH_CHECK_LDFLAG_LINK([-Wl,-z,now])
+	OSSH_CHECK_LDFLAG_LINK([-Wl,-z,noexecstack])
+	# NB. -ftrapv expects certain support functions to be present in
+	# the compiler library (libgcc or similar) to detect integer operations
+	# that can overflow. We must check that the result of enabling it
+	# actually links. The test program compiled/linked includes a number
+	# of integer operations that should exercise this.
+	OSSH_CHECK_CFLAG_LINK([-ftrapv])
+    fi
 	AC_MSG_CHECKING([gcc version])
 	GCC_VER=`$CC -v 2>&1 | $AWK '/gcc version /{print $3}'`
 	case $GCC_VER in
@@ -160,42 +237,43 @@ if test "$GCC" = "yes" || test "$GCC" = "egcs"; then
 	# -fstack-protector-all doesn't always work for some GCC versions
 	# and/or platforms, so we test if we can.  If it's not supported
 	# on a given platform gcc will emit a warning so we use -Werror.
-#	if test "x$use_stack_protector" = "x1"; then
-#	    for t in -fstack-protector-all -fstack-protector; do
-#		AC_MSG_CHECKING([if $CC supports $t])
-#		saved_CFLAGS="$CFLAGS"
-#		saved_LDFLAGS="$LDFLAGS"
-#		CFLAGS="$CFLAGS $t -Werror"
-#		LDFLAGS="$LDFLAGS $t -Werror"
-#		AC_LINK_IFELSE(
-#			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
-#			[[
-#	char x[256];
-#	snprintf(x, sizeof(x), "XXX");
-#			 ]])],
-#		    [ AC_MSG_RESULT([yes])
-#		      CFLAGS="$saved_CFLAGS $t"
-#		      LDFLAGS="$saved_LDFLAGS $t"
-#		      AC_MSG_CHECKING([if $t works])
-#		      AC_RUN_IFELSE(
-#			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
-#			[[
-#	char x[256];
-#	snprintf(x, sizeof(x), "XXX");
-#			]])],
-#			[ AC_MSG_RESULT([yes])
-#			  break ],
-#			[ AC_MSG_RESULT([no]) ],
-#			[ AC_MSG_WARN([cross compiling: cannot test])
-#			  break ]
-#		      )
-#		    ],
-#		    [ AC_MSG_RESULT([no]) ]
-#		)
-#		CFLAGS="$saved_CFLAGS"
-#		LDFLAGS="$saved_LDFLAGS"
-#	    done
-#	fi
+	if test "x$use_stack_protector" = "x1"; then
+	    for t in -fstack-protector-strong -fstack-protector-all \
+		    -fstack-protector; do
+		AC_MSG_CHECKING([if $CC supports $t])
+		saved_CFLAGS="$CFLAGS"
+		saved_LDFLAGS="$LDFLAGS"
+		CFLAGS="$CFLAGS $t -Werror"
+		LDFLAGS="$LDFLAGS $t -Werror"
+		AC_LINK_IFELSE(
+			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
+			[[
+	char x[256];
+	snprintf(x, sizeof(x), "XXX");
+			 ]])],
+		    [ AC_MSG_RESULT([yes])
+		      CFLAGS="$saved_CFLAGS $t"
+		      LDFLAGS="$saved_LDFLAGS $t"
+		      AC_MSG_CHECKING([if $t works])
+		      AC_RUN_IFELSE(
+			[AC_LANG_PROGRAM([[ #include <stdio.h> ]],
+			[[
+	char x[256];
+	snprintf(x, sizeof(x), "XXX");
+			]])],
+			[ AC_MSG_RESULT([yes])
+			  break ],
+			[ AC_MSG_RESULT([no]) ],
+			[ AC_MSG_WARN([cross compiling: cannot test])
+			  break ]
+		      )
+		    ],
+		    [ AC_MSG_RESULT([no]) ]
+		)
+		CFLAGS="$saved_CFLAGS"
+		LDFLAGS="$saved_LDFLAGS"
+	    done
+	fi
 
 	if test -z "$have_llong_max"; then
 		# retry LLONG_MAX with -std=gnu99, needed on some Linuxes
@@ -209,6 +287,18 @@ if test "$GCC" = "yes" || test "$GCC" = "egcs"; then
 		)
 	fi
 fi
+
+AC_MSG_CHECKING([if compiler allows __attribute__ on return types])
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM([[
+#include <stdlib.h>
+__attribute__((__unused__)) static void foo(void){return;}]],
+    [[ exit(0); ]])],
+    [ AC_MSG_RESULT([yes]) ],
+    [ AC_MSG_RESULT([no])
+      AC_DEFINE(NO_ATTRIBUTE_ON_RETURN_TYPE, 1,
+	 [compiler does not accept __attribute__ on return types]) ]
+)
 
 if test "x$no_attrib_nonnull" != "x1" ; then
 	AC_DEFINE([HAVE_ATTRIBUTE__NONNULL__], [1], [Have attribute nonnull])
@@ -276,11 +366,13 @@ AC_ARG_WITH([Werror],
 )
 
 AC_CHECK_HEADERS([ \
+	blf.h \
 	bstring.h \
 	crypt.h \
 	crypto/sha2.h \
 	dirent.h \
 	endian.h \
+	elf.h \
 	features.h \
 	fcntl.h \
 	floatingpoint.h \
@@ -288,7 +380,9 @@ AC_CHECK_HEADERS([ \
 	glob.h \
 	ia.h \
 	iaf.h \
+	inttypes.h \
 	limits.h \
+	locale.h \
 	login.h \
 	maillock.h \
 	ndir.h \
@@ -311,6 +405,7 @@ AC_CHECK_HEADERS([ \
 	sys/audit.h \
 	sys/bitypes.h \
 	sys/bsdtty.h \
+	sys/capability.h \
 	sys/cdefs.h \
 	sys/dir.h \
 	sys/mman.h \
@@ -327,7 +422,6 @@ AC_CHECK_HEADERS([ \
 	sys/sysmacros.h \
 	sys/time.h \
 	sys/timers.h \
-	sys/un.h \
 	time.h \
 	tmpdir.h \
 	ttyent.h \
@@ -363,6 +457,12 @@ AC_CHECK_HEADERS([login_cap.h], [], [], [
 # older BSDs need sys/param.h before sys/mount.h
 AC_CHECK_HEADERS([sys/mount.h], [], [], [
 #include <sys/param.h>
+])
+
+# Android requires sys/socket.h to be included before sys/un.h
+AC_CHECK_HEADERS([sys/un.h], [], [], [
+#include <sys/types.h>
+#include <sys/socket.h>
 ])
 
 # Messages for features tested for in target-specific section
@@ -464,6 +564,11 @@ case "$host" in
 	AC_DEFINE([SSHPAM_CHAUTHTOK_NEEDS_RUID], [1],
 	    [AIX 5.2 and 5.3 (and presumably newer) require this])
 	AC_DEFINE([PTY_ZEROREAD], [1], [read(1) can return 0 for a non-closed fd])
+	AC_DEFINE([PLATFORM_SYS_DIR_UID], 2, [System dirs owned by bin (uid 2)])
+	;;
+*-*-android*)
+	AC_DEFINE([DISABLE_UTMP], [1], [Define if you don't want to use utmp])
+	AC_DEFINE([DISABLE_WTMP], [1], [Define if you don't want to use wtmp])
 	;;
 *-*-cygwin*)
 	check_for_libcrypt_later=1
@@ -481,7 +586,10 @@ case "$host" in
 		[Define if your platform needs to skip post auth
 		file descriptor passing])
 	AC_DEFINE([SSH_IOBUFSZ], [65535], [Windows is sensitive to read buffer size])
-	AC_DEFINE([FILESYSTEM_NO_BACKSLASH], [1], [File names may not contain backslash characters]) 
+	AC_DEFINE([FILESYSTEM_NO_BACKSLASH], [1], [File names may not contain backslash characters])
+	# Cygwin defines optargs, optargs as declspec(dllimport) for historical
+	# reasons which cause compile warnings, so we disable those warnings.
+	OSSH_CHECK_CFLAG_COMPILE([-Wno-attributes])
 	;;
 *-*-dgux*)
 	AC_DEFINE([IP_TOS_IS_BROKEN], [1],
@@ -490,40 +598,8 @@ case "$host" in
 	AC_DEFINE([BROKEN_SETREUID])
 	AC_DEFINE([BROKEN_SETREGID])
 	;;
-*-*-mingw32*)
-       LIBS="$LIBS -lws2_32 -lgdi32 -lNetAPI32 -luserenv -lsecur32 -lshlwapi"
-       CFLAGS="$CFLAGS -I$PWD/contrib/win32/win32compat/includes -I$PWD/openbsd-compat -I$PWD/contrib/win32/win32compat/includes -I$PWD/libkrb"
-       LDFLAGS="$LDFLAGS"
-       
-       AC_DEFINE(USE_PIPES, 1, [Use PIPES instead of a socketpair()])
-       AC_DEFINE(DISABLE_SHADOW, 1,
-               [Define if you want to disable shadow passwords])
-       AC_DEFINE(IP_TOS_IS_BROKEN, 1,
-               [Define if your system choked on IP TOS setting])
-       AC_DEFINE(NO_X11_UNIX_SOCKETS, 1,
-               [Define if X11 doesn't support AF_UNIX sockets on that system])
-       AC_DEFINE(NO_IPPORT_RESERVED_CONCEPT, 1,
-               [Define if the concept of ports only accessible to
-               superusers isn't known])
-       AC_DEFINE(DISABLE_FD_PASSING, 1,
-               [Define if your platform needs to skip post auth
-               file descriptor passing])
-       AC_DEFINE([DISABLE_UTMP], [1],
-               [Define if you don't want to use utmp])        
-       AC_DEFINE([DISABLE_UTMPX], [1],
-               [Define if you don't want to use utmpx])
-       AC_DEFINE([ENABLE_PKCS11], [1],
-               [Enable for PKCS#11, smart card support])
-
-       #
-       # We have no krb5-config tool and we don't want
-       # linking to -lkrb5 on Windows.
-       #
-       
-       SkipGssapiLibsCheck=1
-       
-       ;;
 *-*-darwin*)
+	use_pie=auto
 	AC_MSG_CHECKING([if we have working getaddrinfo])
 	AC_RUN_IFELSE([AC_LANG_SOURCE([[ #include <mach-o/dyld.h>
 main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
@@ -564,6 +640,7 @@ main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
 	;;
 *-*-dragonfly*)
 	SSHDLIBS="$SSHDLIBS -lcrypt"
+	TEST_MALLOC_OPTIONS="AFGJPRX"
 	;;
 *-*-haiku*) 
     LIBS="$LIBS -lbsd "
@@ -582,6 +659,7 @@ main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
 	AC_DEFINE([LOCKED_PASSWD_STRING], ["*"],
 		[String used in /etc/passwd to denote locked account])
 	AC_DEFINE([SPT_TYPE], [SPT_PSTAT])
+	AC_DEFINE([PLATFORM_SYS_DIR_UID], 2, [System dirs owned by bin (uid 2)])
 	maildir="/var/mail"
 	LIBS="$LIBS -lsec"
 	AC_CHECK_LIB([xnet], [t_error], ,
@@ -660,6 +738,7 @@ main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
 	;;
 *-*-linux*)
 	no_dev_ptmx=1
+	use_pie=auto
 	check_for_libcrypt_later=1
 	check_for_openpty_ctty_bug=1
 	AC_DEFINE([PAM_TTY_KLUDGE], [1],
@@ -690,6 +769,32 @@ main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
 		AC_DEFINE([SSH_TUN_PREPEND_AF], [1],
 		    [Prepend the address family to IP tunnel traffic])
 	fi
+	AC_CHECK_HEADERS([linux/seccomp.h linux/filter.h linux/audit.h], [],
+	    [], [#include <linux/types.h>])
+	AC_CHECK_FUNCS([prctl])
+	AC_MSG_CHECKING([for seccomp architecture])
+	seccomp_audit_arch=
+	case "$host" in
+	x86_64-*)
+		seccomp_audit_arch=AUDIT_ARCH_X86_64
+		;;
+	i*86-*)
+		seccomp_audit_arch=AUDIT_ARCH_I386
+		;;
+	arm*-*)
+		seccomp_audit_arch=AUDIT_ARCH_ARM
+		;;
+	aarch64*-*)
+		seccomp_audit_arch=AUDIT_ARCH_AARCH64
+		;;
+	esac
+	if test "x$seccomp_audit_arch" != "x" ; then
+		AC_MSG_RESULT(["$seccomp_audit_arch"])
+		AC_DEFINE_UNQUOTED([SECCOMP_AUDIT_ARCH], [$seccomp_audit_arch],
+		    [Specify the system call convention in use])
+	else
+		AC_MSG_RESULT([architecture not supported])
+	fi
 	;;
 mips-sony-bsd|mips-sony-newsos4)
 	AC_DEFINE([NEED_SETPGRP], [1], [Need setpgrp to acquire controlling tty])
@@ -705,6 +810,11 @@ mips-sony-bsd|mips-sony-newsos4)
 	    AC_DEFINE([SSH_TUN_NO_L2], [1], [No layer 2 tunnel support]))
 	AC_DEFINE([SSH_TUN_PREPEND_AF], [1],
 	    [Prepend the address family to IP tunnel traffic])
+	TEST_MALLOC_OPTIONS="AJRX"
+	AC_DEFINE([BROKEN_STRNVIS], [1],
+	    [NetBSD strnvis argument order is swapped compared to OpenBSD])
+	AC_DEFINE([BROKEN_READ_COMPARISON], [1],
+	    [NetBSD read function is sometimes redirected, breaking atomicio comparisons against it])
 	;;
 *-*-freebsd*)
 	check_for_libcrypt_later=1
@@ -713,6 +823,13 @@ mips-sony-bsd|mips-sony-newsos4)
 	AC_CHECK_HEADER([net/if_tap.h], ,
 	    AC_DEFINE([SSH_TUN_NO_L2], [1], [No layer 2 tunnel support]))
 	AC_DEFINE([BROKEN_GLOB], [1], [FreeBSD glob does not do what we need])
+	AC_DEFINE([BROKEN_STRNVIS], [1],
+	    [FreeBSD strnvis argument order is swapped compared to OpenBSD])
+	TEST_MALLOC_OPTIONS="AJRX"
+	# Preauth crypto occasionally uses file descriptors for crypto offload
+	# and will crash if they cannot be opened.
+	AC_DEFINE([SANDBOX_SKIP_RLIMIT_NOFILE], [1],
+	    [define if setrlimit RLIMIT_NOFILE breaks things])
 	;;
 *-*-bsdi*)
 	AC_DEFINE([SETEUID_BREAKS_SETUID])
@@ -730,11 +847,13 @@ mips-sony-bsd|mips-sony-newsos4)
 	AC_DEFINE([BROKEN_SAVED_UIDS], [1], [Needed for NeXT])
 	;;
 *-*-openbsd*)
+	use_pie=auto
 	AC_DEFINE([HAVE_ATTRIBUTE__SENTINEL__], [1], [OpenBSD's gcc has sentinel])
 	AC_DEFINE([HAVE_ATTRIBUTE__BOUNDED__], [1], [OpenBSD's gcc has bounded])
 	AC_DEFINE([SSH_TUN_OPENBSD], [1], [Open tunnel devices the OpenBSD way])
 	AC_DEFINE([SYSLOG_R_SAFE_IN_SIGHAND], [1],
 	    [syslog_r function is safe to use in in a signal handler])
+	TEST_MALLOC_OPTIONS="AFGJPRX"
 	;;
 *-*-solaris*)
 	if test "x$withval" != "xno" ; then
@@ -790,6 +909,7 @@ mips-sony-bsd|mips-sony-newsos4)
 			SP_MSG="yes" ], )
 		],
 	)
+	TEST_SHELL=$SHELL	# let configure find us a capable shell
 	;;
 *-*-sunos4*)
 	CPPFLAGS="$CPPFLAGS -DSUNOS4"
@@ -833,6 +953,7 @@ mips-sony-bsd|mips-sony-newsos4)
 	AC_DEFINE([BROKEN_SETREGID])
 	AC_DEFINE([PASSWD_NEEDS_USERNAME], [1], [must supply username to passwd])
 	AC_DEFINE([LOCKED_PASSWD_STRING], ["*LK*"])
+	TEST_SHELL=$SHELL	# let configure find us a capable shell
 	;;
 # UnixWare 7.x, OpenUNIX 8
 *-*-sysv5*)
@@ -844,10 +965,10 @@ mips-sony-bsd|mips-sony-newsos4)
 	AC_DEFINE([BROKEN_SETREUID])
 	AC_DEFINE([BROKEN_SETREGID])
 	AC_DEFINE([PASSWD_NEEDS_USERNAME])
+	TEST_SHELL=$SHELL	# let configure find us a capable shell
 	case "$host" in
 	*-*-sysv5SCO_SV*)	# SCO OpenServer 6.x
 		maildir=/var/spool/mail
-		TEST_SHELL=/u95/bin/sh
 		AC_DEFINE([BROKEN_LIBIAF], [1],
 			[ia_uinfo routines not supported by OS yet])
 		AC_DEFINE([BROKEN_UPDWTMPX])
@@ -888,7 +1009,8 @@ mips-sony-bsd|mips-sony-newsos4)
 	AC_DEFINE([PASSWD_NEEDS_USERNAME])
 	AC_CHECK_FUNCS([getluid setluid])
 	MANTYPE=man
-	TEST_SHELL=ksh
+	TEST_SHELL=$SHELL	# let configure find us a capable shell
+	SKIP_DISABLE_LASTLOG_DEFINE=yes
 	;;
 *-*-unicosmk*)
 	AC_DEFINE([NO_SSH_LASTLOG], [1],
@@ -964,9 +1086,6 @@ mips-sony-bsd|mips-sony-newsos4)
 *-*-nto-qnx*)
 	AC_DEFINE([USE_PIPES])
 	AC_DEFINE([NO_X11_UNIX_SOCKETS])
-	AC_DEFINE([MISSING_NFDBITS], [1], [Define on *nto-qnx systems])
-	AC_DEFINE([MISSING_HOWMANY], [1], [Define on *nto-qnx systems])
-	AC_DEFINE([MISSING_FD_MASK], [1], [Define on *nto-qnx systems])
 	AC_DEFINE([DISABLE_LASTLOG])
 	AC_DEFINE([SSHD_ACQUIRES_CTTY])
 	AC_DEFINE([BROKEN_SHADOW_EXPIRE], [1], [QNX shadow support is broken])
@@ -987,7 +1106,6 @@ mips-sony-bsd|mips-sony-newsos4)
 
 *-*-lynxos)
         CFLAGS="$CFLAGS -D__NO_INCLUDE_WARN__"
-	AC_DEFINE([MISSING_HOWMANY])
         AC_DEFINE([BROKEN_SETVBUF], [1], [LynxOS has broken setvbuf() implementation])
         ;;
 esac
@@ -1110,6 +1228,7 @@ AC_ARG_WITH([zlib-version-check],
 AC_MSG_CHECKING([for possibly buggy zlib])
 AC_RUN_IFELSE([AC_LANG_PROGRAM([[
 #include <stdio.h>
+#include <stdlib.h>
 #include <zlib.h>
 	]],
 	[[
@@ -1157,26 +1276,19 @@ AC_CHECK_FUNCS([utimes],
 )
 
 dnl    Checks for libutil functions
+AC_CHECK_HEADERS([bsd/libutil.h libutil.h])
+AC_SEARCH_LIBS([fmt_scaled], [util bsd])
+AC_SEARCH_LIBS([scan_scaled], [util bsd])
+AC_SEARCH_LIBS([login], [util bsd])
+AC_SEARCH_LIBS([logout], [util bsd])
+AC_SEARCH_LIBS([logwtmp], [util bsd])
+AC_SEARCH_LIBS([openpty], [util bsd])
+AC_SEARCH_LIBS([updwtmp], [util bsd])
+AC_CHECK_FUNCS([fmt_scaled scan_scaled login logout openpty updwtmp logwtmp])
 
- #
- # WIN32_FIXME
- #
- 
- case "$host" in
- *-*-mingw32*)
-       ;;
- *)
-       AC_CHECK_HEADERS([libutil.h])
-       AC_SEARCH_LIBS([login], [util bsd], [AC_DEFINE([HAVE_LOGIN], [1],
-               [Define if your libraries define login()])])
-       AC_CHECK_FUNCS([fmt_scaled logout updwtmp logwtmp])
-       ;;
- esac
- 
- #
- # END FIXME
- #
- 
+# On some platforms, inet_ntop may be found in libresolv or libnsl.
+AC_SEARCH_LIBS([inet_ntop], [resolv nsl])
+
 AC_FUNC_STRFTIME
 
 # Check for ALTDIRFUNC glob() extension
@@ -1228,7 +1340,7 @@ g.gl_statv = NULL;
 		AC_MSG_RESULT([yes])
 	], [
 		AC_MSG_RESULT([no])
-	
+
 ])
 
 AC_CHECK_DECLS([GLOB_NOMATCH], , , [#include <glob.h>])
@@ -1312,60 +1424,39 @@ AC_ARG_WITH([skey],
 	]
 )
 
-# Check whether user wants TCP wrappers support
-TCPW_MSG="no"
-AC_ARG_WITH([tcp-wrappers],
-	[  --with-tcp-wrappers[[=PATH]] Enable tcpwrappers support (optionally in PATH)],
-	[
-		if test "x$withval" != "xno" ; then
-			saved_LIBS="$LIBS"
-			saved_LDFLAGS="$LDFLAGS"
-			saved_CPPFLAGS="$CPPFLAGS"
-			if test -n "${withval}" && \
-			    test "x${withval}" != "xyes"; then
-				if test -d "${withval}/lib"; then
-					if test -n "${need_dash_r}"; then
-						LDFLAGS="-L${withval}/lib -R${withval}/lib ${LDFLAGS}"
-					else
-						LDFLAGS="-L${withval}/lib ${LDFLAGS}"
-					fi
-				else
-					if test -n "${need_dash_r}"; then
-						LDFLAGS="-L${withval} -R${withval} ${LDFLAGS}"
-					else
-						LDFLAGS="-L${withval} ${LDFLAGS}"
-					fi
-				fi
-				if test -d "${withval}/include"; then
-					CPPFLAGS="-I${withval}/include ${CPPFLAGS}"
-				else
-					CPPFLAGS="-I${withval} ${CPPFLAGS}"
-				fi
+# Check whether user wants to use ldns
+LDNS_MSG="no"
+AC_ARG_WITH(ldns,
+	[  --with-ldns[[=PATH]]      Use ldns for DNSSEC support (optionally in PATH)],
+    [
+        if test "x$withval" != "xno" ; then
+
+			if test "x$withval" != "xyes" ; then
+				CPPFLAGS="$CPPFLAGS -I${withval}/include"
+				LDFLAGS="$LDFLAGS -L${withval}/lib"
 			fi
-			LIBS="-lwrap $LIBS"
-			AC_MSG_CHECKING([for libwrap])
-			AC_LINK_IFELSE([AC_LANG_PROGRAM([[
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <tcpd.h>
-int deny_severity = 0, allow_severity = 0;
-				]], [[
-	hosts_access(0);
-				]])], [
-					AC_MSG_RESULT([yes])
-					AC_DEFINE([LIBWRAP], [1],
-						[Define if you want
-						TCP Wrappers support])
-					SSHDLIBS="$SSHDLIBS -lwrap"
-					TCPW_MSG="yes"
-				], [
-					AC_MSG_ERROR([*** libwrap missing])
-				
-			])
-			LIBS="$saved_LIBS"
-		fi
-	]
+
+            AC_DEFINE(HAVE_LDNS, 1, [Define if you want ldns support])
+            LIBS="-lldns $LIBS"
+            LDNS_MSG="yes"
+
+            AC_MSG_CHECKING([for ldns support])
+            AC_LINK_IFELSE(
+                [AC_LANG_SOURCE([[
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <ldns/ldns.h>
+int main() { ldns_status status = ldns_verify_trusted(NULL, NULL, NULL, NULL); status=LDNS_STATUS_OK; exit(0); }
+                                ]])
+                ],
+				[AC_MSG_RESULT(yes)],
+				[
+					AC_MSG_RESULT(no)
+					AC_MSG_ERROR([** Incomplete or missing ldns libraries.])
+				])
+        fi
+    ]
 )
 
 # Check whether user wants libedit support
@@ -1374,7 +1465,7 @@ AC_ARG_WITH([libedit],
 	[  --with-libedit[[=PATH]]   Enable libedit support for sftp],
 	[ if test "x$withval" != "xno" ; then
 		if test "x$withval" = "xyes" ; then
-			AC_PATH_PROG([PKGCONFIG], [pkg-config], [no])
+			AC_PATH_TOOL([PKGCONFIG], [pkg-config], [no])
 			if test "x$PKGCONFIG" != "xno"; then
 				AC_MSG_CHECKING([if $PKGCONFIG knows about libedit])
 			 	if "$PKGCONFIG" libedit; then
@@ -1393,7 +1484,7 @@ AC_ARG_WITH([libedit],
 			fi
 		fi
 		if test "x$use_pkgconfig_for_libedit" = "xyes"; then
-			LIBEDIT=`$PKGCONFIG --libs-only-l libedit`
+			LIBEDIT=`$PKGCONFIG --libs libedit`
 			CPPFLAGS="$CPPFLAGS `$PKGCONFIG --cflags libedit`"
 		else
 			LIBEDIT="-ledit -lcurses"
@@ -1447,6 +1538,11 @@ AC_ARG_WITH([audit],
 		# These are optional
 		AC_CHECK_FUNCS([getaudit_addr aug_get_machine])
 		AC_DEFINE([USE_BSM_AUDIT], [1], [Use BSM audit module])
+		if test "$sol2ver" -ge 11; then
+		   	SSHDLIBS="$SSHDLIBS -lscf"
+                   	AC_DEFINE([BROKEN_BSM_API], [1], 
+		        	  [The system has incomplete BSM API])
+		fi
 		;;
 	  linux)
 		AC_MSG_RESULT([linux])
@@ -1470,24 +1566,78 @@ AC_ARG_WITH([audit],
 	esac ]
 )
 
+AC_ARG_WITH([pie],
+    [  --with-pie              Build Position Independent Executables if possible], [
+	if test "x$withval" = "xno"; then
+		use_pie=no
+	fi
+	if test "x$withval" = "xyes"; then
+		use_pie=yes
+	fi
+    ]
+)
+if test "x$use_pie" = "x"; then
+	use_pie=no
+fi
+if test "x$use_toolchain_hardening" != "x1" && test "x$use_pie" = "xauto"; then
+	# Turn off automatic PIE when toolchain hardening is off.
+	use_pie=no
+fi
+if test "x$use_pie" = "xauto"; then
+	# Automatic PIE requires gcc >= 4.x
+	AC_MSG_CHECKING([for gcc >= 4.x])
+	AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+#if !defined(__GNUC__) || __GNUC__ < 4
+#error gcc is too old
+#endif
+]])],
+	[ AC_MSG_RESULT([yes]) ],
+	[ AC_MSG_RESULT([no])
+	  use_pie=no ]
+)
+fi
+if test "x$use_pie" != "xno"; then
+	SAVED_CFLAGS="$CFLAGS"
+	SAVED_LDFLAGS="$LDFLAGS"
+	OSSH_CHECK_CFLAG_COMPILE([-fPIE])
+	OSSH_CHECK_LDFLAG_LINK([-pie])
+	# We use both -fPIE and -pie or neither.
+	AC_MSG_CHECKING([whether both -fPIE and -pie are supported])
+	if echo "x $CFLAGS"  | grep ' -fPIE' >/dev/null 2>&1 && \
+	   echo "x $LDFLAGS" | grep ' -pie'  >/dev/null 2>&1 ; then
+		AC_MSG_RESULT([yes])
+	else
+		AC_MSG_RESULT([no])
+		CFLAGS="$SAVED_CFLAGS"
+		LDFLAGS="$SAVED_LDFLAGS"
+	fi
+fi
+
 dnl    Checks for library functions. Please keep in alphabetical order
 AC_CHECK_FUNCS([ \
-	arc4random \
-	arc4random_buf \
-	arc4random_uniform \
+	Blowfish_initstate \
+	Blowfish_expandstate \
+	Blowfish_expand0state \
+	Blowfish_stream2word \
 	asprintf \
 	b64_ntop \
 	__b64_ntop \
 	b64_pton \
 	__b64_pton \
 	bcopy \
+	bcrypt_pbkdf \
 	bindresvport_sa \
+	blf_enc \
+	cap_rights_limit \
 	clock \
 	closefrom \
 	dirfd \
+	endgrent \
+	explicit_bzero \
 	fchmod \
 	fchown \
 	freeaddrinfo \
+	fstatfs \
 	fstatvfs \
 	futimes \
 	getaddrinfo \
@@ -1497,6 +1647,8 @@ AC_CHECK_FUNCS([ \
 	getopt \
 	getpeereid \
 	getpeerucred \
+	getpgid \
+	getpgrp \
 	_getpty \
 	getrlimit \
 	getttyent \
@@ -1507,20 +1659,21 @@ AC_CHECK_FUNCS([ \
 	inet_ntop \
 	innetgr \
 	login_getcapbool \
+	mblen \
 	md5_crypt \
 	memmove \
+	memset_s \
 	mkdtemp \
 	mmap \
 	ngetaddrinfo \
 	nsleep \
 	ogetaddrinfo \
 	openlog_r \
-	openpty \
 	poll \
 	prctl \
 	pstat \
 	readpassphrase \
-	realpath \
+	reallocarray \
 	recvmsg \
 	rresvport_af \
 	sendmsg \
@@ -1530,6 +1683,7 @@ AC_CHECK_FUNCS([ \
 	seteuid \
 	setgroupent \
 	setgroups \
+	setlinebuf \
 	setlogin \
 	setpassent\
 	setpcred \
@@ -1550,11 +1704,13 @@ AC_CHECK_FUNCS([ \
 	strlcat \
 	strlcpy \
 	strmode \
+	strnlen \
 	strnvis \
 	strptime \
 	strtonum \
 	strtoll \
 	strtoul \
+	strtoull \
 	swap32 \
 	sysconf \
 	tcgetpgrp \
@@ -1563,8 +1719,8 @@ AC_CHECK_FUNCS([ \
 	unsetenv \
 	updwtmpx \
 	user_from_uid \
+	usleep \
 	vasprintf \
-	vhangup \
 	vsnprintf \
 	waitpid \
 ])
@@ -1576,10 +1732,13 @@ AC_LINK_IFELSE(
 	[AC_DEFINE([HAVE_ISBLANK], [1], [Define if you have isblank(3C).])
 ])
 
-# PKCS#11 support requires dlopen() and co
-AC_SEARCH_LIBS([dlopen], [dl],
-    [AC_DEFINE([ENABLE_PKCS11], [], [Enable for PKCS#11 support])]
-)
+# PKCS11 depends on OpenSSL.
+if test "x$openssl" = "xyes" ; then
+	# PKCS#11 support requires dlopen() and co
+	AC_SEARCH_LIBS([dlopen], [dl],
+	    [AC_DEFINE([ENABLE_PKCS11], [], [Enable for PKCS#11 support])]
+	)
+fi
 
 # IRIX has a const char return value for gai_strerror()
 AC_CHECK_FUNCS([gai_strerror], [
@@ -1599,6 +1758,9 @@ const char *gai_strerror(int);
 
 AC_SEARCH_LIBS([nanosleep], [rt posix4], [AC_DEFINE([HAVE_NANOSLEEP], [1],
 	[Some systems put nanosleep outside of libc])])
+
+AC_SEARCH_LIBS([clock_gettime], [rt],
+	[AC_DEFINE([HAVE_CLOCK_GETTIME], [1], [Have clock_gettime])])
 
 dnl Make sure prototypes are defined for these before using them.
 AC_CHECK_DECL([getrusage], [AC_CHECK_FUNCS([getrusage])])
@@ -1651,6 +1813,37 @@ AC_CHECK_DECLS([offsetof], , , [
 #include <stddef.h>
 	])
 
+# extra bits for select(2)
+AC_CHECK_DECLS([howmany, NFDBITS], [], [], [[
+#include <sys/param.h>
+#include <sys/types.h>
+#ifdef HAVE_SYS_SYSMACROS_H
+#include <sys/sysmacros.h>
+#endif
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+	]])
+AC_CHECK_TYPES([fd_mask], [], [], [[
+#include <sys/param.h>
+#include <sys/types.h>
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+	]])
+
 AC_CHECK_FUNCS([setresuid], [
 	dnl Some platorms have setresuid that isn't implemented, test for this
 	AC_MSG_CHECKING([if setresuid seems to work])
@@ -1694,6 +1887,32 @@ AC_CHECK_FUNCS([setresgid], [
 			[Define if your setresgid() is broken])
 		 AC_MSG_RESULT([not implemented])],
 		[AC_MSG_WARN([cross compiling: not checking setresuid])]
+	)
+])
+
+AC_CHECK_FUNCS([realpath], [
+	dnl the sftp v3 spec says SSH_FXP_REALPATH will "canonicalize any given
+	dnl path name", however some implementations of realpath (and some
+	dnl versions of the POSIX spec) do not work on non-existent files,
+	dnl so we use the OpenBSD implementation on those platforms.
+	AC_MSG_CHECKING([if realpath works with non-existent files])
+	AC_RUN_IFELSE(
+		[AC_LANG_PROGRAM([[
+#include <limits.h>
+#include <stdlib.h>
+#include <errno.h>
+		]], [[
+		char buf[PATH_MAX];
+		if (realpath("/opensshnonexistentfilename1234", buf) == NULL)
+			if (errno == ENOENT)
+				exit(1);
+		exit(0);
+		]])],
+		[AC_MSG_RESULT([yes])],
+		[AC_DEFINE([BROKEN_REALPATH], [1],
+			[realpath does not work with nonexistent files])
+		 AC_MSG_RESULT([no])],
+		[AC_MSG_WARN([cross compiling: assuming working])]
 	)
 ])
 
@@ -1742,11 +1961,9 @@ if test "x$ac_cv_func_snprintf" = "xyes" ; then
 	)
 fi
 
-# If we don't have a working asprintf, then we strongly depend on vsnprintf
-# returning the right thing on overflow: the number of characters it tried to
-# create (as per SUSv3)
-if test "x$ac_cv_func_asprintf" != "xyes" && \
-   test "x$ac_cv_func_vsnprintf" = "xyes" ; then
+# We depend on vsnprintf returning the right thing on overflow: the
+# number of characters it tried to create (as per SUSv3)
+if test "x$ac_cv_func_vsnprintf" = "xyes" ; then
 	AC_MSG_CHECKING([whether vsnprintf returns correct values on overflow])
 	AC_RUN_IFELSE(
 		[AC_LANG_PROGRAM([[
@@ -1754,15 +1971,23 @@ if test "x$ac_cv_func_asprintf" != "xyes" && \
 #include <stdio.h>
 #include <stdarg.h>
 
-int x_snprintf(char *str,size_t count,const char *fmt,...)
+int x_snprintf(char *str, size_t count, const char *fmt, ...)
 {
-	size_t ret; va_list ap;
-	va_start(ap, fmt); ret = vsnprintf(str, count, fmt, ap); va_end(ap);
+	size_t ret;
+	va_list ap;
+
+	va_start(ap, fmt);
+	ret = vsnprintf(str, count, fmt, ap);
+	va_end(ap);
 	return ret;
 }
 		]], [[
-	char x[1];
-	exit(x_snprintf(x, 1, "%s %d", "hello", 12345) == 11 ? 0 : 1);
+char x[1];
+if (x_snprintf(x, 1, "%s %d", "hello", 12345) != 11)
+	return 1;
+if (x_snprintf(NULL, 0, "%s %d", "hello", 12345) != 11)
+	return 1;
+return 0;
 		]])],
 		[AC_MSG_RESULT([yes])],
 		[
@@ -2005,6 +2230,13 @@ if test "x$ac_cv_func_getaddrinfo" = "xyes" && \
 	)
 fi
 
+if test "x$ac_cv_func_getaddrinfo" = "xyes"; then
+	AC_CHECK_DECLS(AI_NUMERICSERV, , ,
+	    [#include <sys/types.h>
+	     #include <sys/socket.h>
+	     #include <netdb.h>])
+fi
+
 if test "x$check_for_conflicting_getspnam" = "x1"; then
 	AC_MSG_CHECKING([for conflicting getspnam in shadow.h])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <shadow.h> ]],
@@ -2028,6 +2260,9 @@ saved_LDFLAGS="$LDFLAGS"
 AC_ARG_WITH([ssl-dir],
 	[  --with-ssl-dir=PATH     Specify path to OpenSSL installation ],
 	[
+		if test "x$openssl" = "xno" ; then
+			AC_MSG_ERROR([cannot use --with-ssl-dir when OpenSSL disabled])
+		fi
 		if test "x$withval" != "xno" ; then
 			case "$withval" in
 				# Relative paths
@@ -2060,270 +2295,464 @@ AC_ARG_WITH([ssl-dir],
 		fi
 	]
 )
-LIBS="-lcrypto $LIBS"
-AC_TRY_LINK_FUNC([RAND_add], [AC_DEFINE([HAVE_OPENSSL], [1],
-	[Define if your ssl headers are included
-	with #include <openssl/header.h>])],
-	[
-		dnl Check default openssl install dir
-		if test -n "${need_dash_r}"; then
-			LDFLAGS="-L/usr/local/ssl/lib -R/usr/local/ssl/lib ${saved_LDFLAGS}"
-		else
-			LDFLAGS="-L/usr/local/ssl/lib ${saved_LDFLAGS}"
-		fi
-		CPPFLAGS="-I/usr/local/ssl/include ${saved_CPPFLAGS}"
-		AC_CHECK_HEADER([openssl/opensslv.h], ,
-		    [AC_MSG_ERROR([*** OpenSSL headers missing - please install first or check config.log ***])])
-		AC_TRY_LINK_FUNC([RAND_add], [AC_DEFINE([HAVE_OPENSSL])],
-			[
-				AC_MSG_ERROR([*** Can't find recent OpenSSL libcrypto (see config.log for details) ***])
-			]
-		)
-	]
-)
-
-# Determine OpenSSL header version
-AC_MSG_CHECKING([OpenSSL header version])
-AC_RUN_IFELSE(
-	[AC_LANG_PROGRAM([[
-#include <stdio.h>
-#include <string.h>
-#include <openssl/opensslv.h>
-#define DATA "conftest.sslincver"
-	]], [[
-	FILE *fd;
-	int rc;
-
-	fd = fopen(DATA,"w");
-	if(fd == NULL)
-		exit(1);
-
-	if ((rc = fprintf(fd ,"%x (%s)\n", OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT)) <0)
-		exit(1);
-
-	exit(0);
-	]])],
-	[
-		ssl_header_ver=`cat conftest.sslincver`
-		AC_MSG_RESULT([$ssl_header_ver])
-	],
-	[
-		AC_MSG_RESULT([not found])
-		AC_MSG_ERROR([OpenSSL version header not found.])
-	],
-	[
-		AC_MSG_WARN([cross compiling: not checking])
-	]
-)
-
-# Determine OpenSSL library version
-AC_MSG_CHECKING([OpenSSL library version])
-AC_RUN_IFELSE(
-	[AC_LANG_PROGRAM([[
-#include <stdio.h>
-#include <string.h>
-#include <openssl/opensslv.h>
-#include <openssl/crypto.h>
-#define DATA "conftest.ssllibver"
-	]], [[
-	FILE *fd;
-	int rc;
-
-	fd = fopen(DATA,"w");
-	if(fd == NULL)
-		exit(1);
-
-	if ((rc = fprintf(fd ,"%x (%s)\n", SSLeay(), SSLeay_version(SSLEAY_VERSION))) <0)
-		exit(1);
-
-	exit(0);
-	]])],
-	[
-		ssl_library_ver=`cat conftest.ssllibver`
-		AC_MSG_RESULT([$ssl_library_ver])
-	],
-	[
-		AC_MSG_RESULT([not found])
-		AC_MSG_ERROR([OpenSSL library not found.])
-	],
-	[
-		AC_MSG_WARN([cross compiling: not checking])
-	]
-)
 
 AC_ARG_WITH([openssl-header-check],
 	[  --without-openssl-header-check Disable OpenSSL version consistency check],
-	[  if test "x$withval" = "xno" ; then
-		openssl_check_nonfatal=1
-	   fi
-	]
-)
-
-# Sanity check OpenSSL headers
-AC_MSG_CHECKING([whether OpenSSL's headers match the library])
-AC_RUN_IFELSE(
-	[AC_LANG_PROGRAM([[
-#include <string.h>
-#include <openssl/opensslv.h>
-	]], [[
-	exit(SSLeay() == OPENSSL_VERSION_NUMBER ? 0 : 1);
-	]])],
 	[
-		AC_MSG_RESULT([yes])
-	],
-	[
-		AC_MSG_RESULT([no])
-		if test "x$openssl_check_nonfatal" = "x"; then
-			AC_MSG_ERROR([Your OpenSSL headers do not match your
-library. Check config.log for details.
-If you are sure your installation is consistent, you can disable the check
-by running "./configure --without-openssl-header-check".
-Also see contrib/findssl.sh for help identifying header/library mismatches.
-])
-		else
-			AC_MSG_WARN([Your OpenSSL headers do not match your
-library. Check config.log for details.
-Also see contrib/findssl.sh for help identifying header/library mismatches.])
+		if test "x$withval" = "xno" ; then
+			openssl_check_nonfatal=1
 		fi
-	],
-	[
-		AC_MSG_WARN([cross compiling: not checking])
 	]
 )
 
-AC_MSG_CHECKING([if programs using OpenSSL functions will link])
-AC_LINK_IFELSE(
-	[AC_LANG_PROGRAM([[ #include <openssl/evp.h> ]],
-	[[ SSLeay_add_all_algorithms(); ]])],
-	[
-		AC_MSG_RESULT([yes])
-	],
-	[
-		AC_MSG_RESULT([no])
-		saved_LIBS="$LIBS"
-		LIBS="$LIBS -ldl"
-		AC_MSG_CHECKING([if programs using OpenSSL need -ldl])
-		AC_LINK_IFELSE(
-			[AC_LANG_PROGRAM([[ #include <openssl/evp.h> ]],
-			[[ SSLeay_add_all_algorithms(); ]])],
-			[
-				AC_MSG_RESULT([yes])
-			],
-			[
-				AC_MSG_RESULT([no])
-				LIBS="$saved_LIBS"
-			]
-		)
-	]
-)
-
-AC_CHECK_FUNCS([RSA_generate_key_ex DSA_generate_parameters_ex BN_is_prime_ex RSA_get_default_method])
-
+openssl_engine=no
 AC_ARG_WITH([ssl-engine],
 	[  --with-ssl-engine       Enable OpenSSL (hardware) ENGINE support ],
-	[ if test "x$withval" != "xno" ; then
+	[
+		if test "x$openssl" = "xno" ; then
+			AC_MSG_ERROR([cannot use --with-ssl-engine when OpenSSL disabled])
+		fi
+		if test "x$withval" != "xno" ; then
+			openssl_engine=yes
+		fi
+	]
+)
+
+if test "x$openssl" = "xyes" ; then
+	LIBS="-lcrypto $LIBS"
+	AC_TRY_LINK_FUNC([RAND_add], [AC_DEFINE([HAVE_OPENSSL], [1],
+		[Define if your ssl headers are included
+		with #include <openssl/header.h>])],
+		[
+			dnl Check default openssl install dir
+			if test -n "${need_dash_r}"; then
+				LDFLAGS="-L/usr/local/ssl/lib -R/usr/local/ssl/lib ${saved_LDFLAGS}"
+			else
+				LDFLAGS="-L/usr/local/ssl/lib ${saved_LDFLAGS}"
+			fi
+			CPPFLAGS="-I/usr/local/ssl/include ${saved_CPPFLAGS}"
+			AC_CHECK_HEADER([openssl/opensslv.h], ,
+			    [AC_MSG_ERROR([*** OpenSSL headers missing - please install first or check config.log ***])])
+			AC_TRY_LINK_FUNC([RAND_add], [AC_DEFINE([HAVE_OPENSSL])],
+				[
+					AC_MSG_ERROR([*** Can't find recent OpenSSL libcrypto (see config.log for details) ***])
+				]
+			)
+		]
+	)
+
+	# Determine OpenSSL header version
+	AC_MSG_CHECKING([OpenSSL header version])
+	AC_RUN_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <stdio.h>
+	#include <string.h>
+	#include <openssl/opensslv.h>
+	#define DATA "conftest.sslincver"
+		]], [[
+		FILE *fd;
+		int rc;
+
+		fd = fopen(DATA,"w");
+		if(fd == NULL)
+			exit(1);
+
+		if ((rc = fprintf(fd ,"%08x (%s)\n", OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT)) <0)
+			exit(1);
+
+		exit(0);
+		]])],
+		[
+			ssl_header_ver=`cat conftest.sslincver`
+			AC_MSG_RESULT([$ssl_header_ver])
+		],
+		[
+			AC_MSG_RESULT([not found])
+			AC_MSG_ERROR([OpenSSL version header not found.])
+		],
+		[
+			AC_MSG_WARN([cross compiling: not checking])
+		]
+	)
+
+	# Determine OpenSSL library version
+	AC_MSG_CHECKING([OpenSSL library version])
+	AC_RUN_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <stdio.h>
+	#include <string.h>
+	#include <openssl/opensslv.h>
+	#include <openssl/crypto.h>
+	#define DATA "conftest.ssllibver"
+		]], [[
+		FILE *fd;
+		int rc;
+
+		fd = fopen(DATA,"w");
+		if(fd == NULL)
+			exit(1);
+
+		if ((rc = fprintf(fd ,"%08x (%s)\n", SSLeay(),
+		    SSLeay_version(SSLEAY_VERSION))) <0)
+			exit(1);
+
+		exit(0);
+		]])],
+		[
+			ssl_library_ver=`cat conftest.ssllibver`
+			# Check version is supported.
+			case "$ssl_library_ver" in
+				0090[[0-7]]*|009080[[0-5]]*)
+					AC_MSG_ERROR([OpenSSL >= 0.9.8f required (have "$ssl_library_ver")])
+			                ;;
+			        *) ;;
+			esac
+			AC_MSG_RESULT([$ssl_library_ver])
+		],
+		[
+			AC_MSG_RESULT([not found])
+			AC_MSG_ERROR([OpenSSL library not found.])
+		],
+		[
+			AC_MSG_WARN([cross compiling: not checking])
+		]
+	)
+
+	# Sanity check OpenSSL headers
+	AC_MSG_CHECKING([whether OpenSSL's headers match the library])
+	AC_RUN_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <string.h>
+	#include <openssl/opensslv.h>
+		]], [[
+		exit(SSLeay() == OPENSSL_VERSION_NUMBER ? 0 : 1);
+		]])],
+		[
+			AC_MSG_RESULT([yes])
+		],
+		[
+			AC_MSG_RESULT([no])
+			if test "x$openssl_check_nonfatal" = "x"; then
+				AC_MSG_ERROR([Your OpenSSL headers do not match your
+	library. Check config.log for details.
+	If you are sure your installation is consistent, you can disable the check
+	by running "./configure --without-openssl-header-check".
+	Also see contrib/findssl.sh for help identifying header/library mismatches.
+	])
+			else
+				AC_MSG_WARN([Your OpenSSL headers do not match your
+	library. Check config.log for details.
+	Also see contrib/findssl.sh for help identifying header/library mismatches.])
+			fi
+		],
+		[
+			AC_MSG_WARN([cross compiling: not checking])
+		]
+	)
+
+	AC_MSG_CHECKING([if programs using OpenSSL functions will link])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[ #include <openssl/evp.h> ]],
+		[[ SSLeay_add_all_algorithms(); ]])],
+		[
+			AC_MSG_RESULT([yes])
+		],
+		[
+			AC_MSG_RESULT([no])
+			saved_LIBS="$LIBS"
+			LIBS="$LIBS -ldl"
+			AC_MSG_CHECKING([if programs using OpenSSL need -ldl])
+			AC_LINK_IFELSE(
+				[AC_LANG_PROGRAM([[ #include <openssl/evp.h> ]],
+				[[ SSLeay_add_all_algorithms(); ]])],
+				[
+					AC_MSG_RESULT([yes])
+				],
+				[
+					AC_MSG_RESULT([no])
+					LIBS="$saved_LIBS"
+				]
+			)
+		]
+	)
+
+	AC_CHECK_FUNCS([ \
+		BN_is_prime_ex \
+		DSA_generate_parameters_ex \
+		EVP_DigestInit_ex \
+		EVP_DigestFinal_ex \
+		EVP_MD_CTX_init \
+		EVP_MD_CTX_cleanup \
+		EVP_MD_CTX_copy_ex \
+		HMAC_CTX_init \
+		RSA_generate_key_ex \
+		RSA_get_default_method \
+	])
+
+	if test "x$openssl_engine" = "xyes" ; then
 		AC_MSG_CHECKING([for OpenSSL ENGINE support])
 		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <openssl/engine.h>
+	#include <openssl/engine.h>
 			]], [[
-	ENGINE_load_builtin_engines();
-	ENGINE_register_all_complete();
+				ENGINE_load_builtin_engines();
+				ENGINE_register_all_complete();
 			]])],
 			[ AC_MSG_RESULT([yes])
 			  AC_DEFINE([USE_OPENSSL_ENGINE], [1],
 			     [Enable OpenSSL engine support])
 			], [ AC_MSG_ERROR([OpenSSL ENGINE support not found])
 		])
-	  fi ]
-)
+	fi
 
-# Check for OpenSSL without EVP_aes_{192,256}_cbc
-AC_MSG_CHECKING([whether OpenSSL has crippled AES support])
-AC_LINK_IFELSE(
-	[AC_LANG_PROGRAM([[
-#include <string.h>
-#include <openssl/evp.h>
-	]], [[
-	exit(EVP_aes_192_cbc() == NULL || EVP_aes_256_cbc() == NULL);
-	]])],
-	[
+	# Check for OpenSSL without EVP_aes_{192,256}_cbc
+	AC_MSG_CHECKING([whether OpenSSL has crippled AES support])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <string.h>
+	#include <openssl/evp.h>
+		]], [[
+		exit(EVP_aes_192_cbc() == NULL || EVP_aes_256_cbc() == NULL);
+		]])],
+		[
+			AC_MSG_RESULT([no])
+		],
+		[
+			AC_MSG_RESULT([yes])
+			AC_DEFINE([OPENSSL_LOBOTOMISED_AES], [1],
+			    [libcrypto is missing AES 192 and 256 bit functions])
+		]
+	)
+
+	# Check for OpenSSL with EVP_aes_*ctr
+	AC_MSG_CHECKING([whether OpenSSL has AES CTR via EVP])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <string.h>
+	#include <openssl/evp.h>
+		]], [[
+		exit(EVP_aes_128_ctr() == NULL ||
+		    EVP_aes_192_cbc() == NULL ||
+		    EVP_aes_256_cbc() == NULL);
+		]])],
+		[
+			AC_MSG_RESULT([yes])
+			AC_DEFINE([OPENSSL_HAVE_EVPCTR], [1],
+			    [libcrypto has EVP AES CTR])
+		],
+		[
+			AC_MSG_RESULT([no])
+		]
+	)
+
+	# Check for OpenSSL with EVP_aes_*gcm
+	AC_MSG_CHECKING([whether OpenSSL has AES GCM via EVP])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <string.h>
+	#include <openssl/evp.h>
+		]], [[
+		exit(EVP_aes_128_gcm() == NULL ||
+		    EVP_aes_256_gcm() == NULL ||
+		    EVP_CTRL_GCM_SET_IV_FIXED == 0 ||
+		    EVP_CTRL_GCM_IV_GEN == 0 ||
+		    EVP_CTRL_GCM_SET_TAG == 0 ||
+		    EVP_CTRL_GCM_GET_TAG == 0 ||
+		    EVP_CIPHER_CTX_ctrl(NULL, 0, 0, NULL) == 0);
+		]])],
+		[
+			AC_MSG_RESULT([yes])
+			AC_DEFINE([OPENSSL_HAVE_EVPGCM], [1],
+			    [libcrypto has EVP AES GCM])
+		],
+		[
+			AC_MSG_RESULT([no])
+			unsupported_algorithms="$unsupported_cipers \
+			   aes128-gcm@openssh.com aes256-gcm@openssh.com"
+		]
+	)
+
+	AC_SEARCH_LIBS([EVP_CIPHER_CTX_ctrl], [crypto],
+		[AC_DEFINE([HAVE_EVP_CIPHER_CTX_CTRL], [1],
+		    [Define if libcrypto has EVP_CIPHER_CTX_ctrl])])
+
+	AC_MSG_CHECKING([if EVP_DigestUpdate returns an int])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <string.h>
+	#include <openssl/evp.h>
+		]], [[
+		if(EVP_DigestUpdate(NULL, NULL,0))
+			exit(0);
+		]])],
+		[
+			AC_MSG_RESULT([yes])
+		],
+		[
+			AC_MSG_RESULT([no])
+			AC_DEFINE([OPENSSL_EVP_DIGESTUPDATE_VOID], [1],
+			    [Define if EVP_DigestUpdate returns void])
+		]
+	)
+
+	# Some systems want crypt() from libcrypt, *not* the version in OpenSSL,
+	# because the system crypt() is more featureful.
+	if test "x$check_for_libcrypt_before" = "x1"; then
+		AC_CHECK_LIB([crypt], [crypt])
+	fi
+
+	# Some Linux systems (Slackware) need crypt() from libcrypt, *not* the
+	# version in OpenSSL.
+	if test "x$check_for_libcrypt_later" = "x1"; then
+		AC_CHECK_LIB([crypt], [crypt], [LIBS="$LIBS -lcrypt"])
+	fi
+	AC_CHECK_FUNCS([crypt DES_crypt])
+
+	# Search for SHA256 support in libc and/or OpenSSL
+	AC_CHECK_FUNCS([SHA256_Update EVP_sha256], ,
+	    [unsupported_algorithms="$unsupported_algorithms \
+		hmac-sha2-256 hmac-sha2-512 \
+		diffie-hellman-group-exchange-sha256 \
+		hmac-sha2-256-etm@openssh.com hmac-sha2-512-etm@openssh.com"
+	     ]
+	)
+	# Search for RIPE-MD support in OpenSSL
+	AC_CHECK_FUNCS([EVP_ripemd160], ,
+	    [unsupported_algorithms="$unsupported_algorithms \
+		hmac-ripemd160
+		hmac-ripemd160@openssh.com
+		hmac-ripemd160-etm@openssh.com"
+	     ]
+	)
+
+	# Check complete ECC support in OpenSSL
+	AC_MSG_CHECKING([whether OpenSSL has NID_X9_62_prime256v1])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <openssl/ec.h>
+	#include <openssl/ecdh.h>
+	#include <openssl/ecdsa.h>
+	#include <openssl/evp.h>
+	#include <openssl/objects.h>
+	#include <openssl/opensslv.h>
+	#if OPENSSL_VERSION_NUMBER < 0x0090807f /* 0.9.8g */
+	# error "OpenSSL < 0.9.8g has unreliable ECC code"
+	#endif
+		]], [[
+		EC_KEY *e = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+		const EVP_MD *m = EVP_sha256(); /* We need this too */
+		]])],
+		[ AC_MSG_RESULT([yes])
+		  enable_nistp256=1 ],
+		[ AC_MSG_RESULT([no]) ]
+	)
+
+	AC_MSG_CHECKING([whether OpenSSL has NID_secp384r1])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <openssl/ec.h>
+	#include <openssl/ecdh.h>
+	#include <openssl/ecdsa.h>
+	#include <openssl/evp.h>
+	#include <openssl/objects.h>
+	#include <openssl/opensslv.h>
+	#if OPENSSL_VERSION_NUMBER < 0x0090807f /* 0.9.8g */
+	# error "OpenSSL < 0.9.8g has unreliable ECC code"
+	#endif
+		]], [[
+		EC_KEY *e = EC_KEY_new_by_curve_name(NID_secp384r1);
+		const EVP_MD *m = EVP_sha384(); /* We need this too */
+		]])],
+		[ AC_MSG_RESULT([yes])
+		  enable_nistp384=1 ],
+		[ AC_MSG_RESULT([no]) ]
+	)
+
+	AC_MSG_CHECKING([whether OpenSSL has NID_secp521r1])
+	AC_LINK_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <openssl/ec.h>
+	#include <openssl/ecdh.h>
+	#include <openssl/ecdsa.h>
+	#include <openssl/evp.h>
+	#include <openssl/objects.h>
+	#include <openssl/opensslv.h>
+	#if OPENSSL_VERSION_NUMBER < 0x0090807f /* 0.9.8g */
+	# error "OpenSSL < 0.9.8g has unreliable ECC code"
+	#endif
+		]], [[
+		EC_KEY *e = EC_KEY_new_by_curve_name(NID_secp521r1);
+		const EVP_MD *m = EVP_sha512(); /* We need this too */
+		]])],
+		[ AC_MSG_RESULT([yes])
+		  AC_MSG_CHECKING([if OpenSSL's NID_secp521r1 is functional])
+		  AC_RUN_IFELSE(
+			[AC_LANG_PROGRAM([[
+	#include <openssl/ec.h>
+	#include <openssl/ecdh.h>
+	#include <openssl/ecdsa.h>
+	#include <openssl/evp.h>
+	#include <openssl/objects.h>
+	#include <openssl/opensslv.h>
+			]],[[
+			EC_KEY *e = EC_KEY_new_by_curve_name(NID_secp521r1);
+			const EVP_MD *m = EVP_sha512(); /* We need this too */
+			exit(e == NULL || m == NULL);
+			]])],
+			[ AC_MSG_RESULT([yes])
+			  enable_nistp521=1 ],
+			[ AC_MSG_RESULT([no]) ],
+			[ AC_MSG_WARN([cross-compiling: assuming yes])
+			  enable_nistp521=1 ]
+		  )],
 		AC_MSG_RESULT([no])
-	],
-	[
-		AC_MSG_RESULT([yes])
-		AC_DEFINE([OPENSSL_LOBOTOMISED_AES], [1],
-		    [libcrypto is missing AES 192 and 256 bit functions])
-	]
-)
+	)
 
-AC_MSG_CHECKING([if EVP_DigestUpdate returns an int])
-AC_LINK_IFELSE(
-	[AC_LANG_PROGRAM([[
-#include <string.h>
-#include <openssl/evp.h>
-	]], [[
-	if(EVP_DigestUpdate(NULL, NULL,0))
-		exit(0);
-	]])],
-	[
-		AC_MSG_RESULT([yes])
-	],
-	[
-		AC_MSG_RESULT([no])
-		AC_DEFINE([OPENSSL_EVP_DIGESTUPDATE_VOID], [1],
-		    [Define if EVP_DigestUpdate returns void])
-	]
-)
+	COMMENT_OUT_ECC="#no ecc#"
+	TEST_SSH_ECC=no
 
-# Some systems want crypt() from libcrypt, *not* the version in OpenSSL,
-# because the system crypt() is more featureful.
-if test "x$check_for_libcrypt_before" = "x1"; then
-	AC_CHECK_LIB([crypt], [crypt])
-fi
-
-# Some Linux systems (Slackware) need crypt() from libcrypt, *not* the
-# version in OpenSSL.
-if test "x$check_for_libcrypt_later" = "x1"; then
-	AC_CHECK_LIB([crypt], [crypt], [LIBS="$LIBS -lcrypt"])
-fi
-
-# Search for SHA256 support in libc and/or OpenSSL
-AC_CHECK_FUNCS([SHA256_Update EVP_sha256], [TEST_SSH_SHA256=yes],
-    [TEST_SSH_SHA256=no])
-AC_SUBST([TEST_SSH_SHA256])
-
-# Check complete ECC support in OpenSSL
-AC_MSG_CHECKING([whether OpenSSL has complete ECC support])
-AC_LINK_IFELSE(
-	[AC_LANG_PROGRAM([[
-#include <openssl/ec.h>
-#include <openssl/ecdh.h>
-#include <openssl/ecdsa.h>
-#include <openssl/evp.h>
-#include <openssl/objects.h>
-#include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER < 0x0090807f /* 0.9.8g */
-# error "OpenSSL < 0.9.8g has unreliable ECC code"
-#endif
-	]], [[
-	EC_KEY *e = EC_KEY_new_by_curve_name(NID_secp521r1);
-	const EVP_MD *m = EVP_sha512(); /* We need this too */
-	]])],
-	[
-		AC_MSG_RESULT([yes])
-		AC_DEFINE([OPENSSL_HAS_ECC], [1],
-		    [libcrypto includes complete ECC support])
+	if test x$enable_nistp256 = x1 || test x$enable_nistp384 = x1 || \
+	    test x$enable_nistp521 = x1; then
+		AC_DEFINE(OPENSSL_HAS_ECC, [1], [OpenSSL has ECC])
+	fi
+	if test x$enable_nistp256 = x1; then
+		AC_DEFINE([OPENSSL_HAS_NISTP256], [1],
+		    [libcrypto has NID_X9_62_prime256v1])
 		TEST_SSH_ECC=yes
 		COMMENT_OUT_ECC=""
-	],
-	[
-		AC_MSG_RESULT([no])
-		TEST_SSH_ECC=no
-		COMMENT_OUT_ECC="#no ecc#"
-	]
-)
-AC_SUBST([TEST_SSH_ECC])
-AC_SUBST([COMMENT_OUT_ECC])
+	else
+		unsupported_algorithms="$unsupported_algorithms ecdsa-sha2-nistp256 \
+		    ecdh-sha2-nistp256 ecdsa-sha2-nistp256-cert-v01@openssh.com"
+	fi
+	if test x$enable_nistp384 = x1; then
+		AC_DEFINE([OPENSSL_HAS_NISTP384], [1], [libcrypto has NID_secp384r1])
+		TEST_SSH_ECC=yes
+		COMMENT_OUT_ECC=""
+	else
+		unsupported_algorithms="$unsupported_algorithms ecdsa-sha2-nistp384 \
+		    ecdh-sha2-nistp384 ecdsa-sha2-nistp384-cert-v01@openssh.com"
+	fi
+	if test x$enable_nistp521 = x1; then
+		AC_DEFINE([OPENSSL_HAS_NISTP521], [1], [libcrypto has NID_secp521r1])
+		TEST_SSH_ECC=yes
+		COMMENT_OUT_ECC=""
+	else
+		unsupported_algorithms="$unsupported_algorithms ecdh-sha2-nistp521 \
+		    ecdsa-sha2-nistp521 ecdsa-sha2-nistp521-cert-v01@openssh.com"
+	fi
+
+	AC_SUBST([TEST_SSH_ECC])
+	AC_SUBST([COMMENT_OUT_ECC])
+else
+	AC_CHECK_LIB([crypt], [crypt], [LIBS="$LIBS -lcrypt"])
+	AC_CHECK_FUNCS([crypt])
+fi
+
+AC_CHECK_FUNCS([ \
+	arc4random \
+	arc4random_buf \
+	arc4random_stir \
+	arc4random_uniform \
+])
 
 saved_LIBS="$LIBS"
 AC_CHECK_LIB([iaf], [ia_openinfo], [
@@ -2338,28 +2767,30 @@ LIBS="$saved_LIBS"
 ### Configure cryptographic random number support
 
 # Check wheter OpenSSL seeds itself
-AC_MSG_CHECKING([whether OpenSSL's PRNG is internally seeded])
-AC_RUN_IFELSE(
-	[AC_LANG_PROGRAM([[
-#include <string.h>
-#include <openssl/rand.h>
-	]], [[
-	exit(RAND_status() == 1 ? 0 : 1);
-	]])],
-	[
-		OPENSSL_SEEDS_ITSELF=yes
-		AC_MSG_RESULT([yes])
-	],
-	[
-		AC_MSG_RESULT([no])
-	],
-	[
-		AC_MSG_WARN([cross compiling: assuming yes])
-		# This is safe, since we will fatal() at runtime if
-		# OpenSSL is not seeded correctly.
-		OPENSSL_SEEDS_ITSELF=yes
-	]
-)
+if test "x$openssl" = "xyes" ; then
+	AC_MSG_CHECKING([whether OpenSSL's PRNG is internally seeded])
+	AC_RUN_IFELSE(
+		[AC_LANG_PROGRAM([[
+	#include <string.h>
+	#include <openssl/rand.h>
+		]], [[
+		exit(RAND_status() == 1 ? 0 : 1);
+		]])],
+		[
+			OPENSSL_SEEDS_ITSELF=yes
+			AC_MSG_RESULT([yes])
+		],
+		[
+			AC_MSG_RESULT([no])
+		],
+		[
+			AC_MSG_WARN([cross compiling: assuming yes])
+			# This is safe, since we will fatal() at runtime if
+			# OpenSSL is not seeded correctly.
+			OPENSSL_SEEDS_ITSELF=yes
+		]
+	)
+fi
 
 # PRNGD TCP socket
 AC_ARG_WITH([prngd-port],
@@ -2441,8 +2872,10 @@ elif test ! -z "$PRNGD_SOCKET" ; then
 	RAND_MSG="PRNGd socket $PRNGD_SOCKET"
 elif test ! -z "$OPENSSL_SEEDS_ITSELF" ; then
 	AC_DEFINE([OPENSSL_PRNG_ONLY], [1],
-		[Define if you want OpenSSL's internally seeded PRNG only])
+		[Define if you want the OpenSSL internally seeded PRNG only])
 	RAND_MSG="OpenSSL internal ONLY"
+elif test "x$openssl" = "xno" ; then
+	AC_MSG_WARN([OpenSSH will use /dev/urandom as a source of random numbers. It will fail if this device is not supported or accessible])
 else
 	AC_MSG_ERROR([OpenSSH has no source of random numbers. Please configure OpenSSL with an entropy source or re-run configure using one of the --with-prngd-port or --with-prngd-socket options])
 fi
@@ -2504,11 +2937,18 @@ if test "x$PAM_MSG" = "xyes" ; then
 				which takes only one argument to pam_strerror])
 			AC_MSG_RESULT([yes])
 			PAM_MSG="yes (old library)"
-		
+
 	])
 fi
 
-SSH_PRIVSEP_USER=sshd
+case "$host" in
+*-*-cygwin*)
+	SSH_PRIVSEP_USER=CYGWIN_SSH_PRIVSEP_USER
+	;;
+*)
+	SSH_PRIVSEP_USER=sshd
+	;;
+esac
 AC_ARG_WITH([privsep-user],
 	[  --with-privsep-user=user Specify non-privileged user for privilege separation],
 	[
@@ -2518,14 +2958,47 @@ AC_ARG_WITH([privsep-user],
 		fi
 	]
 )
-AC_DEFINE_UNQUOTED([SSH_PRIVSEP_USER], ["$SSH_PRIVSEP_USER"],
-	[non-privileged user for privilege separation])
+if test "x$SSH_PRIVSEP_USER" = "xCYGWIN_SSH_PRIVSEP_USER" ; then
+	AC_DEFINE_UNQUOTED([SSH_PRIVSEP_USER], [CYGWIN_SSH_PRIVSEP_USER],
+		[Cygwin function to fetch non-privileged user for privilege separation])
+else
+	AC_DEFINE_UNQUOTED([SSH_PRIVSEP_USER], ["$SSH_PRIVSEP_USER"],
+		[non-privileged user for privilege separation])
+fi
 AC_SUBST([SSH_PRIVSEP_USER])
+
+if test "x$have_linux_no_new_privs" = "x1" ; then
+AC_CHECK_DECL([SECCOMP_MODE_FILTER], [have_seccomp_filter=1], , [
+	#include <sys/types.h>
+	#include <linux/seccomp.h>
+])
+fi
+if test "x$have_seccomp_filter" = "x1" ; then
+AC_MSG_CHECKING([kernel for seccomp_filter support])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+		#include <errno.h>
+		#include <elf.h>
+		#include <linux/audit.h>
+		#include <linux/seccomp.h>
+		#include <stdlib.h>
+		#include <sys/prctl.h>
+	]],
+	[[ int i = $seccomp_audit_arch;
+	   errno = 0;
+	   prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, NULL, 0, 0);
+	   exit(errno == EFAULT ? 0 : 1); ]])],
+	[ AC_MSG_RESULT([yes]) ], [
+		AC_MSG_RESULT([no])
+		# Disable seccomp filter as a target
+		have_seccomp_filter=0
+	]
+)
+fi
 
 # Decide which sandbox style to use
 sandbox_arg=""
 AC_ARG_WITH([sandbox],
-	[  --with-sandbox=style    Specify privilege separation sandbox (no, darwin, rlimit, systrace)],
+	[  --with-sandbox=style    Specify privilege separation sandbox (no, darwin, rlimit, systrace, seccomp_filter, capsicum)],
 	[
 		if test "x$withval" = "xyes" ; then
 			sandbox_arg=""
@@ -2534,6 +3007,93 @@ AC_ARG_WITH([sandbox],
 		fi
 	]
 )
+
+# Some platforms (seems to be the ones that have a kernel poll(2)-type
+# function with which they implement select(2)) use an extra file descriptor
+# when calling select(2), which means we can't use the rlimit sandbox.
+AC_MSG_CHECKING([if select works with descriptor rlimit])
+AC_RUN_IFELSE(
+	[AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#ifdef HAVE_SYS_TIME_H
+# include <sys/time.h>
+#endif
+#include <sys/resource.h>
+#ifdef HAVE_SYS_SELECT_H
+# include <sys/select.h>
+#endif
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+	]],[[
+	struct rlimit rl_zero;
+	int fd, r;
+	fd_set fds;
+	struct timeval tv;
+
+	fd = open("/dev/null", O_RDONLY);
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+	rl_zero.rlim_cur = rl_zero.rlim_max = 0;
+	setrlimit(RLIMIT_FSIZE, &rl_zero);
+	setrlimit(RLIMIT_NOFILE, &rl_zero);
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+	r = select(fd+1, &fds, NULL, NULL, &tv);
+	exit (r == -1 ? 1 : 0);
+	]])],
+	[AC_MSG_RESULT([yes])
+	 select_works_with_rlimit=yes],
+	[AC_MSG_RESULT([no])
+	 select_works_with_rlimit=no],
+	[AC_MSG_WARN([cross compiling: assuming yes])]
+)
+
+AC_MSG_CHECKING([if setrlimit(RLIMIT_NOFILE,{0,0}) works])
+AC_RUN_IFELSE(
+	[AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#ifdef HAVE_SYS_TIME_H
+# include <sys/time.h>
+#endif
+#include <sys/resource.h>
+#include <errno.h>
+#include <stdlib.h>
+	]],[[
+	struct rlimit rl_zero;
+	int fd, r;
+	fd_set fds;
+
+	rl_zero.rlim_cur = rl_zero.rlim_max = 0;
+	r = setrlimit(RLIMIT_NOFILE, &rl_zero);
+	exit (r == -1 ? 1 : 0);
+	]])],
+	[AC_MSG_RESULT([yes])
+	 rlimit_nofile_zero_works=yes],
+	[AC_MSG_RESULT([no])
+	 rlimit_nofile_zero_works=no],
+	[AC_MSG_WARN([cross compiling: assuming yes])]
+)
+
+AC_MSG_CHECKING([if setrlimit RLIMIT_FSIZE works])
+AC_RUN_IFELSE(
+	[AC_LANG_PROGRAM([[
+#include <sys/types.h>
+#include <sys/resource.h>
+#include <stdlib.h>
+	]],[[
+		struct rlimit rl_zero;
+
+		rl_zero.rlim_cur = rl_zero.rlim_max = 0;
+		exit(setrlimit(RLIMIT_FSIZE, &rl_zero) != 0);
+	]])],
+	[AC_MSG_RESULT([yes])],
+	[AC_MSG_RESULT([no])
+	 AC_DEFINE(SANDBOX_SKIP_RLIMIT_FSIZE, 1,
+	    [setrlimit RLIMIT_FSIZE works])],
+	[AC_MSG_WARN([cross compiling: assuming yes])]
+)
+
 if test "x$sandbox_arg" = "xsystrace" || \
    ( test -z "$sandbox_arg" && test "x$have_systr_policy_kill" = "x1" ) ; then
 	test "x$have_systr_policy_kill" != "x1" && \
@@ -2548,10 +3108,43 @@ elif test "x$sandbox_arg" = "xdarwin" || \
 		AC_MSG_ERROR([Darwin seatbelt sandbox requires sandbox.h and sandbox_init function])
 	SANDBOX_STYLE="darwin"
 	AC_DEFINE([SANDBOX_DARWIN], [1], [Sandbox using Darwin sandbox_init(3)])
+elif test "x$sandbox_arg" = "xseccomp_filter" || \
+     ( test -z "$sandbox_arg" && \
+       test "x$have_seccomp_filter" = "x1" && \
+       test "x$ac_cv_header_elf_h" = "xyes" && \
+       test "x$ac_cv_header_linux_audit_h" = "xyes" && \
+       test "x$ac_cv_header_linux_filter_h" = "xyes" && \
+       test "x$seccomp_audit_arch" != "x" && \
+       test "x$have_linux_no_new_privs" = "x1" && \
+       test "x$ac_cv_func_prctl" = "xyes" ) ; then
+	test "x$seccomp_audit_arch" = "x" && \
+		AC_MSG_ERROR([seccomp_filter sandbox not supported on $host])
+	test "x$have_linux_no_new_privs" != "x1" && \
+		AC_MSG_ERROR([seccomp_filter sandbox requires PR_SET_NO_NEW_PRIVS])
+	test "x$have_seccomp_filter" != "x1" && \
+		AC_MSG_ERROR([seccomp_filter sandbox requires seccomp headers])
+	test "x$ac_cv_func_prctl" != "xyes" && \
+		AC_MSG_ERROR([seccomp_filter sandbox requires prctl function])
+	SANDBOX_STYLE="seccomp_filter"
+	AC_DEFINE([SANDBOX_SECCOMP_FILTER], [1], [Sandbox using seccomp filter])
+elif test "x$sandbox_arg" = "xcapsicum" || \
+     ( test -z "$sandbox_arg" && \
+       test "x$ac_cv_header_sys_capability_h" = "xyes" && \
+       test "x$ac_cv_func_cap_rights_limit" = "xyes") ; then
+       test "x$ac_cv_header_sys_capability_h" != "xyes" && \
+		AC_MSG_ERROR([capsicum sandbox requires sys/capability.h header])
+       test "x$ac_cv_func_cap_rights_limit" != "xyes" && \
+		AC_MSG_ERROR([capsicum sandbox requires cap_rights_limit function])
+       SANDBOX_STYLE="capsicum"
+       AC_DEFINE([SANDBOX_CAPSICUM], [1], [Sandbox using capsicum])
 elif test "x$sandbox_arg" = "xrlimit" || \
-     ( test -z "$sandbox_arg" && test "x$ac_cv_func_setrlimit" = "xyes" ) ; then
+     ( test -z "$sandbox_arg" && test "x$ac_cv_func_setrlimit" = "xyes" && \
+       test "x$select_works_with_rlimit" = "xyes" && \
+       test "x$rlimit_nofile_zero_works" = "xyes" ) ; then
 	test "x$ac_cv_func_setrlimit" != "xyes" && \
 		AC_MSG_ERROR([rlimit sandbox requires setrlimit function])
+	test "x$select_works_with_rlimit" != "xyes" && \
+		AC_MSG_ERROR([rlimit sandbox requires select to work with rlimit])
 	SANDBOX_STYLE="rlimit"
 	AC_DEFINE([SANDBOX_RLIMIT], [1], [Sandbox using setrlimit(2)])
 elif test -z "$sandbox_arg" || test "x$sandbox_arg" = "xno" || \
@@ -2571,7 +3164,6 @@ fi
 AC_CHECK_TYPES([long long, unsigned long long, long double])
 
 # Check datatype sizes
-AC_CHECK_SIZEOF([char], [1])
 AC_CHECK_SIZEOF([short int], [2])
 AC_CHECK_SIZEOF([int], [4])
 AC_CHECK_SIZEOF([long int], [4])
@@ -2768,7 +3360,9 @@ if test "x$ac_cv_have_u_int64_t" = "xyes" ; then
 	have_u_int64_t=1
 fi
 
-if test -z "$have_u_int64_t" ; then
+if (test -z "$have_u_int64_t" && \
+	   test "x$ac_cv_header_sys_bitypes_h" = "xyes")
+then
     AC_MSG_CHECKING([for u_int64_t type in sys/bitypes.h])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <sys/bitypes.h> ]],
 	[[ u_int64_t a; a = 1]])],
@@ -2798,9 +3392,24 @@ if test -z "$have_u_intxx_t" ; then
 	fi
 fi
 
-if test -z "$have_uintxx_t" ; then
+if (test -z "$have_uintxx_t" && \
+	   test "x$ac_cv_header_stdint_h" = "xyes")
+then
     AC_MSG_CHECKING([for uintXX_t types in stdint.h])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <stdint.h> ]],
+	[[ uint8_t a; uint16_t b; uint32_t c; a = b = c = 1;]])],
+		[
+			AC_DEFINE([HAVE_UINTXX_T])
+			AC_MSG_RESULT([yes])
+		], [ AC_MSG_RESULT([no]) 
+	])
+fi
+
+if (test -z "$have_uintxx_t" && \
+	   test "x$ac_cv_header_inttypes_h" = "xyes")
+then
+    AC_MSG_CHECKING([for uintXX_t types in inttypes.h])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <inttypes.h> ]],
 	[[ uint8_t a; uint16_t b; uint32_t c; a = b = c = 1;]])],
 		[
 			AC_DEFINE([HAVE_UINTXX_T])
@@ -2839,21 +3448,12 @@ if test "x$ac_cv_have_u_char" = "xyes" ; then
 	AC_DEFINE([HAVE_U_CHAR], [1], [define if you have u_char data type])
 fi
 
-#
-# WIN32_FIXME
-#
+AC_CHECK_TYPES([intmax_t, uintmax_t], , , [
+#include <sys/types.h>
+#include <stdint.h>
+])
 
-case "$host" in
-*-*-mingw32*)
-      ;;
-*)
-      TYPE_SOCKLEN_T
-      ;;
-esac
-
-#
-# END FIXME
-#
+TYPE_SOCKLEN_T
 
 AC_CHECK_TYPES([sig_atomic_t], , , [#include <signal.h>])
 AC_CHECK_TYPES([fsblkcnt_t, fsfilcnt_t], , , [
@@ -3084,9 +3684,16 @@ OSSH_CHECK_HEADER_FOR_FIELD([ut_time], [utmpx.h], [HAVE_TIME_IN_UTMPX])
 OSSH_CHECK_HEADER_FOR_FIELD([ut_tv], [utmpx.h], [HAVE_TV_IN_UTMPX])
 
 AC_CHECK_MEMBERS([struct stat.st_blksize])
+AC_CHECK_MEMBERS([struct passwd.pw_gecos, struct passwd.pw_class,
+struct passwd.pw_change, struct passwd.pw_expire],
+[], [], [[
+#include <sys/types.h>
+#include <pwd.h>
+]])
+
 AC_CHECK_MEMBER([struct __res_state.retrans], [], [AC_DEFINE([__res_state], [state],
 	[Define if we don't have struct __res_state in resolv.h])],
-[
+[[
 #include <stdio.h>
 #if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -3094,7 +3701,7 @@ AC_CHECK_MEMBER([struct __res_state.retrans], [], [AC_DEFINE([__res_state], [sta
 #include <netinet/in.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
-])
+]])
 
 AC_CACHE_CHECK([for ss_family field in struct sockaddr_storage],
 		ac_cv_have_ss_family_in_struct_ss, [
@@ -3122,45 +3729,6 @@ AC_CACHE_CHECK([for __ss_family field in struct sockaddr_storage],
 if test "x$ac_cv_have___ss_family_in_struct_ss" = "xyes" ; then
 	AC_DEFINE([HAVE___SS_FAMILY_IN_SS], [1],
 		[Fields in struct sockaddr_storage])
-fi
-
-AC_CACHE_CHECK([for pw_class field in struct passwd],
-		ac_cv_have_pw_class_in_struct_passwd, [
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <pwd.h> ]],
-	[[ struct passwd p; p.pw_class = 0; ]])],
-	[ ac_cv_have_pw_class_in_struct_passwd="yes" ],
-	[ ac_cv_have_pw_class_in_struct_passwd="no" 
-	])
-])
-if test "x$ac_cv_have_pw_class_in_struct_passwd" = "xyes" ; then
-	AC_DEFINE([HAVE_PW_CLASS_IN_PASSWD], [1],
-		[Define if your password has a pw_class field])
-fi
-
-AC_CACHE_CHECK([for pw_expire field in struct passwd],
-		ac_cv_have_pw_expire_in_struct_passwd, [
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <pwd.h> ]],
-	[[ struct passwd p; p.pw_expire = 0; ]])],
-	[ ac_cv_have_pw_expire_in_struct_passwd="yes" ],
-	[ ac_cv_have_pw_expire_in_struct_passwd="no" 
-	])
-])
-if test "x$ac_cv_have_pw_expire_in_struct_passwd" = "xyes" ; then
-	AC_DEFINE([HAVE_PW_EXPIRE_IN_PASSWD], [1],
-		[Define if your password has a pw_expire field])
-fi
-
-AC_CACHE_CHECK([for pw_change field in struct passwd],
-		ac_cv_have_pw_change_in_struct_passwd, [
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <pwd.h> ]],
-	[[ struct passwd p; p.pw_change = 0; ]])],
-	[ ac_cv_have_pw_change_in_struct_passwd="yes" ],
-	[ ac_cv_have_pw_change_in_struct_passwd="no" 
-	])
-])
-if test "x$ac_cv_have_pw_change_in_struct_passwd" = "xyes" ; then
-	AC_DEFINE([HAVE_PW_CHANGE_IN_PASSWD], [1],
-		[Define if your password has a pw_change field])
 fi
 
 dnl make sure we're using the real structure members and not defines
@@ -3191,7 +3759,7 @@ fi
 
 AC_MSG_CHECKING([if struct statvfs.f_fsid is integral type])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #ifdef HAVE_SYS_TIME_H
 # include <sys/time.h>
@@ -3346,15 +3914,7 @@ if test "x$ac_cv_libc_defines_sys_nerr" = "xyes" ; then
 	AC_DEFINE([HAVE_SYS_NERR], [1], [Define if your system defines sys_nerr])
 fi
 
-#
-# WIN32_FIXME
-#
-
 # Check libraries needed by DNS fingerprint support
-case "$host" in
-*-*-mingw32*)
-      ;;
-*)
 AC_SEARCH_LIBS([getrrsetbyname], [resolv],
 	[AC_DEFINE([HAVE_GETRRSETBYNAME], [1],
 		[Define if getrrsetbyname() exists])],
@@ -3399,12 +3959,6 @@ AC_SEARCH_LIBS([getrrsetbyname], [resolv],
 			    [Define if HEADER.ad exists in arpa/nameser.h])], ,
 			[#include <arpa/nameser.h>])
 	])
-  ;;
-esac  
-
-#
-# END FIXME
-#
 
 AC_MSG_CHECKING([if struct __res_state _res is an extern])
 AC_LINK_IFELSE([AC_LANG_PROGRAM([[
@@ -3464,29 +4018,13 @@ AC_ARG_WITH([kerberos5],
 		AC_DEFINE([KRB5], [1], [Define if you want Kerberos 5 support])
 		KRB5_MSG="yes"
 
-
-#
-# WIN32_FIXME
-#
-
-#
-# We have no krb5-config on Windows.
-# Dont link to kerberos libs, becouse we loads
-# them in runtime.
-#
-
-if test "$SkipGssapiLibsCheck" = "1" ; then
-
-  AC_DEFINE(GSSAPI, 1, [Define this if you want GSSAPI support in the version 2 protocol])
-
-  CFLAGS="$CFLAGS -I$KRB5ROOT"
-
-else
-
 		AC_PATH_PROG([KRB5CONF], [krb5-config],
 			     [$KRB5ROOT/bin/krb5-config],
 			     [$KRB5ROOT/bin:$PATH])
 		if test -x $KRB5CONF ; then
+			K5CFLAGS="`$KRB5CONF --cflags`"
+			K5LIBS="`$KRB5CONF --libs`"
+			CPPFLAGS="$CPPFLAGS $K5CFLAGS"
 
 			AC_MSG_CHECKING([for gssapi support])
 			if $KRB5CONF | grep gssapi >/dev/null ; then
@@ -3494,14 +4032,12 @@ else
 				AC_DEFINE([GSSAPI], [1],
 					[Define this if you want GSSAPI
 					support in the version 2 protocol])
-				k5confopts=gssapi
+				GSSCFLAGS="`$KRB5CONF --cflags gssapi`"
+				GSSLIBS="`$KRB5CONF --libs gssapi`"
+				CPPFLAGS="$CPPFLAGS $GSSCFLAGS"
 			else
 				AC_MSG_RESULT([no])
-				k5confopts=""
 			fi
-			K5CFLAGS="`$KRB5CONF --cflags $k5confopts`"
-			K5LIBS="`$KRB5CONF --libs $k5confopts`"
-			CPPFLAGS="$CPPFLAGS $K5CFLAGS"
 			AC_MSG_CHECKING([whether we are using Heimdal])
 			AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include <krb5.h>
 				]], [[ char *tmp = heimdal_version; ]])],
@@ -3533,20 +4069,16 @@ else
 
 			AC_CHECK_LIB([gssapi_krb5], [gss_init_sec_context],
 				[ AC_DEFINE([GSSAPI])
-				  K5LIBS="-lgssapi_krb5 $K5LIBS" ],
+				  GSSLIBS="-lgssapi_krb5" ],
 				[ AC_CHECK_LIB([gssapi], [gss_init_sec_context],
 					[ AC_DEFINE([GSSAPI])
-					  K5LIBS="-lgssapi $K5LIBS" ],
-					AC_MSG_WARN([Cannot find any suitable gss-api library - build may fail]),
-					$K5LIBS)
-				],
-				$K5LIBS)
-
-fi
-
-#
-# END FIXME
-#
+					  GSSLIBS="-lgssapi" ],
+					[ AC_CHECK_LIB([gss], [gss_init_sec_context],
+						[ AC_DEFINE([GSSAPI])
+						  GSSLIBS="-lgss" ],
+						AC_MSG_WARN([Cannot find any suitable gss-api library - build may fail]))
+					])
+				])
 
 			AC_CHECK_HEADER([gssapi.h], ,
 				[ unset ac_cv_header_gssapi_h
@@ -3570,34 +4102,36 @@ fi
 			blibpath="$blibpath:${KRB5ROOT}/lib"
 		fi
 
-#
-# Fix header found, but not usable on MinGW.
-#
-
- case "$host" in
- *-*-mingw32*)
-
-    AC_CHECK_HEADERS([gssapi.h gssapi/gssapi.h], [], [], [ #define _W64 long long ] )
-    AC_CHECK_HEADERS([gssapi_krb5.h gssapi/gssapi_krb5.h], [], [], [ #define _W64 long long ] )
-    AC_CHECK_HEADERS([gssapi_generic.h gssapi/gssapi_generic.h], [], [], [ #define _W64 long long ] )
-
-       ;;
- *)
-
 		AC_CHECK_HEADERS([gssapi.h gssapi/gssapi.h])
-	AC_CHECK_HEADERS([gssapi_krb5.h gssapi/gssapi_krb5.h])
+		AC_CHECK_HEADERS([gssapi_krb5.h gssapi/gssapi_krb5.h])
 		AC_CHECK_HEADERS([gssapi_generic.h gssapi/gssapi_generic.h])
 
-       ;;
- esac
-
-
-		LIBS="$LIBS $K5LIBS"
 		AC_SEARCH_LIBS([k_hasafs], [kafs], [AC_DEFINE([USE_AFS], [1],
 			[Define this if you want to use libkafs' AFS support])])
+
+		AC_CHECK_DECLS([GSS_C_NT_HOSTBASED_SERVICE], [], [], [[
+#ifdef HAVE_GSSAPI_H
+# include <gssapi.h>
+#elif defined(HAVE_GSSAPI_GSSAPI_H)
+# include <gssapi/gssapi.h>
+#endif
+
+#ifdef HAVE_GSSAPI_GENERIC_H
+# include <gssapi_generic.h>
+#elif defined(HAVE_GSSAPI_GSSAPI_GENERIC_H)
+# include <gssapi/gssapi_generic.h>
+#endif
+		]])
+		saved_LIBS="$LIBS"
+		LIBS="$LIBS $K5LIBS"
+		AC_CHECK_FUNCS([krb5_cc_new_unique krb5_get_error_message krb5_free_error_message])
+		LIBS="$saved_LIBS"
+
 	fi
 	]
 )
+AC_SUBST([GSSLIBS])
+AC_SUBST([K5LIBS])
 
 # Looking for programs, paths and files
 
@@ -3829,7 +4363,8 @@ if test -z "$disable_shadow" ; then
 #include <shadow.h>
 struct spwd sp;
 		]], [[ sp.sp_expire = sp.sp_lstchg = sp.sp_inact = 0; ]])],
-		[ sp_expire_available=yes ])
+		[ sp_expire_available=yes ], [
+	])
 
 	if test "x$sp_expire_available" = "xyes" ; then
 		AC_MSG_RESULT([yes])
@@ -3849,7 +4384,7 @@ if test ! -z "$IPADDR_IN_DISPLAY" ; then
 else
 	DISPLAY_HACK_MSG="no"
 	AC_ARG_WITH([ipaddr-display],
-		[  --with-ipaddr-display   Use ip address instead of hostname in \$DISPLAY],
+		[  --with-ipaddr-display   Use ip address instead of hostname in $DISPLAY],
 		[
 			if test "x$withval" != "xno" ; then
 				AC_DEFINE([IPADDR_IN_DISPLAY])
@@ -3895,7 +4430,7 @@ fi
 # Whether to mess with the default path
 SERVER_PATH_MSG="(default)"
 AC_ARG_WITH([default-path],
-	[  --with-default-path=    Specify default \$PATH environment for server],
+	[  --with-default-path=    Specify default $PATH environment for server],
 	[
 		if test "x$external_path_file" = "x/etc/login.conf" ; then
 			AC_MSG_WARN([
@@ -3955,13 +4490,16 @@ otherwise scp will not work.])
 		[ user_path="/usr/bin:/bin:/usr/sbin:/sbin" ]
 	)
 # make sure $bindir is in USER_PATH so scp will work
-		t_bindir=`eval echo ${bindir}`
-		case $t_bindir in
-			NONE/*) t_bindir=`echo $t_bindir | sed "s~NONE~$prefix~"` ;;
-		esac
-		case $t_bindir in
-			NONE/*) t_bindir=`echo $t_bindir | sed "s~NONE~$ac_default_prefix~"` ;;
-		esac
+		t_bindir="${bindir}"
+		while echo "${t_bindir}" | egrep '\$\{|NONE/' >/dev/null 2>&1; do
+			t_bindir=`eval echo ${t_bindir}`
+			case $t_bindir in
+				NONE/*) t_bindir=`echo $t_bindir | sed "s~NONE~$prefix~"` ;;
+			esac
+			case $t_bindir in
+				NONE/*) t_bindir=`echo $t_bindir | sed "s~NONE~$ac_default_prefix~"` ;;
+			esac
+		done
 		echo $user_path | grep ":$t_bindir"  > /dev/null 2>&1
 		if test $? -ne 0  ; then
 			echo $user_path | grep "^$t_bindir"  > /dev/null 2>&1
@@ -4260,7 +4798,6 @@ if test -n "$conf_wtmp_location"; then
 		[Define if you want to specify the path to your wtmp file])
 fi
 
-
 dnl wtmpx detection
 AC_MSG_CHECKING([if your system defines WTMPX_FILE])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
@@ -4292,44 +4829,46 @@ if test ! -z "$blibpath" ; then
 	AC_MSG_WARN([Please check and edit blibpath in LDFLAGS in Makefile])
 fi
 
+AC_CHECK_MEMBER([struct lastlog.ll_line], [], [
+    if test x$SKIP_DISABLE_LASTLOG_DEFINE != "xyes" ; then
+	AC_DEFINE([DISABLE_LASTLOG])
+    fi
+	], [
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_UTMP_H
+#include <utmp.h>
+#endif
+#ifdef HAVE_UTMPX_H
+#include <utmpx.h>
+#endif
+#ifdef HAVE_LASTLOG_H
+#include <lastlog.h>
+#endif
+	])
+
+AC_CHECK_MEMBER([struct utmp.ut_line], [], [
+	AC_DEFINE([DISABLE_UTMP])
+	AC_DEFINE([DISABLE_WTMP])
+	], [
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_UTMP_H
+#include <utmp.h>
+#endif
+#ifdef HAVE_UTMPX_H
+#include <utmpx.h>
+#endif
+#ifdef HAVE_LASTLOG_H
+#include <lastlog.h>
+#endif
+	])
+
 dnl Adding -Werror to CFLAGS early prevents configure tests from running.
 dnl Add now.
 CFLAGS="$CFLAGS $werror_flags"
-
-#
-# WIN32_FIXME
-#
-
-dnl Add new defines for MinGW build
-case "$host" in
-*-*-mingw32*)
-	;;
-*)
-	AC_DEFINE(HAVE_TTY, 1, [Define to 1 if you have tty support])
-	AC_DEFINE(HAVE_PRIV_CONCEPT, 1, [Define to 1 if you have priveleged-port concept])
-	AC_DEFINE(USE_SANITISE_STDFD, 1, [Define if you want to sanitize fds])
-	;;
-esac
-
-dnl Add any needed compatibility library.
-AC_SUBST(LINKWIN32COMPAT)
-AC_SUBST(LIBWIN32COMPAT)
-AC_SUBST(LIBWIN32COMPATDEPEND)
-AC_SUBST(WIN32COMPAT)
-case "$host" in
-*-*-mingw32*)
-	LINKWIN32COMPAT="-lwin32compat"
-	LIBWIN32COMPAT="libwin32compat.a"
-	LIBWIN32COMPATDEPEND="contrib/win32/win32compat/libwin32compat.a"
-	WIN32COMPAT="win32compat"
-	;;
-*)
-	;;
-esac
-
-#
-# End of WIN32_FIXME.
-#
 
 if test "x$ac_cv_func_getaddrinfo" != "xyes" ; then
 	TEST_SSH_IPV6=no
@@ -4338,31 +4877,13 @@ else
 fi
 AC_CHECK_DECL([BROKEN_GETADDRINFO],  [TEST_SSH_IPV6=no])
 AC_SUBST([TEST_SSH_IPV6], [$TEST_SSH_IPV6])
+AC_SUBST([TEST_MALLOC_OPTIONS], [$TEST_MALLOC_OPTIONS])
+AC_SUBST([UNSUPPORTED_ALGORITHMS], [$unsupported_algorithms])
 
 AC_EXEEXT
-
-#
-# WIN32_FIXME
-#
-
-files="Makefile buildpkg.sh opensshd.init openssh.xml \
-       openbsd-compat/Makefile openbsd-compat/regress/Makefile \
-       survey.sh"
-
-case "$host" in
-*-*-mingw32*)
-      files="$files contrib/win32/win32compat/Makefile"
-      ;;
-*)
-      ;;
-esac
-
-AC_CONFIG_FILES([ $files ])
-
-#
-# END FIXME
-#
-
+AC_CONFIG_FILES([Makefile buildpkg.sh opensshd.init openssh.xml \
+	openbsd-compat/Makefile openbsd-compat/regress/Makefile \
+	survey.sh])
 AC_OUTPUT
 
 # Print summary of options
@@ -4408,7 +4929,6 @@ echo "                 KerberosV support: $KRB5_MSG"
 echo "                   SELinux support: $SELINUX_MSG"
 echo "                 Smartcard support: $SCARD_MSG"
 echo "                     S/KEY support: $SKEY_MSG"
-echo "              TCP Wrappers support: $TCPW_MSG"
 echo "              MD5 password support: $MD5_MSG"
 echo "                   libedit support: $LIBEDIT_MSG"
 echo "  Solaris process contract support: $SPC_MSG"

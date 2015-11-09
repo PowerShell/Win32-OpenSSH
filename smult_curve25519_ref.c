@@ -55,7 +55,11 @@ static void freeze(unsigned int a[32])
 
   for (j = 0;j < 32;++j) aorig[j] = a[j];
   add(a,a,minusp);
+#ifndef _WIN32
   negative = -((a[31] >> 7) & 1);
+#else
+  negative = (~((a[31] >> 7) & 1) + 1u);
+#endif 
   for (j = 0;j < 32;++j) a[j] ^= negative & (aorig[j] ^ a[j]);
 }
 

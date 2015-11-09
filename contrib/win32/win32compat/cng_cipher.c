@@ -1,20 +1,37 @@
+/*
+ * Author: Microsoft Corp.
+ *
+ * Copyright (c) 2015 Microsoft Corp.
+ * All rights reserved
+ *
+ * Microsoft openssh win32 port
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ * notice, this list of conditions and the following disclaimer in the
+ * documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 /* cng_cipher.c
-* Author: Pragma Systems, Inc. <www.pragmasys.com>
-* Contribution by Pragma Systems, Inc. for Microsoft openssh win32 port
-* Copyright (c) 2011, 2015 Pragma Systems, Inc.
-* All rights reserved
-*
-* Common library for Windows Console Screen IO.
-* Contains Windows console related definition so that emulation code can draw
-* on Windows console screen surface.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are met:
-*
-* 1. Redistributions of source code must retain the above copyright notice.
-* 2. Binaries produced provide no direct or implied warranties or any
-*    guarantee of performance or suitability.
-*/
+ *
+ * Openssh ciphers implemented using Microsoft Crypto Next Generation (CNG).
+ *
+ */
 
 #include <Windows.h>
 #include <bcrypt.h>
@@ -199,6 +216,7 @@ unsigned int cng_cipher_init(PSSH_CNG_CIPHER_CTX x, const unsigned char *key, un
 	DWORD					cbData = 0;
 	LPCWSTR					pAlg = NULL;
 	DWORD					cbBlockLen = 0;
+	DWORD					cbKeyObject = 0;
 
 	if ((0 == (flags & _CNG_CIPHER_AES)) || (0 == (flags & (_CNG_MODE_CBC | _CNG_MODE_CTR))))
 		return STATUS_INVALID_PARAMETER;
@@ -265,21 +283,36 @@ unsigned int cng_cipher_init(PSSH_CNG_CIPHER_CTX x, const unsigned char *key, un
 
 		if (status == S_OK)
 		{
+			status = BCryptGetProperty(
+				hAlg,
+				BCRYPT_OBJECT_LENGTH,
+				(PBYTE)&cbKeyObject,
+				sizeof(DWORD),
+				&cbData,
+				0);
+		}
+
+		if ((status == S_OK) && (x->pKeyObject = (PBYTE)HeapAlloc(GetProcessHeap(),0,cbKeyObject)))
+		{
 			status = BCryptGenerateSymmetricKey(
 				hAlg,
 				&(x->hKey),
-				NULL,
-				0,
+				x->pKeyObject,
+				cbKeyObject,
 				(PBYTE)key,
 				keylen,
 				0);
 		}
 		BCryptCloseAlgorithmProvider(hAlg, 0);
 
-		// if we got an error along the way, free up the iv
+		// if we got an error along the way, free up the iv and key object
 		if (status != S_OK && x->pbIV)
 		{
 			HeapFree(GetProcessHeap(), 0, x->pbIV);
+		}
+		if (status != S_OK && x->pKeyObject)
+		{
+			HeapFree(GetProcessHeap(), 0, x->pKeyObject);
 		}
 	}
 	return status;
@@ -293,6 +326,8 @@ void cng_cipher_cleanup(PSSH_CNG_CIPHER_CTX x)
 		HeapFree(GetProcessHeap(), 0, x->pbIV);
 	if (x->hKey)
 		BCryptDestroyKey(x->hKey);
+	if (x->pKeyObject)
+		HeapFree(GetProcessHeap(), 0, x->pKeyObject);
 }
 
 #endif

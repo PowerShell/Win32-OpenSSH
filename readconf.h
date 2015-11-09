@@ -206,6 +206,10 @@ void	 dump_client_config(Options *o, const char *host);
 
 void	 add_local_forward(Options *, const struct Forward *);
 void	 add_remote_forward(Options *, const struct Forward *);
+#ifdef WIN32_FIXME
 void	 add_identity_file(Options *, const char *, const char *, int, struct passwd *);
+#else
+void	 add_identity_file(Options *, const char *, const char *, int);
+#endif
 
 #endif				/* READCONF_H */

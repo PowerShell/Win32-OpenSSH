@@ -42,8 +42,11 @@
 #include <AccCtrl.h>
 #include <Aclapi.h>
 #include "Debug.h"
-
+#ifdef WIN32
+#define STATUS_OBJECT_NAME_NOT_FOUND     ((NTSTATUS)0xC0000034L)
+#else
 #include <ddk/ntstatus.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ansiprsr.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_cipher.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_digest.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\conio.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\daemon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\deskright.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\gettimeofday.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\homedirhelp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\kerberos.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsalogon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsastring.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\pwd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\sfds.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\socket.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\startupneeds.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\strcasecmp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\stringhelp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\syslog.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ansiprsr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_cipher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\Debug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\deskright.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\homedirhelp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\kerberos.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsalogon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsastring.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\sfds.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\stringhelp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

@@ -1537,8 +1537,11 @@ main(int ac, char **av)
 
 	__progname = ssh_get_progname(av[0]);
 	seed_rng();
-
+#ifdef WIN32_FIXME
 	while ((ch = getopt(ac, av, "cDdksE:a:t:f")) != -1) {  // PRAGMA:TODO
+#else
+	while ((ch = getopt(ac, av, "cDdksE:a:t:")) != -1) {
+#endif
 		switch (ch) {
 		case 'E':
 			fingerprint_hash = ssh_digest_alg_by_name(optarg);

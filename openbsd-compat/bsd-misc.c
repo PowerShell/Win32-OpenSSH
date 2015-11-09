@@ -24,6 +24,9 @@
 #ifdef HAVE_SYS_TIME_H
 # include <sys/time.h>
 #endif
+#ifdef WIN32_FIXME
+#include <sys/utime.h>
+#endif
 
 #include <string.h>
 #include <signal.h>
@@ -105,6 +108,8 @@ const char *strerror(int e)
 #endif
 
 #ifndef HAVE_UTIMES
+
+
 int utimes(char *filename, struct timeval *tvp)
 {
 	struct utimbuf ub;
@@ -176,7 +181,16 @@ int usleep(unsigned int useconds)
 	return nanosleep(&ts, NULL);
 }
 #endif
+#else
+#if !defined(HAVE_USLEEP)
+int usleep(unsigned int useconds)
+{
+	Sleep(useconds/1000);
+	return 1;
+}
 #endif
+#endif
+
 
 #ifndef HAVE_TCGETPGRP
 pid_t

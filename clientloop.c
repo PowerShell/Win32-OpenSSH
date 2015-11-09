@@ -119,6 +119,12 @@
 #include <sys/stat.h>
 
 #define isatty(a) WSHELPisatty(a)
+
+// Windows Console screen size change related
+extern int ScreenX;
+extern int ScrollBottom;
+int win_received_window_change_signal = 1;
+
 #endif
 
 /* import options */
@@ -162,7 +168,10 @@ static int escape_pending1;	/* Last character was an escape (proto1 only) */
 static int last_was_cr;		/* Last character was a newline. */
 static int exit_status;		/* Used to store the command exit status. */
 static int stdin_eof;		/* EOF has been encountered on stderr. */
-static Buffer stdin_buffer;	/* Buffer for stdin data. */
+#ifndef WIN32_FIXME
+static
+#endif
+Buffer stdin_buffer;	/* Buffer for stdin data. */
 static Buffer stdout_buffer;	/* Buffer for stdout data. */
 static Buffer stderr_buffer;	/* Buffer for stderr data. */
 static u_int buffer_high;	/* Soft max buffer size. */
@@ -561,6 +570,25 @@ client_check_window_change(void)
 		packet_put_int((u_int)ws.ws_col);
 		packet_put_int((u_int)ws.ws_xpixel);
 		packet_put_int((u_int)ws.ws_ypixel);
+		packet_send();
+	}
+#else
+
+	if (! win_received_window_change_signal)
+		return;
+	/** XXX race */
+	win_received_window_change_signal = 0;
+
+	debug2("client_check_window_change: changed");
+
+	if (compat20) {
+		channel_send_window_changes(ScreenX, ScrollBottom, 640, 480);
+	} else {
+		packet_start(SSH_CMSG_WINDOW_SIZE);
+		packet_put_int((u_int)ScreenX);
+		packet_put_int((u_int)ScrollBottom);
+		packet_put_int((u_int)640);
+		packet_put_int((u_int)480);
 		packet_send();
 	}
 #endif /* !WIN32_FIXME */
@@ -1320,14 +1348,14 @@ process_escapes(Channel *c, Buffer *bin, Buffer *bout, Buffer *berr,
 		 * and append it to the buffer.
 		 */
 		last_was_cr = (ch == '\r' || ch == '\n');
-		#ifdef WIN32_FIXME
-		extern int lftocrlf ; // defined in channels.c file's channel_input_data() function for now
-		if ( (lftocrlf == 1) && ( ch == '\n') ) {
+		//#ifdef WIN32_FIXME
+		//extern int lftocrlf ; // defined in channels.c file's channel_input_data() function for now
+		//if ( (lftocrlf == 1) && ( ch == '\n') ) {
 			// add a \r before \n if sshd server sent us ESC[20h during initial tty mode setting
-			buffer_put_char(bin, '\r');
-			bytes++;
-		}
-		#endif
+			//buffer_put_char(bin, '\r');
+			//bytes++;
+		//}
+		//#endif
 		buffer_put_char(bin, ch);
 		bytes++;
 	}
@@ -2571,11 +2599,11 @@ client_session2_setup(int id, int want_tty, int want_subsystem,
 		tty_make_modes(-1, tiop);
 		
 #else
-		packet_put_cstring(term != NULL ? term : "");
-		packet_put_int((u_int) 80 /*ws.ws_col*/);
-		packet_put_int((u_int) 25 /*ws.ws_row*/);
-		packet_put_int((u_int) 640 /*ws.ws_xpixel*/);
-		packet_put_int((u_int) 480 /*ws.ws_ypixel*/);
+		packet_put_cstring(term != NULL ? term : "vt220");
+		packet_put_int((u_int) ScreenX);
+		packet_put_int((u_int) ScrollBottom);
+		packet_put_int((u_int) 640);
+		packet_put_int((u_int) 480);
 		tty_make_modes(-1, NULL);
 #endif /* else !WIN32_FIXME */
 		packet_send();

@@ -146,7 +146,7 @@ ssh_askpass(char *askpass, const char *msg)
   
   int length = 8192;
   
-  CHAR command[length];
+  CHAR command[8192];
   
   char *pass = NULL;
   
@@ -362,7 +362,7 @@ read_passphrase(const char *prompt, int flags)
 		}
 		else {
 
-			_putch( (int) '*' ); // show a star in place of what is typed
+			//_putch( (int) '*' ); // show a star in place of what is typed
 			len++; // keep reading in the loop
 		}
 	}

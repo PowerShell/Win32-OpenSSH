@@ -406,9 +406,11 @@ typedef enum {
 	sBadOption,		/* == unknown option */
 	/* Portable-specific options */
 	sUsePAM,
+#ifdef WIN32_FIXME
   #ifdef RUNTIME_LIBPAM
   sPAMLibrary,                   
   #endif /* RUNTIME_LIBPAM */
+#endif
 	/* Standard Options */
 	sPort, sHostKeyFile, sServerKeyBits, sLoginGraceTime,
 	sKeyRegenerationTime, sPermitRootLogin, sLogFacility, sLogLevel,
@@ -458,14 +460,18 @@ static struct {
 	/* Portable-specific options */
 #ifdef USE_PAM
 	{ "usepam", sUsePAM, SSHCFG_GLOBAL },
+#ifdef WIN32_FIXME
   #ifdef RUNTIME_LIBPAM
   {"pamlibrary", sPAMLibrary, SSHCFG_GLOBAL},
   #endif /* RUNTIME_LIBPAM */
+#endif
 #else
 	{ "usepam", sUnsupported, SSHCFG_GLOBAL },
+#ifdef WIN32_FIXME
   #ifdef RUNTIME_LIBPAM
   {"pamlibrary", sUnsupported, SSHCFG_GLOBAL},
   #endif /* RUNTIME_LIBPAM */
+#endif
 #endif
 	{ "pamauthenticationviakbdint", sDeprecated, SSHCFG_GLOBAL },
 	/* Standard Options */
@@ -1028,6 +1034,7 @@ process_server_config_line(ServerOptions *options, char *line,
 	case sUsePAM:
 		intptr = &options->use_pam;
 		goto parse_flag;
+#ifdef WIN32_FIXME
     #ifdef RUNTIME_LIBPAM
     
     /*
@@ -1042,7 +1049,7 @@ process_server_config_line(ServerOptions *options, char *line,
     }
     
     #endif /* RUNTIME_LIBPAM */
-
+#endif
 	/* Standard Options */
 	case sBadOption:
 		return -1;

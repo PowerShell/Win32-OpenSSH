@@ -35,6 +35,9 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef __MINGW32__
+#include <Crtdbg.h>
+#endif
 
 #include "sfds.h"
 
@@ -42,18 +45,26 @@
 
 #undef  DEBUG
 
+#ifdef WIN32
 #ifdef DEBUG
-  #define DBG_MSG(FMT, ARGS...) debug3(FMT, ## ARGS)
+  #define DBG_MSG(FMT, ...) debug3(FMT, ## ARGS)
 #else
-  #define DBG_MSG(FMT, ARGS...)
+  #define DBG_MSG(FMT, ...)
 #endif
-
+#else
+#ifdef DEBUG
+#define DBG_MSG(FMT, ARGS...) debug3(FMT, ## ARGS)
+#else
+#define DBG_MSG(FMT, ARGS...)
+#endif
+#endif
 extern void debug(const char *fmt,...);
 extern void debug2(const char *fmt,...);
 extern void debug3(const char *fmt,...);
 extern void error(const char *fmt,...);
 extern void fatal(const char *fmt,...);
 
+int glob_itissshclient = 0; // ssh client turns it to 1
 static int winsock_initialized = 0;
 
 extern int logfd;
@@ -69,6 +80,12 @@ static fd_set write_sfd_set;
 #define TEST_WRITE  0
 
 #define MSG_WAITALL 0x8
+
+#ifdef WIN32
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
+#endif
 
 int PassInputFd  = STDIN_FILENO;
 int PassOutputFd = STDOUT_FILENO;
@@ -461,6 +478,7 @@ int WSHELPopen(const char *pathname, int flags, ...)
    */
   
   newsfd = allocate_sfd(newfd);
+
 
   return newsfd;
 }
@@ -1545,7 +1563,26 @@ int socketpair(int socks[2])
   return SOCKET_ERROR;
 }
 
+int DataAvailable ( HANDLE h )
+{
+    INPUT_RECORD irec = {0};
 
+    DWORD events_read = 0;
+
+    int ret = PeekConsoleInput (h, &irec, 1, &events_read);
+
+    if (!ret)
+    {
+      return 0;
+    }
+
+    if (events_read) // && irec.EventType == KEY_EVENT)
+    {
+      return events_read ;
+    }
+
+	return 0;
+}
 int peekConsoleRead(int sfd)
 {
   DWORD sleep_time = 0;
@@ -2388,11 +2425,13 @@ int WSHELPread(int sfd, char *dst, unsigned int max)
 {
   DBG_MSG("-> WSHELPread(sfd = %d)...\n", sfd);
 
+ 
   SOCKET sock;
 
   int ret = -1;
+  int sfd_type = get_sfd_type(sfd);
 
-  switch(get_sfd_type(sfd))
+  switch (sfd_type)
   {
     case SFD_TYPE_SOCKET:
     {
@@ -2450,8 +2489,9 @@ int WSHELPread(int sfd, char *dst, unsigned int max)
     
     case SFD_TYPE_FD:
     case SFD_TYPE_PIPE:
-    case SFD_TYPE_CONSOLE:
+    //case SFD_TYPE_CONSOLE:
     {
+
       ret = _read(sfd_to_fd(sfd), dst, max);
 
       if (FD_ISSET(sfd_to_fd(sfd), &debug_sfds))
@@ -2468,7 +2508,27 @@ int WSHELPread(int sfd, char *dst, unsigned int max)
       {
         error("read from pipe/console sfd [%d] failed with error code [%d]",
                   sfd, GetLastError());
+
       }
+
+      break;
+    }
+	case SFD_TYPE_CONSOLE:
+    {
+		//if (sfd_type == SFD_TYPE_CONSOLE) {
+			// we could be send here due to ctrl-c input, so no data to read
+			//if ( DataAvailable (sfd_to_handle(sfd)) <=0  )
+				//return 1; // no data to read
+		//}
+      ret = ReadConsoleForTermEmul( sfd_to_handle(sfd), dst, max);
+
+      if (ret < 0)
+      {
+        error("read from pipe/console sfd [%d] failed with error code [%d]",
+                  sfd, GetLastError());
+      }
+      if (ret == 0)
+    	  return 0; //1;
 
       break;
     }
@@ -2519,7 +2579,11 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
   
   int ret = -1;
 
-  switch(get_sfd_type(sfd))
+  int sfd_type = get_sfd_type(sfd);
+  if ( (glob_itissshclient) && ( sfd_type == SFD_TYPE_CONSOLE ) )
+	  sfd_type = SFD_TYPE_PIPE ; // client write type uses _write() in place ofn console insertion
+
+  switch(sfd_type)
   {
     case SFD_TYPE_SOCKET:
     {
@@ -2616,7 +2680,7 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
 
     case SFD_TYPE_FD:
     case SFD_TYPE_PIPE:
-    case SFD_TYPE_CONSOLE:
+    //case SFD_TYPE_CONSOLE:
     {
       ret = _write(sfd_to_fd(sfd), buf, max);
       
@@ -2650,7 +2714,16 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
       }
       
       break;
-    }  
+    }
+    case SFD_TYPE_CONSOLE:
+    {
+      //ret = _write(sfd_to_fd(sfd), buf, max);
+	  DWORD dwWritten = 0 ;
+	  ret = WriteToConsole(sfd_to_handle(sfd), buf, max, &dwWritten, 0) ;
+	  ret = max ;
+          
+      break;
+    }  	
   }
 
   DBG_MSG("<- WSHELPwrite(sfd = %d, ret = %d)...\n", sfd, ret);
@@ -2848,6 +2921,17 @@ void WSHELPinitialize()
    */
   
   winsock_initialized = 1;
+
+#ifndef __MINGW32__
+  _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+  _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
+  _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+  _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDOUT);
+  _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+  _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
+
+#endif
+
 
   DBG_MSG("<- WSHELPinitialize()...\n");
 }

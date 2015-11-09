@@ -42,7 +42,12 @@
 #include <sys/prctl.h>
 #endif
 
+#ifdef WIN32_VS
+#include "win32_dirent.h"
+#else
 #include <dirent.h>
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
@@ -63,6 +68,10 @@
 
 #include "sftp.h"
 #include "sftp-common.h"
+
+#ifdef WIN32_VS
+#include "win32_dirent.c"
+#endif
 
 #ifdef WIN32_FIXME
 
@@ -738,6 +747,9 @@ process_init(void)
 	sshbuf_free(msg);
 }
 
+#ifdef WIN32_VS
+#define O_ACCMODE 0x3
+#endif
 static void
 process_open(u_int32_t id)
 {
@@ -1180,8 +1192,11 @@ process_readdir(u_int32_t id)
         /*
          * Convert names to UTF8 before send to network.
          */
-
+		#ifdef WIN32_VS
+		stats[count].name = xstrdup(dp->d_name);
+		#else
         stats[count].name      = ConvertLocal8ToUtf8(dp -> d_name, -1, NULL);
+		#endif
         stats[count].long_name = ls_file(dp -> d_name, &st, 0, 0);
         
         /*
