@@ -29,10 +29,28 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __VS_BUILD__
+#include <winsock2.h>
+#include <Windows.h>
+#include <LsaLookup.h>
+#include <Ntsecapi.h>
+#endif
+
 #include <winsock2.h>
 #include "Key.h"
 
+#ifdef __VS_BUILD__
+#ifdef __cplusplus
+extern "C" {
+#endif
+#endif // __VS_BUILD__
 extern LSA_SECPKG_FUNCTION_TABLE LsaApi;
+#ifdef __VS_BUILD__
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 
 #ifdef DYNAMIC_OPENSSL
   extern SSLFuncList DynSSL;

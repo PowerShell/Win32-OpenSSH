@@ -34,6 +34,8 @@
 
 #undef STRING
 
+
+
 #include "Win64Fix.h"
 
 #include <stdio.h>
@@ -43,10 +45,14 @@
 #include <Ntsecapi.h>
 #include <NTSecPkg.h>
 
+#ifndef __VS_BUILD__
 #ifdef _WIN64
 #include <ntstatus.h>
 #else
 #include <ddk/ntstatus.h>
+#endif
+#else
+#include <ntstatus.h>
 #endif
 
 #include "Debug.h"

@@ -31,6 +31,15 @@
 
 #define WINVER 0x501
 
+#ifdef __VS_BUILD__
+#define UMDF_USING_NTSTATUS 
+#include <winsock2.h>
+#include <Windows.h>
+#include <LsaLookup.h>
+#include <Ntsecapi.h>
+#endif
+
+
 #include <winsock2.h>
 #include "Ssh-lsa.h"
 
@@ -432,9 +441,13 @@ Int AuthorizeUser(wchar_t homeDir[MAX_PATH], HANDLE token, SshLsaAuth *auth)
     if (wcschr(nextFile, ':') == NULL)
     {
       DBG_MSG("Expanding relative path to user homedir.\n");
-      
+#ifndef __VS_BUILD__
       snwprintf(keyFileName, sizeof(keyFileName), 
                     L"%ls\\%ls", homeDir, nextFile);
+#else
+	  _snwprintf(keyFileName, sizeof(keyFileName),
+		  L"%ls\\%ls", homeDir, nextFile);
+#endif
                           
       fileToCheck = keyFileName;
     }
