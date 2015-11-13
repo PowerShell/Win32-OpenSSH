@@ -152,7 +152,11 @@ NTSTATUS FillUnicodeString(UNICODE_STRING *lsaStr, const Char *str)
   // Fill string buffer.
   //
   
-  swprintf(lsaStr -> Buffer, L"%hs", str);
+#ifdef __VS_BUILD__
+  _swprintf(lsaStr -> Buffer, L"%hs", str);
+#else
+  swprintf(lsaStr->Buffer, L"%hs", str);
+#endif
   
   lsaStr -> Length = cbSize * 2;
   
