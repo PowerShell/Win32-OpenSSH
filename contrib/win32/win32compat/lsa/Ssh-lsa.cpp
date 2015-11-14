@@ -32,13 +32,6 @@
 #define WINVER 0x501
 
 #ifdef __VS_BUILD__
-#pragma comment(linker,"/EXPORT:LsaApInitializePackage")
-#pragma comment(linker,"/EXPORT:LsaApLogonUser")
-#pragma comment(linker,"/EXPORT:LsaApLogonTerminated")
-#pragma comment(linker,"/EXPORT:LsaApCallPackagePassthrough")
-#pragma comment(linker,"/EXPORT:LsaApCallPackageUntrusted")
-#pragma comment(linker,"/EXPORT:LsaApCallPackage")
-
 #define UMDF_USING_NTSTATUS 
 #include <winsock2.h>
 #include <Windows.h>
