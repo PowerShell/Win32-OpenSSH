@@ -2718,7 +2718,7 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
     case SFD_TYPE_CONSOLE:
     {
       //ret = _write(sfd_to_fd(sfd), buf, max);
-	  DWORD dwWritten = 0 ;
+	  size_t dwWritten = 0 ;
 	  ret = WriteToConsole(sfd_to_handle(sfd), buf, max, &dwWritten, 0) ;
 	  ret = max ;
           
