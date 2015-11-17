@@ -885,11 +885,12 @@ collect_children(void)
 			char *inittermseq = "\033[20l\033[?7h\0" ; // no LFtoCRLF no AUTOWRAPON
 			Channel *c=channel_by_id ( s->chanid );
 			buffer_append(&c->input, inittermseq, strlen(inittermseq));
-			channel_output_poll();
+			packet_write_poll();
 		}
         session_close_by_pid(s->pid, status);
         
-        CloseHandle(process);
+        if (s->pid)
+			CloseHandle(process);
 		int WSHELPDelChildToWatch (HANDLE processtowatch);
 		WSHELPDelChildToWatch (process); // take the process off from watch list in select mux
       }
