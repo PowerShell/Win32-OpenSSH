@@ -880,13 +880,6 @@ collect_children(void)
         
         process = s->pid;
         
-		// send the other side terminal to be how it was before if it was tty
-		if ( (!s -> is_subsystem) && (s ->ttyfd != -1)) {
-			char *inittermseq = "\033[20l\033[?7h\0" ; // no LFtoCRLF no AUTOWRAPON
-			Channel *c=channel_by_id ( s->chanid );
-			buffer_append(&c->input, inittermseq, strlen(inittermseq));
-			packet_write_poll();
-		}
         session_close_by_pid(s->pid, status);
         
         if (s->pid)
