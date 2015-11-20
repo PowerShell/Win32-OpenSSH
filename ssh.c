@@ -1561,6 +1561,9 @@ main(int ac, char **av)
    
   #ifdef WIN32_FIXME
   
+	if (tty_flag)
+		ConUnInitWithRestore(); // restore terminal to previous settings if it was a tty session
+
     CleanUpProxyProcess();
 
     UninitMitKerberos();
