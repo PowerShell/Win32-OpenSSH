@@ -121,6 +121,26 @@ struct newkeys {
 
 struct ssh;
 
+//KEX DH interface start
+struct sshbuf;
+typedef struct kexdhi_
+{
+	//consume p and g from "in"
+	int(*read_p_g)(struct kexdhi_*, struct sshbuf* in);
+	//encode p and g in "out"
+	int(*get_p_g)(struct kexdhi_*, struct sshbuf* out);
+	//encode public key in pub
+	int(*get_pub_key)(struct kexdhi_*, struct sshbuf* pub);
+	//read other public key from other_pub and encode secretagreement in secret
+	int(*get_secret)(struct kexdhi_*, struct sshbuf* other_pub, struct sshbuf* secret);
+	void(*done)(struct kexdhi_*);
+}kexdhi;
+
+kexdhi* kexdh_openssl_init(struct ssh* ssh);
+//KEX DH interface end
+
+
+
 struct kex {
 	u_char	*session_id;
 	size_t	session_id_len;
@@ -150,6 +170,8 @@ struct kex {
 	    u_char **, size_t *, const u_char *, size_t, u_int);
 	int	(*kex[KEX_MAX])(struct ssh *);
 	/* kex specific state */
+	kexdhi* kexdh;
+
 	DH	*dh;			/* DH */
 	u_int	min, max, nbits;	/* GEX */
 	EC_KEY	*ec_client_key;		/* ECDH */
@@ -190,6 +212,12 @@ int	 kexc25519_server(struct ssh *);
 int	 kex_dh_hash(const char *, const char *,
     const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
     const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char *, size_t *);
+
+//version of kex_dh_hash with public keys and secret passed as sshbuf instead of BIGNUM
+int kex_dh_hash_(
+	const char *, 	const char *,	const u_char *, size_t ,	const u_char *, size_t ,
+	const u_char *, size_t ,	const struct sshbuf *,	const struct sshbuf *,	const struct sshbuf *,
+	u_char *hash, size_t *);
 
 int	 kexgex_hash(int, const char *, const char *,
     const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,

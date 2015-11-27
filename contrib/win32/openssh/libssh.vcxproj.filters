@@ -288,5 +288,8 @@
     <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\kexdh-openssl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

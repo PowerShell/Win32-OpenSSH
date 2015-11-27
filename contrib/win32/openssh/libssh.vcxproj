@@ -258,6 +258,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)uuencode.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)verify.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c" />
+    <ClCompile Include="..\..\..\kexdh-openssl.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

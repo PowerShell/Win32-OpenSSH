@@ -90,4 +90,52 @@ kex_dh_hash(
 #endif
 	return 0;
 }
+kex_dh_hash_(
+	const char *client_version_string,
+	const char *server_version_string,
+	const u_char *ckexinit, size_t ckexinitlen,
+	const u_char *skexinit, size_t skexinitlen,
+	const u_char *serverhostkeyblob, size_t sbloblen,
+	const struct sshbuf *client_dh_pub,
+	const struct sshbuf *server_dh_pub,
+	const struct sshbuf *shared_secret,
+	u_char *hash, size_t *hashlen)
+{
+	struct sshbuf *b;
+	int r;
+
+	if (*hashlen < ssh_digest_bytes(SSH_DIGEST_SHA1))
+		return SSH_ERR_INVALID_ARGUMENT;
+	if ((b = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshbuf_put_cstring(b, client_version_string)) != 0 ||
+		(r = sshbuf_put_cstring(b, server_version_string)) != 0 ||
+		/* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
+		(r = sshbuf_put_u32(b, ckexinitlen + 1)) != 0 ||
+		(r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
+		(r = sshbuf_put(b, ckexinit, ckexinitlen)) != 0 ||
+		(r = sshbuf_put_u32(b, skexinitlen + 1)) != 0 ||
+		(r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
+		(r = sshbuf_put(b, skexinit, skexinitlen)) != 0 ||
+		(r = sshbuf_put_string(b, serverhostkeyblob, sbloblen)) != 0 ||
+		(r = sshbuf_put_b(b, client_dh_pub)) != 0 ||
+		(r = sshbuf_put_b(b, server_dh_pub)) != 0 ||
+		(r = sshbuf_put_b(b, shared_secret)) != 0) {
+		sshbuf_free(b);
+		return r;
+	}
+#ifdef DEBUG_KEX
+	sshbuf_dump(b, stderr);
+#endif
+	if (ssh_digest_buffer(SSH_DIGEST_SHA1, b, hash, *hashlen) != 0) {
+		sshbuf_free(b);
+		return SSH_ERR_LIBCRYPTO_ERROR;
+	}
+	sshbuf_free(b);
+	*hashlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
+#ifdef DEBUG_KEX
+	dump_digest("hash", hash, *hashlen);
+#endif
+	return 0;
+}
 #endif /* WITH_OPENSSL */
