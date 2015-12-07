@@ -1676,8 +1676,8 @@ int peekPipeRead(int sfd)
 
     if (!ret)
     {
-      error("PeekNamedPipe on sfd [%d] failed with error code [%d]",
-                sfd, GetLastError());
+      //error("PeekNamedPipe on sfd [%d] failed with error code [%d]",
+      //          sfd, GetLastError());
       return 0;
     }
 
