@@ -164,6 +164,10 @@ typedef BOOL bool;
 char *win32colon(char *);
 #define colon win32colon
 
+#ifndef _SH_DENYNO
+#define _SH_DENYNO 0x40
+#endif
+
 #define HAVE_UTIME_H
 
 #ifdef HAVE_UTIME_H
@@ -324,12 +328,13 @@ typedef struct {
 
 char * fixslashes(char * str)
 {
+	int i;
 	if (str == NULL)
 		return str;
 
 	int len = (int)strlen(str);
 
-	for (int i = 0; i < len; i++)
+	for (i = 0; i < len; i++)
 		if (str[i] == '/')
 			str[i] = '\\';
 	return str;
@@ -337,12 +342,13 @@ char * fixslashes(char * str)
 
 char * unfixslashes(char * str)
 {
+	int i;
 	if (str == NULL)
 		return str;
 
 	int len = (int)strlen(str);
 
-	for (int i = 0; i < len; i++)
+	for (i = 0; i < len; i++)
 		if (str[i] == '//')
 			str[i] = '/';
 	return str;
@@ -351,6 +357,7 @@ char * unfixslashes(char * str)
 // force path separator to 
 char * forcepathsep(char * str, char sep)
 {
+	int i;
 	// bail if str is null;
 	if (str == NULL)
 		return str;
@@ -367,7 +374,7 @@ char * forcepathsep(char * str, char sep)
 
 	int len = (int)strlen(str);
 
-	for (int i = 0; i < len; i++)
+	for (i = 0; i < len; i++)
 		if (str[i] == antisep)
 			str[i] = sep;
 	return str;
@@ -1023,7 +1030,12 @@ int pflag, iamremote, iamrecursive, targetshouldbedirectory;
 char cmd[CMDNEEDS];		/* must hold "rcp -r -p -d\0" */
 
 int response(void);
+#ifdef WIN32_FIXME
+void rsource(char *, struct _stati64 *);
+#else
 void rsource(char *, struct stat *);
+#endif
+
 void sink(int, char *[]);
 void source(int, char *[]);
 void tolocal(int, char *[]);
@@ -1503,9 +1515,7 @@ source(int argc, char *argv[])
 			continue;
 		}
 
-
 		if (_sopen_s(&fd, name, O_RDONLY | O_BINARY, _SH_DENYNO, 0) != 0) {
-
 			// in NT, we have to check if it is a directory
 			if (_stati64(name, &stb) >= 0) {
 				goto switchpoint;
@@ -1673,10 +1683,10 @@ next:			if (fd != -1) (void)_close(fd);
 		}
 		(void)response();
 	}		
-	
+	int ii;
 	if (numfiles > 0)
-		for (int i = 0;i<numfiles;i++)
-			free(filenames[i]);
+		for (ii = 0;ii<numfiles;ii++)
+			free(filenames[ii]);
 }
 
 void rsource(char *name, struct _stati64 *statp)
@@ -1773,7 +1783,8 @@ void sink(int argc, char *argv[])
 			run_err("ambiguous target");
 			exit(1);
 		}
-		for (int i = 0; i<argc; i++)
+		int i;
+		for (i = 0; i<argc; i++)
 		{
 			if (i != 0)
 				strcat_s(aggregatePath,MAX_PATH," ");
