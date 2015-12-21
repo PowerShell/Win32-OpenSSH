@@ -31,6 +31,15 @@
 
 #define WINVER 0x501
 
+#ifdef __VS_BUILD__
+#define UMDF_USING_NTSTATUS 
+#include <winsock2.h>
+#include <Windows.h>
+#include <LsaLookup.h>
+#include <Ntsecapi.h>
+#endif
+
+
 #include <winsock2.h>
 #include "Ssh-lsa.h"
 
@@ -84,10 +93,10 @@ LSA_SECPKG_FUNCTION_TABLE LsaApi;
 //         
 
 NTSTATUS NTAPI LsaApInitializePackage(ULONG pkgId, 
-                                          PLSA_SECPKG_FUNCTION_TABLE func,
-                                              PLSA_STRING database, 
-                                                  PLSA_STRING confident,
-                                                      PLSA_STRING *pkgName)
+                                      PLSA_SECPKG_FUNCTION_TABLE func,
+                                      PLSA_STRING database, 
+                                      PLSA_STRING confident,
+                                      PLSA_STRING *pkgName)
 {
   DBG_ENTRY("LsaApInitializePackage");
 
@@ -432,9 +441,13 @@ Int AuthorizeUser(wchar_t homeDir[MAX_PATH], HANDLE token, SshLsaAuth *auth)
     if (wcschr(nextFile, ':') == NULL)
     {
       DBG_MSG("Expanding relative path to user homedir.\n");
-      
+#ifndef __VS_BUILD__
       snwprintf(keyFileName, sizeof(keyFileName), 
                     L"%ls\\%ls", homeDir, nextFile);
+#else
+	  _snwprintf(keyFileName, sizeof(keyFileName),
+		  L"%ls\\%ls", homeDir, nextFile);
+#endif
                           
       fileToCheck = keyFileName;
     }
@@ -506,13 +519,13 @@ fail:
 
 NTSTATUS NTAPI 
     LsaApLogonUser(PLSA_CLIENT_REQUEST request, SECURITY_LOGON_TYPE logonType,
-                       PVOID authData, PVOID clientAuthData, ULONG authDataSize,
-                           PVOID *profile, PULONG profileSize, PLUID logonId,
-                               PNTSTATUS subStat,
-                                   PLSA_TOKEN_INFORMATION_TYPE tokenInfoType,
-                                       PVOID *tokenInfo,
-                                           PLSA_UNICODE_STRING *accountName,
-                                               PLSA_UNICODE_STRING *authority)
+                   PVOID authData, PVOID clientAuthData, ULONG authDataSize,
+                   PVOID *profile, PULONG profileSize, PLUID logonId,
+                   PNTSTATUS subStat,
+                   PLSA_TOKEN_INFORMATION_TYPE tokenInfoType,
+                   PVOID *tokenInfo,
+                   PLSA_UNICODE_STRING *accountName,
+                   PLSA_UNICODE_STRING *authority)
 {
   DBG_ENTRY("LsaApLogonUser");
   
@@ -933,12 +946,12 @@ fail:
 //
 
 NTSTATUS NTAPI LsaApCallPackagePassthrough(PLSA_CLIENT_REQUEST request, 
-                                               PVOID submitBuf, 
-                                                   PVOID clientBufBase,
-                                                       ULONG submitBufSize,
-                                                           PVOID *outBuf, 
-                                                               PULONG outBufSize,
-                                                                   PNTSTATUS status)
+                                           PVOID submitBuf, 
+                                           PVOID clientBufBase,
+                                           ULONG submitBufSize,
+                                           PVOID *outBuf, 
+                                           PULONG outBufSize,
+                                           PNTSTATUS status)
 {
   DBG_ENTRY("LsaApCallPackagePassthrough(");
   DBG_LEAVE("LsaApCallPackagePassthrough(");
@@ -951,12 +964,12 @@ NTSTATUS NTAPI LsaApCallPackagePassthrough(PLSA_CLIENT_REQUEST request,
 //
 
 NTSTATUS NTAPI LsaApCallPackageUntrusted(PLSA_CLIENT_REQUEST request, 
-                                             PVOID submitBuf, 
-                                                 PVOID clientBufBase,
-                                                     ULONG submitBufSize,
-                                                         PVOID *outBuf, 
-                                                             PULONG outBufSize,
-                                                                 PNTSTATUS status)
+                                         PVOID submitBuf, 
+                                         PVOID clientBufBase,
+                                         ULONG submitBufSize,
+                                         PVOID *outBuf, 
+                                         PULONG outBufSize,
+                                         PNTSTATUS status)
 {
   DBG_ENTRY("LsaApCallPackageUntrusted");
   DBG_LEAVE("LsaApCallPackageUntrusted");
@@ -969,9 +982,9 @@ NTSTATUS NTAPI LsaApCallPackageUntrusted(PLSA_CLIENT_REQUEST request,
 //
 
 NTSTATUS NTAPI LsaApCallPackage(PLSA_CLIENT_REQUEST request, PVOID submitBuf,
-                                    PVOID clientBufBase, ULONG submitBufSize,
-                                        PVOID *outBuf, PULONG outBufSize,
-                                            PNTSTATUS status)
+                                PVOID clientBufBase, ULONG submitBufSize,
+                                PVOID *outBuf, PULONG outBufSize,
+                                PNTSTATUS status)
 {
   DBG_ENTRY("LsaApCallPackage");
   DBG_LEAVE("LsaApCallPackage");

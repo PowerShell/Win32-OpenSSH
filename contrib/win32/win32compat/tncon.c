@@ -193,7 +193,7 @@ int ReadConsoleForTermEmul( HANDLE hInput, char *destin, int destinlen)
 						{
 						case 0xd:
 							if (pParams->nReceiveCRLF == ENUM_LF)
-								NetWriteString2(pParams->Socket, "\n", 1, 0);
+								NetWriteString2(pParams->Socket, "\r", 1, 0);
 							else
 								NetWriteString2(pParams->Socket, "\r\n", 2, 0);
 							break;

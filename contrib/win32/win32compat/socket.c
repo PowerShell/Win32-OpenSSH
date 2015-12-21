@@ -1676,8 +1676,8 @@ int peekPipeRead(int sfd)
 
     if (!ret)
     {
-      error("PeekNamedPipe on sfd [%d] failed with error code [%d]",
-                sfd, GetLastError());
+      //error("PeekNamedPipe on sfd [%d] failed with error code [%d]",
+      //          sfd, GetLastError());
       return 0;
     }
 
@@ -2718,7 +2718,7 @@ int WSHELPwrite(int sfd, const char *buf, unsigned int max)
     case SFD_TYPE_CONSOLE:
     {
       //ret = _write(sfd_to_fd(sfd), buf, max);
-	  DWORD dwWritten = 0 ;
+	  size_t dwWritten = 0 ;
 	  ret = WriteToConsole(sfd_to_handle(sfd), buf, max, &dwWritten, 0) ;
 	  ret = max ;
           
@@ -2923,12 +2923,12 @@ void WSHELPinitialize()
   winsock_initialized = 1;
 
 #ifndef __MINGW32__
-  _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-  _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
-  _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
-  _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDOUT);
-  _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-  _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
+ // _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+ // _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
+ // _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+ // _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDOUT);
+ // _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+ // _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
 
 #endif
 

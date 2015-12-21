@@ -66,11 +66,15 @@
   #define DBG_ENTER(FUNC_NAME) DbgEntry(FUNC_NAME)
                           
   #define DBG_LEAVE(FUNC_NAME) DbgLeave(FUNC_NAME)
-  
+#ifndef __VS_BUILD__
   #define DBG_MSG(FMT, ARGS...) DbgMsg(FMT, ## ARGS)
   
   #define DBG_MSG_NOLN(FMT, ARGS...) DbgMsgNoLn(FMT, ## ARGS)
-  
+#else
+#define DBG_MSG(FMT, ...) DbgMsg(FMT, __VA_ARGS__)
+
+#define DBG_MSG_NOLN(FMT, ...) DbgMsgNoLn(FMT, __VA_ARGS__)
+#endif
 
   #define DBG_DUMP_TO_FILE(fname, ptr, size) //DbgDumpToFile(fname, ptr, size)
   
