@@ -508,7 +508,9 @@ main(int argc, char **argv)
 	OpenSSL_add_all_algorithms();
 #endif
 
+	#ifndef WIN32_FIXME
 	setvbuf(stdout, NULL, _IOLBF, 0);
+	#endif
 
 	/* First, get a connection to the authentication agent. */
 	switch (r = ssh_get_authentication_socket(&agent_fd)) {
