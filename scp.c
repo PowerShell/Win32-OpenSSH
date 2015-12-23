@@ -119,6 +119,9 @@
 #include "misc.h"
 #include "progressmeter.h"
 
+#ifdef WIN32_VS
+#include <Shlwapi.h>
+#endif
 extern char *__progname;
 
 #define COPY_BUFLEN	16384
