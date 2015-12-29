@@ -772,6 +772,15 @@ process_open(u_int32_t id)
 	debug3("request %u: open flags %d", id, pflags);
 	flags = flags_from_portable(pflags);
 	mode = (a.flags & SSH2_FILEXFER_ATTR_PERMISSIONS) ? a.perm : 0666;
+	#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(name, resolvedname))
+	{
+		free(name);
+		name = strdup(resolvedname);
+	}
+	#endif
+
 	logit("open \"%s\" flags %s mode 0%o",
 	    name, string_from_portable(pflags), mode);
 	if (readonly &&
@@ -915,10 +924,9 @@ process_do_stat(u_int32_t id, int do_lstat)
   if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
   
-  if (realpathWin32(name, resolvedname))
+  if (realpathWin32i(name, resolvedname))
   {
-    free(name);
-  
+    free(name);  
     name = strdup(resolvedname);
   }  
 
@@ -1130,10 +1138,19 @@ process_opendir(u_int32_t id)
 	
 	if ((r = sshbuf_get_cstring(iqueue, &path, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	
+
+	#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(path, resolvedname))
+	{
+		free(path);
+		path = strdup(resolvedname);
+	}
+	#endif
 
 	debug3("request %u: opendir", id);
 	logit("opendir \"%s\"", path);
+
 	dirp = opendir(path);
 	if (dirp == NULL) {
 		status = errno_to_portable(errno);
@@ -1238,6 +1255,17 @@ process_remove(u_int32_t id)
 	
 	debug3("request %u: remove", id);
 	logit("remove name \"%s\"", name);
+
+	#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(name, resolvedname))
+	{
+		free(name);
+
+		name = strdup(resolvedname);
+	}
+	#endif
+
 	r = unlink(name);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
@@ -1261,6 +1289,16 @@ process_mkdir(u_int32_t id)
 	    a.perm & 07777 : 0777;
 	debug3("request %u: mkdir", id);
 	logit("mkdir name \"%s\" mode 0%o", name, mode);
+
+	#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(name, resolvedname))
+	{
+		free(name);
+
+		name = strdup(resolvedname);
+	}
+	#endif
 	r = mkdir(name, mode);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
@@ -1278,6 +1316,15 @@ process_rmdir(u_int32_t id)
 
 	debug3("request %u: rmdir", id);
 	logit("rmdir name \"%s\"", name);
+	#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(name, resolvedname))
+	{
+		free(name);
+
+		name = strdup(resolvedname);
+	}
+	#endif
 	r = rmdir(name);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
@@ -1306,7 +1353,11 @@ process_realpath(u_int32_t id)
 #else
 	if ( (path[0] == '\0') || ( strcmp(path, ".")== 0 ) ) {
 		free(path);
-		_getcwd(resolvedname, sizeof(resolvedname));
+		// add an extra / in front of paths to make them sftp spec compliant
+		// c:/users/test1 will become /c:/users/test1
+		resolvedname[0] = '/';
+
+		_getcwd(&resolvedname[1], sizeof(resolvedname));
 		// convert back slashes to forward slashes to be compatibale with unix naming
 		char *cptr = resolvedname;
 		while (*cptr) {
@@ -1314,8 +1365,36 @@ process_realpath(u_int32_t id)
 				*cptr = '/' ;
 			cptr++;
 		}
-		path = xstrdup(resolvedname);
+		path = strdup(resolvedname);
 	}
+	else {
+		// see if we were given rooted form /dir or /x:/home/x:/dir
+		if (path[2] != ':') {
+			// absolute form given /dir
+			// no drive letter, so was given in absolute form like cd /debug and we got "/debug" to process
+			// we have to attach current drive letter in front
+			resolvedname[0] = '/';
+			resolvedname[1] = _getdrive() + 'A' - 1; // convert current drive letter to Windows driver Char
+			resolvedname[2] = ':';
+			strcpy(&resolvedname[3], path);
+			free(path);
+			path = strdup(resolvedname);
+		}
+		else {
+			char *pch = strchr(path, ':');
+			if (pch != NULL && (pch = strrchr(pch+1, ':')) ) {
+				if (path[0] == '/') { // it was /x:/home/x:/dir form, use last drive letter part
+					pch--;
+					resolvedname[0] = '/';
+					strcpy(resolvedname+1, pch);
+					free(path);
+					path = strdup(resolvedname);
+				}
+			}
+		}
+
+	}
+
 #endif
 
 	debug3("request %u: realpath", id);
@@ -1341,7 +1420,19 @@ process_rename(u_int32_t id)
 if ((r = sshbuf_get_cstring(iqueue, &oldpath, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(iqueue, &newpath, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-
+#ifdef WIN32_FIXME
+char resolvedname[MAXPATHLEN];
+if (realpathWin32i(oldpath, resolvedname))
+{
+	free(oldpath);
+	oldpath = strdup(resolvedname);
+}
+if (realpathWin32i(newpath, resolvedname))
+{
+	free(newpath);
+	newpath = strdup(resolvedname);
+}
+#endif
 	
 	debug3("request %u: rename", id);
 	logit("rename old \"%s\" new \"%s\"", oldpath, newpath);
@@ -1502,6 +1593,19 @@ process_extended_posix_rename(u_int32_t id)
 	    (r = sshbuf_get_cstring(iqueue, &newpath, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
+#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(oldpath, resolvedname))
+	{
+		free(oldpath);
+		oldpath = strdup(resolvedname);
+	}
+	if (realpathWin32i(newpath, resolvedname))
+	{
+		free(newpath);
+		newpath = strdup(resolvedname);
+	}
+#endif
 
 	debug3("request %u: posix-rename", id);
 	logit("posix-rename old \"%s\" new \"%s\"", oldpath, newpath);
@@ -1707,6 +1811,8 @@ if ((r = sshbuf_get_cstring(iqueue, &oldpath, NULL)) != 0 ||
 #ifndef WIN32_FIXME
 	r = link(oldpath, newpath);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
+#else
+	status = SSH2_FX_OP_UNSUPPORTED;
 #endif
 	send_status(id, status);
 	free(oldpath);

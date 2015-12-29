@@ -210,7 +210,7 @@ char *realpathWin32(const char *path, char resolved[PATH_MAX])
   char realpath[PATH_MAX];
   char * pch;
 
-  path_len = strlcpy(realpath, path, sizeof(realpath));
+  path_len = strlcpy(realpath, path+1, sizeof(realpath));
 
   char * pchMac;
   pchMac = strstr (realpath, "._");
@@ -247,12 +247,69 @@ char *realpathWin32(const char *path, char resolved[PATH_MAX])
    
   if (realpath[1] == ':' && realpath[2] == 0)
   {
-    realpath[2] = '\\';
+    realpath[2] = '/';
     realpath[3] = 0;
   }
-   
-  strncpy (resolved, realpath, sizeof(realpath));
+  
+  resolved[0] = *path; // will be our first slash in /x:/users/test1 format
+  strncpy (resolved+1, realpath, sizeof(realpath));
   return resolved;	
 }
 
+char *realpathWin32i(const char *path, char resolved[PATH_MAX])
+{
+	size_t path_len;
+	unsigned int lastSlash;
+	char realpath[PATH_MAX];
+	char * pch;
+
+	if (path[0] != '/') {
+		// absolute form x:/abc/def given, no first slash to take out
+		path_len = strlcpy(realpath, path, sizeof(realpath));
+	}
+	else
+		path_len = strlcpy(realpath, path + 1, sizeof(realpath));
+
+	char * pchMac;
+	pchMac = strstr(realpath, "._");
+	if (pchMac != NULL)
+	{
+		pchMac[0] = '\0';
+		pchMac++;
+		pchMac++;
+		strcat(realpath, pchMac);
+	}
+
+	pch = strrchr(realpath, '/');
+	lastSlash = pch - realpath + 1;
+	if (path_len == lastSlash)
+	{
+		realpath[lastSlash - 1] = '\0';
+	}
+
+	pch = strrchr(realpath, '.');
+	if (pch != NULL)
+	{
+		if (realpath[pch - realpath - 1] == '.')
+		{
+			realpath[pch - realpath - 2] = '\0';
+			pch = strrchr(realpath, '/');
+			if (pch != NULL)
+				realpath[pch - realpath] = '\0';
+		}
+	}
+
+	/*
+	* Store terminating slash in 'X:/' on Windows.
+	*/
+
+	if (realpath[1] == ':' && realpath[2] == 0)
+	{
+		realpath[2] = '/';
+		realpath[3] = 0;
+	}
+
+	strncpy(resolved, realpath, sizeof(realpath));
+	return resolved;
+}
 #endif /* WIN32_FIXME */
