@@ -1193,6 +1193,29 @@ process_readdir(u_int32_t id)
 		int nstats = 10, count = 0, i;
 
 		stats = xcalloc(nstats, sizeof(Stat));
+		#ifdef WIN32_FIXME
+		// process the first entry that opendir() has found already
+		if (_stricmp(dirp->c_file.name, ".") && !_stricmp(dirp->c_file.name, dirp->initName)) // a firstfile that's not ".", this can happen for shared root drives
+		{	  // put first dirp in list
+			if (!strcmp(path, "/")) {
+				snprintf(pathname, sizeof pathname,
+					"/%s", dirp->c_file.name);
+			}
+			else {
+				snprintf(pathname, sizeof pathname,
+					"%s/%s", path, dirp->c_file.name);
+			}
+			if (pathname) {
+				if (lstat(pathname, &st) >= 0) {
+					stat_to_attrib(&st, &(stats[count].attrib));
+					stats[count].name = xstrdup(dirp->c_file.name);
+					stats[count].long_name = ls_file(dirp->c_file.name, &st,0, 0);
+					count++;
+				}
+			}
+		}
+		#endif
+
 		while ((dp = readdir(dirp)) != NULL) {
 			if (count >= nstats) {
 				nstats *= 2;
@@ -1214,7 +1237,7 @@ process_readdir(u_int32_t id)
 		#else
         stats[count].name      = ConvertLocal8ToUtf8(dp -> d_name, -1, NULL);
 		#endif
-        stats[count].long_name = ls_file(dp -> d_name, &st, 0, 0);
+        stats[count].long_name = ls_file(dp -> d_name, &st, dirp->c_file.attrib, 0);
         
         /*
         debug3("putting name [%s]...\n", stats[count].name);

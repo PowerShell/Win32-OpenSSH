@@ -33,6 +33,9 @@
 #ifdef WIN32_FIXME
   #undef GSSAPI
   #undef KRB5
+
+void strmode(mode_t mode, char *p);
+void strmode_from_attrib(unsigned attrib, char *p);
 #endif
 
 #include <sys/param.h>	/* MAX */
@@ -231,6 +234,9 @@ ls_file(const char *name, const struct stat *st, int remote, int si_units)
 
 #ifndef WIN32_FIXME
 	strmode(st->st_mode, mode);
+#else
+	strmode(st->st_mode, mode);
+	strmode_from_attrib(remote, mode);
 #endif
 	if (!remote) {
 		user = user_from_uid(st->st_uid, 0);
@@ -281,3 +287,120 @@ ls_file(const char *name, const struct stat *st, int remote, int si_units)
 	}
 	return xstrdup(buf);
 }
+
+#ifdef WIN32_FIXME
+
+#include <sys/types.h>
+#include <windows.h>
+
+void
+strmode_from_attrib(unsigned attrib, char *p)
+{
+	if (attrib & FILE_ATTRIBUTE_REPARSE_POINT)
+		*p = 'l';
+	else if (attrib & FILE_ATTRIBUTE_DIRECTORY)
+		*p = 'd';
+	else
+		*p = '-';
+}
+
+
+void
+strmode(mode_t mode, char *p)
+{
+	/* print type */
+	switch (mode & S_IFMT) {
+	case S_IFDIR:			/* directory */
+		*p++ = 'd';
+		break;
+	case S_IFCHR:			/* character special */
+		*p++ = 'c';
+		break;
+		//case S_IFBLK:			/* block special */
+		//		*p++ = 'b';
+		//		break;
+	case S_IFREG:			/* regular */
+		*p++ = '-';
+		break;
+		//case S_IFLNK:			/* symbolic link */
+		//		*p++ = 'l';
+		//		break;
+#ifdef S_IFSOCK
+	case S_IFSOCK:			/* socket */
+		*p++ = 's';
+		break;
+#endif
+	case _S_IFIFO:			/* fifo */
+		*p++ = 'p';
+		break;
+	default:			/* unknown */
+		*p++ = '?';
+		break;
+	}
+	/* usr */
+	if (mode & S_IRUSR)
+		*p++ = 'r';
+	else
+		*p++ = '-';
+	if (mode & S_IWUSR)
+		*p++ = 'w';
+	else
+		*p++ = '-';
+	switch (mode & (S_IXUSR)) {
+	case 0:
+		*p++ = '-';
+		break;
+	case S_IXUSR:
+		*p++ = 'x';
+		break;
+		//case S_ISUID:
+		//		*p++ = 'S';
+		//		break;
+		//case S_IXUSR | S_ISUID:
+		//		*p++ = 's';
+		//		break;
+	}
+	/* group */
+	if (mode & S_IRGRP)
+		*p++ = 'r';
+	else
+		*p++ = '-';
+	if (mode & S_IWGRP)
+		*p++ = 'w';
+	else
+		*p++ = '-';
+	switch (mode & (S_IXGRP)) {
+	case 0:
+		*p++ = '-';
+		break;
+	case S_IXGRP:
+		*p++ = 'x';
+		break;
+		//case S_ISGID:
+		//		*p++ = 'S';
+		//		break;
+		//case S_IXGRP | S_ISGID:
+		//		*p++ = 's';
+		//		break;
+	}
+	/* other */
+	if (mode & S_IROTH)
+		*p++ = 'r';
+	else
+		*p++ = '-';
+	if (mode & S_IWOTH)
+		*p++ = 'w';
+	else
+		*p++ = '-';
+	switch (mode & (S_IXOTH)) {
+	case 0:
+		*p++ = '-';
+		break;
+	case S_IXOTH:
+		*p++ = 'x';
+		break;
+	}
+	*p++ = ' ';		/* will be a '+' if ACL's implemented */
+	*p = '\0';
+}
+#endif
