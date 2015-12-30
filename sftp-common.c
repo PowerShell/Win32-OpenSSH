@@ -403,4 +403,160 @@ strmode(mode_t mode, char *p)
 	*p++ = ' ';		/* will be a '+' if ACL's implemented */
 	*p = '\0';
 }
+
+#include <winioctl.h>
+// Maximum reparse buffer info size. The max user defined reparse 
+// data is 16KB, plus there's a header. 
+// 
+#define MAX_REPARSE_SIZE	17000 
+
+#define IO_REPARSE_TAG_SYMBOLIC_LINK      IO_REPARSE_TAG_RESERVED_ZERO 
+#define IO_REPARSE_TAG_MOUNT_POINT              (0xA0000003L)       // winnt ntifs 
+#define IO_REPARSE_TAG_HSM                      (0xC0000004L)       // winnt ntifs 
+#define IO_REPARSE_TAG_SIS                      (0x80000007L)       // winnt ntifs 
+
+
+// 
+// Undocumented FSCTL_SET_REPARSE_POINT structure definition 
+// 
+#define REPARSE_MOUNTPOINT_HEADER_SIZE   8 
+typedef struct {
+	DWORD          ReparseTag;
+	DWORD          ReparseDataLength;
+	WORD           Reserved;
+	WORD           ReparseTargetLength;
+	WORD           ReparseTargetMaximumLength;
+	WORD           Reserved1;
+	WCHAR          ReparseTarget[1];
+} REPARSE_MOUNTPOINT_DATA_BUFFER, *PREPARSE_MOUNTPOINT_DATA_BUFFER;
+
+
+typedef struct _REPARSE_DATA_BUFFER {
+	ULONG  ReparseTag;
+	USHORT ReparseDataLength;
+	USHORT Reserved;
+	union {
+		struct {
+			USHORT SubstituteNameOffset;
+			USHORT SubstituteNameLength;
+			USHORT PrintNameOffset;
+			USHORT PrintNameLength;
+			WCHAR PathBuffer[1];
+		} SymbolicLinkReparseBuffer;
+		struct {
+			USHORT SubstituteNameOffset;
+			USHORT SubstituteNameLength;
+			USHORT PrintNameOffset;
+			USHORT PrintNameLength;
+			WCHAR PathBuffer[1];
+		} MountPointReparseBuffer;
+		struct {
+			UCHAR  DataBuffer[1];
+		} GenericReparseBuffer;
+	};
+} REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
+
+BOOL ResolveLink(char * tLink, char *ret, DWORD * plen, DWORD Flags)
+{
+	HANDLE   fileHandle;
+	BYTE     reparseBuffer[MAX_REPARSE_SIZE];
+	PBYTE    reparseData;
+	PREPARSE_GUID_DATA_BUFFER reparseInfo = (PREPARSE_GUID_DATA_BUFFER)reparseBuffer;
+	PREPARSE_DATA_BUFFER msReparseInfo = (PREPARSE_DATA_BUFFER)reparseBuffer;
+	DWORD   returnedLength;
+
+	if (Flags & FILE_ATTRIBUTE_DIRECTORY)
+	{
+		fileHandle = CreateFile(tLink, 0,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+			OPEN_EXISTING,
+			FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
+
+	}
+	else {
+
+		//    
+		// Open the file    
+		//    
+		fileHandle = CreateFile(tLink, 0,
+			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+			OPEN_EXISTING,
+			FILE_FLAG_OPEN_REPARSE_POINT, 0);
+	}
+	if (fileHandle == INVALID_HANDLE_VALUE)
+	{
+		sprintf_s(ret, *plen, "%s", tLink);
+		return TRUE;
+	}
+
+	if (GetFileAttributes(tLink) & FILE_ATTRIBUTE_REPARSE_POINT) {
+
+		if (DeviceIoControl(fileHandle, FSCTL_GET_REPARSE_POINT,
+			NULL, 0, reparseInfo, sizeof(reparseBuffer),
+			&returnedLength, NULL)) {
+
+			if (IsReparseTagMicrosoft(reparseInfo->ReparseTag)) {
+
+				switch (reparseInfo->ReparseTag) {
+				case 0x80000000 | IO_REPARSE_TAG_SYMBOLIC_LINK:
+				case IO_REPARSE_TAG_MOUNT_POINT:
+					if (*plen >= msReparseInfo->MountPointReparseBuffer.SubstituteNameLength)
+					{
+						reparseData = (PBYTE)&msReparseInfo->SymbolicLinkReparseBuffer.PathBuffer;
+						WCHAR temp[1024];
+						wcsncpy_s(temp, 1024,
+							(PWCHAR)(reparseData + msReparseInfo->MountPointReparseBuffer.SubstituteNameOffset),
+							(size_t)msReparseInfo->MountPointReparseBuffer.SubstituteNameLength);
+						temp[msReparseInfo->MountPointReparseBuffer.SubstituteNameLength] = 0;
+						sprintf_s(ret, *plen, "%S", &temp[4]);
+					}
+					else
+					{
+						sprintf_s(ret, *plen, "%s", tLink);
+						return FALSE;
+					}
+
+					break;
+				default:
+					break;
+				}
+			}
+		}
+	}
+	else {
+		sprintf_s(ret, *plen, "%s", tLink);
+	}
+
+	CloseHandle(fileHandle);
+	return TRUE;
+}
+
+char * get_inside_path(char * opath, BOOL bResolve, BOOL bMustExist)
+{
+	BOOL ResolveLink(char * tLink, char *ret, DWORD * plen, DWORD Flags);
+
+	char * ipath;
+	char * temp_name;
+	char temp[1024];
+	DWORD templen = sizeof(temp);
+	WIN32_FILE_ATTRIBUTE_DATA  FileInfo;
+
+
+	if (!GetFileAttributesEx(opath, GetFileExInfoStandard, &FileInfo) && bMustExist)
+	{
+		return NULL;
+	}
+
+	if (bResolve)
+	{
+		ResolveLink(opath, temp, &templen, FileInfo.dwFileAttributes);
+		ipath = xstrdup(temp);
+	}
+	else
+	{
+		ipath = xstrdup(opath);
+	}
+
+	return ipath;
+}
 #endif

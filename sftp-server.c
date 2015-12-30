@@ -97,6 +97,8 @@
 
   #define stat(PATH, BUF) _stat(PATH, BUF)
 
+  char * get_inside_path(char *, BOOL, BOOL);
+
   /*
    * Function to cut last slash (windows
    * stat requires paths 
@@ -1141,17 +1143,24 @@ process_opendir(u_int32_t id)
 
 	#ifdef WIN32_FIXME
 	char resolvedname[MAXPATHLEN];
+	char * ipath;
 	if (realpathWin32i(path, resolvedname))
 	{
 		free(path);
 		path = strdup(resolvedname);
 	}
+	ipath = get_inside_path(path, TRUE, TRUE);
 	#endif
 
 	debug3("request %u: opendir", id);
 	logit("opendir \"%s\"", path);
 
+	#ifdef WIN32_FIXME
+	dirp = opendir(ipath);
+	free(ipath);
+	#else
 	dirp = opendir(path);
+	#endif
 	if (dirp == NULL) {
 		status = errno_to_portable(errno);
 	} else {
