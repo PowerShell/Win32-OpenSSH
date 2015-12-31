@@ -559,4 +559,11 @@ char * get_inside_path(char * opath, BOOL bResolve, BOOL bMustExist)
 
 	return ipath;
 }
+
+// if file is symbolic link, copy its link into "link" .
+int readlink(const char *path, char *link, int linklen)
+{
+	strcpy_s(link, linklen, path);
+	return 0;
+}
 #endif

@@ -24,6 +24,10 @@
 #ifdef WIN32_FIXME
   #undef GSSAPI
   #undef KRB5
+
+#define true 1
+#define false 0
+
 #endif
 
 #include <sys/param.h>	/* MIN */
@@ -98,6 +102,7 @@
   #define stat(PATH, BUF) _stat(PATH, BUF)
 
   char * get_inside_path(char *, BOOL, BOOL);
+  int readlink(const char *path, char *link, int linklen);
 
   /*
    * Function to cut last slash (windows
@@ -1521,31 +1526,6 @@ if (realpathWin32i(newpath, resolvedname))
 static void
 process_readlink(u_int32_t id)
 {
- #ifdef WIN32_FIXME
-  
-  /*
-   * Win32 code.
-   */
-   
-  //u_int32_t id;
-  
-  char *request;
-
-  //id = get_int();
-  #ifndef WIN32_FIXME
-  // PRAGMA:TODO
-  request = get_string(NULL);
-  
-  send_status(id, SSH2_FX_OP_UNSUPPORTED);
-  
-  free(request);
-  #endif
-  
-  #else  
-
-  /*
-   * Original OpenSSH code.
-   */
 	int r, len;
 	char buf[PATH_MAX];
 	char *path;
@@ -1555,6 +1535,16 @@ process_readlink(u_int32_t id)
 
 	debug3("request %u: readlink", id);
 	verbose("readlink \"%s\"", path);
+	
+	#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(path, resolvedname))
+	{
+		free(path);
+		path = strdup(resolvedname);
+	}
+	#endif
+
 	if ((len = readlink(path, buf, sizeof(buf) - 1)) == -1)
 		send_status(id, errno_to_portable(errno));
 	else {
@@ -1566,37 +1556,13 @@ process_readlink(u_int32_t id)
 		send_names(id, 1, &s);
 	}
 	free(path);
-	#endif /* WIN32_FIXME */
+
 }
 
 static void
 process_symlink(u_int32_t id)
 {
-	#ifdef WIN32_FIXME
-  
-  /*
-   * Win32 code.
-   */
-   
-  //u_int32_t id;
-  
-  char *request;
 
-  //id = get_int();
-   #ifndef WIN32_FIXME
-  // PRAGMA:TODO
-  request = get_string(NULL);
-  
-  send_status(id, SSH2_FX_OP_UNSUPPORTED);
-  
-  free(request);
-  #endif
-  
-  #else
-
-  /*
-   *  Original OpenSSH code.
-   */
 	char *oldpath, *newpath;
 	int r, status;
 
@@ -1606,13 +1572,19 @@ process_symlink(u_int32_t id)
 
 	debug3("request %u: symlink", id);
 	logit("symlink old \"%s\" new \"%s\"", oldpath, newpath);
+
+	#ifdef WIN32_FIXME
+	send_status(id, SSH2_FX_OP_UNSUPPORTED);
+	#else
+
 	/* this will fail if 'newpath' exists */
 	r = symlink(oldpath, newpath);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
+	#endif
+
 	free(oldpath);
 	free(newpath);
- #endif
 }
 
 static void
