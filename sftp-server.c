@@ -1023,6 +1023,14 @@ process_setstat(u_int32_t id)
 	
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0 )
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+	if (realpathWin32i(name, resolvedname))
+	{
+		free(name);
+		name = strdup(resolvedname);
+	}
+	#endif
 
 	if ((r = decode_attrib(iqueue, &a)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
