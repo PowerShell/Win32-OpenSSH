@@ -23,13 +23,15 @@ int fd_table_get_min_index() {
     {
         bitmap++;
         min_index += 8;
+        if (min_index >= MAX_FDS)
+            return -1;
     }
 
     tmp = *bitmap;
 
     while (tmp & 0x80)
     {
-        tmp << 1;
+        tmp <<= 1;
         min_index++;
     }
 
@@ -47,7 +49,7 @@ void fd_table_clear(int index)
 {
     fd_table.w32_ios[index]->table_index = -1;
     fd_table.w32_ios[index] = NULL;
-    FD_SET(index, &(fd_table.occupied));
+    FD_CLR(index, &(fd_table.occupied));
 }
 
 void w32posix_initialize() {
@@ -134,6 +136,7 @@ int w32_close(int fd) {
     fd_table_clear(pio->table_index);
     if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
         socketio_close(pio);
+        return 0;
     }
     else
         return -1;
