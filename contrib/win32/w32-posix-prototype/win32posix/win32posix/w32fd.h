@@ -46,8 +46,8 @@ int fd_table_initialize();
 int fd_table_add(struct w32_io*);
 int fd_table_delete(struct w32_io*);
 
+int socketio_initialize();
 struct w32_io* socketio_socket(int domain, int type, int protocol);
-
 struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen);
 int socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optval, int optlen);
 int socketio_getsockopt(struct w32_io* pio, int level, int optname, char* optval, int* optlen);

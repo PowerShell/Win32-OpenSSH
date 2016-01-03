@@ -11,6 +11,7 @@ struct w32fd_table fd_table;
 int fd_table_initialize() {
     memset(&fd_table, 0, sizeof(fd_table));
     //set stdin, stdout and stderr
+    return 0;
 }
 
 int fd_table_get_min_index() {
@@ -44,8 +45,14 @@ void fd_table_set(struct w32_io* pio, int index) {
 
 void fd_table_clear(int index)
 {
+    struct w32_pio* pio = fd_table.w32fds[index];
+    //pio->table_index = -1;
     fd_table.w32fds[index] = NULL;
     FD_SET(index, &(fd_table.occupied));
+}
+
+void w32posix_initialize() {
+    socketio_initialize();
 }
 
 BOOL w32_io_is_blocking(struct w32_io* pio)
@@ -67,9 +74,7 @@ int w32_socket(int domain, int type, int protocol) {
         return -1;
     }
 
-    pio->type = SOCK_FD;
     fd_table_set(pio, min_index);
-
     return min_index;
 }
 
@@ -89,7 +94,7 @@ int w32_accept(int fd, struct sockaddr* addr, int* addrlen)
     }
 
     fd_table_set(pio, min_index);
-
+    return min_index;
 }
 
 int w32_setsockopt(int fd, int level, int optname, const char* optval, int optlen) {
@@ -127,6 +132,7 @@ int w32_shutdown(int fd, int how) {
 int w32_close(int fd) {
     struct w32_io* pio = fd_table.w32fds[fd];
 
+    fd_table_clear(pio->table_index);
     if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
         socketio_close(pio);
     }
