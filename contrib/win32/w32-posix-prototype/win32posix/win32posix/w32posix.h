@@ -6,9 +6,7 @@
 #include <stdio.h>
 
 //File Descriptor definitions
-#if !defined(MAX_FDS) 
 #define MAX_FDS 128 //a 2^n number
-#endif
 
 typedef struct w32_fd_set_ {
 	unsigned char bitmap[MAX_FDS >> 3];
@@ -43,6 +41,7 @@ typedef struct w32_fd_set_ {
 #define socket w32_socket
 
 void w32posix_initialize();
+void w32posix_done();
 
 /*network i/o*/
 #define socket w32_socket

@@ -1,5 +1,6 @@
 #include "w32posix.h"
 #include "w32fd.h"
+#include <stdarg.h>
 
 struct w32fd_table {
     w32_fd_set occupied;
@@ -54,6 +55,10 @@ void fd_table_clear(int index)
 
 void w32posix_initialize() {
     socketio_initialize();
+}
+
+void w32posix_done() {
+    socketio_done();
 }
 
 BOOL w32_io_is_blocking(struct w32_io* pio)
@@ -140,5 +145,24 @@ int w32_close(int fd) {
     }
     else
         return -1;
+}
+
+int w32_fcntl(int fd, int cmd, ... /* arg */) {
+    va_list valist;
+    va_start(valist, cmd);
+
+    switch (cmd){
+    case F_GETFL:
+        return fd_table.w32_ios[fd]->fd_status_flags;
+    case F_SETFL:
+        fd_table.w32_ios[fd]->fd_status_flags = va_arg(valist, int);
+        return 0;
+    case F_GETFD:
+        return fd_table.w32_ios[fd]->fd_flags;
+        break;
+    case F_SETFD:
+        fd_table.w32_ios[fd]->fd_flags = va_arg(valist, int);
+        return 0;
+    }
 }
 
