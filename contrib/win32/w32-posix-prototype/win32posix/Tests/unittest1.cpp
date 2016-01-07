@@ -87,6 +87,22 @@ namespace UnitTests
                 exit(1);
             }
 
+            fcntl(sockfd, F_SETFL, O_NONBLOCK);
+
+            fd_set read_set, write_set, except_set;
+
+            ZeroMemory(&read_set, sizeof(fd_set));
+            ZeroMemory(&write_set, sizeof(fd_set));
+            ZeroMemory(&except_set, sizeof(fd_set));
+
+            FD_SET(sockfd, &read_set);
+            struct timeval timeout;
+            timeout.tv_sec = 30;
+            timeout.tv_usec = 0;
+            int ret = select(sockfd, &read_set, &write_set, &except_set, &timeout);
+
+            new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+
         }
 
 

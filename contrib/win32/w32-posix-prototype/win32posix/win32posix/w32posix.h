@@ -53,6 +53,8 @@ void w32posix_done();
 #define listen w32_listen
 #define bind w32_bind
 #define connect w32_connect
+#define recv w32_recv
+#define send w32_send
 #define shutdown w32_shutdown
 int w32_socket(int domain, int type, int protocol);
 int w32_accept(int fd, struct sockaddr* addr, int* addrlen);
@@ -63,6 +65,8 @@ int w32_getpeername(int fd, struct sockaddr* name, int* namelen);
 int w32_listen(int fd, int backlog);
 int w32_bind(int fd, const struct sockaddr *name, int namelen);
 int w32_connect(int fd, const struct sockaddr* name, int namelen);
+int w32_recv(int fd, void *buf, size_t len, int flags);
+int w32_send(int fd, const void *buf, size_t len, int flags);
 int w32_shutdown(int fd, int how);
 
 /*non-network i/o*/
