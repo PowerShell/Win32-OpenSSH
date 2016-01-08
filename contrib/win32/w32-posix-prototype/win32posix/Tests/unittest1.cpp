@@ -37,7 +37,6 @@ namespace UnitTests
             struct sockaddr_storage their_addr; // connector's address information
             socklen_t sin_size;
             int yes = 1;
-            char s[INET6_ADDRSTRLEN];
             int rv;
 #define PORT "3490"  // the port users will be connecting to
 
@@ -97,7 +96,7 @@ namespace UnitTests
 
             FD_SET(sockfd, &read_set);
             struct timeval timeout;
-            timeout.tv_sec = 30;
+            timeout.tv_sec = 300;
             timeout.tv_usec = 0;
             int ret = select(sockfd, &read_set, &write_set, &except_set, &timeout);
 
