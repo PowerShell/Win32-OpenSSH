@@ -145,6 +145,12 @@
 #define O_NOCTTY	0
 #endif
 
+#ifdef USE_MSCNG
+ /* CNG KEX imports */
+int cng_kexgex_server(struct ssh *ssh);
+int cng_kexdh_server(struct ssh *ssh);
+#endif
+
 /* Re-exec fds */
 #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
 #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
@@ -3379,10 +3385,17 @@ do_ssh2_kex(void)
 		fatal("kex_setup: %s", ssh_err(r));
 	kex = active_state->kex;
 #ifdef WITH_OPENSSL
+#ifdef USE_MSCNG
+	kex->kex[KEX_DH_GRP1_SHA1] = cng_kexdh_server;
+	kex->kex[KEX_DH_GRP14_SHA1] = cng_kexdh_server;
+	kex->kex[KEX_DH_GEX_SHA1] = cng_kexgex_server;
+	kex->kex[KEX_DH_GEX_SHA256] = cng_kexgex_server;
+#else
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
+#endif
 # ifdef OPENSSL_HAS_ECC
 	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
 # endif

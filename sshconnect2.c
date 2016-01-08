@@ -76,6 +76,12 @@
 #include "ssh-gss.h"
 #endif
 
+#ifdef USE_MSCNG
+/* CNG KEX imports */
+int cng_kexgex_client(struct ssh *ssh);
+int cng_kexdh_client(struct ssh *ssh);
+#endif
+
 /* import */
 extern char *client_version_string;
 extern char *server_version_string;
@@ -212,10 +218,17 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 		fatal("kex_setup: %s", ssh_err(r));
 	kex = active_state->kex;
 #ifdef WITH_OPENSSL
+#ifdef USE_MSCNG
+	kex->kex[KEX_DH_GRP1_SHA1] = cng_kexdh_client;
+	kex->kex[KEX_DH_GRP14_SHA1] = cng_kexdh_client;
+	kex->kex[KEX_DH_GEX_SHA1] = cng_kexgex_client;
+	kex->kex[KEX_DH_GEX_SHA256] = cng_kexgex_client;
+#else
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
+#endif
 # ifdef OPENSSL_HAS_ECC
 	kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
 # endif
