@@ -1,7 +1,7 @@
 #include <Windows.h>
 
 enum w32_io_type {
-	UNKOWN_FD,
+	UNKOWN_FD = 0,
 	LISTEN_FD,
 	SOCK_FD,
 	FILE_FD
@@ -11,16 +11,26 @@ struct w32_io {
 	OVERLAPPED read_overlapped;
     OVERLAPPED write_overlapped;
     struct {
-        DWORD error;
-        DWORD remaining;
-        DWORD completed;
-        BOOL pending;
+        //internal buffer details
+        char *buf;
+        DWORD buf_size;
+
+        //async io details
+        DWORD error;  //error reported on async read completion
+        DWORD remaining; //bytes in internal buffer remaining to be read by application
+        DWORD completed; //bytes in internal buffer already read by application
+        BOOL pending; //waiting on async io to complete 
     }read_details;
     struct {
-        DWORD error;
-        DWORD remaining;
-        DWORD completed;
-        BOOL pending;
+        //internal buffer details
+        char* buf;
+        DWORD buf_size;
+
+        //async io details 
+        DWORD error;   //error reported on async write completion
+        DWORD remaining; //bytes in internal buffer that are not yet successfully written on i/o 
+        DWORD completed; //bytes in internal buffer that have been successfully written on i/o 
+        BOOL pending; //waiting on async io to complete 
     }write_details;
 
     //-1 if not indexed
@@ -42,10 +52,6 @@ struct w32_io {
 
 BOOL w32_io_is_blocking(struct w32_io*);
 BOOL w32_io_is_ioready(struct w32_io* pio, BOOL rd);
-
-int fd_table_initialize();
-int fd_table_add(struct w32_io*);
-int fd_table_delete(struct w32_io*);
 
 int socketio_initialize();
 int socketio_done();

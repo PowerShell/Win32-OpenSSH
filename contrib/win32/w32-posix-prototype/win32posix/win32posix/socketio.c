@@ -5,6 +5,7 @@
 #include "w32fd.h"
 #include <stddef.h>
 
+#define INTERNAL_BUFFER_SIZE 100*1024 //100KB
 
 static int getWSAErrno()
 {
@@ -110,8 +111,9 @@ void CALLBACK WSARecvCompletionRoutine(
 
 int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     int ret = 0;
-    WSABUF* wsabuf;
-
+    WSABUF wsabuf;
+    DWORD recv_flags = 0;
+    
     //if io is already pending
     if (pio->read_details.pending)
     {
@@ -120,49 +122,46 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     }
 
     //initialize recv buffers if needed
-    if (pio->read_overlapped.hEvent == NULL)
+    wsabuf.len = INTERNAL_BUFFER_SIZE;
+    if (pio->read_details.buf == NULL)
     {
-        wsabuf = malloc(sizeof(WSABUF));
-        if (wsabuf) {
-            wsabuf->len = 1024;
-            wsabuf->buf = malloc(wsabuf->len);
-        }
-
-        if (!wsabuf || !wsabuf->buf)
+        wsabuf.buf = malloc(wsabuf.len);
+        
+        if (!wsabuf.buf)
         {
-            if (wsabuf)
-                free(wsabuf);
             errno = ENOMEM;
             return -1;
         }
 
-        pio->read_overlapped.hEvent = (HANDLE)wsabuf;
+        pio->read_details.buf = wsabuf.buf;
+        pio->read_details.buf_size = wsabuf.len;
     }
     else
-        wsabuf = (WSABUF*)pio->read_overlapped.hEvent;
+        wsabuf.buf = pio->read_details.buf;
 
     //if we have some buffer copy it and retun #bytes copied
     if (pio->read_details.remaining)
     {
         int num_bytes_copied = min(len, pio->read_details.remaining);
-        memcpy(buf, pio->read_overlapped.hEvent, num_bytes_copied);
+        memcpy(buf, pio->read_details.buf + pio->read_details.completed, num_bytes_copied);
         pio->read_details.remaining -= num_bytes_copied;
+        pio->read_details.completed += num_bytes_copied;
         return num_bytes_copied;
     }
 
     //TODO - implement flags if any needed for OpenSSH
-    ret = WSARecv(pio->sock, wsabuf, 1, NULL, 0, &pio->read_overlapped, &WSARecvCompletionRoutine);
+    ret = WSARecv(pio->sock, &wsabuf, 1, NULL, &recv_flags, &pio->read_overlapped, &WSARecvCompletionRoutine);
     if (ret == 0)
     {
         //receive has completed and APC is scheduled, let it run
         pio->read_details.pending = TRUE;
         SleepEx(1, TRUE);
-        if ((pio->read_details.pending == FALSE) || (pio->read_details.remaining == 0)) {
+        if (pio->read_details.pending) {
+            //unexpected internal error
             errno = EOTHER;
             return -1;
         }
-
-        //we should have some bytes copied to internal buffer
+        
     }
     else { //(ret == SOCKET_ERROR) 
         if (WSAGetLastError() == WSA_IO_PENDING)
@@ -187,20 +186,24 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
         }
     }
 
-    //by this time we should have some bytes in internal buffer
-    //if we have some buffer copy it and retun #bytes copied
-    if (pio->read_details.remaining)
+    //by this time we should have some bytes in internal buffer or an error from callback
+    if (pio->read_details.error)
     {
-        int num_bytes_copied = min(len, pio->read_details.remaining);
-        memcpy(buf, ((WSABUF*)pio->read_overlapped.hEvent)->buf, num_bytes_copied);
-        pio->read_details.remaining -= num_bytes_copied;
-        return num_bytes_copied;
-    }
-    else {
         errno = EOTHER;
         return -1;
     }
-
+    
+    if (pio->read_details.remaining) {
+        int num_bytes_copied = min(len, pio->read_details.remaining);
+        memcpy(buf, pio->read_details.buf, num_bytes_copied);
+        pio->read_details.remaining -= num_bytes_copied;
+        pio->read_details.completed = num_bytes_copied;
+        return num_bytes_copied;
+    } 
+    else { //connection is closed
+        return 0;
+    }
+ 
 }
 
 void CALLBACK WSASendCompletionRoutine(
@@ -219,8 +222,8 @@ void CALLBACK WSASendCompletionRoutine(
 
 int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
     int ret = 0;
-    WSABUF* wsabuf;
-
+    WSABUF wsabuf;
+    
     //if io is already pending
     if (pio->write_details.pending)
     {
@@ -229,53 +232,49 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
     }
 
     //initialize buffers if needed
-    if (pio->write_overlapped.hEvent == NULL)
+    wsabuf.len = INTERNAL_BUFFER_SIZE;
+    if (pio->write_details.buf == NULL)
     {
-        wsabuf = malloc(sizeof(WSABUF));
-        if (wsabuf) {
-            wsabuf->len = 1024;
-            wsabuf->buf = malloc(wsabuf->len);
-        }
-
-        if (!wsabuf || !wsabuf->buf)
+        wsabuf.buf = malloc(wsabuf.len);
+        if (!wsabuf.buf)
         {
-            if (wsabuf)
-                free(wsabuf);
             errno = ENOMEM;
             return -1;
         }
 
-        pio->write_overlapped.hEvent = (HANDLE)wsabuf;
+        pio->write_details.buf = wsabuf.buf;
+        pio->write_details.buf_size = wsabuf.len;
     }
     else {
-        wsabuf = (WSABUF*)pio->write_overlapped.hEvent;
+        wsabuf.buf = pio->write_details.buf;
     }
 
-    wsabuf->len = min(1024, len);
-    memcpy(wsabuf->buf, buf, wsabuf->len);
+    wsabuf.len = min(wsabuf.len, len);
+    memcpy(wsabuf.buf, buf, wsabuf.len);
 
-    ret = WSASend(pio->sock, wsabuf, 1, NULL, 0, &pio->write_overlapped, &WSASendCompletionRoutine);
+    //implement flags support if needed
+    ret = WSASend(pio->sock, &wsabuf, 1, NULL, 0, &pio->write_overlapped, &WSASendCompletionRoutine);
 
     if (ret == 0)
     {
         //send has completed and APC is scheduled, let it run
         pio->write_details.pending = TRUE;
-        pio->write_details.remaining = wsabuf->len;
+        pio->write_details.remaining = wsabuf.len;
         SleepEx(1, TRUE);
-        if ((pio->write_details.pending == FALSE) || (pio->write_details.remaining != 0)) {
+        if ((pio->write_details.pending) || (pio->write_details.remaining != 0)) {
             errno = EOTHER;
             return -1;
         }
         
         //return num of bytes written
-        return wsabuf->len;
+        return wsabuf.len;
     }
     else { //(ret == SOCKET_ERROR) 
         if (WSAGetLastError() == WSA_IO_PENDING)
         {
             //io is initiated and pending
             pio->write_details.pending = TRUE;
-            pio->write_details.remaining = wsabuf->len;
+            pio->write_details.remaining = wsabuf.len;
             if (w32_io_is_blocking(pio))
             {
                 //wait until io is done
@@ -283,7 +282,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
                     SleepEx(INFINITE, TRUE);
             }
 
-            return wsabuf->len;
+            return wsabuf.len;
         }
         else { //failed 
             errno = getWSAErrno();
@@ -300,6 +299,20 @@ int socketio_shutdown(struct w32_io* pio, int how) {
 
 int socketio_close(struct w32_io* pio) {
     closesocket(pio->sock);
+    if (pio->type == LISTEN_FD) {
+        if (pio->read_overlapped.hEvent)
+            CloseHandle(pio->read_overlapped.hEvent);
+        if (pio->context)
+            free(pio->context);
+    }
+    else {
+        if (pio->read_details.buf)
+            free(pio->read_details.buf);
+
+        if (pio->write_details.buf)
+            free(pio->write_details.buf);
+    }
+     
     //todo- wait for pending io to abort
     free(pio);
     return 0;
@@ -360,12 +373,13 @@ BOOL socketio_is_ioready(struct w32_io* pio, BOOL rd) {
 
     if (pio->type == LISTEN_FD) {
         DWORD numBytes = 0;
-        if (pio->read_details.pending && GetOverlappedResult(pio->read_overlapped.hEvent, &pio->read_overlapped, &numBytes, FALSE)) {
+        DWORD flags;
+        if (pio->read_details.pending && WSAGetOverlappedResult(pio->sock, &pio->read_overlapped, &numBytes, FALSE, &flags)) {
             return TRUE;
         }
         else {
-            if (pio->read_details.pending && GetLastError() != ERROR_IO_INCOMPLETE) {
-                //unexpected error;
+            if (pio->read_details.pending && WSAGetLastError() != WSA_IO_INCOMPLETE) {                
+                //unexpected error; log an event                
             }
             return FALSE;
         }
