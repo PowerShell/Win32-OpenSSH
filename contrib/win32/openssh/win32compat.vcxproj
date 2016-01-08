@@ -159,6 +159,11 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kex.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexdhc.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexdhs.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexgexc.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexgexs.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ansiprsr.h" />
@@ -175,6 +180,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kex.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
