@@ -24,6 +24,9 @@
     <ClCompile Include="w32fd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="signal.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="w32fd.h">

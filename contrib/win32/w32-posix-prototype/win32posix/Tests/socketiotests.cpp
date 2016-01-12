@@ -5,11 +5,68 @@ extern "C" {
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
+#define DEFAULT_PORT "27015"
+
 namespace UnitTests
 {
-    TEST_CLASS(UnitTest1)
+    TEST_CLASS(SocketIOTests)
     {
+
     public:
+        
+        struct addrinfo *result = NULL;
+        struct addrinfo hints;
+        int ListenSocket = -1;
+
+        
+        TEST_METHOD_INITIALIZE(TestMethodInitialize)
+        {
+            int iResult;
+
+            w32posix_initialize();
+            ZeroMemory(&hints, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            hints.ai_protocol = IPPROTO_TCP;
+            hints.ai_flags = AI_PASSIVE;
+
+            iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
+            if (iResult != 0) {
+                printf("getaddrinfo failed with error: %d\n", iResult);
+                return;
+            }
+
+            ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+            if (ListenSocket == -1) {
+                printf("socket failed with error: %ld\n", errno);
+                return;
+            }
+
+            // Setup the TCP listening socket
+            iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+            if (iResult == -1) {
+                printf("bind failed with error: %d\n", errno);
+                return ;
+            }
+
+            iResult = listen(ListenSocket, SOMAXCONN);
+            if (iResult == -1) {
+                printf("listen failed with error: %d\n", errno);
+                return;
+            }
+            freeaddrinfo(result);
+
+        }
+
+        TEST_METHOD_CLEANUP(TestMethodCleanup)
+        {
+            if (result)
+                freeaddrinfo(result);
+            if (ListenSocket != -1)
+                close(ListenSocket);
+            w32posix_done();
+
+        }
 
         TEST_METHOD(TestMethod1)
         {

@@ -70,9 +70,9 @@ BOOL w32_io_is_blocking(struct w32_io* pio)
     return (pio->fd_status_flags & O_NONBLOCK) ? FALSE : TRUE;
 }
 
-BOOL w32_io_is_ioready(struct w32_io* pio, BOOL rd) {
+BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd) {
     if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
-        return socketio_is_ioready(pio, rd);
+        return socketio_is_io_available(pio, rd);
     }
     else {
         //return fileio_is_ready(pio);
@@ -81,13 +81,13 @@ BOOL w32_io_is_ioready(struct w32_io* pio, BOOL rd) {
 
 }
 
-int w32_io_start_asyncio(struct w32_io* pio, BOOL rd)
+int w32_io_on_select(struct w32_io* pio, BOOL rd)
 {
     if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
-        return socketio_start_asyncio(pio, rd);
+        return socketio_on_select(pio, rd);
     }
     else {
-        //return fileio_is_ready(pio);
+        //return fileio_start_io(pio);
         return -1;
     }
 
@@ -214,30 +214,36 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
         return -1;
     }
 
+    if (!readfds && !writefds && !exceptfds) {
+        errno = EPERM;
+        return -1;
+    }
+
+
     //see if any io is ready
     for (int i = 0; i <= fds; i++) {
 
-        if FD_ISSET(i, readfds) {
+        if (readfds && FD_ISSET(i, readfds)) {
             if (fd_table.w32_ios[i] == NULL) {
                 errno = EPERM;
                 return -1;
             }
 
             in_ready_fds++;
-            if (w32_io_is_ioready(fd_table.w32_ios[i], TRUE)) {
+            if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
                 FD_SET(i, &read_ready_fds);
                 out_ready_fds++;
             }
         }
 
-        if FD_ISSET(i, writefds) {
+        if (writefds && FD_ISSET(i, writefds)) {
             if (fd_table.w32_ios[i] == NULL) {
                 errno = EPERM;
                 return -1;
             }
 
             in_ready_fds++;
-            if (w32_io_is_ioready(fd_table.w32_ios[i], FALSE)) {
+            if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
                 FD_SET(i, &write_ready_fds);
                 out_ready_fds++;
             }
@@ -254,94 +260,68 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
     //if some fds are already ready, return
     if (out_ready_fds)
     {
-        *readfds = read_ready_fds;
-        *writefds = write_ready_fds;
+        if (readfds)
+            *readfds = read_ready_fds;
+        if (writefds)
+            *writefds = write_ready_fds;
         return out_ready_fds;
     }
 
     //start async io on selected fds
     for (int i = 0; i <= fds; i++) {
 
-        if FD_ISSET(i, readfds) {
-            if (w32_io_start_asyncio(fd_table.w32_ios[i], TRUE) == -1)
+        if (readfds && FD_ISSET(i, readfds)) {
+            if (w32_io_on_select(fd_table.w32_ios[i], TRUE) == -1)
                 return -1;
             if (fd_table.w32_ios[i]->type == LISTEN_FD) {
                 events[num_events++] = fd_table.w32_ios[i]->read_overlapped.hEvent;
             }
         }
 
-        if FD_ISSET(i, writefds) {
-            if (w32_io_start_asyncio(fd_table.w32_ios[i], FALSE) == -1)
+        if (writefds && FD_ISSET(i, writefds)) {
+            if (w32_io_on_select(fd_table.w32_ios[i], FALSE) == -1)
                 return -1;
         }
     }
 
-    //wait for any io to complete
-    if (num_events)
-    {
-        DWORD ret = WaitForMultipleObjectsEx(num_events, events, FALSE, ((timeout->tv_sec) * 1000) + ((timeout->tv_usec) / 1000), TRUE);
-        if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_events - 1)) {
-            //woken up by event signalled
-        }
-        else if (ret == WAIT_IO_COMPLETION) {
-            //woken up by APC from IO completion
-        }
-        else if (ret == WAIT_TIMEOUT) {
-            errno = ETIMEDOUT;
+    do {
+        //to-do cut down wait time on subsequent waits
+        if (0 != wait_for_any_event(events, num_events, ((timeout->tv_sec) * 1000) + ((timeout->tv_usec) / 1000))) {
             return -1;
         }
-        else { //some other error
-            errno = EOTHER;
-            return -1;
-        }
-    }
-    else
-    {
-        DWORD ret = SleepEx(((timeout->tv_sec) * 1000) + ((timeout->tv_usec) / 1000), TRUE);
-        if (ret == WAIT_IO_COMPLETION) {
-            //worken up by APC from IO completion
-        }
-        else if (ret == 0) {
-            //timed out
-            errno = ETIMEDOUT;
-            return -1;
-        }
-        else { //some other error
-            errno = EOTHER;
-            return -1;
-        }
-    }
 
-    //check on fd status
-    out_ready_fds = 0;
-    for (int i = 0; i <= fds; i++) {
+        //check on fd status
+        out_ready_fds = 0;
+        for (int i = 0; i <= fds; i++) {
 
-        if FD_ISSET(i, readfds) {
-            in_ready_fds++;
-            if (w32_io_is_ioready(fd_table.w32_ios[i], TRUE)) {
-                FD_SET(i, &read_ready_fds);
-                out_ready_fds++;
+            if (readfds && FD_ISSET(i, readfds)) {
+                in_ready_fds++;
+                if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
+                    FD_SET(i, &read_ready_fds);
+                    out_ready_fds++;
+                }
+            }
+
+            if (writefds && FD_ISSET(i, writefds)) {
+                in_ready_fds++;
+                if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
+                    FD_SET(i, &write_ready_fds);
+                    out_ready_fds++;
+                }
             }
         }
 
-        if FD_ISSET(i, writefds) {
-            in_ready_fds++;
-            if (w32_io_is_ioready(fd_table.w32_ios[i], FALSE)) {
-                FD_SET(i, &write_ready_fds);
-                out_ready_fds++;
-            }
-        }
+        if (out_ready_fds)
+            break;
 
-    }
+    } while (1);
 
-    if (out_ready_fds)
-    {
+    if (readfds)
         *readfds = read_ready_fds;
+    if (writefds)
         *writefds = write_ready_fds;
-        return out_ready_fds;
-    }
+    
+    return out_ready_fds;
  
-    errno = EOTHER;
-    return -1;
 }
 

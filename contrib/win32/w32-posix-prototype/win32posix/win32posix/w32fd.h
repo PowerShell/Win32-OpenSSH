@@ -51,12 +51,16 @@ struct w32_io {
 };
 
 BOOL w32_io_is_blocking(struct w32_io*);
-BOOL w32_io_is_ioready(struct w32_io* pio, BOOL rd);
+BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd);
 
+//signal
+int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds);
+
+//socket io
 int socketio_initialize();
 int socketio_done();
-BOOL socketio_is_ioready(struct w32_io* pio, BOOL rd);
-int socketio_start_asyncio(struct w32_io* pio, BOOL rd);
+BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd);
+int socketio_on_select(struct w32_io* pio, BOOL rd);
 struct w32_io* socketio_socket(int domain, int type, int protocol);
 struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen);
 int socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optval, int optlen);
