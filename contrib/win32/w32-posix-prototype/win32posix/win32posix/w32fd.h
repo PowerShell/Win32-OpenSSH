@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <stdio.h>
 
 enum w32_io_type {
 	UNKOWN_FD = 0,
@@ -74,4 +75,14 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags);
 int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags);
 int socketio_shutdown(struct w32_io* pio, int how);
 int socketio_close(struct w32_io* pio);
+
+
+//fileio
+int fileio_pipe(struct w32_io* pio[2]);
+struct w32_io* fileio_open(const char *pathname, int flags, int mode);
+int fileio_read(struct w32_io* pio, void *dst, unsigned int max);
+int fileio_write(struct w32_io* pio, const void *buf, unsigned int max);
+int fileio_fstat(struct w32_io* pio, struct stat *buf);
+int fileio_isatty(struct w32_io* pio);
+FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
 

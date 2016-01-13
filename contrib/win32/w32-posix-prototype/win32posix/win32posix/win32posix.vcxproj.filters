@@ -27,12 +27,18 @@
     <ClCompile Include="signal.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="fileio.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="w32fd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="w32posix.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

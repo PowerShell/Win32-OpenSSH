@@ -5,7 +5,7 @@
 #include "w32fd.h"
 #include <stddef.h>
 
-#define INTERNAL_BUFFER_SIZE 100*1024 //100KB
+#define INTERNAL_SEND_BUFFER_SIZE 70*1024 //70KB
 
 #define INTERNAL_RECV_BUFFER_SIZE 70*1024 //70KB
 
@@ -248,7 +248,7 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     BOOL completed = FALSE;
     
     if ((buf == NULL) || (len == 0)){
-        errno = EPERM;
+        errno = EINVAL;
         return -1;
     }
 
@@ -371,7 +371,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
     }
 
     //initialize buffers if needed
-    wsabuf.len = INTERNAL_BUFFER_SIZE;
+    wsabuf.len = INTERNAL_SEND_BUFFER_SIZE;
     if (pio->write_details.buf == NULL)
     {
         wsabuf.buf = malloc(wsabuf.len);

@@ -127,48 +127,155 @@ int w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 }
 
 int w32_setsockopt(int fd, int level, int optname, const char* optval, int optlen) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_setsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
 }
 
 int w32_getsockopt(int fd, int level, int optname, char* optval, int* optlen) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_getsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
 }
 
 int w32_getsockname(int fd, struct sockaddr* name, int* namelen) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_getsockname(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_getpeername(int fd, struct sockaddr* name, int* namelen) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_getpeername(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_listen(int fd, int backlog) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_listen(fd_table.w32_ios[fd], backlog);
 }
 
 int w32_bind(int fd, const struct sockaddr *name, int namelen) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_bind(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_connect(int fd, const struct sockaddr* name, int namelen) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_connect(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_recv(int fd, void *buf, size_t len, int flags) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_recv(fd_table.w32_ios[fd], buf, len, flags);
 }
 
 int w32_send(int fd, const void *buf, size_t len, int flags) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_send(fd_table.w32_ios[fd], buf, len, flags);
 }
 
 
 int w32_shutdown(int fd, int how) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
     return socketio_shutdown(fd_table.w32_ios[fd], how);
 }
 
+
+
+
+//file io
+int w32_pipe(int *pfds){
+    pfds[0] = -1;
+    pfds[1] = -1;
+    struct w32_io* pio[2];
+
+    fileio_pipe(pio);
+    return -1;
+}
+
+int w32_open(const char *pathname, int flags, ...) {
+
+    struct w32_io* fileio = fileio_open(pathname, flags, 0);
+    return -1;
+}
+
+int w32_read(int fd, void *dst, unsigned int max) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    return fileio_read(fd_table.w32_ios[fd], dst, max);
+}
+
+int w32_write(int fd, const void *buf, unsigned int max) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    return fileio_write(fd_table.w32_ios[fd], buf, max);
+}
+
+int w32_fstat(int fd, struct stat *buf) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+    return fileio_fstat(fd_table.w32_ios[fd], buf);
+}
+
+int w32_isatty(int fd) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
+
+    return fileio_isatty(fd_table.w32_ios[fd]);
+}
+
+FILE* w32_fdopen(int fd, const char *mode) {
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return NULL;
+    }
+
+    return fileio_fdopen(fd_table.w32_ios[fd], mode);
+}
+
+//Common IO
 int w32_close(int fd) {
     struct w32_io* pio = fd_table.w32_ios[fd];
+
+    if (pio == NULL) {
+        errno = EBADF;
+        return -1;
+    }
 
     fd_table_clear(pio->table_index);
     if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
@@ -181,6 +288,11 @@ int w32_close(int fd) {
 int w32_fcntl(int fd, int cmd, ... /* arg */) {
     va_list valist;
     va_start(valist, cmd);
+
+    if (fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        return -1;
+    }
 
     switch (cmd){
     case F_GETFL:
@@ -215,7 +327,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
     }
 
     if (!readfds && !writefds && !exceptfds) {
-        errno = EPERM;
+        errno = EINVAL;
         return -1;
     }
 
@@ -225,7 +337,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
 
         if (readfds && FD_ISSET(i, readfds)) {
             if (fd_table.w32_ios[i] == NULL) {
-                errno = EPERM;
+                errno = EBADF;
                 return -1;
             }
 
@@ -238,7 +350,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
 
         if (writefds && FD_ISSET(i, writefds)) {
             if (fd_table.w32_ios[i] == NULL) {
-                errno = EPERM;
+                errno = EBADF;
                 return -1;
             }
 
@@ -325,3 +437,11 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
  
 }
 
+
+int w32_dup(int oldfd) {
+    return -1;
+}
+
+int w32_dup2(int oldfd, int newfd) {
+    return -1;
+}
