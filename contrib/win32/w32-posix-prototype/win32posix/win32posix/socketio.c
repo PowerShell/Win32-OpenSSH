@@ -9,7 +9,7 @@
 
 #define INTERNAL_RECV_BUFFER_SIZE 70*1024 //70KB
 
-static int getWSAErrno()
+static int errno_from_WSAError()
 {
 	int wsaerrno = WSAGetLastError();
 
@@ -34,7 +34,7 @@ static int getWSAErrno()
 static int set_errno_on_error(int ret)
 {
     if (ret == SOCKET_ERROR) {
-        errno = getWSAErrno();
+        errno = errno_from_WSAError();
     }
     return ret;
 }
@@ -76,7 +76,7 @@ int socketio_acceptEx(struct w32_io* pio) {
             &dwBytes, NULL, NULL))
         {
             free(context);
-            errno = getWSAErrno();
+            errno = errno_from_WSAError();
             return -1;
         }
 
@@ -99,7 +99,7 @@ int socketio_acceptEx(struct w32_io* pio) {
     //todo - get socket parameters from listening socket
     context->accept_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (context->accept_socket == INVALID_SOCKET) {
-        errno = getWSAErrno();
+        errno = errno_from_WSAError();
         return -1;
     }
 
@@ -118,7 +118,7 @@ int socketio_acceptEx(struct w32_io* pio) {
     else {
         //if overlapped io is in progress, we are good
         if (WSAGetLastError() != ERROR_IO_PENDING) {
-            errno = getWSAErrno();
+            errno = errno_from_WSAError();
             return -1;
         }
     }
@@ -188,7 +188,7 @@ int socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
             pio->read_details.pending = TRUE;
         }
         else { //failed 
-            errno = getWSAErrno();
+            errno = errno_from_WSAError();
             return -1;
         }
     }
@@ -206,7 +206,7 @@ struct w32_io* socketio_socket(int domain, int type, int protocol) {
 	memset(pio, 0, sizeof(struct w32_io));
 	pio->sock = socket(domain, type, protocol);
 	if (pio->sock == INVALID_SOCKET) {
-		errno = getWSAErrno(); 
+		errno = errno_from_WSAError(); 
 		free(pio);
 		return NULL;
 	}
@@ -424,7 +424,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
             return wsabuf.len;
         }
         else { //failed 
-            errno = getWSAErrno();
+            errno = errno_from_WSAError();
             return -1;
         }
     }
@@ -492,7 +492,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     
     if (0 != setsockopt(context->accept_socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&pio->sock, sizeof(pio->sock)))
     {
-        errno = getWSAErrno();
+        errno = errno_from_WSAError();
         return NULL;
     }
 

@@ -75,8 +75,7 @@ BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd) {
         return socketio_is_io_available(pio, rd);
     }
     else {
-        //return fileio_is_ready(pio);
-        return FALSE;
+        return fileio_is_io_available(pio, rd);
     }
 
 }
@@ -87,8 +86,7 @@ int w32_io_on_select(struct w32_io* pio, BOOL rd)
         return socketio_on_select(pio, rd);
     }
     else {
-        //return fileio_start_io(pio);
-        return -1;
+        return fileio_on_select(pio, rd);
     }
 
 }
@@ -212,18 +210,43 @@ int w32_shutdown(int fd, int how) {
 
 //file io
 int w32_pipe(int *pfds){
-    pfds[0] = -1;
-    pfds[1] = -1;
+    int read_index, write_index;
     struct w32_io* pio[2];
 
-    fileio_pipe(pio);
-    return -1;
+    read_index = fd_table_get_min_index();
+    if (read_index == -1)
+        return -1;
+
+    //temporarily set occupied bit
+    FD_SET(read_index, &fd_table.occupied);
+    write_index = fd_table_get_min_index();
+    FD_CLR(write_index, &fd_table.occupied);
+    if (read_index == -1)
+        return -1;
+
+    if (-1 == fileio_pipe(pio))
+        return -1;
+
+    fd_table_set(pio[0], read_index);
+    fd_table_set(pio[1], write_index);
+    pfds[0] = read_index;
+    pfds[1] = write_index;
+    return 0;
 }
 
 int w32_open(const char *pathname, int flags, ...) {
+    int min_index = fd_table_get_min_index();
+    struct w32_io* pio;
+    
+    if (min_index == -1)
+        return -1;
+    
+    pio = fileio_open(pathname, flags, 0);
+    if (pio == NULL)
+        return -1;
 
-    struct w32_io* fileio = fileio_open(pathname, flags, 0);
-    return -1;
+    fd_table_set(pio, min_index);
+    return min_index;
 }
 
 int w32_read(int fd, void *dst, unsigned int max) {
@@ -282,7 +305,7 @@ int w32_close(int fd) {
         return socketio_close(pio);
     }
     else
-        return -1;
+        return fileio_close(pio);
 }
 
 int w32_fcntl(int fd, int cmd, ... /* arg */) {

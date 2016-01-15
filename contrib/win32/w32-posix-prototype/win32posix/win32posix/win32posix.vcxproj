@@ -74,7 +74,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="fileio.cpp" />
+    <ClCompile Include="fileio.c" />
     <ClCompile Include="signal.c" />
     <ClCompile Include="socketio.c" />
     <ClCompile Include="w32fd.c" />

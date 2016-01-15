@@ -27,7 +27,7 @@
     <ClCompile Include="signal.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="fileio.cpp">
+    <ClCompile Include="fileio.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -2,10 +2,12 @@
 #include <stdio.h>
 
 enum w32_io_type {
-	UNKOWN_FD = 0,
-	LISTEN_FD,
-	SOCK_FD,
-	FILE_FD
+    UNKOWN_FD = 0,
+    LISTEN_FD,
+    SOCK_FD,
+    FILE_FD,
+    PIPE_FD,
+    CONSOLE_FD
 };
 
 struct w32_io {
@@ -78,6 +80,9 @@ int socketio_close(struct w32_io* pio);
 
 
 //fileio
+BOOL fileio_is_io_available(struct w32_io* pio, BOOL rd);
+int fileio_on_select(struct w32_io* pio, BOOL rd);
+int fileio_close(struct w32_io* pio);
 int fileio_pipe(struct w32_io* pio[2]);
 struct w32_io* fileio_open(const char *pathname, int flags, int mode);
 int fileio_read(struct w32_io* pio, void *dst, unsigned int max);
@@ -85,4 +90,5 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max);
 int fileio_fstat(struct w32_io* pio, struct stat *buf);
 int fileio_isatty(struct w32_io* pio);
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
+
 
