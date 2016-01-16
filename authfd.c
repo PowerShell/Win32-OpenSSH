@@ -114,6 +114,14 @@ ssh_get_authentication_socket(int *fdp)
 		errno = oerrno;
 		return SSH_ERR_SYSTEM_ERROR;
 	}
+#else
+	if (
+		connect(sock, (struct sockaddr *)&sunaddr, sizeof(sunaddr)) < 0) {
+		oerrno = errno;
+		close(sock);
+		errno = oerrno;
+		return SSH_ERR_SYSTEM_ERROR;
+	}
 #endif /* #ifndef WIN32_FIXME */
 
 	if (fdp != NULL)
