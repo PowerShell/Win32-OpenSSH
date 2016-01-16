@@ -34,20 +34,6 @@
 #include "leakmalloc.h"
 #endif
 
-#ifdef WITH_OPENSSL
-# ifdef OPENSSL_HAS_ECC
-#  include <openssl/ec.h>
-# else /* OPENSSL_HAS_ECC */
-#  define EC_KEY	void
-#  define EC_GROUP	void
-#  define EC_POINT	void
-# endif /* OPENSSL_HAS_ECC */
-#else /* WITH_OPENSSL */
-# define EC_KEY		void
-# define EC_GROUP	void
-# define EC_POINT	void
-#endif /* WITH_OPENSSL */
-
 #define KEX_COOKIE_LEN	16
 
 #define	KEX_DH1			"diffie-hellman-group1-sha1"
@@ -142,15 +128,15 @@ struct kex {
 	char	*client_version_string;
 	char	*server_version_string;
 	char	*failed_choice;
-	int	(*verify_host_key)(struct sshkey *, struct ssh *);
+	int(*verify_host_key)(struct sshkey *, struct ssh *);
 	struct sshkey *(*load_host_public_key)(int, int, struct ssh *);
 	struct sshkey *(*load_host_private_key)(int, int, struct ssh *);
-	int	(*host_key_index)(struct sshkey *, int, struct ssh *);
-	int	(*sign)(struct sshkey *, struct sshkey *,
-	    u_char **, size_t *, const u_char *, size_t, u_int);
-	int	(*kex[KEX_MAX])(struct ssh *);
+	int(*host_key_index)(struct sshkey *, int, struct ssh *);
+	int(*sign)(struct sshkey *, struct sshkey *,
+		u_char **, size_t *, const u_char *, size_t, u_int);
+	int(*kex[KEX_MAX])(struct ssh *);
 	/* kex specific state */
-	DH	*dh;			/* DH */
+	struct sshdh *dh;			/* DH */
 	u_int	min, max, nbits;	/* GEX */
 	EC_KEY	*ec_client_key;		/* ECDH */
 	const EC_GROUP *ec_group;	/* ECDH */
@@ -175,7 +161,8 @@ void	 kex_prop_free(char **);
 int	 kex_send_kexinit(struct ssh *);
 int	 kex_input_kexinit(int, u_int32_t, void *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, const struct sshbuf *);
-int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int, const BIGNUM *);
+int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int,
+	const struct sshbn *);
 int	 kex_send_newkeys(struct ssh *);
 
 int	 kexdh_client(struct ssh *);
@@ -188,29 +175,30 @@ int	 kexc25519_client(struct ssh *);
 int	 kexc25519_server(struct ssh *);
 
 int	 kex_dh_hash(const char *, const char *,
-    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-    const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char *, size_t *);
+	const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+	const struct sshbn *, const struct sshbn *,
+	const struct sshbn *, u_char *, size_t *);
 
 int	 kexgex_hash(int, const char *, const char *,
-    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-    int, int, int,
-    const BIGNUM *, const BIGNUM *, const BIGNUM *,
-    const BIGNUM *, const BIGNUM *,
-    u_char *, size_t *);
+	const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+	int, int, int,
+	const struct sshbn *, const struct sshbn *, const struct sshbn *,
+	const struct sshbn *, const struct sshbn *,
+	u_char *, size_t *);
 
 int kex_ecdh_hash(int, const EC_GROUP *, const char *, const char *,
-    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-    const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char *, size_t *);
+	const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+	const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char *, size_t *);
 
 int	 kex_c25519_hash(int, const char *, const char *, const char *, size_t,
-    const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
-    const u_char *, size_t, u_char *, size_t *);
+	const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
+	const u_char *, size_t, u_char *, size_t *);
 
 void	kexc25519_keygen(u_char key[CURVE25519_SIZE], u_char pub[CURVE25519_SIZE])
-	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
-	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
+__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
+__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
 int	kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
-    const u_char pub[CURVE25519_SIZE], struct sshbuf *out)
+	const u_char pub[CURVE25519_SIZE], struct sshbuf *out)
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
 
@@ -219,12 +207,6 @@ derive_ssh1_session_id(BIGNUM *, BIGNUM *, u_int8_t[8], u_int8_t[16]);
 
 #if defined(DEBUG_KEX) || defined(DEBUG_KEXDH) || defined(DEBUG_KEXECDH)
 void	dump_digest(char *, u_char *, int);
-#endif
-
-#if !defined(WITH_OPENSSL) || !defined(OPENSSL_HAS_ECC)
-# undef EC_KEY
-# undef EC_GROUP
-# undef EC_POINT
 #endif
 
 #endif

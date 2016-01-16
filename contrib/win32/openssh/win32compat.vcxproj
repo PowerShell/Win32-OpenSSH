@@ -159,11 +159,13 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kex.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexdhc.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexdhs.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexgexc.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kexgexs.c" />
+    <ClCompile Include="..\win32compat\cng_dh.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_openssl_dh.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ansiprsr.h" />
