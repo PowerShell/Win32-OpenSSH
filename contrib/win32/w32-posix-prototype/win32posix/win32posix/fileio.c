@@ -157,34 +157,142 @@ VOID CALLBACK ReadCompletionRoutine(
     pio->read_details.pending = FALSE;
 }
 
-int fileio_ReadFileEx(struct w32_io* pio, BOOL *completed) {
+#define READ_BUFFER_SIZE 100*1024
 
+int fileio_ReadFileEx(struct w32_io* pio) {
+    
+    if (pio->read_details.buf == NULL)
+    {
+        pio->read_details.buf = malloc(READ_BUFFER_SIZE);
+
+        if (!pio->read_details.buf)
+        {
+            errno = ENOMEM;
+            return -1;
+        }
+
+        pio->read_details.buf_size = READ_BUFFER_SIZE;
+    }
+    
+    if (ReadFileEx(pio->handle, pio->read_details.buf, pio->read_details.buf_size, &pio->read_overlapped, &ReadCompletionRoutine))
+    {
+        pio->read_details.pending = TRUE;
+    }
+    else
+    {
+        errno = errno_from_Win32Error();
+        return -1;
+    }
+
+    return 0;
 }
 
 int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
+    int bytes_copied;
 
-    BOOL WINAPI ReadFileEx(
-        _In_      HANDLE                          hFile,
-        _Out_opt_ LPVOID                          lpBuffer,
-        _In_      DWORD                           nNumberOfBytesToRead,
-        _Inout_   LPOVERLAPPED                    lpOverlapped,
-        _In_      LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
-        );
+    if (fileio_is_io_available(pio, TRUE) == FALSE)
+    {
 
+        if (-1 == fileio_ReadFileEx(pio))
+            return -1;
 
-    return -1;
+        //Pick up APC if IO has completed
+        SleepEx(0, TRUE);
+
+        if (w32_io_is_blocking(pio))  {
+            while (fileio_is_io_available(pio, TRUE) == FALSE) {
+                if (-1 == wait_for_any_event(NULL, 0, INFINITE))
+                    return -1;
+            }
+        }
+        else {
+
+            if (pio->read_details.pending) {
+                errno = EAGAIN;
+                return -1;
+            }
+            else {
+                if (pio->read_details.error) {
+                    errno = EOTHER;
+                    return -1;
+                }
+            }
+        }
+    }
+
+    if (pio->read_details.error) {
+        errno = EOTHER;
+        return -1;
+    }
+
+    bytes_copied = min(max, pio->read_details.remaining);
+    memcpy(dst, pio->read_details.buf, bytes_copied);
+    return bytes_copied;
 }
-
 
 VOID CALLBACK WriteCompletionRoutine(
     _In_    DWORD        dwErrorCode,
     _In_    DWORD        dwNumberOfBytesTransfered,
     _Inout_ LPOVERLAPPED lpOverlapped
     ) {
-
+    struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, write_overlapped));
+    pio->write_details.error = dwErrorCode;
+    //assert that remaining == dwNumberOfBytesTransfered
+    pio->write_details.remaining -= dwNumberOfBytesTransfered;
+    pio->write_details.pending = FALSE;
 }
+
+#define WRITE_BUFFER_SIZE 100*1024
 int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
-    return -1;
+    int bytes_copied;
+
+    if (pio->write_details.pending) {
+        errno = EAGAIN;
+        return -1;
+    }
+
+    if (pio->write_details.error) {
+        errno = EOTHER;
+        return -1;
+    }
+
+    if (pio->write_details.buf == NULL) {
+        pio->write_details.buf = malloc(WRITE_BUFFER_SIZE);
+        if (pio->write_details.buf == NULL) {
+            errno = ENOMEM;
+            return -1;
+        }
+        pio->write_details.buf_size = WRITE_BUFFER_SIZE;
+    }
+
+    bytes_copied = min(max, pio->write_details.buf_size);
+    memcpy(pio->write_details.buf, buf, bytes_copied);
+
+    if (WriteFileEx(pio->handle, pio->write_details.buf, bytes_copied, &pio->write_overlapped, &WriteCompletionRoutine))
+    {
+        pio->write_details.pending = TRUE;
+        SleepEx(0, TRUE);
+
+        if (w32_io_is_blocking(pio, FALSE)) {
+            while (pio->write_details.pending) {
+                if (wait_for_any_event(NULL, 0, INFINITE) == -1)
+                    return -1;
+            }
+        }
+        else {
+            if (!pio->write_details.pending && pio->write_details.error){
+                errno = EOTHER;
+                return -1;
+            }
+            return bytes_copied;
+        }
+    }
+    else
+    {
+        errno = EOTHER;
+        return -1;
+    }
+
 }
 
 int fileio_fstat(struct w32_io* pio, struct stat *buf) {
@@ -239,7 +347,20 @@ FILE* fileio_fdopen(struct w32_io* pio, const char *mode) {
     return _fdopen(fd, mode);
 }
 
-int fileio_on_select(struct w32_io* pio, BOOL rd);
+int fileio_on_select(struct w32_io* pio, BOOL rd) {
+    if (rd && pio->read_details.pending)
+        return 0;
+
+    if (!rd && pio->write_details.pending)
+        return 0;
+    if (rd) {
+        if (fileio_ReadFileEx(pio) == -1)
+            return -1;
+    }
+    else {
+        //nothing to do with write
+    }
+}
 
 
 int fileio_close(struct w32_io* pio) {
