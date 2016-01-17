@@ -220,8 +220,8 @@ int w32_pipe(int *pfds){
     //temporarily set occupied bit
     FD_SET(read_index, &fd_table.occupied);
     write_index = fd_table_get_min_index();
-    FD_CLR(write_index, &fd_table.occupied);
-    if (read_index == -1)
+    FD_CLR(read_index, &fd_table.occupied);
+    if (write_index == -1)
         return -1;
 
     if (-1 == fileio_pipe(pio))

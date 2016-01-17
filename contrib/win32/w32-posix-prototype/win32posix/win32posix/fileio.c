@@ -39,8 +39,8 @@ int fileio_pipe(struct w32_io* pio[2]) {
     sec_attributes.nLength = 0;
 
     read_handle = CreateNamedPipeA(pipe_name,
-        PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE,
-        PIPE_TYPE_BYTE | PIPE_NOWAIT,
+        PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+        PIPE_TYPE_BYTE | PIPE_WAIT,
         1,
         4096,
         4096,
@@ -56,7 +56,7 @@ int fileio_pipe(struct w32_io* pio[2]) {
         0,
         &sec_attributes,
         OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
         NULL);
     if (write_handle == INVALID_HANDLE_VALUE) {
         errno = errno_from_Win32Error();
@@ -82,6 +82,7 @@ int fileio_pipe(struct w32_io* pio[2]) {
 
     pio[0] = pio_read;
     pio[1] = pio_write;
+    return 0;
 
 error:
     if (read_handle)
@@ -226,7 +227,9 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     }
 
     bytes_copied = min(max, pio->read_details.remaining);
-    memcpy(dst, pio->read_details.buf, bytes_copied);
+    memcpy(dst, pio->read_details.buf + pio->read_details.completed, bytes_copied);
+    pio->read_details.remaining -= bytes_copied;
+    pio->read_details.completed += bytes_copied;
     return bytes_copied;
 }
 
@@ -273,23 +276,21 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
         pio->write_details.pending = TRUE;
         SleepEx(0, TRUE);
 
-        if (w32_io_is_blocking(pio, FALSE)) {
+        if (w32_io_is_blocking(pio)) {
             while (pio->write_details.pending) {
                 if (wait_for_any_event(NULL, 0, INFINITE) == -1)
                     return -1;
             }
         }
-        else {
-            if (!pio->write_details.pending && pio->write_details.error){
-                errno = EOTHER;
-                return -1;
-            }
-            return bytes_copied;
+        if (!pio->write_details.pending && pio->write_details.error){
+            errno = EOTHER;
+            return -1;
         }
+        return bytes_copied;
     }
     else
     {
-        errno = EOTHER;
+        errno = errno_from_Win32Error();
         return -1;
     }
 
@@ -300,7 +301,7 @@ int fileio_fstat(struct w32_io* pio, struct stat *buf) {
  
     if (fd == -1) {
         errno = EOTHER;
-        return NULL;
+        return -1;
     }
 
     return _fstat(fd, (struct _stat*)&buf);
@@ -353,20 +354,19 @@ int fileio_on_select(struct w32_io* pio, BOOL rd) {
 
     if (!rd && pio->write_details.pending)
         return 0;
-    if (rd) {
-        if (fileio_ReadFileEx(pio) == -1)
-            return -1;
-    }
-    else {
+    
+    if (rd)
+        return fileio_ReadFileEx(pio);
+    else
         //nothing to do with write
-    }
+        return 0;
 }
 
 
 int fileio_close(struct w32_io* pio) {
     CancelIo(pio->handle);
     //let queued APCs (if any) drain
-    SleepEx(1, TRUE);
+    SleepEx(0, TRUE);
     CloseHandle(pio->handle);
 
     if (pio->read_details.buf)
