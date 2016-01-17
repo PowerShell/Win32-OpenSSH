@@ -191,6 +191,12 @@ int fileio_ReadFileEx(struct w32_io* pio) {
 int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     int bytes_copied;
 
+    //if read is pending 
+    if (pio->read_details.pending) {
+        errno = EAGAIN;
+        return -1;
+    }
+
     if (fileio_is_io_available(pio, TRUE) == FALSE)
     {
 
