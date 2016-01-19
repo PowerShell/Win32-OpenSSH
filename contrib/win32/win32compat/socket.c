@@ -2013,9 +2013,10 @@ int cleanSelectThread(int thread_no)
 
   if(thread_data_set[thread_no] != NULL)
   {
-    HeapFree(GetProcessHeap(), 0, thread_data_set[thread_no]);
-   
-    thread_data_set[thread_no] = NULL;
+	thread_data_p ap = thread_data_set[thread_no];
+	thread_data_set[thread_no] = NULL;
+    HeapFree(GetProcessHeap(), 0, ap);
+       
   }
   
   DBG_MSG("<- cleanSelectThread()...\n");

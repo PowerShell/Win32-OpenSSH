@@ -1734,7 +1734,9 @@ main(int ac, char **av)
 		cleanup_exit(1);
 	}
 	if (pid != 0) {		/* Parent - execute the given command. */
+		#ifndef WIN32_FIXME
 		close(sock);
+		#endif
 		snprintf(pidstrbuf, sizeof pidstrbuf, "%ld", (long)pid);
 		if (ac == 0) {
 	#ifdef WIN32_FIXME
@@ -1748,6 +1750,11 @@ main(int ac, char **av)
 			printf(format, SSH_AGENTPID_ENV_NAME, pidstrbuf,
 			    SSH_AGENTPID_ENV_NAME);
 			printf("echo Agent pid %ld;\n", (long)pid);
+			#ifdef WIN32_FIXME
+			SetEnvironmentVariable(SSH_AUTHSOCKET_ENV_NAME, socket_name);
+			SetEnvironmentVariable(SSH_AGENTPID_ENV_NAME, pidstrbuf);
+			system("start cmd");
+			#endif
 			exit(0);
 		}
 		if (setenv(SSH_AUTHSOCKET_ENV_NAME, socket_name, 1) == -1 ||

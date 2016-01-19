@@ -203,6 +203,8 @@ realpath(const char *path, char resolved[PATH_MAX])
 
 #else
 
+#include <Shlwapi.h>
+
 void backslashconvert(char *str)
 {
 	while (*str) {

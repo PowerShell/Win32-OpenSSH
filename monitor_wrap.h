@@ -39,7 +39,7 @@ struct Authctxt;
 
 void mm_log_handler(LogLevel, const char *, void *);
 int mm_is_monitor(void);
-DH *mm_choose_dh(int, int, int);
+struct sshdh *mm_choose_dh(int, int, int);
 int mm_key_sign(Key *, u_char **, u_int *, const u_char *, u_int);
 void mm_inform_authserv(char *, char *);
 struct passwd *mm_getpwnamallow(const char *);

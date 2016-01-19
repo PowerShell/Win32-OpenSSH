@@ -520,6 +520,11 @@ main(int argc, char **argv)
 		fprintf(stderr, "Could not open a connection to your "
 		    "authentication agent.\n");
 		exit(2);
+	#ifdef WIN32_FIXME
+	case SSH_ERR_SYSTEM_ERROR:
+		fprintf(stderr, "Error connecting to agent: ssh-agent.exe may not be running\n");
+		exit(2);
+	#endif
 	default:
 		fprintf(stderr, "Error connecting to agent: %s\n", ssh_err(r));
 		exit(2);
