@@ -262,6 +262,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openssl-dh.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\..\openssl-epoint.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h" />
