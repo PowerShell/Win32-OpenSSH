@@ -804,25 +804,25 @@ do_exec_no_pty(Session *s, const char *command)
    * Get user homedir if needed.
    */
   
-  if (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
+  if (1) // (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
   {
     /*
      * If there is homedir from LSA use it.
      */
 
-    if (HomeDirLsaW[0] != '\0')
-    {
-      s -> pw -> pw_dir = HomeDirLsaW;
-    }
+    //if (HomeDirLsaW[0] != '\0')
+    //{
+      //s -> pw -> pw_dir = HomeDirLsaW;
+    //}
     
     /*
      * If not get homedir from token.
      */
     
-    else
-    {
+    //else
+    //{
       s -> pw -> pw_dir = GetHomeDirFromToken(s -> pw -> pw_name, hToken);
-    }
+    //}
   }
 
   /*
@@ -832,6 +832,16 @@ do_exec_no_pty(Session *s, const char *command)
   _wchdir(s -> pw -> pw_dir);
 
   SetEnvironmentVariableW(L"HOME", s -> pw -> pw_dir);
+  wchar_t *wstr, wchr;
+  wstr = wcschr(s->pw->pw_dir, ':');
+  if (wstr) {
+	  wchr = *(wstr + 1);
+	  *(wstr + 1) = '\0';
+	  SetEnvironmentVariableW(L"HOMEDRIVE", s->pw->pw_dir);
+	  *(wstr + 1) = wchr;
+	  SetEnvironmentVariableW(L"HOMEPATH", (wstr+1));
+  }
+
   SetEnvironmentVariableW(L"USERPROFILE", s -> pw -> pw_dir);
   
   // find the server name of the domain controller which created this token
