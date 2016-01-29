@@ -9,10 +9,20 @@ struct w32fd_table {
 };
 
 struct w32fd_table fd_table;
+struct w32_io w32_io_stdin, w32_io_stdout, w32_io_stderr;
+void fd_table_set(struct w32_io* pio, int index);
 
 int fd_table_initialize() {
     memset(&fd_table, 0, sizeof(fd_table));
-    //set stdin, stdout and stderr
+    memset(&w32_io_stdin, 0, sizeof(w32_io_stdin));
+    w32_io_stdin.handle = STD_INPUT_HANDLE;
+    fd_table_set(&w32_io_stdin, stdin);
+    memset(&w32_io_stdout, 0, sizeof(w32_io_stdout));
+    w32_io_stdout.handle = STD_OUTPUT_HANDLE;
+    fd_table_set(&w32_io_stdout, stdout);
+    memset(&w32_io_stderr, 0, sizeof(w32_io_stderr));
+    w32_io_stderr.handle = STD_ERROR_HANDLE;
+    fd_table_set(&w32_io_stderr, stderr);
     return 0;
 }
 
@@ -356,7 +366,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
 
 
     //see if any io is ready
-    for (int i = 0; i <= fds; i++) {
+    for (int i = 0; i < fds; i++) {
 
         if (readfds && FD_ISSET(i, readfds)) {
             if (fd_table.w32_ios[i] == NULL) {
@@ -403,7 +413,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
     }
 
     //start async io on selected fds
-    for (int i = 0; i <= fds; i++) {
+    for (int i = 0; i < fds; i++) {
 
         if (readfds && FD_ISSET(i, readfds)) {
             if (w32_io_on_select(fd_table.w32_ios[i], TRUE) == -1)
@@ -427,7 +437,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
 
         //check on fd status
         out_ready_fds = 0;
-        for (int i = 0; i <= fds; i++) {
+        for (int i = 0; i < fds; i++) {
 
             if (readfds && FD_ISSET(i, readfds)) {
                 in_ready_fds++;
