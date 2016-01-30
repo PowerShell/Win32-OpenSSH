@@ -127,8 +127,6 @@ int socketio_acceptEx(struct w32_io* pio) {
     return 0;
 }
 
-#define RECV_CONNECTION_CLOSED 1234
-
 void CALLBACK WSARecvCompletionRoutine(
     IN DWORD dwError,
     IN DWORD cbTransferred,
@@ -138,7 +136,7 @@ void CALLBACK WSARecvCompletionRoutine(
 {
     struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, read_overlapped));
     if (!dwError && !cbTransferred)
-        dwError = RECV_CONNECTION_CLOSED;
+        dwError = ERROR_GRACEFUL_DISCONNECT;
     pio->read_details.error = dwError;
     pio->read_details.remaining = cbTransferred;
     pio->read_details.completed = 0;
@@ -270,7 +268,7 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 
     //if there was an error on async call, return
     if (pio->read_details.error) {
-        if (pio->read_details.error == RECV_CONNECTION_CLOSED) {
+        if (pio->read_details.error == ERROR_GRACEFUL_DISCONNECT) {
             //connection is closed
             return 0;
         }
@@ -313,7 +311,7 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     //by this time we should have some bytes in internal buffer or an error from callback
     if (pio->read_details.error)
     {
-        if (pio->read_details.error == RECV_CONNECTION_CLOSED) {
+        if (pio->read_details.error == ERROR_GRACEFUL_DISCONNECT) {
             //connection is closed
             return 0;
         }
@@ -361,12 +359,24 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
     //if io is already pending
     if (pio->write_details.pending)
     {
-        errno = EAGAIN;
-        return -1;
+        if (w32_io_is_blocking(pio))
+        {
+            //this covers the scenario when the fd was previously non blocking (and hence io is still pending)
+            //wait for previous io to complete
+            while (pio->write_details.pending) {
+                if (wait_for_any_event(NULL, 0, INFINITE) == -1)
+                    return -1;
+            }
+        }
+        else {
+            errno = EAGAIN;
+            return -1;
+        }
     }
 
+
     if (pio->write_details.error) {
-        errno = EOTHER;
+        errno = errno_from_WSAError(pio->write_details.error);
         return -1;
     }
 

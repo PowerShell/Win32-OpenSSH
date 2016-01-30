@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <stdio.h>
+#include "debug.h"
 
 enum w32_io_type {
     UNKOWN_FD = 0,

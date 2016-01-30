@@ -31,7 +31,13 @@ int fileio_pipe(struct w32_io* pio[2]) {
     char pipe_name[MAX_PATH];
     SECURITY_ATTRIBUTES sec_attributes;
     
-    if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\RemoteExeAnon.%08x.%08x", GetCurrentProcessId(), pipe_number++))
+    if (pio == NULL) {
+        errno = EFAULT;
+        return -1;
+    }
+
+
+    if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\W32PosixPipe.%08x.%08x", GetCurrentProcessId(), pipe_number++))
         goto error;
 
     sec_attributes.bInheritHandle = TRUE;
@@ -200,8 +206,13 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     if (fileio_is_io_available(pio, TRUE) == FALSE)
     {
 
-        if (-1 == fileio_ReadFileEx(pio))
+        if (-1 == fileio_ReadFileEx(pio)) {
+            if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK))  {//write end of the pipe closed
+                errno = 0;
+                return 0;
+            }
             return -1;
+        }
 
         //Pick up APC if IO has completed
         SleepEx(0, TRUE);
@@ -228,7 +239,11 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     }
 
     if (pio->read_details.error) {
-        errno = EOTHER;
+        errno = errno_from_Win32Error(pio->read_details.error);
+        if (errno == ERROR_BROKEN_PIPE) { //write end of the pipe is closed or pipe broken
+            errno = 0;
+            return 0;
+        }
         return -1;
     }
 
@@ -256,12 +271,23 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
     int bytes_copied;
 
     if (pio->write_details.pending) {
-        errno = EAGAIN;
-        return -1;
+        if (w32_io_is_blocking(pio))
+        {
+            //this covers the scenario when the fd was previously non blocking (and hence io is still pending)
+            //wait for previous io to complete
+            while (pio->write_details.pending) {
+                if (wait_for_any_event(NULL, 0, INFINITE) == -1)
+                    return -1;
+            }
+        }
+        else {
+            errno = EAGAIN;
+            return -1;
+        }
     }
 
     if (pio->write_details.error) {
-        errno = EOTHER;
+        errno = errno_from_Win32Error(pio->write_details.error);
         return -1;
     }
 
@@ -297,6 +323,8 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
     else
     {
         errno = errno_from_Win32Error();
+        if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) //read end of the pipe closed
+            errno = EPIPE;
         return -1;
     }
 
