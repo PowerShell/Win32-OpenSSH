@@ -6,9 +6,11 @@
 //signal queue
 
 //wakes on
-// - any signals (errno = EINTR )
+// - any signals (errno = EINTR ) - TODO
 // - any of the supplied events set 
 // - any APCs caused by IO completions 
+// - time out (errno = ETIMEOUT)
+// Returns 0 on IO completion and -1 on rest
 int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 {
     //todo - implement signal catching and handling
@@ -24,10 +26,12 @@ int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
         }
         else if (ret == WAIT_TIMEOUT) {
             errno = ETIMEDOUT;
+            debug("ERROR: wait timed out");
             return -1;
         }
         else { //some other error
             errno = EOTHER;
+            debug("ERROR: unxpected wait end with error: %d", ret);
             return -1;
         }
     }
@@ -40,10 +44,12 @@ int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
         else if (ret == 0) {
             //timed out
             errno =  ETIMEDOUT;
+            debug("ERROR: wait timed out");
             return -1;
         }
         else { //some other error
             errno = EOTHER;
+            debug("ERROR: unxpected SleepEx error: %d", ret);
             return -1;
         }
     }

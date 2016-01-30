@@ -2,6 +2,7 @@
 #include "w32fd.h"
 #include <stdarg.h>
 #include <errno.h>
+#include <time.h>
 
 struct w32fd_table {
     w32_fd_set occupied;
@@ -315,6 +316,8 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
     fd_set read_ready_fds, write_ready_fds;
     HANDLE events[32];
     int num_events = 0;
+    unsigned int time_milliseconds = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
+    ULONGLONG ticks_start = GetTickCount64(), ticks_now;
 
     memset(&read_ready_fds, 0, sizeof(fd_set));
     memset(&write_ready_fds, 0, sizeof(fd_set));
@@ -405,9 +408,16 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
         }
     }
 
+    
     do {
-        //to-do cut down wait time on subsequent waits
-        if (0 != wait_for_any_event(events, num_events, ((timeout->tv_sec) * 1000) + ((timeout->tv_usec) / 1000))) {
+        ticks_now = GetTickCount64();
+        if (time_milliseconds < (ticks_now - ticks_start)) {
+            errno = ETIMEDOUT;
+            debug("select timing out");
+            return -1;
+        }
+            
+        if (0 != wait_for_any_event(events, num_events, time_milliseconds - (ticks_now - ticks_start))) {
             return -1;
         }
 
@@ -435,6 +445,8 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
         if (out_ready_fds)
             break;
 
+        debug("wait ended without any IO completion, looping again");
+
     } while (1);
 
     if (readfds)
@@ -448,9 +460,13 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
 
 
 int w32_dup(int oldfd) {
+    errno = EOPNOTSUPP;
+    debug("ERROR: dup is not implemented yet");
     return -1;
 }
 
 int w32_dup2(int oldfd, int newfd) {
+    errno = EOPNOTSUPP;
+    debug("ERROR: dup2 is not implemented yet");
     return -1;
 }
