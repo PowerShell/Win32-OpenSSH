@@ -16,13 +16,13 @@ void fd_table_set(struct w32_io* pio, int index);
 int fd_table_initialize() {
     memset(&fd_table, 0, sizeof(fd_table));
     memset(&w32_io_stdin, 0, sizeof(w32_io_stdin));
-    w32_io_stdin.handle = STD_INPUT_HANDLE;
+    w32_io_stdin.handle = (HANDLE)STD_INPUT_HANDLE;
     fd_table_set(&w32_io_stdin, STDIN_FILENO);
     memset(&w32_io_stdout, 0, sizeof(w32_io_stdout));
-    w32_io_stdout.handle = STD_OUTPUT_HANDLE;
+    w32_io_stdout.handle = (HANDLE)STD_OUTPUT_HANDLE;
     fd_table_set(&w32_io_stdout, STDOUT_FILENO);
     memset(&w32_io_stderr, 0, sizeof(w32_io_stderr));
-    w32_io_stderr.handle = STD_ERROR_HANDLE;
+    w32_io_stderr.handle = (HANDLE)STD_ERROR_HANDLE;
     fd_table_set(&w32_io_stderr, STDERR_FILENO);
     return 0;
 }
@@ -265,7 +265,12 @@ int w32_isatty(int fd) {
 }
 
 FILE* w32_fdopen(int fd, const char *mode) {
-    CHECK_FD(fd);
+    if ((fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
+        errno = EBADF;
+        debug("bad fd: %d", fd);
+        return NULL;
+    }
+
     return fileio_fdopen(fd_table.w32_ios[fd], mode);
 }
 
