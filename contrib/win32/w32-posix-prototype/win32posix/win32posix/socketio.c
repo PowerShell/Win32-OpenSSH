@@ -500,10 +500,12 @@ int socketio_shutdown(struct w32_io* pio, int how) {
 }
 
 int socketio_close(struct w32_io* pio) {
+    debug("pio: %p", pio);
     closesocket(pio->sock);
-    //todo- wait for pending io to abort
-    SleepEx(1, TRUE);
-
+    //wait for pending io to abort
+    SleepEx(0, TRUE);
+    if (pio->read_details.pending || pio->write_details.pending)
+        debug("IO is still pending on closed socket. read:%d, write:%d", pio->read_details.pending, pio->write_details.pending);
     if (pio->type == LISTEN_FD) {
         if (pio->read_overlapped.hEvent)
             CloseHandle(pio->read_overlapped.hEvent);
@@ -527,6 +529,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     int iResult = 0;
     struct acceptEx_context* context = (struct acceptEx_context*)pio->context;
 
+    debug("pio:%p", pio);
     //start io if not already started
     if (pio->read_details.pending == FALSE) {
         if (socketio_acceptEx(pio) != 0) {
@@ -548,6 +551,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
         //if i/o is not ready
         if (FALSE == socketio_is_io_available(pio, TRUE)) {
             errno = EAGAIN;
+            debug("accept is pending");
             return NULL;
         }
 
@@ -556,6 +560,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     if (0 != setsockopt(context->accept_socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&pio->sock, sizeof(pio->sock)))
     {
         errno = errno_from_WSALastError();
+        debug("ERROR: setsockopt failed: %d", errno);
         return NULL;
     }
 
@@ -563,6 +568,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     if (!accept_io)
     {
         errno = ENOMEM;
+        debug("ERROR:%d", errno);
         return NULL;
     }
     memset(accept_io, 0, sizeof(struct w32_io));
@@ -572,6 +578,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     context->accept_socket = INVALID_SOCKET;
     pio->read_details.pending = FALSE;
     ResetEvent(pio->read_overlapped.hEvent);
+    debug("accept io:%p", accept_io);
     return accept_io;
 }
 
@@ -586,7 +593,8 @@ BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd) {
         }
         else {
             if (pio->read_details.pending && WSAGetLastError() != WSA_IO_INCOMPLETE) {                
-                //unexpected error; log an event                
+                //unexpected error;
+                debug("ERROR:Unxpected State. WSAError:%d", WSAGetLastError());
             }
             return FALSE;
         }
@@ -605,6 +613,7 @@ BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd) {
 
 int socketio_on_select(struct w32_io* pio, BOOL rd) {
 
+    debug("pio:%p", pio);
     if (rd && pio->read_details.pending)
         return 0;
 

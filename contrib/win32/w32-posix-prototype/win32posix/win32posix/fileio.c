@@ -8,11 +8,10 @@
 #include <errno.h>
 #include <stddef.h>
 
+#define errno_from_Win32LastError() errno_from_Win32Error(GetLastError())
 
-static int errno_from_Win32Error()
+static int errno_from_Win32Error(int win32_error)
 {
-    int win32_error = GetLastError();
-
     switch (win32_error){
     case ERROR_ACCESS_DENIED:
         return EACCES;
@@ -33,12 +32,16 @@ int fileio_pipe(struct w32_io* pio[2]) {
     
     if (pio == NULL) {
         errno = EFAULT;
+        debug("ERROR:%d", errno);
         return -1;
     }
 
 
-    if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\W32PosixPipe.%08x.%08x", GetCurrentProcessId(), pipe_number++))
+    if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\W32PosixPipe.%08x.%08x", GetCurrentProcessId(), pipe_number++)) {
+        errno = EOTHER;
+        debug("ERROR:%d", errno);
         goto error;
+    }
 
     sec_attributes.bInheritHandle = TRUE;
     sec_attributes.lpSecurityDescriptor = NULL;
@@ -53,7 +56,8 @@ int fileio_pipe(struct w32_io* pio[2]) {
         0,
         &sec_attributes);
     if (read_handle == INVALID_HANDLE_VALUE) {
-        errno = errno_from_Win32Error();
+        errno = errno_from_Win32LastError();
+        debug("ERROR:%d", errno);
         goto error;
     }
 
@@ -65,7 +69,8 @@ int fileio_pipe(struct w32_io* pio[2]) {
         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
         NULL);
     if (write_handle == INVALID_HANDLE_VALUE) {
-        errno = errno_from_Win32Error();
+        errno = errno_from_Win32LastError();
+        debug("ERROR:%d", errno);
         goto error;
     }
 
@@ -74,6 +79,7 @@ int fileio_pipe(struct w32_io* pio[2]) {
 
     if (!pio_read || !pio_write) {
         errno = ENOMEM;
+        debug("ERROR:%d", errno);
         goto error;
     }
 
@@ -112,8 +118,38 @@ struct createFile_flags {
 
 static int createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags){
 
-    cf_flags->dwDesiredAccess = GENERIC_READ | GENERIC_WRITE;
+    //check flags
+    int rwflags = flags & 0xf;
+    int c_s_flags = flags & 0xfffffff0; 
+
+    //should be one of one of the following access modes: O_RDONLY, O_WRONLY, or O_RDWR
+    if ((rwflags != O_RDONLY) && (rwflags != O_WRONLY) && (rwflags != O_RDWR)) {
+        debug("ERROR: wrong rw flags");
+        errno = EINVAL;
+        return -1;
+    }
+
+    //only following create and status flags currently supported
+    if (c_s_flags & ~(O_NONBLOCK | O_APPEND | O_CREAT | O_TRUNC | O_EXCL | O_BINARY)) {
+        debug("ERROR: Unsupported flags: %d", flags);
+        errno = ENOTSUP;
+        return -1;
+    }
+
+    switch (rwflags) {
+    case O_RDONLY:
+        cf_flags->dwDesiredAccess = GENERIC_READ;
+        break;
+    case O_WRONLY:
+        cf_flags->dwDesiredAccess = GENERIC_WRITE;
+        break;
+    case O_RDWR:
+        cf_flags->dwDesiredAccess = GENERIC_READ | GENERIC_WRITE;
+        break;
+    }
+
     cf_flags->dwShareMode = 0;
+    
     cf_flags->securityAttributes.lpSecurityDescriptor = NULL;
     cf_flags->securityAttributes.bInheritHandle = TRUE;
     cf_flags->securityAttributes.nLength = 0;
@@ -127,13 +163,21 @@ struct w32_io* fileio_open(const char *pathname, int flags, int mode) {
     struct createFile_flags cf_flags;
     HANDLE handle;
 
+    //check input params
+    if (pathname == NULL) {
+        errno = EINVAL;
+        debug("ERROR:%d", errno);
+        return -1;
+    }
+
+
     if (createFile_flags_setup(flags, mode, &cf_flags) == -1)
         return NULL;
     
     handle = CreateFileA(pathname, cf_flags.dwDesiredAccess, cf_flags.dwShareMode, &cf_flags.securityAttributes, cf_flags.dwCreationDisposition, cf_flags.dwFlagsAndAttributes, NULL);
 
     if (handle == NULL) {
-        errno = errno_from_Win32Error();
+        errno = errno_from_Win32LastError();
         return NULL;
     }
 
@@ -187,7 +231,7 @@ int fileio_ReadFileEx(struct w32_io* pio) {
     }
     else
     {
-        errno = errno_from_Win32Error();
+        errno = errno_from_Win32LastError();
         return -1;
     }
 
@@ -239,7 +283,7 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     }
 
     if (pio->read_details.error) {
-        errno = errno_from_Win32Error(pio->read_details.error);
+        errno = errno_from_Win32LastError(pio->read_details.error);
         if (errno == ERROR_BROKEN_PIPE) { //write end of the pipe is closed or pipe broken
             errno = 0;
             return 0;
@@ -287,7 +331,7 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
     }
 
     if (pio->write_details.error) {
-        errno = errno_from_Win32Error(pio->write_details.error);
+        errno = errno_from_Win32LastError(pio->write_details.error);
         return -1;
     }
 
@@ -322,7 +366,7 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
     }
     else
     {
-        errno = errno_from_Win32Error();
+        errno = errno_from_Win32LastError();
         if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) //read end of the pipe closed
             errno = EPIPE;
         return -1;
