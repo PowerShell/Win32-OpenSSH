@@ -29,6 +29,7 @@
 #include "mac.h"
 #include "buffer.h" /* XXX for typedef */
 #include "key.h" /* XXX for typedef */
+#include "crypto-wrap.h"
 
 #ifdef WITH_LEAKMALLOC
 #include "leakmalloc.h"
