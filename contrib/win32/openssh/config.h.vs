@@ -1707,5 +1707,7 @@ struct iovec
 
 // define building with MS Visual Studio Compiler and runtime and not with MingW/gcc compiler
 #define WIN32_VS 1
-
+// Use Pragma Systems Remote Console modules for shell sessions so that cmd/powershell fully
+// works remotely over SSH like they operate in a local machine
+//#define WIN32_PRAGMA_REMCON
 
