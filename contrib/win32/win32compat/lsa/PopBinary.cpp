@@ -31,7 +31,17 @@
 
 #include "PopBinary.h"
 
-extern LSA_SECPKG_FUNCTION_TABLE LsaApi;
+#ifdef __VS_BUILD__
+#ifdef __cplusplus
+extern "C" {
+#endif
+#endif // __VS_BUILD__
+	extern LSA_SECPKG_FUNCTION_TABLE LsaApi;
+#ifdef __VS_BUILD__
+#ifdef __cplusplus
+}
+#endif
+#endif
 
 #ifdef DYNAMIC_OPENSSL
   extern SSLFuncList DynSSL;

@@ -129,6 +129,7 @@ int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
 char *GetHomeDirFromToken(char *userName, HANDLE token)
 {
   UCHAR domain[200];
+  wchar_t pw_buf[MAX_PATH] = { L'\0' };
   
   debug("-> GetHomeDirFromToken()...");
   
@@ -172,7 +173,19 @@ char *GetHomeDirFromToken(char *userName, HANDLE token)
     
     return NULL;
   }
-          
+
+  // update APPDATA user's env variable
+  if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA, token, 0, pw_buf)))
+  {
+	  SetEnvironmentVariableW(L"APPDATA", pw_buf);
+  }
+
+  // update LOCALAPPDATA user's env variable
+  if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, token, 0, pw_buf)))
+  {
+	  SetEnvironmentVariableW(L"LOCALAPPDATA", pw_buf);
+  }
+
   /*
    * Unload user profile.
    */

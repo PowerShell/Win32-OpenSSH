@@ -32,7 +32,9 @@
 #include <winsock2.h>
 #include <io.h>
 #include "sfds.h"
-
+#ifndef __MINGW32__
+#include <Crtdbg.h>
+#endif
 
 extern void debug(const char *fmt,...);
 extern void debug2(const char *fmt,...);
@@ -156,12 +158,14 @@ int allocate_sfd(int fd_or_handle)
 	_invalid_parameter_handler oldHandler, newHandler;
 	newHandler = myInvalidParameterHandler;
 	oldHandler = _set_invalid_parameter_handler(newHandler);
+	int iPrev = _CrtSetReportMode(_CRT_ASSERT, 0);
 #endif
 
 
 	real_handle = (HANDLE)_get_osfhandle(fd_or_handle);
 #ifndef __MINGW32__
 	_set_invalid_parameter_handler(oldHandler);
+	_CrtSetReportMode(_CRT_ASSERT, iPrev);
 #endif
 
   if (real_handle == INVALID_HANDLE_VALUE)

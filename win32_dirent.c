@@ -19,9 +19,10 @@ DIR * opendir(char *name)
 	DIR *pdir;
 	char searchstr[256];
 
-	sprintf_s(searchstr, sizeof(searchstr), "%s\\*.*",name); // add *.* to it for NT
+	// add *.* for Windows _findfirst() search pattern
+	sprintf_s(searchstr, sizeof(searchstr), "%s\\*.*",name);
 
-   if( (hFile = _findfirst( searchstr, &c_file )) == -1L ) {
+   if ((hFile = _findfirst(searchstr, &c_file)) == -1L) {
        if (1) // verbose
 			printf( "No files found for %s search.\n", name );
 		return (DIR *) NULL;
@@ -30,6 +31,7 @@ DIR * opendir(char *name)
 		pdir = (DIR *) malloc( sizeof(DIR) );
 		pdir->hFile = hFile ;
 		pdir->c_file = c_file ;
+		strcpy_s(pdir->initName,sizeof(pdir->initName), c_file.name);
 
 		return pdir ;
 	}

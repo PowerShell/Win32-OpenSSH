@@ -91,7 +91,7 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	sc25519.o ge25519.o fe25519.o ed25519.o verify.o hash.o blocks.o \
 	kex.o kexdh.o kexgex.o kexecdh.o kexc25519.o \
 	kexdhc.o kexgexc.o kexecdhc.o kexc25519c.o \
-	kexdhs.o kexgexs.o kexecdhs.o kexc25519s.o
+	kexdhs.o kexgexs.o kexecdhs.o kexc25519s.o openssl-dh.o openssl-bn.o
 
 SSHOBJS= ssh.o readconf.o clientloop.o sshtty.o \
 	sshconnect.o sshconnect1.o sshconnect2.o mux.o \

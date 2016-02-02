@@ -664,8 +664,11 @@ monitor_reset_key_state(void)
 int
 mm_answer_moduli(int sock, Buffer *m)
 {
-	DH *dh;
+	struct sshdh *dh;
 	int min, want, max;
+	struct sshbn  * dh_p = NULL;
+	struct sshbn  * dh_g = NULL;
+	int ret = 0;
 
 	min = buffer_get_int(m);
 	want = buffer_get_int(m);
@@ -681,18 +684,25 @@ mm_answer_moduli(int sock, Buffer *m)
 	buffer_clear(m);
 
 	dh = choose_dh(min, want, max);
+
+
 	if (dh == NULL) {
 		buffer_put_char(m, 0);
 		return (0);
 	} else {
-		/* Send first bignum */
-		buffer_put_char(m, 1);
-		buffer_put_bignum2(m, dh->p);
-		buffer_put_bignum2(m, dh->g);
+		if ((dh_p = sshdh_p(dh)) != NULL &&
+			(dh_g = sshdh_g(dh)) != NULL) {
 
-		DH_free(dh);
+			/* Send first bignum */
+			buffer_put_char(m, 1);
+			sshbuf_put_bignum2_wrap(m, dh_p);
+			sshbuf_put_bignum2_wrap(m, dh_g);
+			mm_request_send(sock, MONITOR_ANS_MODULI, m);
+		}
+		sshdh_free(dh);
+		sshbn_free(dh_p);
+		sshbn_free(dh_g);
 	}
-	mm_request_send(sock, MONITOR_ANS_MODULI, m);
 	return (0);
 }
 #endif

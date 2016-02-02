@@ -1561,6 +1561,9 @@ main(int ac, char **av)
    
   #ifdef WIN32_FIXME
   
+	if (tty_flag)
+		ConUnInitWithRestore(); // restore terminal to previous settings if it was a tty session
+
     CleanUpProxyProcess();
 
     UninitMitKerberos();
@@ -2060,6 +2063,14 @@ ssh_session2_open(void)
 		window >>= 1;
 		packetmax >>= 1;
 	}
+	#ifdef WIN32_FIXME
+	else {
+		// make stdio duplicated ports of above binary mode so no CRLF xlate
+		_setmode(sfd_to_fd(in), O_BINARY);
+		_setmode(sfd_to_fd(out), O_BINARY);
+	}
+	#endif
+	
 	c = channel_new(
 	    "session", SSH_CHANNEL_OPENING, in, out, err,
 	    window, packetmax, CHAN_EXTENDED_WRITE,
@@ -2152,8 +2163,6 @@ ssh_session2(void)
 			fork_postauth();
 	}
 
-	if (options.use_roaming)
-		request_roaming();
 
 	return client_loop(tty_flag, tty_flag ?
 	    options.escape_char : SSH_ESCAPECHAR_NONE, id);

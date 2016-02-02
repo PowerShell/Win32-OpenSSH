@@ -145,6 +145,8 @@
 #define O_NOCTTY	0
 #endif
 
+
+
 /* Re-exec fds */
 #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
 #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
@@ -739,10 +741,17 @@ sshd_exchange_identification(int sock_in, int sock_out)
 		minor = PROTOCOL_MINOR_1;
 	}
 
+	#ifndef WIN32_FIXME
 	xasprintf(&server_version_string, "SSH-%d.%d-%.100s%s%s%s",
-	    major, minor, SSH_VERSION,
+		major, minor, SSH_VERSION,
+		*options.version_addendum == '\0' ? "" : " ",
+		options.version_addendum, newline);
+	#else
+	xasprintf(&server_version_string, "SSH-%d.%d-%.100s%s%s%s",
+	    major, minor, SSH_RELEASE,
 	    *options.version_addendum == '\0' ? "" : " ",
 	    options.version_addendum, newline);
+	#endif
 
 	/* Send our protocol version identification. */
 	if (roaming_atomicio(vwrite, sock_out, server_version_string,
@@ -2741,8 +2750,10 @@ main(int ac, char **av)
 
 	/* Chdir to the root directory so that the current disk can be
 	   unmounted if desired. */
+	#ifndef WIN32_FIXME
 	if (chdir("/") == -1)
 		error("chdir(\"/\"): %s", strerror(errno));
+	#endif
 
 	/* ignore SIGPIPE */
 	signal(SIGPIPE, SIG_IGN);
@@ -3371,15 +3382,17 @@ do_ssh2_kex(void)
 	if ((r = kex_setup(active_state, myproposal)) != 0)
 		fatal("kex_setup: %s", ssh_err(r));
 	kex = active_state->kex;
-#ifdef WITH_OPENSSL
+
+
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
+
 # ifdef OPENSSL_HAS_ECC
 	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
 # endif
-#endif
+
 	kex->kex[KEX_C25519_SHA256] = kexc25519_server;
 	kex->server = 1;
 	kex->client_version_string=client_version_string;

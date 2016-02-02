@@ -42,8 +42,20 @@
 #include "includes.h"
 
 #ifdef WIN32_FIXME
-  #define ECONNABORTED WSAECONNABORTED
-  #define ECONNREFUSED WSAECONNREFUSED
+//#define WIN32_PRAGMA_REMCON
+#ifdef ECONNABORTED
+#undef ECONNABORTED
+#endif
+#define ECONNABORTED WSAECONNABORTED
+#ifdef ECONNREFUSED
+#undef ECONNREFUSED
+#endif
+#define ECONNREFUSED WSAECONNREFUSED
+#ifdef EINPROGRESS
+#undef EINPROGRESS
+#endif
+#define EINPROGRESS WSAEINPROGRESS
+#define _CRT_NO_POSIX_ERROR_CODES
 #endif
 
 
@@ -2471,6 +2483,9 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 		if ( c->client_tty )
 			telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
 		else {
+				#ifdef WIN32_PRAGMA_REMCON
+				buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
+				#else
 				if  ( ( c->isatty) && (data_len ==1) && (data[0] == '\003') ) {
 						/* send control-c to the shell process */
 						if ( GenerateConsoleCtrlEvent ( CTRL_C_EVENT, 0 ) ) {
@@ -2481,7 +2496,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 				}
 				else {
 					// avoid sending the 4 arrow keys out to remote for now "ESC[A" ..
-					if  ( (c->isatty) && (data_len ==3) && (data[0] == '\033') && (data[1] == '[')) {
+					if ( (c->isatty) && (data_len ==3) && (data[0] == '\033') && (data[1] == '[')) {
 						if ( ( data[2] == 'A') ||  (data[2] == 'B') ||  (data[2] == 'C') ||  (data[2] == 'D'))
 								packet_check_eom();
 								return 0;
@@ -2504,6 +2519,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 							charinline = 0;  // a line has ended, begin char in line count again
 					}
 				}
+				#endif // WIN32_PRAGMA_REMCON
 		}
 
 		#endif

@@ -92,7 +92,11 @@
 #include <sys/uio.h>
 
 #include <ctype.h>
+
+#ifndef WIN32_FIXME
 #include <dirent.h>
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -115,6 +119,9 @@
 #include "misc.h"
 #include "progressmeter.h"
 
+#ifdef WIN32_VS
+#include <Shlwapi.h>
+#endif
 extern char *__progname;
 
 #define COPY_BUFLEN	16384
@@ -151,6 +158,473 @@ char *ssh_program = _PATH_SSH_PROGRAM;
 /* This is used to store the pid of ssh_program */
 pid_t do_cmd_pid = -1;
 
+
+#ifdef WIN32_FIXME
+typedef BOOL bool;
+#define false FALSE
+#define true TRUE
+
+char *win32colon(char *);
+#define colon win32colon
+
+#ifndef _SH_DENYNO
+#define _SH_DENYNO 0x40
+#endif
+
+#define HAVE_UTIME_H
+
+#ifdef HAVE_UTIME_H
+#include <sys/utime.h>
+#if defined(_NEXT_SOURCE) && !defined(_POSIX_SOURCE)
+struct utimbuf {
+  time_t actime;
+  time_t modtime;
+};
+#endif /* _NEXT_SOURCE */
+#else
+struct utimbuf
+{
+  long actime;
+  long modtime;
+};
+#endif
+
+#ifndef _PATH_CP
+#define _PATH_CP "copy"
+//CHECK should we change in NT/2000 to copy ?? #define _PATH_CP "copy"
+#endif
+
+#ifndef STDIN_FILENO
+#define STDIN_FILENO 0
+#endif
+#ifndef STDOUT_FILENO
+#define STDOUT_FILENO 1
+#endif
+#ifndef STDERR_FILENO
+#define STDERR_FILENO 2
+#endif
+
+
+/* This is set to non-zero to enable verbose mode. */
+int scpverbose = 0;
+
+#define SCP_STATISTICS_ENABLED
+#define WITH_SCP_STATS
+#define SCP_ALL_STATISTICS_ENABLED
+
+/* This is set to non-zero to enable statistics mode. */
+#ifdef SCP_STATISTICS_ENABLED
+int statistics = 1;
+#else /* SCP_STATISTICS_ENABLED */
+int statistics = 0;
+#endif /* SCP_STATISTICS_ENABLED */
+
+/* This is set to non-zero to enable printing statistics for each file */
+#ifdef SCP_ALL_STATISTICS_ENABLED
+int all_statistics = 1;
+#else /* SCP_ALL_STATISTICS_ENABLED */
+int all_statistics = 0;
+#endif /* SCP_ALL_STATISTICS_ENABLED */
+
+/* This is set to non-zero if compression is desired. */
+int compress = 0;
+
+/* This is set to non-zero if running in batch mode (that is, password
+   and passphrase queries are not allowed). */
+int batchmode = 0;
+
+/* This is to call ssh with argument -P (for using non-privileged
+   ports to get through some firewalls.) */
+int use_privileged_port = 1;
+
+/* This is set to the cipher type string if given on the command line. */
+char *cipher = NULL;
+
+/* This is set to the RSA authentication identity file name if given on 
+   the command line. */
+char *identity = NULL;
+
+/* This is the port to use in contacting the remote site (is non-NULL). */
+char *port = NULL;
+
+/* This is set password if given on the command line. */
+char *password = NULL;
+
+int ipv_restrict = 0;
+
+#define ONLY_IPV4	1
+#define ONLY_IPV6   2
+
+#ifdef WITH_SCP_STATS
+
+#define SOME_STATS_FILE stderr
+
+#define ssh_max(a,b) (((a) > (b)) ? (a) : (b))
+
+/*unsigned long*/ u_int64_t statbytes = 0;
+DWORD stat_starttimems = 0;
+time_t stat_starttime = 0;
+time_t stat_lasttime = 0;
+double ratebs = 0.0;
+
+void stats_fixlen(int bytes);
+//char *stat_eta(int secs);
+char *stat_eta_new(int msecs);
+#endif /* WITH_SCP_STATS */
+
+/* Ssh options */
+char **ssh_options = NULL;
+size_t ssh_options_cnt = 0;
+size_t ssh_options_alloc = 0;
+
+// start: Windows specfic functions
+#define S_ISDIR(x) (x & _S_IFDIR)
+
+static int g_RootMode = 0;
+#define M_ADMIN  4
+
+CHAR	g_HomeDir[MAX_PATH];
+CHAR	g_FSRoot[MAX_PATH];
+int		isRootedPath = 0;  // set to 1 if we prepend a home root
+
+char *TranslatePath(char *, bool *bDirSpec);
+int start_process_io(char *exename, char **argv, char **envv,
+	HANDLE StdInput, HANDLE StdOutput, HANDLE StdError,
+	unsigned long CreateFlags, PROCESS_INFORMATION  *pi,
+	char *homedir, char *lpDesktop);
+
+// InitForMicrosoftWindows() will initialize Unix like settings in Windows operating system.
+struct passwd pw;
+char   username[128];
+int InitForMicrosoftWindows()
+{
+   int rc;
+   struct passwd *pwd;
+
+  /* Get user\'s passwd structure.  We need this for the home directory. */
+  pwd = &pw ;
+  rc = sizeof(username);
+  GetUserName(username,(LPDWORD)&rc);
+  pwd->pw_name = username;
+
+  return 0;
+}
+
+// start of direntry functions in Windows NT like UNIX
+// opendir(), readdir(), closedir().
+// 	NT_DIR * nt_opendir(char *name) ;
+// 	struct nt_dirent *nt_readdir(NT_DIR *dirp);
+// 	int nt_closedir(NT_DIR *dirp) ;
+
+// Windows NT directory structure content
+struct scp_dirent {
+	char *d_name ; // name of the directory entry
+	int  d_ino; // UNIX inode
+	//unsigned attrib ; // its attributes
+};
+
+typedef struct {
+	long hFile;
+   struct _finddata_t c_file;
+} SCPDIR;
+
+
+char * fixslashes(char * str)
+{
+	int i;
+	if (str == NULL)
+		return str;
+
+	int len = (int)strlen(str);
+
+	for (i = 0; i < len; i++)
+		if (str[i] == '/')
+			str[i] = '\\';
+	return str;
+}
+
+char * unfixslashes(char * str)
+{
+	int i;
+	if (str == NULL)
+		return str;
+
+	int len = (int)strlen(str);
+
+	for (i = 0; i < len; i++)
+		if (str[i] == '//')
+			str[i] = '/';
+	return str;
+}
+
+// force path separator to 
+char * forcepathsep(char * str, char sep)
+{
+	int i;
+	// bail if str is null;
+	if (str == NULL)
+		return str;
+
+	// bail if sep isn't valid
+	if ((sep != '\\') || (sep != '/'))
+		return str;
+
+	char antisep = '/';
+
+	if (sep == '/')
+		antisep = '\\';
+
+
+	int len = (int)strlen(str);
+
+	for (i = 0; i < len; i++)
+		if (str[i] == antisep)
+			str[i] = sep;
+	return str;
+}
+
+// get the path separator character
+char getpathsep(char * path)
+{
+	char sep = '/';
+	char * p = strpbrk(path,"/\\");
+	if (p != NULL)
+		sep = p[0];
+
+	return sep;
+}
+
+bool getRootFrompath(char * path, char * root)
+{
+	strcpy(root,path);
+
+	char sep = getpathsep(root);
+	forcepathsep(root,sep);
+	char * lastslash = strrchr(root,sep);
+	if (lastslash)
+		*lastslash = 0x00;
+	return (lastslash != NULL);
+}
+
+
+
+/*
+ * get option letter from argument vector
+ */
+
+
+char * getfilenamefrompath(char * path)
+{
+	char * lastslash;
+	char * lastbackslash;
+
+	lastslash = strrchr(path,'/');
+	lastbackslash = strrchr(path, '\\');
+
+	if (lastslash == NULL && lastbackslash == NULL)
+	{
+		// no delimiters, just return the original string
+		return path;
+	}
+	else if (lastslash == NULL)
+	{
+		// no slashes, return the backslash search minus the last char
+		return ++lastbackslash;
+	}
+	else if (lastbackslash == NULL)
+	{
+		// no backslashes, return the slash search minus the last char
+		return ++lastslash;
+	}
+	else
+	{
+		// string has both slashes and backslashes.  return whichever is larger
+		// (i.e. further down the string)
+		lastslash++;
+		lastbackslash++;
+		return ((lastslash > lastbackslash)?lastslash:lastbackslash);
+
+	}
+	return NULL;
+}
+
+
+#define	EMSG	""
+#define	BADCH	(int)'~'
+
+int
+sgetopt(int nargc,
+	char * const *nargv,
+	const char *ostr)
+{
+	static char *place = EMSG;		/* option letter processing */
+	register char *oli;			/* option letter list index */
+	char *p;
+	extern char *optarg;
+	extern int optind;
+	extern int optopt;
+	extern int opterr;
+
+	if (!*place) 
+	{				/* update scanning pointer */
+		if (optind >= nargc ||  (*(place = nargv[optind]) != '-'))
+		{
+			place = EMSG;
+			if (optind >= nargc )
+				return(EOF);
+			else
+				return(BADCH);
+		}
+		if (place[1] && *++place == '-') 
+		{	/* found "--" */
+			++optind;
+			place = EMSG;
+			return(EOF);
+		}
+	}					/* option letter okay? */
+	if ((optopt = (int)*place++) == (int)':' ||
+	    !(oli = strchr((char *)ostr, optopt))) 
+	{
+		/*
+		 * if the user didn't specify '-' as an option,
+		 * assume it means EOF.
+		 */
+		if ((optopt == (int)'-'))
+			return(EOF);
+		if (!*place)
+			++optind;
+		if (opterr) 
+		{
+			if (!(p = strrchr(*nargv, '/')))
+				p = *nargv;
+			else
+				++p;
+			(void)fprintf(stderr, "%s: illegal option -- %c\n",
+			    p, optopt);
+		}
+		return(BADCH);
+	}
+	if (*++oli != ':') 
+	{			/* don't need argument */
+		optarg = NULL;
+		if (!*place)
+			++optind;
+	}
+	else 
+	{					/* need an argument */
+		if (*place)			/* no white space */
+			optarg = place;
+		else if (nargc <= ++optind) 
+		{	/* no arg */
+			place = EMSG;
+			if (!(p = strrchr(*nargv, '/')))
+				p = *nargv;
+			else
+				++p;
+			if (opterr)
+				(void)fprintf(stderr,
+				    "%s: option requires an argument -- %c\n",
+				    p, optopt);
+			return(BADCH);
+		}
+	 	else				/* white space */
+			optarg = nargv[optind];
+		place = EMSG;
+		++optind;
+	}
+	return(optopt);				/* dump back option letter */
+}
+
+
+
+/* Open a directory stream on NAME.
+   Return a SCPDIR stream on the directory, or NULL if it could not be opened.  */
+SCPDIR * scp_opendir(char *name)
+{
+   struct _finddata_t c_file;
+   long hFile;
+	SCPDIR *pdir;
+	char searchstr[256];
+
+	sprintf_s(searchstr,sizeof(searchstr),"%s\\*.*",name); // add *.* to it for NT
+
+   if( (hFile = (long)_findfirst( searchstr, &c_file )) == -1L ) {
+       if ( scpverbose)
+			printf( "No files found for %s search.\n", name );
+		return (SCPDIR *) NULL;
+   }
+   else {
+		pdir = (SCPDIR *) malloc( sizeof(SCPDIR) );
+		pdir->hFile = hFile ;
+		pdir->c_file = c_file ;
+
+		return pdir ;
+	}
+}
+
+/* Close the directory stream SCPDIRP.
+   Return 0 if successful, -1 if not.  */
+int closedir(SCPDIR *dirp)
+{
+   if ( dirp && (dirp->hFile) ) {
+	   _findclose( dirp->hFile );
+	   dirp->hFile = 0;
+		free (dirp);
+   }
+
+	return 0;
+}
+
+/* Read a directory entry from SCPDIRP.
+   Return a pointer to a `struct scp_dirent' describing the entry,
+   or NULL for EOF or error.  The storage returned may be overwritten
+   by a later readdir call on the same SCPDIR stream.  */
+struct scp_dirent *readdir(SCPDIR *dirp)
+{
+	struct scp_dirent *pdirentry;
+
+ for (;;) {
+  if ( _findnext( dirp->hFile, &(dirp->c_file) ) == 0 ) {
+		if ( ( strcmp (dirp->c_file.name,".") == 0 ) ||
+			  ( strcmp (dirp->c_file.name,"..") == 0 ) ) {
+			continue ;
+		}
+		pdirentry = (struct scp_dirent *)malloc( sizeof(struct scp_dirent) );
+		pdirentry->d_name = dirp->c_file.name ;
+		pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero
+		return pdirentry ;
+  }
+  else {
+	return (struct scp_dirent *) NULL;
+  }
+ }
+}
+
+int _utimedir (char *name, struct _utimbuf *filetime)
+{
+   int rc, chandle;
+	HANDLE	hFile;
+
+	hFile = CreateFile( name,
+							  GENERIC_WRITE,
+						FILE_SHARE_READ,
+						NULL,
+						OPEN_EXISTING,
+						FILE_FLAG_BACKUP_SEMANTICS,
+						NULL );
+	if ( hFile != INVALID_HANDLE_VALUE ) {
+		chandle = _open_osfhandle ( (intptr_t)hFile, 0 );
+		rc=_futime(chandle,filetime); // update access time to what we want
+		_close(chandle);
+		CloseHandle(hFile);
+	}
+
+	return rc;
+}
+
+// end of direntry functions
+HANDLE hprocess=(HANDLE) 0; // we made it a global to stop child process(ssh) of scp
+#else
 static void
 killchild(int signo)
 {
@@ -177,6 +651,7 @@ suspchild(int signo)
 		kill(getpid(), SIGSTOP);
 	}
 }
+#endif
 
 static int
 do_local_cmd(arglist *a)
@@ -194,6 +669,18 @@ do_local_cmd(arglist *a)
 			fprintf(stderr, " %s", a->list[i]);
 		fprintf(stderr, "\n");
 	}
+	#ifdef WIN32_FIXME
+	// flatten the cmd into a long space separated string and execute using system(cmd) api
+	char cmdstr[2048] ;
+	cmdstr[0] = '\0' ;
+	for (i = 0; i < a->num; i++) {
+		strcat (cmdstr, a->list[i]);
+		strcat (cmdstr, " ");
+	}
+	if (system(cmdstr))
+		return (-1); // failure executing
+	return (0); // success
+	#else
 	if ((pid = fork()) == -1)
 		fatal("do_local_cmd: fork: %s", strerror(errno));
 
@@ -218,6 +705,7 @@ do_local_cmd(arglist *a)
 		return (-1);
 
 	return (0);
+	#endif
 }
 
 /*
@@ -229,6 +717,188 @@ do_local_cmd(arglist *a)
 int
 do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 {
+  #ifdef WIN32_FIXME
+  size_t i, j;
+
+	HANDLE hSaveStdout, hSaveStdin ; 
+	HANDLE hstdout[2], hstdin[2] ;
+	PROCESS_INFORMATION  pi;
+	SECURITY_ATTRIBUTES sa ; /* simple */
+	int rc; 
+	HANDLE rfdfromssh, wfdtossh ;
+   char *args[256];
+
+  if (verbose_mode)
+    fprintf(stderr, "Executing: host %s, user %s, command %s\n",
+	    host, remuser ? remuser : "(unspecified)", cmd);
+
+  // Child code in Windows OS will be a new created process of ssh.exe.
+  // Child to execute the command on the remote host using ssh.
+
+  if (1) { // No fork in Windows OS, so we code it such that we use CreateProcess()
+
+      i = 0;
+      args[i++] = ssh_program;
+	  size_t	len;
+      for(j = 0; j < ssh_options_cnt; j++) {
+		  args[i++] = "-o";
+
+		  //args[i++] = ssh_options[j];
+		  len = strlen(ssh_options[j])+3;
+
+		  args[i] = (char *) malloc(len); // add quotes
+		  strcpy_s(args[i],len, "\"");
+		  strcat_s(args[i],len, ssh_options[j]);
+		  strcat_s(args[i],len, "\"");
+		  i++ ;
+
+	  	  if (i > 250)
+		    fatal("Too many -o options (total number of arguments is more than 256)");
+		}
+      args[i++] = "-x";
+      args[i++] = "-a";
+      args[i++] = "\"-oFallBackToRsh no\""; // extra double quote needed for
+														  // Windows platforms
+      //7/2/2001 args[i++] = "\"-oClearAllForwardings yes\"";
+      if (verbose_mode)
+			args[i++] = "-v";
+      if (compress)
+			args[i++] = "-C";
+      if (!use_privileged_port)
+			args[i++] = "-P";
+      if (batchmode)
+			args[i++] = "\"-oBatchMode yes\"";
+	  if (password != NULL)
+			{
+			  args[i++] = "-A";
+			  args[i++] = password;
+			}
+      if (cipher != NULL)
+			{
+			  args[i++] = "-c";
+			  args[i++] = cipher;
+			}
+      if (identity != NULL)
+			{
+			  args[i++] = "-i";
+			  args[i++] = identity;
+			}
+      if (port != NULL)
+			{
+			  args[i++] = "-p";
+			  args[i++] = port;
+			}
+      if (remuser != NULL)
+			{
+			  args[i++] = "-l";
+			  args[i++] = remuser;
+			}
+
+	  if (ipv_restrict == ONLY_IPV4)
+		  args[i++] = "-4";
+	  if (ipv_restrict == ONLY_IPV6)
+		  args[i++] = "-6";
+
+      args[i++] = host;
+      args[i++] = cmd;
+      args[i++] = NULL;
+
+		// Create a pair of pipes for communicating with ssh
+		// which we will spawn
+		// Do the plunmbing so that child ssh process to be spawned has its
+		// standard input from the pout[0] and its standard output going to
+		// pin[1]
+
+		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+		sa.bInheritHandle = TRUE ; /* pipe handles to be inherited */
+		sa.lpSecurityDescriptor = NULL;
+		/* command processor output redirected to a nameless pipe */
+
+		rc = CreatePipe ( &hstdout[0], &hstdout[1], &sa, 0 ) ;
+		/* read from this fd to get data from ssh.exe*/
+
+		// make scp's pipe read handle not inheritable by ssh
+	   rc = DuplicateHandle(GetCurrentProcess(), hstdout[0], 
+						     GetCurrentProcess(), (PHANDLE) &rfdfromssh,
+							 0, // this parm ignored if DUPLICATE_SAME_ACCESS below
+							 FALSE, // not inherited
+						     DUPLICATE_SAME_ACCESS); 
+		CloseHandle(hstdout[0]); // this CloseHandle() is a crucial must do
+		hstdout[0] = rfdfromssh ;
+
+
+		*fdin = _open_osfhandle((intptr_t)hstdout[0],0);
+		_setmode (*fdin, O_BINARY); // set this file handle for binary I/O
+
+		rc = CreatePipe ( &hstdin[0], &hstdin[1], &sa, 0 ) ;
+		/* write to this fd to get data into ssh.exe*/
+
+		// make scp's pipe write handle not inheritable by ssh
+	   rc = DuplicateHandle(GetCurrentProcess(), hstdin[1], 
+						     GetCurrentProcess(), (PHANDLE) &wfdtossh,
+							 0, // this parm ignored if DUPLICATE_SAME_ACCESS below
+							 FALSE, // not inherited
+						     DUPLICATE_SAME_ACCESS); 
+		CloseHandle(hstdin[1]); // this CloseHandle() is a crucial must do
+		hstdin[1] = (HANDLE) wfdtossh ;
+
+
+		*fdout = _open_osfhandle((intptr_t)hstdin[1],0);
+		_setmode (*fdout, O_BINARY); // set this file handle for binary I/O
+
+		hSaveStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
+		//hSaveStderr = GetStdHandle(STD_ERROR_HANDLE); 
+		hSaveStdin = GetStdHandle(STD_INPUT_HANDLE); 
+
+		// Set a write handle to the pipe to be STDOUT. 
+		SetStdHandle(STD_OUTPUT_HANDLE, hstdout[1]);
+		// Set a write handle to the pipe to be STDERR. 
+		//SetStdHandle(STD_ERROR_HANDLE, hstdout[1]);
+		// Set a input handle to the pipe to be STDIN. 
+		SetStdHandle(STD_INPUT_HANDLE, hstdin[0]);
+
+
+		// start the child process(ssh)
+		rc = start_process_io(
+			 NULL, /* executable name with .ext found in argv[0] */
+			 &args[0], /* argv */
+			 NULL ,
+			 hstdin[0], /* std input for cmd.exe */
+			 hstdout[1], /* std output for cmd.exe */
+			 GetStdHandle(STD_ERROR_HANDLE), //hstdout[1],  /* std error for cmd.exe */
+			 0, // dwStartupFlags,
+			 &pi,
+			 NULL, /* current directory is default directory we set before */
+			 NULL
+		  );
+
+		if (!rc) {
+			printf("%s could not be started\n", ssh_program);
+			exit(1);
+		}
+		else {
+			hprocess = pi.hProcess ;
+		}
+
+		// After process creation, restore the saved STDOUT and STDERR. 
+		SetStdHandle(STD_OUTPUT_HANDLE, hSaveStdout);
+		//SetStdHandle(STD_ERROR_HANDLE, hSaveStderr);
+		SetStdHandle(STD_INPUT_HANDLE, hSaveStdin);
+
+		/* now close the pipe's side that the ssh.exe will use as write handle */
+		CloseHandle(hstdout[1]) ;
+		/* now close the pipe's side that the ssh.exe will use as read handle */
+		CloseHandle(hstdin[0]) ;
+  }
+
+  // update passed variables with where other funstions should read and write
+  // from to get I/O from above child process over pipe.
+
+  //*fdout = remout;
+  //*fdin =  remin;
+
+  return 0;
+  #else
 	int pin[2], pout[2], reserved[2];
 
 	if (verbose_mode)
@@ -293,6 +963,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 	signal(SIGINT, killchild);
 	signal(SIGHUP, killchild);
 	return 0;
+  #endif
 }
 
 /*
@@ -303,6 +974,8 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 int
 do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 {
+	#ifndef WIN32_FIXME
+
 	pid_t pid;
 	int status;
 
@@ -336,6 +1009,7 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 	while (waitpid(pid, &status, 0) == -1)
 		if (errno != EINTR)
 			fatal("do_cmd2: waitpid: %s", strerror(errno));
+	#endif
 	return 0;
 }
 
@@ -359,7 +1033,12 @@ int pflag, iamremote, iamrecursive, targetshouldbedirectory;
 char cmd[CMDNEEDS];		/* must hold "rcp -r -p -d\0" */
 
 int response(void);
+#ifdef WIN32_FIXME
+void rsource(char *, struct _stati64 *);
+#else
 void rsource(char *, struct stat *);
+#endif
+
 void sink(int, char *[]);
 void source(int, char *[]);
 void tolocal(int, char *[]);
@@ -376,7 +1055,9 @@ main(int argc, char **argv)
 	extern int optind;
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
+	#ifndef WIN32_FIXME
 	sanitise_stdfd();
+	#endif
 
 	/* Copy argv, because we modify it */
 	newargv = xcalloc(MAX(argc + 1, 1), sizeof(*newargv));
@@ -478,14 +1159,22 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	#ifndef WIN32_FIXME
 	if ((pwd = getpwuid(userid = getuid())) == NULL)
 		fatal("unknown user %u", (u_int) userid);
+	#else
+	InitForMicrosoftWindows(); // picks the username, user home dir
+	#endif
 
 	if (!isatty(STDOUT_FILENO))
 		showprogress = 0;
 
 	remin = STDIN_FILENO;
 	remout = STDOUT_FILENO;
+	#ifdef WIN32_FIXME
+	_setmode(remin,O_BINARY); // needed for Windows OS to avoid CrLf translations of text mode
+	_setmode(remout,O_BINARY);
+	#endif
 
 	if (fflag) {
 		/* Follow "protocol", send data. */
@@ -511,7 +1200,9 @@ main(int argc, char **argv)
 	    iamrecursive ? " -r" : "", pflag ? " -p" : "",
 	    targetshouldbedirectory ? " -d" : "");
 
+	#ifndef WIN32_FIXME
 	(void) signal(SIGPIPE, lostconn);
+	#endif
 
 	if ((targ = colon(argv[argc - 1])))	/* Dest is remote host. */
 		toremote(targ, argc, argv);
@@ -524,6 +1215,7 @@ main(int argc, char **argv)
 	 * Finally check the exit status of the ssh process, if one was forked
 	 * and no error has occurred yet
 	 */
+	#ifndef WIN32_FIXME
 	if (do_cmd_pid != -1 && errs == 0) {
 		if (remin != -1)
 		    (void) close(remin);
@@ -536,6 +1228,7 @@ main(int argc, char **argv)
 				errs = 1;
 		}
 	}
+	#endif
 	exit(errs != 0);
 }
 
@@ -701,6 +1394,7 @@ tolocal(int argc, char **argv)
 
 	for (i = 0; i < argc - 1; i++) {
 		if (!(src = colon(argv[i]))) {	/* Local to local. */
+		#ifndef WIN32_FIXME
 			freeargs(&alist);
 			addargs(&alist, "%s", _PATH_CP);
 			if (iamrecursive)
@@ -712,6 +1406,7 @@ tolocal(int argc, char **argv)
 			addargs(&alist, "%s", argv[argc-1]);
 			if (do_local_cmd(&alist))
 				++errs;
+		#endif
 			continue;
 		}
 		*src++ = 0;
@@ -740,7 +1435,735 @@ tolocal(int argc, char **argv)
 		remin = remout = -1;
 	}
 }
+#ifdef WIN32_FIXME
+void
+source(int argc, char *argv[])
+{
+	struct _stati64 stb;
+	static BUF buffer;
+	BUF *bp;
+	off_t i;
+	int haderr;
+	size_t amt, indx, result;
+	int	fd;
+	char *last, *name, buf[16384];
+	unsigned short locfmode;
+	char * originalname = NULL;
+	char aggregatePath[MAX_PATH] = "";
+	char * pArgPath;
+	bool bDirSpec = false;
 
+	char * filenames[1024];
+	int	   numfiles = 0;
+
+	WIN32_FIND_DATA FindFileData;
+	HANDLE hFind;
+
+	char FileRoot[MAX_PATH];
+	bool bHasRoot = false;
+
+	for (indx = 0; indx < (size_t)argc; ++indx) {		
+		if (strchr(argv[indx],'*'))
+		{
+			bHasRoot = getRootFrompath(argv[indx],FileRoot);
+
+			if  (1){//!iamremote) {
+				hFind = FindFirstFile(argv[indx], &FindFileData);
+				if (hFind != INVALID_HANDLE_VALUE){
+
+					do {					
+					if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+						if (bHasRoot)
+						{
+							filenames[numfiles] = (char *)malloc(MAX_PATH);
+							sprintf(filenames[numfiles++],"%s/%s",FileRoot,FindFileData.cFileName);
+						}
+						else
+							filenames[numfiles++] = strdup(FindFileData.cFileName);
+
+						if (numfiles >= 1024)
+						{
+							break;
+						}
+					}
+					while (FindNextFile(hFind,&FindFileData));
+					FindClose(hFind);
+				}
+
+			}
+			// expand
+		}
+		else
+			filenames[numfiles++] = strdup(argv[indx]);
+
+		if (numfiles >= 1024)
+			break;
+	}
+
+
+ // loop through filenames list
+	for (indx = 0; indx < (size_t)numfiles; ++indx) {
+
+		{
+			pArgPath = filenames[indx];
+		}
+
+		originalname = pArgPath;
+		name = TranslatePath(pArgPath, &bDirSpec);
+		if (name == NULL)
+		{
+//			strerror_s(buf, EPERM);
+			strerror_s(buf, sizeof(buf), ENOENT);
+			run_err("%s: %s", pArgPath, buf);
+			continue;
+		}
+
+		if (_sopen_s(&fd, name, O_RDONLY | O_BINARY, _SH_DENYNO, 0) != 0) {
+			// in NT, we have to check if it is a directory
+			if (_stati64(name, &stb) >= 0) {
+				goto switchpoint;
+			}
+			else
+				goto syserr;
+		}
+
+		if (_fstati64(fd, &stb) < 0) {
+syserr:			
+			strerror_s(buf, sizeof(buf), errno);
+			run_err("%s: %s", originalname, buf);
+			goto next;
+		}
+switchpoint:
+		switch (stb.st_mode & _S_IFMT) {
+		case _S_IFREG:
+			break;
+		case _S_IFDIR:
+			if (iamrecursive) {
+				rsource(name, &stb);
+				goto next;
+			}
+			/* FALLTHROUGH */
+		default:
+			run_err("%s: not a regular file", name);
+			goto next;
+		}
+
+		last = getfilenamefrompath(originalname);
+
+		if (pflag) {
+			/*
+			 * Make it compatible with possible future
+			 * versions expecting microseconds.
+			 */
+			(void)sprintf_s(buf, sizeof(buf), "T%lu 0 %lu 0\n",
+				      (unsigned long)stb.st_mtime, 
+				      (unsigned long)stb.st_atime);
+			(void)_write(remout, buf, (unsigned int)strlen(buf));
+			if (response() < 0)
+				goto next;
+		}
+//CHECK #define	FILEMODEMASK	(S_ISUID|S_ISGID|S_IRWXU|S_IRWXG|S_IRWXO)
+//#define	FILEMODEMASK	(S_IRWXU|S_IRWXG|S_IRWXO)
+#define	FILEMODEMASK	(S_IREAD|S_IWRITE|S_IEXEC)
+		locfmode = stb.st_mode & FILEMODEMASK;
+		locfmode |= ((locfmode & _S_IREAD) >> 3); // group access, just read bit now
+		locfmode |= ((locfmode & _S_IREAD) >> 6); // world access, just read bit now
+
+
+		(void)sprintf_s(buf, sizeof(buf), "C%04o %I64u %s\n",
+			      (unsigned int)(locfmode), //(stb.st_mode & FILEMODEMASK), 
+			      (u_int64_t)stb.st_size, 
+			      last);
+	        if (scpverbose)
+		  {
+		    fprintf(stderr, "Sending file modes: %s", buf);
+		    fflush(stderr);
+		  }
+		(void)_write(remout, buf, (unsigned int)strlen(buf));
+		if (response() < 0)
+			goto next;
+		if ((bp = allocbuf(&buffer, fd, 16384)) == NULL) {
+next:			if (fd != -1) (void)_close(fd);
+			continue;
+		}
+#ifdef WITH_SCP_STATS
+		if (!iamremote && statistics)
+		  {
+		    statbytes = 0;
+		    ratebs = 0.0;
+		    stat_starttime = time(NULL);
+			stat_starttimems = GetTickCount();
+		  }
+#endif /* WITH_SCP_STATS */
+
+		/* Keep writing after an error so that we stay sync'd up. */
+		for (haderr = 0, i = 0; i < (size_t)stb.st_size; i += bp->cnt) {
+			amt = bp->cnt;
+			if (i + amt > (size_t)stb.st_size)
+				amt = (size_t)(stb.st_size - i);
+			if (!haderr) {
+				result = _read(fd, bp->buf, (unsigned int)amt);
+				if (result != amt)
+					haderr = result >= 0 ? EIO : errno;
+			}
+			if (haderr)
+			  {
+			    (void)_write(remout, bp->buf, (unsigned int)amt);
+#ifdef WITH_SCP_STATS
+			    if (!iamremote && statistics)
+			      {
+				if ((time(NULL) - stat_lasttime) > 0)
+				  {
+				    int bwritten;
+				    bwritten = fprintf(SOME_STATS_FILE,
+						       "\r%s : ERROR..continuing to end of file anyway", last);
+				    stats_fixlen(bwritten);
+				    fflush(SOME_STATS_FILE);
+				    stat_lasttime = time(NULL);
+				  }
+			      }
+#endif /* WITH_SCP_STATS */
+			  }
+			else {
+				result = _write(remout, bp->buf, (unsigned int)amt);
+				if (result != amt)
+					haderr = result >= 0 ? EIO : errno;
+#ifdef WITH_SCP_STATS
+				if (!iamremote && statistics)
+				  {
+				    statbytes += result;
+				    /* At least one second delay between
+				       outputs, or if finished */
+				    if (time(NULL) - stat_lasttime > 0 ||
+					//(result + i) == stb.st_size)
+					statbytes == stb.st_size)
+				      {
+					int bwritten;
+					
+					if (time(NULL) == stat_starttime)
+					  {
+					    stat_starttime -= 1;
+					//	stat_starttimems -= 1000;
+					  }
+					ratebs = ssh_max(1.0,
+							 (double) statbytes /
+							 (time(NULL) -
+							  stat_starttime));
+					bwritten =
+					  fprintf(SOME_STATS_FILE,
+						  "\r%-25.25s | %10I64d KB | %7.1f kB/s | %s | %3d%%",
+						  last,
+						  statbytes / 1024,
+						  ratebs / 1024,
+  						  stat_eta_new((int) ( GetTickCount() - stat_starttimems)),
+//stat_eta((int) ( time(NULL) - stat_starttime)),
+						  (int) (100.0 *
+							 (double) statbytes /
+							 stb.st_size));
+					if (all_statistics && /*(result + i)*/ statbytes ==
+					    stb.st_size)
+					  bwritten += fprintf(SOME_STATS_FILE,
+							      "\n");
+				   fflush(SOME_STATS_FILE);
+					stats_fixlen(bwritten);
+					stat_lasttime = time(NULL);
+				      }
+				  }
+#endif /* WITH_SCP_STATS */
+			}
+		}
+
+
+
+		if (_close(fd) < 0 && !haderr)
+			haderr = errno;
+		if (!haderr)
+			(void)_write(remout, "", 1);
+		else
+		{
+			strerror_s(buf, sizeof(buf), haderr);
+			run_err("%s: %s", originalname, buf);
+		}
+		(void)response();
+	}		
+	int ii;
+	if (numfiles > 0)
+		for (ii = 0;ii<numfiles;ii++)
+			free(filenames[ii]);
+}
+
+void rsource(char *name, struct _stati64 *statp)
+{
+	SCPDIR *dirp;
+	struct scp_dirent *dp;
+	char *last, *vect[1], path[1100];
+	unsigned short locfmode;
+
+	if (!(dirp = scp_opendir(name))) {
+		char buf[256];
+		strerror_s(buf, sizeof(buf), errno);
+		run_err("%s: %s", name, buf);
+		return;
+	}
+
+	last = getfilenamefrompath(name);
+	if (pflag) {
+		(void)sprintf_s(path, sizeof(path), "T%lu 0 %lu 0\n",
+			      (unsigned long)statp->st_mtime, 
+			      (unsigned long)statp->st_atime);
+		(void)_write(remout, path, (unsigned int)strlen(path));
+		if (response() < 0) {
+			closedir(dirp);
+			return;
+		}
+	}
+	locfmode = statp->st_mode & FILEMODEMASK;
+	locfmode |= ((locfmode & (_S_IREAD | _S_IEXEC)) >> 3); // group access, read,exec bit now
+	locfmode |= ((locfmode & (_S_IREAD | _S_IEXEC)) >> 6); // world access, read,exec bit now
+
+	(void)sprintf_s(path, sizeof(path),
+	    "D%04o %d %.1024s\n", (unsigned int)(locfmode),
+		      0, last);
+  	if (scpverbose)
+	  fprintf(stderr, "Entering directory: %s", path);
+	(void)_write(remout, path, (unsigned int)strlen(path));
+	if (response() < 0) {
+		closedir(dirp);
+		return;
+	}
+	while ((dp = readdir(dirp))) {
+		//if (dp->d_ino == 0) //commented out as not needed
+		//	continue;
+
+		if (!strcmp(dp->d_name, ".") || !strcmp(dp->d_name, ".."))
+			continue;
+		if (strlen(name) + 1 + strlen(dp->d_name) >= sizeof(path) - 1) {
+			run_err("%s/%s: name too long", name, dp->d_name);
+			continue;
+		}
+		(void)sprintf_s(path, sizeof(path), "%s/%s", name, dp->d_name);
+		vect[0] = path;
+		source(1, vect);
+	}
+	(void)closedir(dirp);
+	(void)_write(remout, "E\n", 2);
+	(void)response();
+}
+
+void sink(int argc, char *argv[])
+{
+//	DWORD dwread;
+	static BUF buffer;
+	struct _stati64 stb;
+	enum { YES, NO, DISPLAYED } wrerr;
+	BUF *bp;
+	size_t i, j, size;
+	size_t amt, count, exists, first;
+	int mask, mode, ofd, omode;
+	int setimes, targisdir, wrerrno = 0;
+	char ch, *cp, *np, *targ, *why, *vect[1], buf[16384];
+	char aggregatePath[MAX_PATH] = "";
+  	struct _utimbuf ut;
+  	int dummy_usec;
+	bool bDirSpec = false;
+
+#ifdef WITH_SCP_STATS
+        char *statslast;
+#endif /* WITH_SCP_STATS */
+
+#define	SCREWUP(str)	{ why = str; goto screwup; }
+
+
+
+	setimes = targisdir = 0;
+	_umask_s(0, &mask);
+	int oldmask;
+	if (!pflag)
+		_umask_s(mask,&oldmask);
+	if (argc != 1) {
+		if (!iamremote)
+		{
+			run_err("ambiguous target");
+			exit(1);
+		}
+		int i;
+		for (i = 0; i<argc; i++)
+		{
+			if (i != 0)
+				strcat_s(aggregatePath,MAX_PATH," ");
+			strcat_s(aggregatePath,MAX_PATH,argv[i]);
+		}
+		targ = TranslatePath(aggregatePath,&bDirSpec);
+	}
+	else
+	{
+		targ = TranslatePath(*argv,&bDirSpec);
+	}
+
+	if (targ == NULL)
+	{
+		//strerror_s(buf, EPERM);
+		strerror_s(buf, sizeof(buf), ENOENT);
+		run_err("%s: %s", *argv, buf);
+		return;
+	}
+	if (targetshouldbedirectory || bDirSpec)
+		verifydir(targ);
+        
+	(void)_write(remout, "", 1);
+
+	if (_stati64(targ, &stb) == 0 && S_ISDIR(stb.st_mode))
+		targisdir = 1;
+
+	for (first = 1;; first = 0) {
+keepgoing:
+		cp = buf;
+
+		if (_read(remin, cp, 1) <= 0) {
+			return;
+		}
+
+		if (*cp++ == '\n')
+			SCREWUP("unexpected <newline>");
+		do {
+			if (_read(remin, &ch, sizeof(ch)) != sizeof(ch))
+				SCREWUP("lost connection");
+			*cp++ = ch;
+		} while (cp < &buf[sizeof(buf) - 1] && ch != '\n');
+		*cp = 0;
+
+		if (buf[0] == '\01' || buf[0] == '\02') {
+			if (iamremote == 0)
+				(void)_write(STDERR_FILENO,
+				    buf + 1, (unsigned int)strlen(buf + 1));
+			if (buf[0] == '\02')
+				exit(1);
+			++errs;
+			continue;
+		}
+		if (buf[0] == 'E') {
+			(void)_write(remout, "", 1);
+			return;
+		}
+
+		if (ch == '\n')
+			*--cp = 0;
+
+#define getnum(t) (t) = 0; \
+  while (*cp >= '0' && *cp <= '9') (t) = (t) * 10 + (*cp++ - '0');
+		cp = buf;
+		if (*cp == 'T') {
+			setimes++;
+			cp++;
+			getnum(ut.modtime);
+			if (*cp++ != ' ')
+				SCREWUP("mtime.sec not delimited");
+			getnum(dummy_usec);
+			if (*cp++ != ' ')
+				SCREWUP("mtime.usec not delimited");
+			getnum(ut.actime);
+			if (*cp++ != ' ')
+				SCREWUP("atime.sec not delimited");
+			getnum(dummy_usec);
+			if (*cp++ != '\0')
+				SCREWUP("atime.usec not delimited");
+			(void)_write(remout, "", 1);
+			goto keepgoing; // added 5/3/2001 by QI for -p not working !!!
+								 // in place of next continue commented out
+			//continue;
+		}
+		if (*cp != 'C' && *cp != 'D') {
+			/*
+			 * Check for the case "rcp remote:foo\* local:bar".
+			 * In this case, the line "No match." can be returned
+			 * by the shell before the rcp command on the remote is
+			 * executed so the ^Aerror_message convention isn't
+			 * followed.
+			 */
+			if (first) {
+				run_err("%s", cp);
+				exit(1);
+			}
+			SCREWUP("expected control record");
+		}
+		mode = 0;
+		for (++cp; cp < buf + 5; cp++) {
+			if (*cp < '0' || *cp > '7')
+				SCREWUP("bad mode");
+			mode = (mode << 3) | (*cp - '0');
+		}
+		if (*cp++ != ' ')
+			SCREWUP("mode not delimited");
+
+	        for (size = 0; *cp >= '0' && *cp <= '9';)
+			size = size * 10 + (*cp++ - '0');
+		if (*cp++ != ' ')
+			SCREWUP("size not delimited");
+		if (targisdir) {
+			static char *namebuf;
+			static unsigned int cursize;
+			size_t need;
+
+			need = strlen(targ) + strlen(cp) + 250;
+			if (need > cursize)
+			  namebuf = (char *)xmalloc(need);
+			(void)sprintf_s(namebuf, need, "%s%s%s", targ,
+			    *targ ? "/" : "", cp);
+			np = namebuf;
+		} else
+			np = targ;
+		exists = _stati64(np, &stb) == 0;
+		if (buf[0] == 'D') {
+			int mod_flag = pflag;
+			if (exists) {
+				if (!S_ISDIR(stb.st_mode)) {
+					errno = ENOTDIR;
+					goto bad;
+				}
+				if (pflag)
+					(void)_chmod(np, mode);
+			} else {
+				/* Handle copying from a read-only directory */
+				mod_flag = 1;
+				if (_mkdir(np) < 0) // was mkdir(np, mode | S_IRWXU) < 0)
+				{
+					if (errno == EEXIST) // stat returned didn't exist, but mkdir returned it does - see this when user doesn't have access
+						errno = EPERM;
+					np = targ;
+					goto bad;
+				}
+			}
+			vect[0] = np;
+			sink(1, vect);
+			if (setimes) {
+				setimes = 0;
+				//if (_utime(np, &ut) < 0)
+				// in NT cannot set directory time by _utime(), we have our
+				// call _utimedir() above in this file.
+				if (_utimedir(np, &ut) < 0)
+				    //run_err("%s: set times: %s",	np, strerror(errno));
+				    run_err("setting times on %s failed:",	np );
+			}
+			if (mod_flag)
+				(void)_chmod(np, mode);
+			continue;
+		}
+		omode = mode;
+#ifdef HAVE_FTRUNCATE
+	        /* Don't use O_TRUNC so the file doesn't get corrupted if
+		   copying on itself. */
+		ofd = open(np, O_WRONLY|O_CREAT|O_BINARY, mode);
+#else /* HAVE_FTRUNCATE */
+		_sopen_s(&ofd, np, O_WRONLY|O_CREAT|O_TRUNC|O_BINARY, _SH_DENYNO, S_IWRITE);
+#endif /* HAVE_FTRUNCATE */
+		if (ofd < 0) {
+bad:			strerror_s(buf, sizeof(buf), errno);
+
+			if (isRootedPath && (strlen(np) > strlen(g_HomeDir)))
+				np += strlen(g_HomeDir);
+			run_err("%s: %s", np, buf);
+			continue;
+		}
+		(void)_write(remout, "", 1);
+		if ((bp = allocbuf(&buffer, ofd, 16384)) == NULL) {
+			(void)_close(ofd);
+			continue;
+		}
+		cp = bp->buf;
+		wrerr = NO;
+#ifdef WITH_SCP_STATS
+		if (!iamremote && statistics)
+		  {
+		    statbytes = 0;
+		    ratebs = 0.0;
+		    stat_starttime = time(NULL);
+			stat_starttimems = GetTickCount();
+			statslast = getfilenamefrompath(np);
+
+		  }
+#endif /* WITH_SCP_STATS */
+		for (count = i = 0; i < size; i += 16384) {
+			amt = 16384;
+			if (i + amt > size)
+				amt = size - i;
+			count += amt;
+			do {
+				j = _read(remin, cp, (unsigned int)amt);
+				if (j <= 0) {
+					strerror_s(buf, sizeof(buf), errno);
+					run_err("%s", j ? buf :
+					    "dropped connection");
+					exit(1);
+				}
+
+#ifdef WITH_SCP_STATS
+				if (!iamremote && statistics){
+				    int bwritten;
+				    statbytes += j;
+					if ( (time(NULL) - stat_lasttime > 0) || ( statbytes == size) ) {
+				      if (time(NULL) == stat_starttime)	{
+						stat_starttime -= 1;
+//						stat_starttimems -= 1000;
+					  }
+				      ratebs = ssh_max(1.0,
+						       (double)
+						       statbytes /
+						       (time(NULL) -
+							stat_starttime));
+				      bwritten =
+					  fprintf(SOME_STATS_FILE,
+						"\r%-25.25s | %10I64d KB | %7.1f kB/s | %s | %3d%%",
+						statslast,
+						statbytes / 1024,
+						ratebs / 1024,
+//						stat_eta((int)
+//							 (time(NULL) - stat_starttime)),
+						stat_eta_new((int)(GetTickCount() - stat_starttimems)),
+						  (int) (100.0 *
+							 (double) statbytes /size));
+				      if (all_statistics && statbytes == size)
+						bwritten += fprintf(SOME_STATS_FILE, "\n");
+					  fflush(SOME_STATS_FILE);
+				      stats_fixlen(bwritten);
+				      stat_lasttime = time(NULL);
+				    }
+				}
+#endif /* WITH_SCP_STATS */
+				amt -= j;
+				cp += j;
+			} while (amt > 0);
+			if (count == bp->cnt) {
+				/* Keep reading so we stay sync'd up. */
+				if (wrerr == NO) {
+					j = _write(ofd, bp->buf, (unsigned int)count);
+					if (j != count) {
+						wrerr = YES;
+						wrerrno = j >= 0 ? EIO : errno; 
+					}
+				}
+				count = 0;
+				cp = bp->buf;
+			}
+		} // end of main 16384 byte read for loop
+		if (count != 0 && wrerr == NO &&
+		    (j = _write(ofd, bp->buf, (unsigned int)count)) != count) {
+			wrerr = YES;
+			wrerrno = j >= 0 ? EIO : errno; 
+		}
+#ifdef HAVE_FTRUNCATE
+		if (ftruncate(ofd, size)) {
+			run_err("%s: truncate: %s", np, strerror(errno));
+			wrerr = DISPLAYED;
+		}
+#endif /* HAVE_FTRUNCATE */
+		if (pflag) {
+			if (exists || omode != mode)
+			{
+#ifdef HAVE_FCHMOD
+				if (fchmod(ofd, omode)) {
+#else /* HAVE_FCHMOD */
+				if (_chmod(np, omode)) {
+#endif /* HAVE_FCHMOD */
+					strerror_s(buf, sizeof(buf), errno);
+					run_err("%s: set mode: %s",
+					    np, buf);
+				}
+			}
+		} else {
+			if (!exists && omode != mode)
+#ifdef HAVE_FCHMOD
+				if (fchmod(ofd, omode & ~mask)) {
+#else /* HAVE_FCHMOD */
+				if (_chmod(np, omode & ~mask)) {
+#endif /* HAVE_FCHMOD */
+					strerror_s(buf, sizeof(buf), errno);
+					run_err("%s: set mode: %s",
+					    np, buf);
+				}
+		}
+		(void)_close(ofd);
+		(void)response();
+		if (setimes && wrerr == NO) {
+			setimes = 0;
+			if (_utime(np, &ut) < 0) {
+
+				// see if the error was due to read only file permission
+				if ( _access(np,2) < 0 ) {
+					// lacks write permission, so give it for now
+					_chmod(np, _S_IWRITE);
+					if (_utime(np, &ut) < 0) {
+						strerror_s(buf, sizeof(buf), errno);
+						run_err("%s: set times: %s", np, buf);
+						wrerr = DISPLAYED;
+					}
+					_chmod(np, _S_IREAD); // read only permission set again
+				}
+				else {
+				strerror_s(buf, sizeof(buf), errno);
+				run_err("%s: set times: %s",
+				    np, buf);
+				wrerr = DISPLAYED;
+				}
+			}
+		}
+		switch(wrerr) {
+		case YES:
+			strerror_s(buf, sizeof(buf), errno);
+			run_err("%s: %s", np, buf);
+			break;
+		case NO:
+			(void)_write(remout, "", 1);
+			fflush(stdout);
+			fflush(stdin);
+			break;
+		case DISPLAYED:
+			break;
+		}
+	}
+
+	if (targ)
+		LocalFree(targ);
+
+	if ( first > 1 ) {
+		return;
+	}
+screwup:
+	run_err("protocol error: %s", why);
+	exit(1);
+}
+
+int response(void)
+{
+	char ch, *cp, resp, rbuf[2048];
+
+	if (_read(remin, &resp, sizeof(resp)) != sizeof(resp))
+		lostconn(0);
+
+	cp = rbuf;
+	switch(resp) {
+	case 0:				/* ok */
+		return (0);
+	default:
+		*cp++ = resp;
+		/* FALLTHROUGH */
+	case 1:				/* error, followed by error msg */
+	case 2:				/* fatal error, "" */
+		do {
+			if (_read(remin, &ch, sizeof(ch)) != sizeof(ch))
+				lostconn(0);
+			*cp++ = ch;
+		} while (cp < &rbuf[sizeof(rbuf) - 1] && ch != '\n');
+
+		if (!iamremote)
+			(void)_write(STDERR_FILENO, rbuf, (unsigned int)(cp - rbuf));
+		++errs;
+		if (resp == 1)
+			return (-1);
+		exit(1);
+	}
+	/* NOTREACHED */
+}
+#else
 void
 source(int argc, char **argv)
 {
@@ -1231,6 +2654,7 @@ response(void)
 	}
 	/* NOTREACHED */
 }
+#endif
 
 void
 usage(void)
@@ -1266,7 +2690,7 @@ run_err(const char *fmt,...)
 		fprintf(stderr, "\n");
 	}
 }
-
+#ifndef WIN32_FIXME
 void
 verifydir(char *cp)
 {
@@ -1349,3 +2773,297 @@ lostconn(int signo)
 	else
 		exit(1);
 }
+#else
+char *win32colon(char *cp)
+{
+	int len=0;
+	bool bSkip = false;
+
+	if (*cp == ':')		/* Leading colon is part of file name. */
+		return (0);
+
+	for (; *cp; ++cp) {
+		len++;
+
+		if (*cp == '[')
+			bSkip = true;
+
+		if (bSkip && *cp!= ']')
+			continue;
+
+		if (*cp == ']')
+			bSkip = false;
+
+		if (*cp == ':') {
+			if ( len != 2 ) { // avoid x: format for drive letter in Windows
+				return (cp);
+			}
+		}
+	//	if ( (*cp == '/') || (*cp == '\\') )
+	//		return (0);
+	}
+	return (0);
+}
+
+void verifydir(char *cp)
+{
+	struct _stati64 stb;
+
+	if (!_stati64(cp, &stb)) {
+		if (S_ISDIR(stb.st_mode))
+			return;
+		errno = ENOTDIR;
+	}
+	char buf[MAX_PATH];
+	strerror_s(buf, sizeof(buf), errno);
+	run_err("%s: %s", cp, buf);
+	exit(1);
+}
+
+int okname(char *cp0)
+{
+	return (1);
+}
+
+BUF *
+allocbuf(BUF *bp, int fd, int blksize)
+{
+	size_t size;
+#ifdef HAVE_STRUCT_STAT_ST_BLKSIZE
+	struct stat stb;
+
+	if (fstat(fd, &stb) < 0) {
+		run_err("fstat: %s", strerror(errno));
+		return (0);
+	}
+	size = roundup(stb.st_blksize, blksize);
+	if (size == 0)
+		size = blksize;
+#else /* HAVE_STRUCT_STAT_ST_BLKSIZE */
+	size = blksize;
+#endif /* HAVE_STRUCT_STAT_ST_BLKSIZE */
+	if (bp->cnt >= size)
+		return (bp);
+	if (bp->buf == NULL)
+		bp->buf = xmalloc(size);
+	else
+		bp->buf = xreallocarray(bp->buf, 1, size);
+	memset(bp->buf, 0, size);
+	bp->cnt = size;
+	return (bp);
+}
+
+void lostconn(int signo)
+{
+	if (!iamremote)
+		fprintf(stderr, "lost connection\n");
+	exit(1);
+}
+#endif
+
+#ifdef WIN32_FIXME
+
+#ifdef WITH_SCP_STATS
+void stats_fixlen(int bwritten)
+{
+	char rest[80];
+	int i = 0;
+
+	while (bwritten++ < 77)
+	{
+		rest[i++] = ' ';
+	}
+	rest[i] = '\0';
+	fputs(rest, SOME_STATS_FILE);
+	fflush(SOME_STATS_FILE);
+}
+
+
+char *stat_eta_new(int msecs)
+{
+	static char stat_result[32];
+	int hours = 0, mins = 0, secs = 0;
+
+	//   hours = msecs / 3600000;
+	//   msecs %= 3600000;
+	//   mins = msecs / 60000;
+	//   msecs %= 60000;
+
+	hours = msecs / 3600000;
+	msecs %= 3600000;
+	mins = msecs / 60000;
+	msecs %= 60000;
+	secs = msecs / 1000;
+	msecs %= 1000;
+
+	if (hours > 0) {
+		sprintf_s(stat_result, sizeof(stat_result),"%02d:%02d:%02d:%03d", hours, mins, secs, msecs);
+	}
+	else
+		sprintf_s(stat_result, sizeof(stat_result), "%02d:%02d:%03d", mins, secs, msecs);
+
+	return(stat_result);
+}
+
+char *stat_eta_old(int secs)
+{
+	static char stat_result[20];
+	int hours, mins;
+
+	hours = secs / 3600;
+	secs %= 3600;
+	mins = secs / 60;
+	secs %= 60;
+
+	sprintf_s(stat_result, sizeof(stat_result), "%02d:%02d:%02d", hours, mins, secs);
+	return(stat_result);
+}
+#endif /* WITH_SCP_STATS */
+
+
+char *TranslatePath(char *path, bool *bDirSpec)
+{
+	char	temp[MAX_PATH*2];
+	char	resolved[MAX_PATH];
+	char *	rootpath;
+
+	if ( iamremote == 0)
+		return path; // if we are scp client, nothing special to do, return path we got.
+
+	char *s = NULL;
+
+	if (g_RootMode == M_ADMIN){
+		rootpath = g_FSRoot;
+	}else{
+		rootpath = g_HomeDir;
+	}
+
+	if (!_strnicmp(path, rootpath, strlen(g_HomeDir)))
+	{	// already set to home directory
+		strcpy_s(temp, sizeof(temp), path); // absolute path
+	}
+	else
+	{
+		if (path[1] != ':')
+		{
+			if (path[0] == '\\' || path[0] == '/')
+				sprintf_s(temp, sizeof(temp), "%s%s",rootpath,&path[1]);
+			else
+				sprintf_s(temp, sizeof(temp), "%s%s",rootpath,path);
+		}
+		else
+			strcpy(temp,path);
+
+	}
+	fixslashes(temp);
+	PathCanonicalizeA(resolved,temp);
+
+
+	*bDirSpec = (resolved[strlen(temp)-1] == '\\');
+	// Remove trailing slash unless it's a root spec (c:\ etc)
+	if (strcmp(&(resolved[1]),":\\") && resolved[strlen(temp)-1] == '\\')
+		resolved[strlen(temp)-1] = 0x00;
+
+	if (strlen(resolved) == strlen(rootpath)-1)
+	{
+		// We specify a length of less than one because if we 
+		// resolve to the scp home directory (i.e. user specified
+		// '.' for the target), then PathCanonicalize will strip 
+		// the trailing slash.
+		if (_strnicmp(resolved, rootpath, strlen(g_HomeDir)-1))
+			return NULL;
+	}
+	else if (!((g_RootMode == M_ADMIN) && resolved[1] == ':')){
+		// if we are in admin mode and the user specified a drive, let it go through
+		if (_strnicmp(resolved, rootpath, strlen(rootpath)))
+ 			return NULL;
+	}
+
+	// if we reach this point, the path is fine.  We can actually just return path
+	// if the path doesn't begin with a slash
+	if (path[0] != '/' && path[0] != '\\')
+		return path;
+
+
+	s = (char *)LocalAlloc(LPTR,strlen(resolved)+1);
+	strcpy_s(s,strlen(resolved)+1,resolved);
+	isRootedPath = 1;
+
+	return s;
+}
+
+/* start_process_io()
+input parameters:
+	exename - name of executable
+	StdXXXX - the three stdin, stdout, stdout I/O handles.
+*/
+
+int start_process_io(char *exename, char **argv, char **envv,
+	HANDLE StdInput, HANDLE StdOutput, HANDLE StdError,
+	unsigned long CreateFlags, PROCESS_INFORMATION  *pi,
+	char *homedir, char *lpDesktop)
+{
+	UNREFERENCED_PARAMETER(envv);
+	STARTUPINFO          sui;
+	DWORD ret;
+	char cmdbuf[2048];
+	int ctr;
+
+	/* set up the STARTUPINFO structure,
+	*  then call CreateProcess to try and start the new exe.
+	*/
+	sui.cb = sizeof(STARTUPINFO);
+	sui.lpReserved = 0;
+	sui.lpDesktop = lpDesktop;
+	sui.lpTitle = NULL; /* NULL means use exe name as title */
+	sui.dwX = 0;
+	sui.dwY = 0;
+	sui.dwXSize = 132;
+	sui.dwYSize = 60;
+	sui.dwXCountChars = 132;
+	sui.dwYCountChars = 60;
+	sui.dwFillAttribute = 0;
+	sui.dwFlags = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS; // | STARTF_USESHOWWINDOW ;
+	sui.wShowWindow = 0; // FALSE ;
+	sui.cbReserved2 = 0;
+	sui.lpReserved2 = 0;
+	sui.hStdInput = (HANDLE)StdInput;
+	sui.hStdOutput = (HANDLE)StdOutput;
+	sui.hStdError = (HANDLE)StdError;
+
+	ctr = 0;
+	cmdbuf[0] = '\0';
+	while (argv[ctr]) {
+		strcat_s(cmdbuf, sizeof(cmdbuf), argv[ctr]);
+		strcat_s(cmdbuf, sizeof(cmdbuf), " ");
+		ctr++;
+	}
+
+	ret = CreateProcess(
+		exename, // given in form like "d:\\util\\cmd.exe"
+		cmdbuf, /* in "arg0 arg1 arg2" form command line */
+		NULL, /* process security */
+		NULL, /* thread security */
+		TRUE, /* inherit handles is YES */
+		CreateFlags,
+		/* give new proc a new screen, suspend it for debugging also */
+		NULL, /* in "E1=a0E2=b0E3=c00" form environment,
+			  NULL means use parent's */
+		homedir, /* Current Directory, NULL means use whats for parent */
+		&sui, /* start up info */
+		pi); /* process created info kept here */
+
+	if (ret == TRUE) {
+		//cprintf ( "Process created, pid=%d, threadid=%d\n",pi->dwProcessId,
+		//			  pi->dwThreadId ) ;
+
+		return pi->dwProcessId;
+
+	}
+	else {
+		/* report failure to the user. */
+		return ret;
+	}
+}
+#endif
+

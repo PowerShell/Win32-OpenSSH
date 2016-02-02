@@ -42,10 +42,14 @@
 
 #include <NTSecPkg.h>
 
+#ifndef __VS_BUILD__
 #ifdef _WIN64
 #include <ntstatus.h>
 #else
 #include <ddk/ntstatus.h>
+#endif
+#else
+#include <ntstatus.h>
 #endif
 
 #include <Userenv.h>
@@ -84,9 +88,17 @@ typedef struct _SshLsaAuth
 } 
 SshLsaAuth;
 
+#ifndef __VS_BUILD__
 typedef VOID WINAPI (*RtlInitUnicodeStringPtr) 
                          (PUNICODE_STRING, PCWSTR SourceString);
 
+#else
+typedef VOID (WINAPI *RtlInitUnicodeStringPtr)
+						(PUNICODE_STRING, PCWSTR SourceString);
+#endif
+
+
+#ifndef __VS_BUILD__
 #ifndef _WIN64
 typedef struct _LSA_TOKEN_INFORMATION_V1
 {
@@ -105,6 +117,7 @@ typedef struct _LSA_TOKEN_INFORMATION_V1
   TOKEN_DEFAULT_DACL DefaultDacl;
 } 
 LSA_TOKEN_INFORMATION_V1, *PLSA_TOKEN_INFORMATION_V1;
+#endif
 #endif
 
 #endif

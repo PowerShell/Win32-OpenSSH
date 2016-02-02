@@ -1598,19 +1598,18 @@ read_config_file(const char *filename, struct passwd *pw, const char *host,
 	if ((f = fopen(filename, "r")) == NULL)
 		return 0;
 
+#ifndef WIN32_FIXME
 	if (flags & SSHCONF_CHECKPERM) {
 		struct stat sb;
 
 		if (fstat(fileno(f), &sb) == -1)
 			fatal("fstat %s: %s", filename, strerror(errno));
 		
-#ifndef WIN32_FIXME
 		if (((sb.st_uid != 0 && sb.st_uid != getuid()) ||
 		    (sb.st_mode & 022) != 0))
 			fatal("Bad owner or permissions on %s", filename);
-#endif
 	}
-
+#endif
 	debug("Reading configuration data %.200s", filename);
 
 	/*
@@ -1724,7 +1723,7 @@ initialize_options(Options * options)
 	options->tun_remote = -1;
 	options->local_command = NULL;
 	options->permit_local_command = -1;
-	options->use_roaming = -1;
+	options->use_roaming = 0;
 	options->visual_host_key = -1;
 	options->ip_qos_interactive = -1;
 	options->ip_qos_bulk = -1;
@@ -1942,8 +1941,7 @@ void fill_default_options(Options * options, struct passwd *pw)
 		options->tun_remote = SSH_TUNID_ANY;
 	if (options->permit_local_command == -1)
 		options->permit_local_command = 0;
-	if (options->use_roaming == -1)
-		options->use_roaming = 1;
+	options->use_roaming = 0;
 	if (options->visual_host_key == -1)
 		options->visual_host_key = 0;
 	if (options->ip_qos_interactive == -1)

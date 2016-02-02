@@ -29,10 +29,28 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __VS_BUILD__
+#define UMDF_USING_NTSTATUS 
+#include <winsock2.h>
+#include <Windows.h>
+#include <LsaLookup.h>
+#include <Ntsecapi.h>
+#endif
+
 #include <winsock2.h>
 #include "LsaString.h"
 
-extern LSA_SECPKG_FUNCTION_TABLE LsaApi;
+#ifdef __VS_BUILD__
+#ifdef __cplusplus
+extern "C" {
+#endif
+#endif // __VS_BUILD__
+	extern LSA_SECPKG_FUNCTION_TABLE LsaApi;
+#ifdef __VS_BUILD__
+#ifdef __cplusplus
+}
+#endif
+#endif
 
 //
 // Allocate empty UNICODE_STRING in LSA address space.
@@ -134,7 +152,11 @@ NTSTATUS FillUnicodeString(UNICODE_STRING *lsaStr, const Char *str)
   // Fill string buffer.
   //
   
-  swprintf(lsaStr -> Buffer, L"%hs", str);
+#ifdef __VS_BUILD__
+  _swprintf(lsaStr -> Buffer, L"%hs", str);
+#else
+  swprintf(lsaStr->Buffer, L"%hs", str);
+#endif
   
   lsaStr -> Length = cbSize * 2;
   
