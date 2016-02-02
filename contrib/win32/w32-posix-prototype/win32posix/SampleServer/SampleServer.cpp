@@ -416,9 +416,19 @@ int throughput()
     return 0;
 }
 
+DWORD WINAPI ThreadProcedure(void* param)
+{
+    Sleep(20*1000);
+    int writefd = *((int*)param);
+    close(writefd);
+    return 0;
+}
+
 int pipetest()
 {
     int pipefds[2];
+
+    w32posix_initialize();
     if (-1 == pipe(pipefds))
     {
         printf("creating pipe failed %d\n", errno);
@@ -429,15 +439,21 @@ int pipetest()
     int writefd = pipefds[1];
     char* buf = "test characters to write";
     char readbuf[512];
-
-    int written = write(writefd, buf, strlen(buf));
-    if (written == -1) {
-        printf("write to pipe failed %d \n", errno);
-        close(readfd);
-        close(writefd);
-        return -1;
+    
+    CreateThread(0, 0, &ThreadProcedure, &readfd, 0, NULL);
+    int count = 0;
+    while (1) {
+        int written = write(writefd, buf, strlen(buf));
+        printf("Iteration %d  Written %d\n", count++, written);
+        if (written == -1) {
+            printf("write to pipe failed %d \n", errno);
+            close(readfd);
+            close(writefd);
+            return -1;
+        }
     }
 
+    /*
     int rd = read(readfd, readbuf, 512);
     if (rd == -1) {
         printf("reading from pipe failed %d \n", errno);
@@ -445,10 +461,78 @@ int pipetest()
         close(writefd);
         return -1;
     }
+    */
+
+    close(writefd);
 
     close(readfd);
-    close(writefd);
     return 0;
+}
+
+int pipelinetest()
+{
+    int pipe1[2];
+    if (-1 == pipe(pipe1))
+    {
+        printf("creating pipe failed %d\n", errno);
+        return -1;
+    }
+
+    int pipe1_out = pipe1[0];
+    int pipe1_in = pipe1[1];
+    
+    int fd_flags = fcntl(pipe1_in, F_GETFL);
+    fcntl(pipe1_in, F_SETFL, fd_flags | O_NONBLOCK);
+
+    fd_flags = fcntl(pipe1_out, F_GETFL);
+    fcntl(pipe1_out, F_SETFL, fd_flags | O_NONBLOCK);
+
+
+    int max_fd = max(pipe1_in, pipe1_out) + 1;
+
+    fd_set read_set, write_set;
+
+    FD_ZERO(&read_set);
+    FD_ZERO(&write_set);
+
+    FD_SET(pipe1_out, &read_set);
+    FD_SET(pipe1_in, &write_set);
+    timeval time;
+    time.tv_sec = 60000;
+    time.tv_usec = 0;
+    char* input = "hi how are you?";
+    char read_buf[256];
+
+    while (-1 != select(max_fd, &read_set, &write_set, NULL, &time))
+    {
+        fd_set read_ret_set = read_set;
+        fd_set write_ret_set = write_set;
+
+        FD_ZERO(&read_set);
+        FD_ZERO(&write_set);
+
+        if (FD_ISSET(pipe1_in, &write_ret_set))
+        {
+            int to_write = strlen(input);
+            int written = write(pipe1_in, input, to_write);
+            if (written != to_write)
+                FD_SET(pipe1_in, &write_set);
+            else
+                FD_SET(pipe1_out, &read_set);
+
+        }
+
+        if (FD_ISSET(pipe1_out, &read_ret_set))
+        {
+            int bytes_read = read(pipe1_out, read_buf, 256);
+            if (bytes_read > 0)
+            {
+                read_buf[bytes_read] = '\0';
+                printf("Received %s \n", read_buf);
+            }
+        }
+        
+    }
 }
 
 

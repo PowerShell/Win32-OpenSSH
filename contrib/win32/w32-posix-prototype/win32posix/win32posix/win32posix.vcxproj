@@ -74,12 +74,14 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="debug.c" />
     <ClCompile Include="fileio.c" />
     <ClCompile Include="signal.c" />
     <ClCompile Include="socketio.c" />
     <ClCompile Include="w32fd.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="debug.h" />
     <ClInclude Include="defs.h" />
     <ClInclude Include="w32fd.h" />
     <ClInclude Include="w32posix.h" />

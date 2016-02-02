@@ -14,6 +14,7 @@
     <ProjectGuid>{D52F8255-C3A9-4416-A0A6-8CE63A4D7E43}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>SampleServer</RootNamespace>
+    <ProjectName>SampleServer_</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -56,7 +57,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>C:\openssh\Win32-OpenSSH_\contrib\win32\w32-posix-prototype\win32posix\Debug\win32posix.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>C:\openssh\Win32-OpenSSH\contrib\win32\w32-posix-prototype\win32posix\Debug\win32posix.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
