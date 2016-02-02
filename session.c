@@ -117,6 +117,9 @@ FIXME: GFPZR: Function stat() may be undeclared.
 #include <Userenv.h>
 #include <shlobj.h>
 
+#ifdef WIN32_PRAGMA_REMCON
+#include <shlwapi.h>
+#endif
 extern char HomeDirLsaW[MAX_PATH];
 
 #endif
@@ -599,9 +602,17 @@ do_exec_no_pty(Session *s, const char *command)
 	#ifndef WIN32_PRAGMA_REMCON
     exec_command = s->pw->pw_shell;
 	#else
-	snprintf(exec_command_str, sizeof(exec_command_str),
-		"\\program files\\pragma\\shared files\\cmdserver.exe SSHD %d %d",
-		s->row, s->col );
+	if ( PathFileExists("\\program files\\pragma\\shared files\\cmdserver.exe") )
+	 snprintf(exec_command_str, sizeof(exec_command_str),
+		"\\program files\\pragma\\shared files\\cmdserver.exe SSHD %d %d", s->row, s->col );
+	else {
+		// find base path of our executable
+		char basepath[MAX_PATH];
+		strcpy_s(basepath, MAX_PATH, __progname);
+		PathRemoveFileSpec(basepath); // get the full dir part of the name
+		snprintf(exec_command_str, sizeof(exec_command_str),
+			"%s\\cmdserver.exe SSHD %d %d", basepath,s->row, s->col);
+	}
 	exec_command = exec_command_str;
 	#endif
   }  
