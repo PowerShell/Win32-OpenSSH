@@ -233,7 +233,7 @@ VOID CALLBACK ReadCompletionRoutine(
     _Inout_ LPOVERLAPPED lpOverlapped
     ) {
     struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, read_overlapped));
-    debug("pio:%p, pending_state:%d, error:%d, transferred:%d", pio, pio->read_details.pending, dwErrorCode, dwNumberOfBytesTransfered);
+    debug2("pio:%p, pending_state:%d, error:%d, transferred:%d", pio, pio->read_details.pending, dwErrorCode, dwNumberOfBytesTransfered);
     pio->read_details.error = dwErrorCode;
     pio->read_details.remaining = dwNumberOfBytesTransfered;
     pio->read_details.completed = 0;
@@ -276,7 +276,7 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     //if read is pending 
     if (pio->read_details.pending) {
         errno = EAGAIN;
-        debug("IO is already pending");
+        debug2("IO is already pending");
         return -1;
     }
 
@@ -285,7 +285,7 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 
         if (-1 == fileio_ReadFileEx(pio)) {
             if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK))  {//write end of the pipe closed
-                debug("no more data");
+                debug2("no more data");
                 errno = 0;
                 return 0;
             }
@@ -303,7 +303,7 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
         }
         else if (pio->read_details.pending) {
             errno = EAGAIN;
-            debug("IO is pending");
+            debug2("IO is pending");
             return -1;
         }
     }
@@ -312,7 +312,7 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
         errno = errno_from_Win32Error(pio->read_details.error);
         if ((errno == ERROR_BROKEN_PIPE) || //write end of the pipe is closed or pipe broken
             (errno == ERROR_HANDLE_EOF)) { //end of file reached
-            debug("no more data");
+            debug2("no more data");
             errno = 0;
             pio->read_details.error = 0;
             return 0;
@@ -326,7 +326,7 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     memcpy(dst, pio->read_details.buf + pio->read_details.completed, bytes_copied);
     pio->read_details.remaining -= bytes_copied;
     pio->read_details.completed += bytes_copied;
-    debug("read %d bytes", bytes_copied);
+    debug2("read %d bytes", bytes_copied);
     return bytes_copied;
 }
 
@@ -336,7 +336,7 @@ VOID CALLBACK WriteCompletionRoutine(
     _Inout_ LPOVERLAPPED lpOverlapped
     ) {
     struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, write_overlapped));
-    debug("pio:%p, pending_state:%d, remaining:%d, error:%d, transferred:%d", pio, pio->write_details.pending, pio->write_details.remaining, dwErrorCode, dwNumberOfBytesTransfered);
+    debug2("pio:%p, pending_state:%d, remaining:%d, error:%d, transferred:%d", pio, pio->write_details.pending, pio->write_details.remaining, dwErrorCode, dwNumberOfBytesTransfered);
     pio->write_details.error = dwErrorCode;
     //assert that remaining == dwNumberOfBytesTransfered
     pio->write_details.remaining -= dwNumberOfBytesTransfered;
@@ -352,7 +352,7 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
         {
             //this covers the scenario when the fd was previously non blocking (and hence io is still pending)
             //wait for previous io to complete
-            debug("waiting for prior unblocking write to complete before proceeding with this blocking write");
+            debug2("waiting for prior unblocking write to complete before proceeding with this blocking write");
             while (pio->write_details.pending) {
                 if (wait_for_any_event(NULL, 0, INFINITE) == -1)
                     return -1;
@@ -360,7 +360,7 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
         }
         else {
             errno = EAGAIN;
-            debug("IO is already pending");
+            debug2("IO is already pending");
             return -1;
         }
     }
@@ -420,7 +420,7 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 
 int fileio_fstat(struct w32_io* pio, struct stat *buf) {
     int fd = _open_osfhandle((intptr_t)pio->handle, 0);
-    debug("pio:%p", pio);
+    debug2("pio:%p", pio);
     if (fd == -1) {
         errno = EOTHER;
         return -1;
@@ -438,7 +438,7 @@ int fileio_isatty(struct w32_io* pio) {
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode) {
 
     int fd_flags = 0;
-    debug("pio:%p", pio);
+    debug2("pio:%p", pio);
 
     if (mode[1] == '\0') {
         switch (*mode) {
@@ -489,7 +489,7 @@ int fileio_on_select(struct w32_io* pio, BOOL rd) {
 
 
 int fileio_close(struct w32_io* pio) {
-    debug("pio:%p", pio);
+    debug2("pio:%p", pio);
     CancelIo(pio->handle);
     //let queued APCs (if any) drain
     SleepEx(0, TRUE);

@@ -392,7 +392,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
             *readfds = read_ready_fds;
         if (writefds)
             *writefds = write_ready_fds;
-        debug("IO ready:%d, no wait", out_ready_fds);
+        debug2("IO ready:%d, no wait", out_ready_fds);
         return out_ready_fds;
     }
 
@@ -450,7 +450,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
         if (out_ready_fds)
             break;
 
-        debug("wait ended without any IO completion, looping again");
+        debug2("wait ended without any IO completion, looping again");
 
     } while (1);
 

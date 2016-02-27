@@ -133,7 +133,7 @@ void CALLBACK WSARecvCompletionRoutine(
     )
 {
     struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, read_overlapped));
-    debug("pio:%p, pending_state:%d, remaining:%d, completed:%d, error:%d, transferred: %d", 
+    debug2("pio:%p, pending_state:%d, remaining:%d, completed:%d, error:%d, transferred: %d", 
         pio, pio->read_details.pending, pio->read_details.remaining, pio->read_details.pending, dwError, cbTransferred);
     if (!dwError && !cbTransferred)
         dwError = ERROR_GRACEFUL_DISCONNECT;
@@ -176,7 +176,7 @@ int socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
     {
         pio->read_details.pending = TRUE;
         //receive has completed but APC is pending to be scheduled
-        debug("WSARecv immediate completion");
+        debug2("WSARecv immediate completion");
         if (completed)
             *completed = TRUE;
     }
@@ -258,7 +258,7 @@ int socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namele
 int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     BOOL completed = FALSE;
     
-    debug("pio: %p", pio);
+    debug2("pio: %p", pio);
 
     if ((buf == NULL) || (len == 0)){
         errno = EINVAL;
@@ -275,7 +275,7 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     //if io is already pending
     if (pio->read_details.pending) {
         errno = EAGAIN;
-        debug("Read is already pending");
+        debug2("Read is already pending");
         return -1;
     }
 
@@ -286,14 +286,14 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
         memcpy(buf, pio->read_details.buf + pio->read_details.completed, num_bytes_copied);
         pio->read_details.remaining -= num_bytes_copied;
         pio->read_details.completed += num_bytes_copied;
-        debug("returning %d bytes from prior completed IO, remaining: %d", num_bytes_copied, pio->read_details.remaining);
+        debug2("returning %d bytes from prior completed IO, remaining: %d", num_bytes_copied, pio->read_details.remaining);
         return num_bytes_copied;
     } 
 
     //if there was an error on async call, return
     if (pio->read_details.error) {
         if (pio->read_details.error == ERROR_GRACEFUL_DISCONNECT) {
-            debug("connection closed");
+            debug2("connection closed");
             //connection is closed
             return 0;
         }
@@ -330,7 +330,7 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     else {
         if (socketio_is_io_available(pio, TRUE) == FALSE) {
             errno = EAGAIN;
-            debug("IO is pending");
+            debug2("IO is pending");
             return -1;
         }
     }
@@ -340,7 +340,7 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
     {
         if (pio->read_details.error == ERROR_GRACEFUL_DISCONNECT) {
             //connection is closed
-            debug("connection closed");
+            debug2("connection closed");
             return 0;
         }
         else {
@@ -356,7 +356,7 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
         memcpy(buf, pio->read_details.buf, num_bytes_copied);
         pio->read_details.remaining -= num_bytes_copied;
         pio->read_details.completed = num_bytes_copied;
-        debug("returning %d bytes from completed IO, remaining: %d", num_bytes_copied, pio->read_details.remaining);
+        debug2("returning %d bytes from completed IO, remaining: %d", num_bytes_copied, pio->read_details.remaining);
         return num_bytes_copied;
     }
     else {
@@ -376,7 +376,7 @@ void CALLBACK WSASendCompletionRoutine(
     )
 {
     struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, write_overlapped));
-    debug("pio: %p, pending_state:%d, error:%d, transferred:%d, remaining: %d", pio, pio->write_details.pending, dwError, cbTransferred, pio->write_details.remaining);
+    debug2("pio: %p, pending_state:%d, error:%d, transferred:%d, remaining: %d", pio, pio->write_details.pending, dwError, cbTransferred, pio->write_details.remaining);
     pio->write_details.error = dwError;
     //assert that remaining == cbTransferred
     pio->write_details.remaining -= cbTransferred;
@@ -387,7 +387,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
     int ret = 0;
     WSABUF wsabuf;
 
-    debug("pio: %p", pio);
+    debug2("pio: %p", pio);
 
     if ((buf == NULL) || (len == 0)){
         errno = EINVAL;
@@ -408,7 +408,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
         {
             //this covers the scenario when the fd was previously non blocking (and hence io is still pending)
             //wait for previous io to complete
-            debug("waiting for IO on a previous nonblocking send to complete");
+            debug2("waiting for IO on a previous nonblocking send to complete");
             while (pio->write_details.pending) {
                 if (wait_for_any_event(NULL, 0, INFINITE) == -1)
                     return -1;
@@ -416,7 +416,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
         }
         else {
             errno = EAGAIN;
-            debug("IO pending");
+            debug2("IO pending");
             return -1;
         }
     }
@@ -456,7 +456,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
     if (ret == 0)
     {
         //send has completed and APC is scheduled, let it run
-        debug("WSASend immediate completion");
+        debug2("WSASend immediate completion");
         pio->write_details.pending = TRUE;
         pio->write_details.remaining = wsabuf.len;
         SleepEx(1, TRUE);
@@ -473,7 +473,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
         if (WSAGetLastError() == WSA_IO_PENDING)
         {
             //io is initiated and pending
-            debug("IO pending");
+            debug2("IO pending");
             pio->write_details.pending = TRUE;
             pio->write_details.remaining = wsabuf.len;
             if (w32_io_is_blocking(pio))
@@ -500,12 +500,12 @@ int socketio_shutdown(struct w32_io* pio, int how) {
 }
 
 int socketio_close(struct w32_io* pio) {
-    debug("pio: %p", pio);
+    debug2("pio: %p", pio);
     closesocket(pio->sock);
     //wait for pending io to abort
     SleepEx(0, TRUE);
     if (pio->read_details.pending || pio->write_details.pending)
-        debug("IO is still pending on closed socket. read:%d, write:%d", pio->read_details.pending, pio->write_details.pending);
+        debug2("IO is still pending on closed socket. read:%d, write:%d", pio->read_details.pending, pio->write_details.pending);
     if (pio->type == LISTEN_FD) {
         if (pio->read_overlapped.hEvent)
             CloseHandle(pio->read_overlapped.hEvent);
@@ -529,7 +529,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     int iResult = 0;
     struct acceptEx_context* context = (struct acceptEx_context*)pio->context;
 
-    debug("pio:%p", pio);
+    debug2("pio:%p", pio);
     //start io if not already started
     if (pio->read_details.pending == FALSE) {
         if (socketio_acceptEx(pio) != 0) {
@@ -551,7 +551,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
         //if i/o is not ready
         if (FALSE == socketio_is_io_available(pio, TRUE)) {
             errno = EAGAIN;
-            debug("accept is pending");
+            debug2("accept is pending");
             return NULL;
         }
 
@@ -578,7 +578,7 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     context->accept_socket = INVALID_SOCKET;
     pio->read_details.pending = FALSE;
     ResetEvent(pio->read_overlapped.hEvent);
-    debug("accept io:%p", accept_io);
+    debug2("accept io:%p", accept_io);
     return accept_io;
 }
 
@@ -613,7 +613,7 @@ BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd) {
 
 int socketio_on_select(struct w32_io* pio, BOOL rd) {
 
-    debug("pio:%p", pio);
+    debug2("pio:%p", pio);
     if (rd && pio->read_details.pending)
         return 0;
 
