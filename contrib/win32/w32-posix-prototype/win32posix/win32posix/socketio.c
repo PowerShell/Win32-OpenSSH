@@ -716,8 +716,7 @@ int socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namele
 
     //close event handle
     CloseHandle(pio->write_overlapped.hEvent);
-    pio->write_overlapped.hEvent = 0;
-
+    
     if (pio->write_details.error) {
         errno = errno_from_WSAError(pio->write_details.error);
         debug("ERROR: async io completed with error: %d, io:%p", errno, pio);
@@ -726,12 +725,14 @@ int socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namele
 
     if (0 != setsockopt(pio->sock, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, NULL, 0))
     {
+        int i = WSAGetLastError();
         errno = errno_from_WSALastError();
         debug("ERROR: setsockopt failed:%d, io:%p", errno, pio);
-        return NULL;
+        return -1;
     }
 
-
+    //Reset any state used during connect
+    ZeroMemory(&pio->write_details, sizeof(pio->write_details));
     pio->type = SOCK_FD;
     return 0;
 }

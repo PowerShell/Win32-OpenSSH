@@ -84,7 +84,7 @@ BOOL w32_io_is_blocking(struct w32_io* pio)
 }
 
 BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd) {
-    if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
+    if (pio->type <= SOCK_FD) {
         return socketio_is_io_available(pio, rd);
     }
     else {

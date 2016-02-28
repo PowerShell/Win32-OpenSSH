@@ -74,6 +74,9 @@ int socket_prepare(char* ip)
     return 0;
 }
 
+#define READ_BUf_SIZE 1024 * 1024 * 2
+#define WRITE_BUF_SIZE 1024 * 1024 * 5
+
 namespace UnitTests
 {
     TEST_CLASS(SocketIOTests)
@@ -99,7 +102,7 @@ namespace UnitTests
             w32posix_done();
         }
 
-        TEST_METHOD(TestMethod1)
+        TEST_METHOD(socketio)
         {
             int ret;
             ret = socket_prepare("::1");
@@ -117,10 +120,9 @@ namespace UnitTests
             set_nonblock(c);
             set_nonblock(s);
 
-#define WRITE_BUF_SIZE 1024 * 1024 * 5
-            char to_write[1024 * 1024 * 5]; //5MB
-#define READ_BUf_SIZE 1024 * 1024 * 2
-            char read_to[READ_BUf_SIZE]; //2MB
+            char *to_write = (char*)malloc(WRITE_BUF_SIZE); //5MB
+
+            char *read_to = (char*)malloc(READ_BUf_SIZE); //2MB
 
             //write from c, read from s
             fd_set read_set;
@@ -177,7 +179,7 @@ namespace UnitTests
                     
             }
 
-            //Assert::AreEqual(bytes_written, bytes_read, L"", LINE_INFO());
+            Assert::AreEqual((bytes_written == bytes_read)? 1:0, TRUE, L"", LINE_INFO());
         }
 
         TEST_METHOD(TestMethod)
