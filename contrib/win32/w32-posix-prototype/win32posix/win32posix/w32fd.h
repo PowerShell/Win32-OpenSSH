@@ -5,6 +5,7 @@
 enum w32_io_type {
     UNKOWN_FD = 0,
     LISTEN_FD,
+    CONNECT_FD,
     SOCK_FD,
     FILE_FD,
     PIPE_FD,
