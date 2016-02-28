@@ -538,9 +538,9 @@ int pipelinetest()
 
 int __cdecl main(void)
 {
-    //return regular();
+    return regular();
     //return async();
     writemode = TRUE;
     //return throughput();
-    return pipetest();
+    //return pipetest();
 }

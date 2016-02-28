@@ -217,13 +217,14 @@ struct w32_io* socketio_socket(int domain, int type, int protocol) {
     return pio;
 }
 
-#define SET_ERRNO_ON_ERROR(ret) \
+#define SET_ERRNO_ON_ERROR(expr) \
 do {  \
-    if ((ret) == SOCKET_ERROR) {  \
+    int ret = (expr); \
+    if (ret == SOCKET_ERROR) {  \
         errno = errno_from_WSALastError(); \
-        debug("ERROR:%d, io:%p", errno, pio); \
+        debug("ERROR:%d", errno); \
     }  \
-    return (ret); \
+    return ret; \
 } while (0) 
 
 int socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optval, int optlen) {
@@ -248,7 +249,7 @@ int socketio_listen(struct w32_io* pio, int backlog) {
 }
 
 int socketio_bind(struct w32_io* pio, const struct sockaddr *name, int namelen) {
-    SET_ERRNO_ON_ERROR(bind(pio->sock, name, namelen));
+    SET_ERRNO_ON_ERROR(bind(pio->sock, name, namelen)); 
 }
 
 int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
@@ -523,7 +524,7 @@ int socketio_close(struct w32_io* pio) {
 struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
     struct w32_io *accept_io = NULL;
     int iResult = 0;
-    struct acceptEx_context* context = (struct acceptEx_context*)pio->context;
+    struct acceptEx_context* context;
 
     debug2("io:%p", pio);
     //start io if not already started
@@ -553,11 +554,22 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
 
     }
 
+    context = (struct acceptEx_context*)pio->context;
+    pio->read_details.pending = FALSE;
+    ResetEvent(pio->read_overlapped.hEvent);
+
+    if (pio->read_details.error)
+    {
+        errno = errno_from_WSAError(pio->read_details.error);
+        debug("ERROR: async io completed with error: %d, io:%p", errno, pio);
+        goto on_error;
+    }
+
     if (0 != setsockopt(context->accept_socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, (char*)&pio->sock, sizeof(pio->sock)))
     {
         errno = errno_from_WSALastError();
         debug("ERROR: setsockopt failed:%d, io:%p", errno, pio);
-        return NULL;
+        goto on_error;
     }
 
     accept_io = (struct w32_io*)malloc(sizeof(struct w32_io));
@@ -565,33 +577,58 @@ struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* a
     {
         errno = ENOMEM;
         debug("ERROR:%d, io:%p", errno, pio);
-        return NULL;
+        goto on_error;
     }
     memset(accept_io, 0, sizeof(struct w32_io));
 
     accept_io->sock = context->accept_socket;
     accept_io->type = SOCK_FD;
     context->accept_socket = INVALID_SOCKET;
-    pio->read_details.pending = FALSE;
-    ResetEvent(pio->read_overlapped.hEvent);
     debug2("accept io:%p", accept_io);
+
+    //TODO : fill in addr
     return accept_io;
+
+on_error:
+    if (context->accept_socket != INVALID_SOCKET) {
+        closesocket(context->accept_socket);
+        context->accept_socket = INVALID_SOCKET;
+    }
+
+    return NULL;
 }
 
 int socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int namelen) {
 
-    struct sockaddr_in tmp_addr;
+    struct sockaddr_in tmp_addr4;
+    struct sockaddr_in6 tmp_addr6;
+    SOCKADDR* tmp_addr;
+    size_t tmp_addr_len;
     DWORD tmp_bytes;
     GUID connectex_guid = WSAID_CONNECTEX;
     LPFN_CONNECTEX ConnectEx;
 
-
-    //TODO - add support for DGRAM socket, below works only for STREAM sockets
-    ZeroMemory(&tmp_addr, sizeof(tmp_addr));
-    tmp_addr.sin_family = AF_UNSPEC;
-    tmp_addr.sin_addr.s_addr = INADDR_ANY;
-    tmp_addr.sin_port = 0;
-    if (SOCKET_ERROR == bind(pio->sock, (SOCKADDR*)&tmp_addr, sizeof(tmp_addr)))
+    if (name->sa_family == AF_INET6)  {
+        ZeroMemory(&tmp_addr6, sizeof(tmp_addr6));
+        tmp_addr6.sin6_family = AF_INET6;
+        tmp_addr6.sin6_port = 0;
+        tmp_addr = (SOCKADDR*)&tmp_addr6;
+        tmp_addr_len = sizeof(tmp_addr6);
+    } 
+    else if (name->sa_family == AF_INET)  {
+        ZeroMemory(&tmp_addr4, sizeof(tmp_addr4));
+        tmp_addr4.sin_family = AF_INET;
+        tmp_addr4.sin_port = 0;
+        tmp_addr = (SOCKADDR*)&tmp_addr4;
+        tmp_addr_len = sizeof(tmp_addr4);
+    }
+    else  {
+        errno = ENOTSUP;
+        debug("ERROR: unsuppored address family:%d, io:%p", name->sa_family, pio);
+        return -1;
+    }
+    
+    if (SOCKET_ERROR == bind(pio->sock, tmp_addr, tmp_addr_len))
     {
         errno = errno_from_WSALastError();
         debug("ERROR: bind failed :%d, io:%p", errno, pio);
@@ -614,7 +651,7 @@ int socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int name
         return -1;
     }
 
-    if (TRUE == ConnectEx(pio->sock, name, namelen, NULL, 0, pio->write_details.completed, &pio->write_overlapped))
+    if (TRUE == ConnectEx(pio->sock, name, namelen, NULL, 0, NULL, &pio->write_overlapped))
     {
         //set completion event
         SetEvent(pio->write_overlapped.hEvent);
@@ -632,7 +669,7 @@ int socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int name
     }
 
     pio->write_details.pending = TRUE;
-    pio->type == CONNECT_FD;
+    pio->type = CONNECT_FD;
     return 0;
 }
 
@@ -665,6 +702,16 @@ int socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namele
 
     }
 
+    //close event handle
+    CloseHandle(pio->write_overlapped.hEvent);
+    pio->write_overlapped.hEvent = 0;
+
+    if (pio->write_details.error) {
+        errno = errno_from_WSAError(pio->write_details.error);
+        debug("ERROR: async io completed with error: %d, io:%p", errno, pio);
+        return -1;
+    }
+
     if (0 != setsockopt(pio->sock, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, NULL, 0))
     {
         errno = errno_from_WSALastError();
@@ -672,9 +719,7 @@ int socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namele
         return NULL;
     }
 
-    //close event handle
-    CloseHandle(pio->write_overlapped.hEvent);
-    pio->write_overlapped.hEvent = 0;
+
     pio->type = SOCK_FD;
     return 0;
 }
@@ -693,8 +738,11 @@ BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd) {
         }
         else {
             if (pending && WSAGetLastError() != WSA_IO_INCOMPLETE) {
-                //unexpected error;
-                debug("ERROR:Unxpected State. io:%p, WSAError:%d", pio, WSAGetLastError());
+                if (pio->type == LISTEN_FD)
+                    pio->read_details.error = WSAGetLastError();
+                else
+                    pio->write_details.error = WSAGetLastError();
+                return TRUE;
             }
             return FALSE;
         }
@@ -723,6 +771,10 @@ int socketio_on_select(struct w32_io* pio, BOOL rd) {
     if (pio->type == LISTEN_FD) {
         if (socketio_acceptEx(pio) != 0)
             return -1;
+        return 0;
+    }
+    else if (pio->type == CONNECT_FD) {
+        //nothing to do for connect
         return 0;
     }
     else if (rd) {

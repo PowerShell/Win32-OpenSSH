@@ -5,7 +5,70 @@ extern "C" {
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
-#define DEFAULT_PORT "27015"
+#define PORT "34912"  // the port users will be connecting to
+
+#define BACKLOG 10     // how many pending connections queue will hold
+
+// get sockaddr, IPv4 or IPv6:
+void *get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+int
+unset_nonblock(int fd)
+{
+    int val;
+
+    val = fcntl(fd, F_GETFL, 0);
+    if (val < 0) {
+        return (-1);
+    }
+    if (!(val & O_NONBLOCK)) {
+        return (0);
+    }
+    val &= ~O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, val) == -1) {
+        return (-1);
+    }
+    return (0);
+}
+
+int
+set_nonblock(int fd)
+{
+    int val;
+
+    val = fcntl(fd, F_GETFL, 0);
+    if (val < 0) {
+        return (-1);
+    }
+    if (val & O_NONBLOCK) {
+        return (0);
+    }
+    val |= O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, val) == -1) {
+        return (-1);
+    }
+    return (0);
+
+}
+
+int listen_fd = -1;
+int accept_fd = -1;
+int connect_fd = -1;
+
+DWORD WINAPI MyThreadFunction(LPVOID lpParam)
+{
+    accept_fd = accept(listen_fd, NULL, NULL);
+    return 0;
+}
+
+
 
 namespace UnitTests
 {
@@ -14,63 +77,139 @@ namespace UnitTests
 
     public:
         
-        struct addrinfo *result = NULL;
+        struct addrinfo *servinfo = NULL, *p;
         struct addrinfo hints;
-        int ListenSocket = -1;
 
         
         TEST_METHOD_INITIALIZE(TestMethodInitialize)
         {
-            int iResult;
-
+ 
             w32posix_initialize();
-            ZeroMemory(&hints, sizeof(hints));
-            hints.ai_family = AF_INET;
+            listen_fd = -1;
+            accept_fd = -1;
+            connect_fd = -1;
+            struct sockaddr_storage their_addr; // connector's address information
+            socklen_t sin_size;
+            int yes = 1;
+            char s[INET6_ADDRSTRLEN];
+            int rv;
+
+            memset(&hints, 0, sizeof hints);
+            hints.ai_family = AF_UNSPEC;
             hints.ai_socktype = SOCK_STREAM;
-            hints.ai_protocol = IPPROTO_TCP;
-            hints.ai_flags = AI_PASSIVE;
+            hints.ai_flags = AI_PASSIVE; // use my IP
 
-            iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
-            if (iResult != 0) {
-                printf("getaddrinfo failed with error: %d\n", iResult);
+            if ((rv = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo)) != 0) {
+                fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
                 return;
             }
 
-            ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-            if (ListenSocket == -1) {
-                printf("socket failed with error: %ld\n", errno);
-                return;
+            // loop through all the results and bind to the first we can
+            for (p = servinfo; p != NULL; p = p->ai_next) {
+                if ((listen_fd = socket(p->ai_family, p->ai_socktype,
+                    p->ai_protocol)) == -1) {
+                    perror("server: socket");
+                    continue;
+                }
+
+                if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (char*)&yes,
+                    sizeof(int)) == -1) {
+                    perror("setsockopt");
+                    exit(1);
+                }
+
+                if (bind(listen_fd, p->ai_addr, p->ai_addrlen) == -1) {
+                    int i = errno;
+                    close(listen_fd);
+                    perror("server: bind");
+                    continue;
+                }
+
+                break;
             }
 
-            // Setup the TCP listening socket
-            iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
-            if (iResult == -1) {
-                printf("bind failed with error: %d\n", errno);
-                return ;
+            freeaddrinfo(servinfo); // all done with this structure
+            servinfo = NULL;
+
+            if (p == NULL) {
+                fprintf(stderr, "server: failed to bind\n");
+                exit(1);
             }
 
-            iResult = listen(ListenSocket, SOMAXCONN);
-            if (iResult == -1) {
-                printf("listen failed with error: %d\n", errno);
-                return;
-            }
-            freeaddrinfo(result);
+            if (listen(listen_fd, BACKLOG) == -1) {
+                perror("listen");
+                exit(1);
+            }        
 
         }
 
         TEST_METHOD_CLEANUP(TestMethodCleanup)
         {
-            if (result)
-                freeaddrinfo(result);
-            if (ListenSocket != -1)
-                close(ListenSocket);
+            if (servinfo)
+                freeaddrinfo(servinfo);
+            if (listen_fd != -1)
+                close(listen_fd);
+            if (connect_fd != -1)
+                close(connect_fd);
+            if (accept_fd != -1)
+                close(accept_fd);
             w32posix_done();
 
         }
 
         TEST_METHOD(TestMethod1)
         {
-            // TODO: Your test code here
+            int rv;
+            struct sockaddr_storage their_addr;
+            socklen_t sin_size;
+            int ret;
+            servinfo = NULL;
+
+            memset(&hints, 0, sizeof hints);
+            hints.ai_family = AF_UNSPEC;
+            hints.ai_socktype = SOCK_STREAM;
+
+            rv = getaddrinfo("::1", PORT, &hints, &servinfo);
+            Assert::AreEqual(rv, 0, L"getaddreinfo failed", LINE_INFO());
+
+            p = servinfo;
+            connect_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+            Assert::AreNotEqual(connect_fd, -1, L"connect_fd", LINE_INFO());
+            
+            //set_nonblock(listen_fd);
+            //set_nonblock(connect_fd);
+
+            //fd_set read_set;
+            //fd_set write_set;
+            //FD_ZERO(&read_set);
+            //FD_ZERO(&write_set);
+            //FD_SET(listen_fd, &read_set);
+            //FD_SET(connect_fd, &write_set);
+
+            HANDLE thread = CreateThread(NULL, 0, MyThreadFunction, &connect_fd, 0, NULL);
+
+            //sin_size = sizeof(their_addr);
+            //accept_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
+            //Assert::AreEqual(accept_fd, -1, L"", LINE_INFO());
+            //Assert::AreEqual(errno, EAGAIN, L"", LINE_INFO());
+
+            ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+            Assert::AreEqual(ret, 0, L"", LINE_INFO());
+
+            WaitForSingleObject(thread, INFINITE);
+            CloseHandle(thread);
+            
+            int i = 9;
+           /* accept_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
+            Assert::AreNotEqual(accept_fd, -1, L"", LINE_INFO());
+*/
+           /* ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+            Assert::AreEqual(ret, 0, L"", LINE_INFO());*/
+
+        }
+
+        TEST_METHOD(TestMethod)
+        {
             fd_set* set = (fd_set*)malloc(sizeof(fd_set));
 
             FD_ZERO(set);
@@ -87,82 +226,6 @@ namespace UnitTests
             Assert::AreEqual(0, FD_ISSET(0, set), L"", LINE_INFO());
             Assert::AreEqual(0, FD_ISSET(1, set), L"", LINE_INFO());
             Assert::AreEqual(0, FD_ISSET(2, set), L"", LINE_INFO());
-
-            w32posix_initialize();
-            int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
-            struct addrinfo hints, *servinfo, *p;
-            struct sockaddr_storage their_addr; // connector's address information
-            socklen_t sin_size;
-            int yes = 1;
-            int rv;
-#define PORT "3490"  // the port users will be connecting to
-
-#define BACKLOG 10     // how many pending connections queue will hold
-
-            memset(&hints, 0, sizeof hints);
-            hints.ai_family = AF_UNSPEC;
-            hints.ai_socktype = SOCK_STREAM;
-            hints.ai_flags = AI_PASSIVE; // use my IP
-
-            if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
-                fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-            }
-
-            // loop through all the results and bind to the first we can
-            for (p = servinfo; p != NULL; p = p->ai_next) {
-                if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                    p->ai_protocol)) == -1) {
-                    perror("server: socket");
-                    continue;
-                }
-
-                if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char*)&yes,
-                    sizeof(int)) == -1) {
-                    perror("setsockopt");
-                    exit(1);
-                }
-
-                if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-                    close(sockfd);
-                    perror("server: bind");
-                    continue;
-                }
-
-                break;
-            }
-
-            freeaddrinfo(servinfo); // all done with this structure
-
-            if (p == NULL)  {
-                fprintf(stderr, "server: failed to bind\n");
-                exit(1);
-            }
-
-            if (listen(sockfd, BACKLOG) == -1) {
-                perror("listen");
-                exit(1);
-            }
-
-            fcntl(sockfd, F_SETFL, O_NONBLOCK);
-
-            fd_set read_set, write_set, except_set;
-
-            ZeroMemory(&read_set, sizeof(fd_set));
-            ZeroMemory(&write_set, sizeof(fd_set));
-            ZeroMemory(&except_set, sizeof(fd_set));
-
-            FD_SET(sockfd, &read_set);
-            struct timeval timeout;
-            timeout.tv_sec = 300;
-            timeout.tv_usec = 0;
-            int ret = select(sockfd, &read_set, &write_set, &except_set, &timeout);
-
-            new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-
         }
-
-
-
-
     };
 }

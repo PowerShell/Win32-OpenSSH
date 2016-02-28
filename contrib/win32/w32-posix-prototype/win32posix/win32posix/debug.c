@@ -19,11 +19,15 @@ void debug_initialize() {
 }
 
 void debug_done() {
-    fclose(log);
+    if (log)
+        fclose(log);
 }
 
 
 void write_log(const char *source_name, const char *function_name, int line_num, const char *fmt, ...) {
+    if (!log)
+        return;
+
     va_list args;
     fprintf(log,"\n%s:%s:%d: ", source_name, function_name, line_num);
     va_start(args, fmt);
