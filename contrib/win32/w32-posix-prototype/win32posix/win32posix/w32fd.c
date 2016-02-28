@@ -284,7 +284,7 @@ int w32_close(int fd) {
     
     debug("io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd, pio->table_index);
     fd_table_clear(pio->table_index);
-    if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
+    if ((pio->type == LISTEN_FD) || (pio->type == CONNECT_FD) || (pio->type == SOCK_FD)) {
         return socketio_close(pio);
     }
     else

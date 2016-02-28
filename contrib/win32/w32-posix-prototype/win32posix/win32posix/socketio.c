@@ -508,6 +508,11 @@ int socketio_close(struct w32_io* pio) {
             CloseHandle(pio->read_overlapped.hEvent);
         if (pio->context)
             free(pio->context);
+        //TODO: cleanup other details in pio->context
+    }
+    else if (pio->type == CONNECT_FD) {
+        if (pio->write_overlapped.hEvent)
+            CloseHandle(pio->write_overlapped.hEvent);
     }
     else {
         if (pio->read_details.buf)
