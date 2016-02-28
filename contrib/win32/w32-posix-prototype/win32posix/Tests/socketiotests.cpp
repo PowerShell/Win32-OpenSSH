@@ -99,7 +99,7 @@ namespace UnitTests
             hints.ai_socktype = SOCK_STREAM;
             hints.ai_flags = AI_PASSIVE; // use my IP
 
-            if ((rv = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo)) != 0) {
+            if ((rv = getaddrinfo("::1", PORT, &hints, &servinfo)) != 0) {
                 fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
                 return;
             }
@@ -186,7 +186,8 @@ namespace UnitTests
             //FD_SET(listen_fd, &read_set);
             //FD_SET(connect_fd, &write_set);
 
-            HANDLE thread = CreateThread(NULL, 0, MyThreadFunction, &connect_fd, 0, NULL);
+            //HANDLE thread = CreateThread(NULL, 0, MyThreadFunction, &connect_fd, 0, NULL);
+
 
             //sin_size = sizeof(their_addr);
             //accept_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
@@ -196,8 +197,11 @@ namespace UnitTests
             ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
             Assert::AreEqual(ret, 0, L"", LINE_INFO());
 
-            WaitForSingleObject(thread, INFINITE);
-            CloseHandle(thread);
+            MyThreadFunction(NULL);
+
+
+            //WaitForSingleObject(thread, INFINITE);
+            //CloseHandle(thread);
             
             int i = 9;
            /* accept_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);

@@ -32,13 +32,13 @@ int regular()
     w32posix_initialize();
 
     ZeroMemory(&hints, sizeof(hints));
-    hints.ai_family = AF_INET;
+    //hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
+    //hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
 
     // Resolve the server address and port
-    iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
+    iResult = getaddrinfo("127.0.0.1", DEFAULT_PORT, &hints, &result);
     if (iResult != 0) {
         printf("getaddrinfo failed with error: %d\n", iResult);
         w32posix_done();

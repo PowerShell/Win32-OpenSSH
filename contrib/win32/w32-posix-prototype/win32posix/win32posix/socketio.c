@@ -93,7 +93,7 @@ int socketio_acceptEx(struct w32_io* pio) {
 
     //create accepting socket
     //todo - get socket parameters from listening socket
-    context->accept_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    context->accept_socket = socket(AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
     if (context->accept_socket == INVALID_SOCKET) {
         errno = errno_from_WSALastError();
         debug("ERROR:%d, io:%p", errno, pio);
@@ -104,8 +104,8 @@ int socketio_acceptEx(struct w32_io* pio) {
         context->accept_socket,
         context->lpOutputBuf,
         0,
-        sizeof(struct sockaddr_in) + 16,
-        sizeof(struct sockaddr_in) + 16,
+        sizeof(struct sockaddr_in6) + 16,
+        sizeof(struct sockaddr_in6) + 16,
         &context->bytes_received,
         &pio->read_overlapped))
     {
