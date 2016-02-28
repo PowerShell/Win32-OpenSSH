@@ -507,7 +507,14 @@ int socketio_close(struct w32_io* pio) {
         if (pio->read_overlapped.hEvent)
             CloseHandle(pio->read_overlapped.hEvent);
         if (pio->context)
+        {
+            struct acceptEx_context *ctx = (struct acceptEx_context*)pio->context;
+            if (ctx->accept_socket != INVALID_SOCKET)
+                closesocket(ctx->accept_socket);
+            if (ctx->lpOutputBuf)
+                free(ctx->lpOutputBuf);
             free(pio->context);
+        }
         //TODO: cleanup other details in pio->context
     }
     else if (pio->type == CONNECT_FD) {

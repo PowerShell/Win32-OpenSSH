@@ -104,21 +104,6 @@ namespace UnitTests
             int ret;
             ret = socket_prepare("::1");
             Assert::AreEqual(ret, 0, L"failed to prepare sockets", LINE_INFO());
-            
-            //set_nonblock(listen_fd);
-            //set_nonblock(connect_fd);
-
-            //fd_set read_set;
-            //fd_set write_set;
-            //FD_ZERO(&read_set);
-            //FD_ZERO(&write_set);
-            //FD_SET(listen_fd, &read_set);
-            //FD_SET(connect_fd, &write_set);
-
-             //sin_size = sizeof(their_addr);
-            //accept_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
-            //Assert::AreEqual(accept_fd, -1, L"", LINE_INFO());
-            //Assert::AreEqual(errno, EAGAIN, L"", LINE_INFO());
 
             ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
             Assert::AreEqual(ret, 0, L"", LINE_INFO());
@@ -126,14 +111,73 @@ namespace UnitTests
             accept_fd = accept(listen_fd, NULL, NULL);
             Assert::AreNotEqual(accept_fd, -1, L"", LINE_INFO());
 
+            int c = connect_fd;
+            int s = accept_fd;
 
+            set_nonblock(c);
+            set_nonblock(s);
+
+#define WRITE_BUF_SIZE 1024 * 1024 * 5
+            char to_write[1024 * 1024 * 5]; //5MB
+#define READ_BUf_SIZE 1024 * 1024 * 2
+            char read_to[READ_BUf_SIZE]; //2MB
+
+            //write from c, read from s
+            fd_set read_set;
+            fd_set write_set;
+            FD_ZERO(&read_set);
+            FD_ZERO(&write_set);
+            FD_SET(s, &read_set);
+            FD_SET(c, &write_set);
+            int max_fd = max(c, s) + 1;
+            timeval time;
+            time.tv_sec = 60 * 60;
+            time.tv_usec = 0;
+            long long bytes_written = 0;
+            long long bytes_read = 0;
             
-           /* accept_fd = accept(listen_fd, (struct sockaddr *)&their_addr, &sin_size);
-            Assert::AreNotEqual(accept_fd, -1, L"", LINE_INFO());
-*/
-           /* ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
-            Assert::AreEqual(ret, 0, L"", LINE_INFO());*/
+            while (-1 != select(max_fd, &read_set, &write_set, NULL, &time))
+            {
+                BOOL read_ready = FD_ISSET(s, &read_set);
+                BOOL write_ready = FD_ISSET(c, &write_set);
+                FD_ZERO(&read_set);
+                FD_ZERO(&write_set);
 
+                if (bytes_written > WRITE_BUF_SIZE * 100)
+                {
+                    ret = shutdown(c, SD_SEND), 0, L"", LINE_INFO();
+                    Assert::AreEqual(ret, 0, L"", LINE_INFO());
+                }
+                else if (write_ready)
+                {
+                    int bw = send(c, to_write, WRITE_BUF_SIZE, 0);
+                    while (bw != -1) {
+                        bytes_written += bw;
+                        bw = send(c, to_write, WRITE_BUF_SIZE, 0);
+                    }
+                    ret = errno;
+                    Assert::AreEqual(ret, EAGAIN, L"", LINE_INFO());
+                    FD_SET(c, &write_set);
+                }
+
+                if (read_ready)
+                {
+                    int br = read(s, read_to, READ_BUf_SIZE);
+                    while (br > 1) {
+                        bytes_read += br;
+                        br = read(s, read_to, READ_BUf_SIZE);
+                    }
+
+                    if (br == 0) //send from other side is done
+                        break;
+                    ret = errno;
+                    Assert::AreEqual(ret, EAGAIN, L"", LINE_INFO());
+                    FD_SET(s, &read_set);
+                }
+                    
+            }
+
+            //Assert::AreEqual(bytes_written, bytes_read, L"", LINE_INFO());
         }
 
         TEST_METHOD(TestMethod)
