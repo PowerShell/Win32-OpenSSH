@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "win32posix", "win32posix\win32posix.vcxproj", "{D8744F47-1741-4FB8-97D3-EBB9C3A13E67}"
 EndProject
@@ -11,6 +11,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tests", "Tests\Tests.vcxpro
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SampleServer", "SampleServer\SampleServer.vcxproj", "{D52F8255-C3A9-4416-A0A6-8CE63A4D7E43}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D8744F47-1741-4FB8-97D3-EBB9C3A13E67} = {D8744F47-1741-4FB8-97D3-EBB9C3A13E67}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTests", "UnitTests\UnitTests.vcxproj", "{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}"
 	ProjectSection(ProjectDependencies) = postProject
 		{D8744F47-1741-4FB8-97D3-EBB9C3A13E67} = {D8744F47-1741-4FB8-97D3-EBB9C3A13E67}
 	EndProjectSection
@@ -47,6 +52,14 @@ Global
 		{D52F8255-C3A9-4416-A0A6-8CE63A4D7E43}.Release|Win32.Build.0 = Release|Win32
 		{D52F8255-C3A9-4416-A0A6-8CE63A4D7E43}.Release|x64.ActiveCfg = Release|x64
 		{D52F8255-C3A9-4416-A0A6-8CE63A4D7E43}.Release|x64.Build.0 = Release|x64
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Debug|Win32.ActiveCfg = Debug|Win32
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Debug|Win32.Build.0 = Debug|Win32
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Debug|x64.ActiveCfg = Debug|x64
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Debug|x64.Build.0 = Debug|x64
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Release|Win32.ActiveCfg = Release|Win32
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Release|Win32.Build.0 = Release|Win32
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Release|x64.ActiveCfg = Release|x64
+		{31E868FF-DE6C-4CF7-9BF0-2C9B51DB58AD}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
