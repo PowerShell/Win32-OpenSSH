@@ -1,16 +1,19 @@
+#pragma once
+
 #include <Windows.h>
 #include <stdio.h>
 #include "debug.h"
 
+
 //order to be maintained
 enum w32_io_type {
     UNKOWN_FD = 0,
-    LISTEN_FD,
-    CONNECT_FD,
-    SOCK_FD,
-    FILE_FD,
-    PIPE_FD,
-    CONSOLE_FD
+    LISTEN_FD = 1,
+    CONNECT_FD = 2,
+    SOCK_FD = 3,
+    FILE_FD = 4,
+    PIPE_FD = 5,
+    CONSOLE_FD = 6
 };
 
 struct w32_io {

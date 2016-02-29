@@ -14,7 +14,7 @@ void debug_initialize() {
     GetLocalTime(&time);
     
     sprintf(filename + len, "_%d_%d_%d.log", time.wHour, time.wMinute, time.wSecond);
-
+    //sprintf(filename, "%s", "e:\\tmp.log");
     log = fopen(filename, "w");
 }
 
@@ -29,9 +29,9 @@ void write_log(const char *source_name, const char *function_name, int line_num,
         return;
 
     va_list args;
-    fprintf(log,"\n%s:%s:%d: ", source_name, function_name, line_num);
+    fprintf(log,"\n%s:%d: ", function_name, line_num);
     va_start(args, fmt);
-    fprintf(log,fmt, args);
+    vfprintf(log,fmt, args);
     va_end(args);
     fflush(log);
 }

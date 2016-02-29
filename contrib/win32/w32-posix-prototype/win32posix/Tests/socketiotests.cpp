@@ -74,8 +74,8 @@ int socket_prepare(char* ip)
     return 0;
 }
 
-#define READ_BUf_SIZE 1024 * 1024 * 2
-#define WRITE_BUF_SIZE 1024 * 1024 * 5
+#define READ_BUf_SIZE 1024 * 100 
+#define WRITE_BUF_SIZE 1024 * 100
 
 namespace UnitTests
 {
@@ -105,7 +105,7 @@ namespace UnitTests
         TEST_METHOD(socketio)
         {
             int ret;
-            ret = socket_prepare("::1");
+            ret = socket_prepare("127.0.0.1");
             Assert::AreEqual(ret, 0, L"failed to prepare sockets", LINE_INFO());
 
             ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
@@ -114,15 +114,18 @@ namespace UnitTests
             accept_fd = accept(listen_fd, NULL, NULL);
             Assert::AreNotEqual(accept_fd, -1, L"", LINE_INFO());
 
+            //close(listen_fd);
+            //listen_fd = -1;
+
             int c = connect_fd;
             int s = accept_fd;
 
             set_nonblock(c);
             set_nonblock(s);
 
-            char *to_write = (char*)malloc(WRITE_BUF_SIZE); //5MB
+            char *to_write = (char*)malloc(WRITE_BUF_SIZE); 
 
-            char *read_to = (char*)malloc(READ_BUf_SIZE); //2MB
+            char *read_to = (char*)malloc(READ_BUf_SIZE);
 
             //write from c, read from s
             fd_set read_set;
@@ -144,23 +147,36 @@ namespace UnitTests
                 BOOL write_ready = FD_ISSET(c, &write_set);
                 FD_ZERO(&read_set);
                 FD_ZERO(&write_set);
+                FD_SET(s, &read_set);
 
-                if (bytes_written > WRITE_BUF_SIZE * 100)
+                if (write_ready)
                 {
-                    ret = shutdown(c, SD_SEND), 0, L"", LINE_INFO();
-                    Assert::AreEqual(ret, 0, L"", LINE_INFO());
-                }
-                else if (write_ready)
-                {
-                    int bw = send(c, to_write, WRITE_BUF_SIZE, 0);
-                    while (bw != -1) {
-                        bytes_written += bw;
+                    
+#define WR_LIMIT  WRITE_BUF_SIZE*5                  
+                
+                    int bw = 0;// send(c, to_write, WRITE_BUF_SIZE, 0);
+                    while ((bw != -1) && (bytes_written < WR_LIMIT)) {
+                            
                         bw = send(c, to_write, WRITE_BUF_SIZE, 0);
+                        if (bw > 0)
+                            bytes_written += bw;
+                        else {
+                            ret = errno;
+                            Assert::AreEqual(errno, EAGAIN, L"", LINE_INFO());
+                        }
+                            
+                    }                       
+
+                    if (bytes_written >= WR_LIMIT)
+                    {
+                        ret = shutdown(c, SD_SEND), 0, L"", LINE_INFO();
+                        Assert::AreEqual(ret, 0, L"", LINE_INFO());
                     }
-                    ret = errno;
-                    Assert::AreEqual(ret, EAGAIN, L"", LINE_INFO());
-                    FD_SET(c, &write_set);
+                    else
+                        FD_SET(c, &write_set);
                 }
+
+
 
                 if (read_ready)
                 {
@@ -173,8 +189,7 @@ namespace UnitTests
                     if (br == 0) //send from other side is done
                         break;
                     ret = errno;
-                    Assert::AreEqual(ret, EAGAIN, L"", LINE_INFO());
-                    FD_SET(s, &read_set);
+                    Assert::AreEqual(errno, EAGAIN, L"", LINE_INFO());
                 }
                     
             }

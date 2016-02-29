@@ -117,12 +117,13 @@ int w32_socket(int domain, int type, int protocol) {
     }
 
     fd_table_set(pio, min_index);
-    debug("socket:%p, io:%p, fd:%d ", pio->sock, pio, min_index);
+    debug("socket:%d, io:%p, fd:%d ", pio->sock, pio, min_index);
     return min_index;
 }
 
 int w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 {
+    debug3("fd:%d", fd);
     int min_index = fd_table_get_min_index();
     struct w32_io* pio = NULL;
 
@@ -135,7 +136,7 @@ int w32_accept(int fd, struct sockaddr* addr, int* addrlen)
     }
 
     fd_table_set(pio, min_index);
-    debug("socket:%p, io:%p, fd:%d ", pio->sock, pio, min_index);
+    debug("socket:%d, io:%p, fd:%d ", pio->sock, pio, min_index);
     return min_index;
 }
 
@@ -149,52 +150,62 @@ do { \
 } while (0)
 
 int w32_setsockopt(int fd, int level, int optname, const char* optval, int optlen) {
+    debug3("fd:%d", fd); 
     CHECK_FD(fd);
     return socketio_setsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
 }
 
 int w32_getsockopt(int fd, int level, int optname, char* optval, int* optlen) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_getsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
 }
 
 int w32_getsockname(int fd, struct sockaddr* name, int* namelen) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_getsockname(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_getpeername(int fd, struct sockaddr* name, int* namelen) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_getpeername(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_listen(int fd, int backlog) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_listen(fd_table.w32_ios[fd], backlog);
 }
 
 int w32_bind(int fd, const struct sockaddr *name, int namelen) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_bind(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_connect(int fd, const struct sockaddr* name, int namelen) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_connect(fd_table.w32_ios[fd], name, namelen);
 }
 
 int w32_recv(int fd, void *buf, size_t len, int flags) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_recv(fd_table.w32_ios[fd], buf, len, flags);
 }
 
 int w32_send(int fd, const void *buf, size_t len, int flags) {
+    debug3("fd:%d", fd);
     CHECK_FD(fd);
     return socketio_send(fd_table.w32_ios[fd], buf, len, flags);
 }
 
 
 int w32_shutdown(int fd, int how) {
+    debug3("fd:%d how:%d", fd, how);
     CHECK_FD(fd);
     return socketio_shutdown(fd_table.w32_ios[fd], how);
 }
@@ -246,11 +257,15 @@ int w32_open(const char *pathname, int flags, ...) {
 
 int w32_read(int fd, void *dst, unsigned int max) {
     CHECK_FD(fd);
+    if (fd_table.w32_ios[fd]->type == SOCK_FD)
+        return socketio_recv(fd_table.w32_ios[fd], dst, max, 0);
     return fileio_read(fd_table.w32_ios[fd], dst, max);
 }
 
 int w32_write(int fd, const void *buf, unsigned int max) {
     CHECK_FD(fd);
+    if (fd_table.w32_ios[fd]->type == SOCK_FD)
+        return socketio_send(fd_table.w32_ios[fd], buf, max, 0);
     return fileio_write(fd_table.w32_ios[fd], buf, max);
 }
 
