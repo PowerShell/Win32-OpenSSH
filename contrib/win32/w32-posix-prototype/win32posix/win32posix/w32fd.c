@@ -27,7 +27,7 @@ int fd_table_initialize() {
     return 0;
 }
 
-int fd_table_get_min_index() {
+static int fd_table_get_min_index() {
     int min_index = 0;
     unsigned char* bitmap = fd_table.occupied.bitmap;
     unsigned char tmp;
@@ -54,13 +54,13 @@ int fd_table_get_min_index() {
     return min_index;
 }
 
-void fd_table_set(struct w32_io* pio, int index) {
+static void fd_table_set(struct w32_io* pio, int index) {
     fd_table.w32_ios[index] = pio;
     pio->table_index = index;
     FD_SET(index, &(fd_table.occupied));
 }
 
-void fd_table_clear(int index)
+static void fd_table_clear(int index)
 {
     fd_table.w32_ios[index]->table_index = -1;
     fd_table.w32_ios[index] = NULL;
@@ -68,9 +68,10 @@ void fd_table_clear(int index)
 }
 
 void w32posix_initialize() {
-    debug_initialize();
-    fd_table_initialize();
-    socketio_initialize();
+    if ((debug_initialize() != 0)
+        || (fd_table_initialize() != 0)
+        || (socketio_initialize() != 0))
+        abort();
 }
 
 void w32posix_done() {
@@ -95,7 +96,7 @@ BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd) {
 
 int w32_io_on_select(struct w32_io* pio, BOOL rd)
 {
-    if ((pio->type == LISTEN_FD) || (pio->type == SOCK_FD)) {
+    if ((pio->type <= SOCK_FD)) {
         return socketio_on_select(pio, rd);
     }
     else {
@@ -104,10 +105,21 @@ int w32_io_on_select(struct w32_io* pio, BOOL rd)
 
 }
 
+#define CHECK_FD(fd) do {                                                   \
+    errno = 0;                                                              \
+    if ((fd < 0) || (fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {   \
+         errno = EBADF;                                                     \
+         debug("bad fd: %d", fd);                                           \
+         return -1;                                                         \
+    }                                                                       \
+} while (0)
+
+
 int w32_socket(int domain, int type, int protocol) {
     int min_index = fd_table_get_min_index();
     struct w32_io* pio = NULL;
 
+    errno = 0;
     if (min_index == -1)
         return -1;
 
@@ -124,6 +136,7 @@ int w32_socket(int domain, int type, int protocol) {
 int w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 {
     debug3("fd:%d", fd);
+    CHECK_FD(fd);
     int min_index = fd_table_get_min_index();
     struct w32_io* pio = NULL;
 
@@ -139,15 +152,6 @@ int w32_accept(int fd, struct sockaddr* addr, int* addrlen)
     debug("socket:%d, io:%p, fd:%d ", pio->sock, pio, min_index);
     return min_index;
 }
-
-#define CHECK_FD(fd) \
-do { \
-    if ((fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) { \
-         errno = EBADF; \
-         debug("bad fd: %d", fd); \
-         return -1; \
-    } \
-} while (0)
 
 int w32_setsockopt(int fd, int level, int optname, const char* optval, int optlen) {
     debug3("fd:%d", fd); 
@@ -216,6 +220,7 @@ int w32_pipe(int *pfds){
     int read_index, write_index;
     struct w32_io* pio[2];
 
+    errno = 0;
     read_index = fd_table_get_min_index();
     if (read_index == -1)
         return -1;
@@ -243,6 +248,7 @@ int w32_open(const char *pathname, int flags, ...) {
     int min_index = fd_table_get_min_index();
     struct w32_io* pio;
     
+    errno = 0;
     if (min_index == -1)
         return -1;
     
@@ -280,6 +286,7 @@ int w32_isatty(int fd) {
 }
 
 FILE* w32_fdopen(int fd, const char *mode) {
+    errno = 0;
     if ((fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
         errno = EBADF;
         debug("bad fd: %d", fd);
@@ -339,6 +346,7 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
     unsigned int time_milliseconds = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
     ULONGLONG ticks_start = GetTickCount64(), ticks_now;
 
+    errno = 0;
     memset(&read_ready_fds, 0, sizeof(fd_set));
     memset(&write_ready_fds, 0, sizeof(fd_set));
 

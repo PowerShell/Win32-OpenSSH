@@ -4,6 +4,10 @@
 #define PORT "34912"  
 #define BACKLOG 2  
 
+int listen_fd, accept_fd, connect_fd, ret;
+struct addrinfo hints,*servinfo;
+fd_set read_set, write_set, except_set;
+
 int
 unset_nonblock(int fd)
 {
@@ -43,31 +47,105 @@ set_nonblock(int fd)
 
 }
 
-int listen_fd = -1;
-int accept_fd = -1;
-int connect_fd = -1;
-struct addrinfo *servinfo;
+void socket_fd_tests()
+{
+    fd_set set,*pset;
+    pset = &set;
+    
+    TEST_START("fd_set initial state");
+    FD_ZERO(pset);
+    ASSERT_CHAR_EQ(0, FD_ISSET(0, pset));
+    ASSERT_CHAR_EQ(0, FD_ISSET(1, pset));
+    ASSERT_CHAR_EQ(0, FD_ISSET(2, pset));
+    TEST_DONE();
 
+    TEST_START("FD_SET");
+    FD_SET(0, pset);
+    FD_SET(1, pset);
+    ASSERT_CHAR_EQ(1, FD_ISSET(0, pset));
+    ASSERT_CHAR_EQ(1, FD_ISSET(1, pset));
+    ASSERT_CHAR_EQ(0, FD_ISSET(2, pset));
+    TEST_DONE();
+    
+    TEST_START("FD_CLR");
+    FD_CLR(0, pset);
+    ASSERT_CHAR_EQ(0, FD_ISSET(0, pset));
+    ASSERT_CHAR_EQ(1, FD_ISSET(1, pset));
+    ASSERT_CHAR_EQ(0, FD_ISSET(2, pset));
+    TEST_DONE();
+
+    TEST_START("FD_ZERO");
+    FD_ZERO(pset);
+    ASSERT_CHAR_EQ(0, FD_ISSET(0, pset));
+    ASSERT_CHAR_EQ(0, FD_ISSET(1, pset));
+    ASSERT_CHAR_EQ(0, FD_ISSET(2, pset));
+    TEST_DONE();
+
+}
+
+socket_syncio_tests()
+{
+    TEST_START("BAD FDs");
+    ASSERT_INT_EQ(accept(-1, NULL, NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(setsockopt(MAX_FDS, 0, 0, NULL, 0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    /*0,1,2 fd's are initialized */
+    ASSERT_INT_EQ(getsockopt(3, 0, 0, NULL, NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(getsockname(4, NULL, NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(getpeername(5, NULL, NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(listen(6, 2), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(bind(7, NULL, 0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(connect(8, NULL, 0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(recv(9, NULL, 0, 0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(send(10, NULL, 0,0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(shutdown(11, 0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(read(MAX_FDS + 1, NULL, 0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(write(INFINITE, NULL, 0), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(fstat(11, NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(isatty(12), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(fdopen(13,NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(close(14), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(fcntl(15, 1), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(dup(16), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    ASSERT_INT_EQ(dup2(17, 18), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    FD_ZERO(&read_set);
+    FD_SET(20, &read_set);
+    ASSERT_INT_EQ(select(21, &read_set, NULL, NULL, NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    FD_ZERO(&write_set);
+    FD_SET(21, &write_set);
+    ASSERT_INT_EQ(select(22, NULL, &write_set, NULL, NULL), -1);
+    ASSERT_INT_EQ(errno, EBADF);
+    TEST_DONE();
+
+
+}
 
 void socket_tests()
 {
-    TEST_START("test 1");
-    ASSERT_INT_EQ(1, 1);
     w32posix_initialize();
-    TEST_DONE();
-
-    TEST_START("test 1");
-    ASSERT_INT_EQ(1, 0);
-    TEST_DONE();
-    
-    TEST_START("test 1");
-    ASSERT_INT_EQ(1, 1);
-    TEST_DONE();
-    
-    TEST_START("test 1");
-    ASSERT_INT_EQ(1, 1);
-    TEST_DONE();
-    return;
+    socket_fd_tests();
+    socket_syncio_tests();
+    w32posix_done();
 }
 
 int socket_prepare(char* ip)

@@ -5,7 +5,7 @@
 
 FILE* log;
 
-void debug_initialize() {
+int debug_initialize() {
     char filename[MAX_PATH];
     int len = 0;
     SYSTEMTIME time;
@@ -16,6 +16,7 @@ void debug_initialize() {
     sprintf(filename + len, "_%d_%d_%d.log", time.wHour, time.wMinute, time.wSecond);
     //sprintf(filename, "%s", "e:\\tmp.log");
     log = fopen(filename, "w");
+    return 0;
 }
 
 void debug_done() {
