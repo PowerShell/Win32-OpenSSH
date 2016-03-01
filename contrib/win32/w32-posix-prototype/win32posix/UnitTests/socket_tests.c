@@ -155,7 +155,7 @@ void socket_fd_tests()
 
 }
 
-void socket_syncio_tests()
+void socket_blocing_io_tests()
 {
     char* small_send_buf = "sample payload";
     char small_recv_buf[SMALL_RECV_BUF_SIZE];
@@ -265,11 +265,183 @@ void socket_syncio_tests()
     freeaddrinfo(servinfo);
 }
 
+void socket_nonblocking_io_tests()
+{
+    char* small_send_buf = "sample payload";
+    char small_recv_buf[SMALL_RECV_BUF_SIZE];
+
+    TEST_START("IPv6 sockets setup");
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    ret = getaddrinfo("::1", PORT, &hints, &servinfo);
+    ASSERT_INT_EQ(ret, 0);
+    listen_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(listen_fd, -1);
+    ret = bind(listen_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    ASSERT_INT_EQ(ret, 0);
+    ret = listen(listen_fd, BACKLOG);
+    ASSERT_INT_EQ(ret, 0);
+    connect_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(connect_fd, -1);
+    TEST_DONE();
+
+    TEST_START("non blocking accept and connect");
+    ret = set_nonblock(listen_fd);
+    ASSERT_INT_EQ(ret, 0);
+    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    ASSERT_INT_EQ(accept_fd, -1);
+    ASSERT_INT_EQ(errno, EAGAIN);
+    ret = set_nonblock(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    /* connect is too fast to block
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, EINPROGRESS); */
+    ASSERT_INT_EQ(ret, 0);
+    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    ASSERT_INT_NE(accept_fd, -1);
+    ret = close(listen_fd);
+    ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
+
+    TEST_START("non blocking recv");
+    ret = set_nonblock(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = recv(connect_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0);
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, EAGAIN);
+    ret = unset_nonblock(accept_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = send(accept_fd, small_send_buf, strlen(small_send_buf), 0);
+    ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    ret = unset_nonblock(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = recv(connect_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0);
+    ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    small_recv_buf[ret] = '\0';
+    ASSERT_STRING_EQ(small_send_buf, small_recv_buf);
+    memset(small_recv_buf, 0, sizeof(small_recv_buf));
+    TEST_DONE();
+
+    TEST_START("non blocking send");
+    send_buf = malloc(10 * 1024);
+    ASSERT_PTR_NE(send_buf, NULL);
+    ret = set_nonblock(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = 1;
+    while (ret > 0) {
+        ret = send(connect_fd, send_buf, 10 * 1024, 0);
+    }
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, EAGAIN);
+    ret = close(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = close(accept_fd);
+    ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
+
+    free(send_buf);
+    freeaddrinfo(servinfo);
+}
+
+void socket_select_tests() {
+    int s, r, i;
+    int num_bytes = 1024 * 1024; //1MB
+    int bytes_sent = 0;
+    int bytes_received = 0;
+    int seed = 326;
+
+    TEST_START("select listen");
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    ret = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo);
+    ASSERT_INT_EQ(ret, 0);
+    listen_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(listen_fd, -1);
+    ret = bind(listen_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    ASSERT_INT_EQ(ret, 0);
+    ret = listen(listen_fd, BACKLOG);
+    ASSERT_INT_EQ(ret, 0);
+    connect_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(connect_fd, -1);
+    ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    ASSERT_INT_EQ(ret, 0);
+    ret = set_nonblock(listen_fd);
+    ASSERT_INT_EQ(ret, 0);
+    time_val.tv_sec = 60;
+    time_val.tv_usec = 0;
+    FD_ZERO(&read_set);
+    FD_SET(listen_fd, &read_set);
+    ret = select(listen_fd + 1, &read_set, NULL, NULL, &time_val);
+    ASSERT_INT_EQ(ret, 0);
+    ASSERT_INT_EQ(FD_ISSET(listen_fd, &read_set), 1);
+    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    ASSERT_INT_NE(accept_fd, -1);
+    ret = close(listen_fd);
+    ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
+    
+    TEST_START("select send and recv");
+    s = accept_fd;
+    r = connect_fd;
+    ret = set_nonblock(s);
+    ASSERT_INT_EQ(ret, 0);
+    ret = set_nonblock(r);
+    ASSERT_INT_EQ(ret, 0);
+    send_buf = malloc(num_bytes);
+    recv_buf = malloc(num_bytes);
+    ASSERT_PTR_NE(send_buf, NULL);
+    ASSERT_PTR_NE(recv_buf, NULL);
+    FD_ZERO(&read_set);
+    FD_ZERO(&write_set);
+    FD_SET(s, &write_set);
+    FD_SET(r, &read_set);
+    while (-1 != select(max(r,s)+1, &read_set ,&write_set, NULL, &time_val)) {
+        if (FD_ISSET(s, &write_set)) {
+            while (((ret = send(s, send_buf + bytes_sent, num_bytes - bytes_sent, 0)) > 0) && (bytes_sent < num_bytes))
+                bytes_sent += ret;
+            if (bytes_sent < num_bytes) {
+                ASSERT_INT_EQ(ret, -1);
+                ASSERT_INT_EQ(errno, EAGAIN);
+            }
+        }
+
+        if (FD_ISSET(r, &read_set)) {
+            while ((ret = recv(r, recv_buf + bytes_received, num_bytes - bytes_received, 0)) > 0)
+                bytes_received += ret;
+            if (ret == 0)
+                break;
+            ASSERT_INT_EQ(ret, -1);
+            ASSERT_INT_EQ(errno, EAGAIN);
+        }
+
+        if (bytes_sent < num_bytes)
+            FD_SET(s, &write_set);
+        else {
+            FD_CLR(s, &write_set);
+            ret = shutdown(s, SD_SEND);
+            ASSERT_INT_EQ(ret, 0);
+        }
+        FD_SET(r, &read_set);
+    }
+
+    ASSERT_INT_EQ(bytes_sent, bytes_received);
+    ret = close(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = close(accept_fd);
+    ASSERT_INT_EQ(ret, 0);
+
+    freeaddrinfo(servinfo);
+}
+
+
 void socket_tests()
 {
     w32posix_initialize();
     socket_fd_tests();
-    socket_syncio_tests();
+    socket_blocing_io_tests();
+    socket_nonblocking_io_tests();
+    socket_select_tests();
     w32posix_done();
 }
 

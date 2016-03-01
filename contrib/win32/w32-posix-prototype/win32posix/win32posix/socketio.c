@@ -223,6 +223,7 @@ do {  \
 } while (0) 
 
 int socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optval, int optlen) {
+    //TODO: unsupport SO_RCVTIMEO
     SET_ERRNO_ON_ERROR(setsockopt(pio->sock, level, optname, optval, optlen));
 }
 
@@ -791,11 +792,13 @@ int socketio_on_select(struct w32_io* pio, BOOL rd) {
     if (!rd && pio->write_details.pending)
         return 0;
 
-    if (pio->type == LISTEN_FD) {
+    //TODO - do this on rd = TRUE
+    if (pio->type == LISTEN_FD) { 
         if (socketio_acceptEx(pio) != 0)
             return -1;
         return 0;
     }
+    //TODO - do this only on rd = FALSE
     else if (pio->type == CONNECT_FD) {
         //nothing to do for connect
         return 0;
