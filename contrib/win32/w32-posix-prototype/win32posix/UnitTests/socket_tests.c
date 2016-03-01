@@ -216,6 +216,7 @@ void socket_syncio_tests()
     TEST_START("basic recv s->c");
     ret = recv(connect_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0);
     ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    small_recv_buf[ret] = '\0';
     ASSERT_STRING_EQ(small_send_buf, small_recv_buf);
     memset(small_recv_buf, 0, sizeof(small_recv_buf));
     TEST_DONE();
@@ -225,6 +226,7 @@ void socket_syncio_tests()
     ASSERT_INT_EQ(ret, strlen(small_send_buf));
     ret = recv(accept_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0);
     ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    small_recv_buf[ret] = '\0';
     ASSERT_STRING_EQ(small_send_buf, small_recv_buf);
     memset(small_recv_buf, 0, sizeof(small_recv_buf));
     TEST_DONE();

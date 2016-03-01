@@ -13,23 +13,18 @@
 
 static int errno_from_WSAError(int wsaerrno)
 {
-
-    if (wsaerrno == WSAEWOULDBLOCK)
-    {
+    switch (wsaerrno) {
+    case WSAEWOULDBLOCK:
         return EAGAIN;
-    }
-
-    if (wsaerrno == WSAEFAULT)
-    {
+    case WSAEFAULT:
         return EFAULT;
-    }
-
-    if (wsaerrno == WSAEINVAL)
-    {
+    case WSAEINVAL:
         return EINVAL;
+    case WSAESHUTDOWN:
+        return ECONNRESET;
+    default:
+        return wsaerrno;
     }
-
-    return wsaerrno;
 }
 
 int socketio_initialize() {
@@ -271,9 +266,19 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 
     //if io is already pending
     if (pio->read_details.pending) {
-        errno = EAGAIN;
-        debug2("Read is already pending, io:%p", pio);
-        return -1;
+        //if recv is now in blocking mode, wait for data to be available
+        if (w32_io_is_blocking(pio))  {
+            debug2("socket was previously non-blocing but now in blocking mode, waiting for io");
+            while (socketio_is_io_available(pio, TRUE) == FALSE) {
+                if (0 != wait_for_any_event(NULL, 0, INFINITE))
+                    return -1;
+            }
+        }
+        else {
+            errno = EAGAIN;
+            debug2("Read is already pending, io:%p", pio);
+            return -1;
+        }
     }
 
     //if we have some buffer copy it and return #bytes copied
