@@ -6,11 +6,14 @@
 
 #define PORT "34912"  
 #define BACKLOG 2  
+#define SMALL_RECV_BUF_SIZE 128
 
 int listen_fd, accept_fd, connect_fd, ret;
 struct addrinfo hints,*servinfo;
 fd_set read_set, write_set, except_set;
 struct timeval time_val;
+struct sockaddr_storage their_addr;
+char* send_buf, recv_buf;
 
 int
 unset_nonblock(int fd)
@@ -85,10 +88,7 @@ void socket_fd_tests()
     ASSERT_CHAR_EQ(0, FD_ISSET(2, pset));
     TEST_DONE();
 
-}
 
-socket_syncio_tests()
-{
     TEST_START("BAD FDs");
     ASSERT_INT_EQ(accept(-1, NULL, NULL), -1);
     ASSERT_INT_EQ(errno, EBADF);
@@ -141,7 +141,126 @@ socket_syncio_tests()
     ASSERT_INT_EQ(errno, EBADF);
     TEST_DONE();
 
+    TEST_START("min fd allocation");
+    connect_fd = socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_INT_EQ(connect_fd, 3);
+    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_INT_EQ(listen_fd, 4);
+    close(connect_fd);
+    connect_fd = socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_INT_EQ(connect_fd, 3); /*minimum free fd gets allocated*/
+    close(connect_fd);
+    close(listen_fd);
+    TEST_DONE();
 
+}
+
+void socket_syncio_tests()
+{
+    char* small_send_buf = "sample payload";
+    char small_recv_buf[SMALL_RECV_BUF_SIZE];
+
+    TEST_START("Basic IPv4 client server connection setup");
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    ret = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo);
+    ASSERT_INT_EQ(ret, 0);
+    listen_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(listen_fd, -1);
+    ret = bind(listen_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    ASSERT_INT_EQ(ret, 0);
+    ret = listen(listen_fd, BACKLOG);
+    ASSERT_INT_EQ(ret, 0);
+    //call listen again??
+    connect_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(connect_fd, -1);
+    ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    ASSERT_INT_EQ(ret, 0);
+    //call connect again??
+    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    ASSERT_INT_NE(accept_fd, -1);
+    ret = close(listen_fd);
+    ASSERT_INT_EQ(ret, 0);
+    //call accept after listen_fd is closed??
+    TEST_DONE();
+
+    TEST_START("send failures");
+    ret = send(accept_fd, NULL, 4, 0);/*invalid buffer*/
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, EINVAL);
+    ret = send(accept_fd, small_send_buf, 0, 0); /*invalid buffer*/
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, EINVAL);
+    ret = send(accept_fd, small_send_buf, strlen(small_send_buf), 4); /*flags not supported yet*/
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, ENOTSUP);
+    TEST_DONE();
+
+    TEST_START("basic send s->c");
+    ret = send(accept_fd, small_send_buf, strlen(small_send_buf), 0);
+    ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    TEST_DONE();
+
+    TEST_START("recv failures");
+    ret = recv(connect_fd, NULL, SMALL_RECV_BUF_SIZE, 0); /* invalid buffer*/
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, EINVAL);
+    ret = recv(connect_fd, small_recv_buf, 0, 0); /*invalid buffer*/
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, EINVAL);
+    ret = recv(connect_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 6); /*flags not supported yet*/
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, ENOTSUP);
+    TEST_DONE();
+
+    TEST_START("basic recv s->c");
+    ret = recv(connect_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0);
+    ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    ASSERT_STRING_EQ(small_send_buf, small_recv_buf);
+    memset(small_recv_buf, 0, sizeof(small_recv_buf));
+    TEST_DONE();
+
+    TEST_START("basic send recv c->s");
+    ret = send(connect_fd, small_send_buf, strlen(small_send_buf), 0);
+    ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    ret = recv(accept_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0);
+    ASSERT_INT_EQ(ret, strlen(small_send_buf));
+    ASSERT_STRING_EQ(small_send_buf, small_recv_buf);
+    memset(small_recv_buf, 0, sizeof(small_recv_buf));
+    TEST_DONE();
+
+    TEST_START("shutdown SD_SEND");
+    ret = shutdown(connect_fd, SD_SEND);
+    ASSERT_INT_EQ(ret, 0);
+    ret = recv(accept_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0); /* send on other side is shutdown*/
+    ASSERT_INT_EQ(ret, 0);
+    ret = shutdown(accept_fd, SD_SEND);
+    ASSERT_INT_EQ(ret, 0);
+    ret = recv(connect_fd, small_recv_buf, SMALL_RECV_BUF_SIZE, 0); /* send on other side is shutdown*/
+    ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
+
+    TEST_START("shutdown SD_RECEIVE");
+    ret = shutdown(connect_fd, SD_RECEIVE);
+    ASSERT_INT_EQ(ret, 0);
+    ret = send(accept_fd, small_send_buf, strlen(small_send_buf), 0);
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, ECONNRESET);
+    ret = shutdown(accept_fd, SD_RECEIVE);
+    ASSERT_INT_EQ(ret, 0);
+    ret = send(connect_fd, small_send_buf, strlen(small_send_buf), 0);
+    ASSERT_INT_EQ(ret, -1);
+    ASSERT_INT_EQ(errno, ECONNRESET);
+    TEST_DONE();
+
+    TEST_START("basic close");
+    ret = close(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = close(accept_fd);
+    ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
+
+    freeaddrinfo(servinfo);
 }
 
 void socket_tests()
