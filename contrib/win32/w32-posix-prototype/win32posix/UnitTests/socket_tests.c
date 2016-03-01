@@ -346,6 +346,16 @@ void socket_nonblocking_io_tests()
     freeaddrinfo(servinfo);
 }
 
+void prep_input_buffer(char* buf, int size, int seed)
+{
+    int ctr = 1;
+    int *cur = (int*)buf;
+    for (; size; size -= 4) {
+        *(cur++) = ctr;
+        ctr += seed;
+    }
+}
+
 void socket_select_tests() {
     int s, r, i;
     int num_bytes = 1024 * 700; //700KB
@@ -395,6 +405,7 @@ void socket_select_tests() {
     recv_buf = malloc(num_bytes + 1);
     ASSERT_PTR_NE(send_buf, NULL);
     ASSERT_PTR_NE(recv_buf, NULL);
+    prep_input_buffer(send_buf, num_bytes, 17);
     FD_ZERO(&read_set);
     FD_ZERO(&write_set);
     FD_SET(s, &write_set);
@@ -430,10 +441,102 @@ void socket_select_tests() {
         FD_SET(r, &read_set);
     }
 
-    /*ensure that we hit send and recv paths that returned EAGAIN. Else it would have be similar to blocking sends and recvs*/
+    /*ensure that we hit send and recv paths that returned EAGAIN. Else it would not have touched the async paths*/
     /*if this assert is being hit, then num_bytes is too small. up it*/
     ASSERT_INT_GT(eagain_results, 0);
     ASSERT_INT_EQ(bytes_sent, bytes_received);
+    ASSERT_INT_EQ(memcmp(send_buf, recv_buf, num_bytes), 0);
+    ret = close(connect_fd);
+    ASSERT_INT_EQ(ret, 0);
+    ret = close(accept_fd);
+    ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
+
+    freeaddrinfo(servinfo);
+}
+
+void socket_typical_ssh_payload_tests() {
+    int s, r, i;
+    int max_bytes = 1024 * 700; //700KB
+    int max_packetsize = 1024 * 5;
+    int packets_sent = 0;
+    int packets_received = 0;
+    int send_packet_remaining = 0, recv_packet_remaining = 0;
+    int eagain_results = 0;
+
+    TEST_START("connection setup");
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    ret = getaddrinfo("127.0.0.1", PORT, &hints, &servinfo);
+    ASSERT_INT_EQ(ret, 0);
+    listen_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(listen_fd, -1);
+    ret = bind(listen_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    ASSERT_INT_EQ(ret, 0);
+    ret = listen(listen_fd, BACKLOG);
+    ASSERT_INT_EQ(ret, 0);
+    connect_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+    ASSERT_INT_NE(connect_fd, -1);
+    ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
+    ASSERT_INT_EQ(ret, 0);
+    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    ASSERT_INT_NE(accept_fd, -1);
+    ret = close(listen_fd);
+    ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
+
+    TEST_START("select send and recv packets");
+    r = accept_fd;
+    s = connect_fd;
+    ret = set_nonblock(s);
+    ASSERT_INT_EQ(ret, 0);
+    ret = set_nonblock(r);
+    ASSERT_INT_EQ(ret, 0);
+    send_buf = malloc(num_bytes);
+    recv_buf = malloc(num_bytes + 1);
+    ASSERT_PTR_NE(send_buf, NULL);
+    ASSERT_PTR_NE(recv_buf, NULL);
+    prep_input_buffer(send_buf, num_bytes, 17);
+    FD_ZERO(&read_set);
+    FD_ZERO(&write_set);
+    FD_SET(s, &write_set);
+    FD_SET(r, &read_set);
+    while (-1 != select(max(r, s) + 1, &read_set, &write_set, NULL, &time_val)) {
+        if (FD_ISSET(s, &write_set)) {
+            while ((bytes_sent < num_bytes) && ((ret = send(s, send_buf + bytes_sent, num_bytes - bytes_sent, 0)) > 0))
+                bytes_sent += ret;
+            if (bytes_sent < num_bytes) {
+                ASSERT_INT_EQ(ret, -1);
+                ASSERT_INT_EQ(errno, EAGAIN);
+                eagain_results++;
+            }
+        }
+
+        if (FD_ISSET(r, &read_set)) {
+            while ((ret = recv(r, recv_buf + bytes_received, num_bytes - bytes_received + 1, 0)) > 0)
+                bytes_received += ret;
+            if (ret == 0)
+                break;
+            ASSERT_INT_EQ(ret, -1);
+            ASSERT_INT_EQ(errno, EAGAIN);
+            eagain_results++;
+        }
+
+        if (bytes_sent < num_bytes)
+            FD_SET(s, &write_set);
+        else {
+            FD_CLR(s, &write_set);
+            ret = shutdown(s, SD_SEND);
+            ASSERT_INT_EQ(ret, 0);
+        }
+        FD_SET(r, &read_set);
+    }
+
+    /*ensure that we hit send and recv paths that returned EAGAIN. Else it would not have touched the async paths*/
+    /*if this assert is being hit, then num_bytes is too small. up it*/
+    ASSERT_INT_GT(eagain_results, 0);
+    ASSERT_INT_EQ(bytes_sent, bytes_received);
+    ASSERT_INT_EQ(memcmp(send_buf, recv_buf, num_bytes), 0);
     ret = close(connect_fd);
     ASSERT_INT_EQ(ret, 0);
     ret = close(accept_fd);
