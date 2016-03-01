@@ -13,7 +13,7 @@ struct addrinfo hints,*servinfo;
 fd_set read_set, write_set, except_set;
 struct timeval time_val;
 struct sockaddr_storage their_addr;
-char* send_buf, recv_buf;
+char *send_buf, *recv_buf;
 
 int
 unset_nonblock(int fd)
@@ -155,7 +155,7 @@ void socket_fd_tests()
 
 }
 
-void socket_blocing_io_tests()
+void socket_blocking_io_tests()
 {
     char* small_send_buf = "sample payload";
     char small_recv_buf[SMALL_RECV_BUF_SIZE];
@@ -298,6 +298,8 @@ void socket_nonblocking_io_tests()
     ASSERT_INT_EQ(ret, -1);
     ASSERT_INT_EQ(errno, EINPROGRESS); */
     ASSERT_INT_EQ(ret, 0);
+    ret = unset_nonblock(listen_fd);
+    ASSERT_INT_EQ(ret, 0);
     accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
     ASSERT_INT_NE(accept_fd, -1);
     ret = close(listen_fd);
@@ -346,10 +348,11 @@ void socket_nonblocking_io_tests()
 
 void socket_select_tests() {
     int s, r, i;
-    int num_bytes = 1024 * 1024; //1MB
+    int num_bytes = 1024 * 700; //700KB
     int bytes_sent = 0;
     int bytes_received = 0;
     int seed = 326;
+    int eagain_results = 0;
 
     TEST_START("select listen");
     memset(&hints, 0, sizeof(hints));
@@ -373,7 +376,7 @@ void socket_select_tests() {
     FD_ZERO(&read_set);
     FD_SET(listen_fd, &read_set);
     ret = select(listen_fd + 1, &read_set, NULL, NULL, &time_val);
-    ASSERT_INT_EQ(ret, 0);
+    ASSERT_INT_NE(ret, -1);
     ASSERT_INT_EQ(FD_ISSET(listen_fd, &read_set), 1);
     accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
     ASSERT_INT_NE(accept_fd, -1);
@@ -389,7 +392,7 @@ void socket_select_tests() {
     ret = set_nonblock(r);
     ASSERT_INT_EQ(ret, 0);
     send_buf = malloc(num_bytes);
-    recv_buf = malloc(num_bytes);
+    recv_buf = malloc(num_bytes + 1);
     ASSERT_PTR_NE(send_buf, NULL);
     ASSERT_PTR_NE(recv_buf, NULL);
     FD_ZERO(&read_set);
@@ -398,21 +401,23 @@ void socket_select_tests() {
     FD_SET(r, &read_set);
     while (-1 != select(max(r,s)+1, &read_set ,&write_set, NULL, &time_val)) {
         if (FD_ISSET(s, &write_set)) {
-            while (((ret = send(s, send_buf + bytes_sent, num_bytes - bytes_sent, 0)) > 0) && (bytes_sent < num_bytes))
+            while ((bytes_sent < num_bytes) && ((ret = send(s, send_buf + bytes_sent, num_bytes - bytes_sent, 0)) > 0))
                 bytes_sent += ret;
             if (bytes_sent < num_bytes) {
                 ASSERT_INT_EQ(ret, -1);
                 ASSERT_INT_EQ(errno, EAGAIN);
+                eagain_results++;
             }
         }
 
         if (FD_ISSET(r, &read_set)) {
-            while ((ret = recv(r, recv_buf + bytes_received, num_bytes - bytes_received, 0)) > 0)
+            while ((ret = recv(r, recv_buf + bytes_received, num_bytes - bytes_received + 1, 0)) > 0)
                 bytes_received += ret;
             if (ret == 0)
                 break;
             ASSERT_INT_EQ(ret, -1);
             ASSERT_INT_EQ(errno, EAGAIN);
+            eagain_results++;
         }
 
         if (bytes_sent < num_bytes)
@@ -425,11 +430,15 @@ void socket_select_tests() {
         FD_SET(r, &read_set);
     }
 
+    /*ensure that we hit send and recv paths that returned EAGAIN. Else it would have be similar to blocking sends and recvs*/
+    /*if this assert is being hit, then num_bytes is too small. up it*/
+    ASSERT_INT_GT(eagain_results, 0);
     ASSERT_INT_EQ(bytes_sent, bytes_received);
     ret = close(connect_fd);
     ASSERT_INT_EQ(ret, 0);
     ret = close(accept_fd);
     ASSERT_INT_EQ(ret, 0);
+    TEST_DONE();
 
     freeaddrinfo(servinfo);
 }
@@ -439,7 +448,7 @@ void socket_tests()
 {
     w32posix_initialize();
     socket_fd_tests();
-    socket_blocing_io_tests();
+    socket_blocking_io_tests();
     socket_nonblocking_io_tests();
     socket_select_tests();
     w32posix_done();

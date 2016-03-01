@@ -56,5 +56,8 @@
     <ClInclude Include="inc\sys\socket.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
+    <ClInclude Include="inc\sys\stat.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
