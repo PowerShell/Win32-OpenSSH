@@ -286,13 +286,7 @@ int w32_isatty(int fd) {
 }
 
 FILE* w32_fdopen(int fd, const char *mode) {
-    errno = 0;
-    if ((fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
-        errno = EBADF;
-        debug("bad fd: %d", fd);
-        return NULL;
-    }
-
+    CHECK_FD(fd);
     return fileio_fdopen(fd_table.w32_ios[fd], mode);
 }
 
@@ -488,12 +482,14 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
 
 
 int w32_dup(int oldfd) {
+    CHECK_FD(oldfd);
     errno = EOPNOTSUPP;
     debug("ERROR: dup is not implemented yet");
     return -1;
 }
 
 int w32_dup2(int oldfd, int newfd) {
+    CHECK_FD(oldfd);
     errno = EOPNOTSUPP;
     debug("ERROR: dup2 is not implemented yet");
     return -1;

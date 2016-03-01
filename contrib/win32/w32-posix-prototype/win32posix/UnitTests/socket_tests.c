@@ -1,4 +1,7 @@
-#include "w32posix.h"
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
 #include "test_helper.h"
 
 #define PORT "34912"  
@@ -7,6 +10,7 @@
 int listen_fd, accept_fd, connect_fd, ret;
 struct addrinfo hints,*servinfo;
 fd_set read_set, write_set, except_set;
+struct timeval time_val;
 
 int
 unset_nonblock(int fd)
@@ -129,11 +133,11 @@ socket_syncio_tests()
     ASSERT_INT_EQ(errno, EBADF);
     FD_ZERO(&read_set);
     FD_SET(20, &read_set);
-    ASSERT_INT_EQ(select(21, &read_set, NULL, NULL, NULL), -1);
+    ASSERT_INT_EQ(select(21, &read_set, NULL, NULL, &time_val), -1);
     ASSERT_INT_EQ(errno, EBADF);
     FD_ZERO(&write_set);
     FD_SET(21, &write_set);
-    ASSERT_INT_EQ(select(22, NULL, &write_set, NULL, NULL), -1);
+    ASSERT_INT_EQ(select(22, NULL, &write_set, NULL, &time_val), -1);
     ASSERT_INT_EQ(errno, EBADF);
     TEST_DONE();
 

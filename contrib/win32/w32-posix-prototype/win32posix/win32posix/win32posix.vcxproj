@@ -145,6 +145,8 @@
   <ItemGroup>
     <ClInclude Include="debug.h" />
     <ClInclude Include="defs.h" />
+    <ClInclude Include="inc\sys\socket.h" />
+    <ClInclude Include="inc\unistd.h" />
     <ClInclude Include="w32fd.h" />
     <ClInclude Include="w32posix.h" />
   </ItemGroup>
