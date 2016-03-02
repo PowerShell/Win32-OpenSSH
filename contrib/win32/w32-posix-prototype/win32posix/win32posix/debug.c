@@ -13,9 +13,9 @@ int debug_initialize() {
     len = GetModuleFileNameA(NULL, filename, MAX_PATH);
     GetLocalTime(&time);
     
-    sprintf(filename + len, "_%d_%d_%d.log", time.wHour, time.wMinute, time.wSecond);
+    sprintf_s(filename + len, MAX_PATH-len, "_%d_%d_%d.log", time.wHour, time.wMinute, time.wSecond);
     //sprintf(filename, "%s", "e:\\tmp.log");
-    log = fopen(filename, "w");
+    fopen_s(&log, filename, "w");
     return 0;
 }
 

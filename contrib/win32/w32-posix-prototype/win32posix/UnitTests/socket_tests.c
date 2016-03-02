@@ -8,11 +8,14 @@
 #define BACKLOG 2  
 #define SMALL_RECV_BUF_SIZE 128
 
+#pragma warning(disable:4267)
+
 int listen_fd, accept_fd, connect_fd, ret;
 struct addrinfo hints, *servinfo;
 fd_set read_set, write_set, except_set;
 struct timeval time_val;
 struct sockaddr_storage their_addr;
+int their_addr_len = sizeof(their_addr);
 char *send_buf, *recv_buf;
 
 int
@@ -121,7 +124,7 @@ void socket_fd_tests()
     ASSERT_INT_EQ(errno, EBADF);
     ASSERT_INT_EQ(isatty(12), -1);
     ASSERT_INT_EQ(errno, EBADF);
-    ASSERT_INT_EQ(fdopen(13, NULL), -1);
+    ASSERT_PTR_EQ(fdopen(13, NULL), NULL);
     ASSERT_INT_EQ(errno, EBADF);
     ASSERT_INT_EQ(close(14), -1);
     ASSERT_INT_EQ(errno, EBADF);
@@ -139,6 +142,16 @@ void socket_fd_tests()
     FD_SET(21, &write_set);
     ASSERT_INT_EQ(select(22, NULL, &write_set, NULL, &time_val), -1);
     ASSERT_INT_EQ(errno, EBADF);
+    TEST_DONE();
+
+    TEST_START("socket failures");
+    ASSERT_INT_EQ(setsockopt(0, 0, SO_RCVTIMEO, NULL, 0), -1);
+    ASSERT_INT_EQ(errno, ENOTSOCK);
+    connect_fd = socket(AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
+    ASSERT_INT_NE(connect_fd, -1);
+    ASSERT_INT_EQ(setsockopt(connect_fd, 0, SO_RCVTIMEO, NULL, 0), -1);
+    ASSERT_INT_EQ(errno, ENOTSUP);
+    close(connect_fd);
     TEST_DONE();
 
     TEST_START("min fd allocation");
@@ -177,7 +190,8 @@ void socket_blocking_io_tests()
     ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
     ASSERT_INT_EQ(ret, 0);
     //call connect again??
-    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    their_addr_len = sizeof(their_addr);
+    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, &their_addr_len);
     ASSERT_INT_NE(accept_fd, -1);
     ret = close(listen_fd);
     ASSERT_INT_EQ(ret, 0);
@@ -288,7 +302,7 @@ void socket_nonblocking_io_tests()
     TEST_START("non blocking accept and connect");
     ret = set_nonblock(listen_fd);
     ASSERT_INT_EQ(ret, 0);
-    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    accept_fd = accept(listen_fd, NULL, NULL);
     ASSERT_INT_EQ(accept_fd, -1);
     ASSERT_INT_EQ(errno, EAGAIN);
     ret = set_nonblock(connect_fd);
@@ -300,7 +314,7 @@ void socket_nonblocking_io_tests()
     ASSERT_INT_EQ(ret, 0);
     ret = unset_nonblock(listen_fd);
     ASSERT_INT_EQ(ret, 0);
-    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    accept_fd = accept(listen_fd, NULL, NULL);
     ASSERT_INT_NE(accept_fd, -1);
     ret = close(listen_fd);
     ASSERT_INT_EQ(ret, 0);
@@ -357,7 +371,7 @@ void prep_input_buffer(char* buf, int size, int seed)
 }
 
 void socket_select_tests() {
-    int s, r, i;
+    int s, r;
     int num_bytes = 1024 * 700; //700KB
     int bytes_sent = 0;
     int bytes_received = 0;
@@ -388,7 +402,7 @@ void socket_select_tests() {
     ret = select(listen_fd + 1, &read_set, NULL, NULL, &time_val);
     ASSERT_INT_NE(ret, -1);
     ASSERT_INT_EQ(FD_ISSET(listen_fd, &read_set), 1);
-    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    accept_fd = accept(listen_fd, NULL, NULL);
     ASSERT_INT_NE(accept_fd, -1);
     ret = close(listen_fd);
     ASSERT_INT_EQ(ret, 0);
@@ -456,7 +470,7 @@ void socket_select_tests() {
 }
 
 void socket_typical_ssh_payload_tests() {
-    int s, r, i;
+    int s, r;
     int max_bytes = 1024 * 700; //700KB
     int max_packetsize = 1024 * 5, bytes_sent = 0;
     int packets_sent = 0;
@@ -479,7 +493,7 @@ void socket_typical_ssh_payload_tests() {
     ASSERT_INT_NE(connect_fd, -1);
     ret = connect(connect_fd, servinfo->ai_addr, servinfo->ai_addrlen);
     ASSERT_INT_EQ(ret, 0);
-    accept_fd = accept(listen_fd, (struct sockaddr*)&their_addr, sizeof(their_addr));
+    accept_fd = accept(listen_fd, NULL, NULL);
     ASSERT_INT_NE(accept_fd, -1);
     ret = close(listen_fd);
     ASSERT_INT_EQ(ret, 0);
@@ -514,7 +528,7 @@ void socket_typical_ssh_payload_tests() {
                 ASSERT_INT_EQ(errno, EAGAIN);
             }
             else if (bytes_sent < max_bytes) {
-                send_packet_remaining = ((double)rand() / (RAND_MAX + 1)) * (max_packetsize - 100) + 100;
+                send_packet_remaining = (rand()*(max_packetsize - 100)/RAND_MAX)  + 100;
                 ret = send(s, &send_packet_remaining, 4, 0);
                 if (ret == -1) {
                     send_packet_remaining = 0; //we'll try again when io is ready

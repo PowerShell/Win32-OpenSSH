@@ -59,5 +59,8 @@
     <ClInclude Include="inc\sys\stat.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
+    <ClInclude Include="inc\fcntl.h">
+      <Filter>inc</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

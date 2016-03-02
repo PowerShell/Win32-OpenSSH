@@ -4,16 +4,21 @@
 #include <stdio.h>
 #include "debug.h"
 
-
-//order to be maintained
 enum w32_io_type {
-    UNKOWN_FD = 0,
-    LISTEN_FD = 1,
-    CONNECT_FD = 2,
-    SOCK_FD = 3,
-    FILE_FD = 4,
-    PIPE_FD = 5,
-    CONSOLE_FD = 6
+    UNKNOWN_FD = 0,
+    SOCK_FD = 1,
+    FILE_FD = 2,
+    PIPE_FD = 3,
+    CONSOLE_FD = 4,
+    STD_IO_FD = 5
+};
+
+enum w32_io_sock_state {
+    SOCK_INITIALIZED = 0,
+    SOCK_LISTENING = 1,
+    SOCK_ACCEPTED = 2,
+    SOCK_CONNECTING = 3,
+    SOCK_CONNECTED = 4
 };
 
 struct w32_io {
@@ -55,8 +60,11 @@ struct w32_io {
 		HANDLE handle;
 	};
 
-	//handle specific context
-	void* context;
+	//handle specific internal state context, currently used by sockets
+    struct {
+        enum w32_io_sock_state state;
+        void* context;
+    }internal;
 };
 
 BOOL w32_io_is_blocking(struct w32_io*);

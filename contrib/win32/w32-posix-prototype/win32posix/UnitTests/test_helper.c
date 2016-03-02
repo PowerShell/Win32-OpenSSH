@@ -125,7 +125,7 @@ void debug3(const char *fmt,...) {/*stub*/}
 int
 main(int argc, char **argv)
 {
-	int ch;
+	//int ch;
     __progname = NULL;
 	/* Handle systems without __progname */
 	if (__progname == NULL) {
@@ -134,7 +134,7 @@ main(int argc, char **argv)
 			__progname = argv[0];	
 		else
 			__progname++;
-		if ((__progname = strdup(__progname)) == NULL) {
+		if ((__progname = _strdup(__progname)) == NULL) {
 			fprintf(stderr, "strdup failed\n");
 			exit(1);
 		}
@@ -215,7 +215,7 @@ void
 test_start(const char *n)
 {
 	assert(active_test_name == NULL);
-	assert((active_test_name = strdup(n)) != NULL);
+	assert((active_test_name = _strdup(n)) != NULL);
 	*subtest_info = '\0';
 	if (verbose_mode)
 		printf("test %u - \"%s\": ", test_number, active_test_name);
@@ -465,7 +465,7 @@ void
 assert_char(const char *file, int line, const char *a1, const char *a2,
     char aa1, char aa2, enum test_predicate pred)
 {
-	char buf[8];
+	//char buf[8];
 
 	TEST_CHECK(aa1, aa2, pred);
 	test_header(file, line, a1, a2, "CHAR", pred);
