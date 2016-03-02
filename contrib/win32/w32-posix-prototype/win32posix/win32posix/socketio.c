@@ -128,8 +128,8 @@ void CALLBACK WSARecvCompletionRoutine(
     )
 {
     struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, read_overlapped));
-    debug2("io:%p, pending_state:%d, remaining:%d, completed:%d, error:%d, transferred:%d",
-        pio, pio->read_details.pending, pio->read_details.remaining, pio->read_details.completed, dwError, cbTransferred);
+    debug2("io:%p, pending_state:%d, flags:%d, error:%d, received:%d",
+        pio, pio->read_details.pending, dwFlags, dwError, cbTransferred);
     if (!dwError && !cbTransferred)
         dwError = ERROR_GRACEFUL_DISCONNECT;
     pio->read_details.error = dwError;
@@ -179,6 +179,7 @@ int socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
         if (WSAGetLastError() == WSA_IO_PENDING)
         {
             //io is initiated and pending
+            debug2("WSARecv reported IO pending");
             pio->read_details.pending = TRUE;
         }
         else { //failed 
@@ -382,7 +383,7 @@ void CALLBACK WSASendCompletionRoutine(
     )
 {
     struct w32_io* pio = (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, write_overlapped));
-    debug2("io:%p, pending_state:%d, error:%d, transferred:%d of remaining:%d", pio, pio->write_details.pending, dwError, cbTransferred, pio->write_details.remaining);
+    debug2("io:%p, pending_state:%d, error:%d, sent:%d of remaining:%d", pio, pio->write_details.pending, dwError, cbTransferred, pio->write_details.remaining);
     pio->write_details.error = dwError;
     //assert that remaining == cbTransferred
     pio->write_details.remaining -= cbTransferred;
@@ -785,7 +786,13 @@ BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd) {
 
 int socketio_on_select(struct w32_io* pio, BOOL rd) {
 
-    debug2("io:%p type:%d", pio, pio->type);
+    debug2("io:%p type:%d rd:%d", pio, pio->type, rd);
+    
+    //return if io is already available
+    if (socketio_is_io_available(pio, rd))
+        return 0;
+
+    //return if io is pending
     if (rd && pio->read_details.pending)
         return 0;
 

@@ -364,35 +364,18 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
 
     if (readfds) {
         for (i = 0; i < fds; i++) 
-            if (FD_ISSET(i, readfds))
+            if (FD_ISSET(i, readfds)) {
                 CHECK_FD(i);
+                in_ready_fds++;
+            }
     }
 
     if (writefds) {
         for (i = 0; i < fds; i++) 
-            if (FD_ISSET(i, writefds))
+            if (FD_ISSET(i, writefds)) {
                 CHECK_FD(i);
-    }
-
-
-    //see if any io is ready
-    for (i = 0; i < fds; i++) {
-
-        if (readfds && FD_ISSET(i, readfds)) {
-            in_ready_fds++;
-            if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
-                FD_SET(i, &read_ready_fds);
-                out_ready_fds++;
+                in_ready_fds;
             }
-        }
-
-        if (writefds && FD_ISSET(i, writefds)) {
-            in_ready_fds++;
-            if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
-                FD_SET(i, &write_ready_fds);
-                out_ready_fds++;
-            }
-        }
     }
 
     //if none of input fds are set return error
@@ -402,18 +385,8 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
         return -1;
     }
 
-    //if io on some fds is already ready, return
-    if (out_ready_fds)
-    {
-        if (readfds)
-            *readfds = read_ready_fds;
-        if (writefds)
-            *writefds = write_ready_fds;
-        debug2("IO ready:%d, no wait", out_ready_fds);
-        return out_ready_fds;
-    }
 
-    //start async io on selected fds
+    //start async io on selected fds if needed and pick up any events that select needs to listen on
     for (int i = 0; i < fds; i++) {
 
         if (readfds && FD_ISSET(i, readfds)) {
@@ -427,9 +400,45 @@ int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, co
         if (writefds && FD_ISSET(i, writefds)) {
             if (w32_io_on_select(fd_table.w32_ios[i], FALSE) == -1)
                 return -1;
+            if (fd_table.w32_ios[i]->type == CONNECT_FD) {
+                events[num_events++] = fd_table.w32_ios[i]->write_overlapped.hEvent;
+            }
         }
     }
 
+    //excute any scheduled APCs
+    if (0 != wait_for_any_event(NULL, 0, 0)) {
+            return -1;
+    }
+
+    //see if any io is ready
+    for (i = 0; i < fds; i++) {
+
+        if (readfds && FD_ISSET(i, readfds)) {
+            if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
+                FD_SET(i, &read_ready_fds);
+                out_ready_fds++;
+            }
+        }
+
+        if (writefds && FD_ISSET(i, writefds)) {
+            if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
+                FD_SET(i, &write_ready_fds);
+                out_ready_fds++;
+            }
+        }
+    }
+
+    //if io on some fds is already ready, return
+    if (out_ready_fds)
+    {
+        if (readfds)
+            *readfds = read_ready_fds;
+        if (writefds)
+            *writefds = write_ready_fds;
+        debug2("IO ready:%d, no wait", out_ready_fds);
+        return out_ready_fds;
+    }
     
     do {
         ticks_now = GetTickCount64();
