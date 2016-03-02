@@ -213,14 +213,13 @@ struct w32_io* socketio_socket(int domain, int type, int protocol) {
     return pio;
 }
 
-#define SET_ERRNO_ON_ERROR(expr) \
-do {  \
-    int ret = (expr); \
-    if (ret == SOCKET_ERROR) {  \
-        errno = errno_from_WSALastError(); \
-        debug("ERROR:%d", errno); \
-    }  \
-    return ret; \
+#define SET_ERRNO_ON_ERROR(expr) do {                   \
+    int ret = (expr);                                   \
+    if (ret == SOCKET_ERROR) {                          \
+        errno = errno_from_WSALastError();              \
+        debug("ERROR:%d", errno);                       \
+    }                                                   \
+    return ret;                                         \
 } while (0) 
 
 int socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optval, int optlen) {
