@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <io.h>
 #include "w32fd.h"
-#include "defs.h"
+#include "inc/defs.h"
 #include <errno.h>
 #include <stddef.h>
 

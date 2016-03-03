@@ -1,4 +1,4 @@
-#include "w32posix.h"
+#include "inc\w32posix.h"
 #include "w32fd.h"
 #include <stdarg.h>
 #include <errno.h>

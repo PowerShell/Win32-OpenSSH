@@ -41,12 +41,6 @@
     <ClInclude Include="w32fd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="w32posix.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="defs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="debug.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -60,6 +54,12 @@
       <Filter>inc\sys</Filter>
     </ClInclude>
     <ClInclude Include="inc\fcntl.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\w32posix.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="inc\defs.h">
       <Filter>inc</Filter>
     </ClInclude>
   </ItemGroup>
