@@ -48,34 +48,16 @@ void allocate_standard_descriptor(int fd);
 
 
 /* Redirect callers of socket functions to use our indirection functions */
-#if NEED_FUNC_MACROS
-#define isatty(sfd)								WSHELPisatty(sfd)
-#define fstat(sfd, buf)                                                         WSHELPfstat(sfd, buf)
-#define fdopen(sfd, mode)                                                       WSHELPfdopen(sfd, mode)
-#define pipe(pfds)								WSHELPpipe(pfds)
-#define dup(oldfd)                                                              WSHELPdup(oldfd)
-#define socket(af, type, protocol)						WSHELPsocket(af, type, protocol)
-#define setsockopt(sfd, level, optname, optval, optlen)				WSHELPsetsockopt(sfd, level, optname, optval, optlen)
-#define getsockopt(sfd, level, optname, optval, optlen)				WSHELPgetsockopt(sfd, level, optname, optval, optlen)
-#define getsockname(sfd, name, namelen)						WSHELPgetsockname(sfd, name, namelen)
-#define getpeername(sfd, name, namelen)						WSHELPgetpeername(sfd, name, namelen)
-#define ioctlsocket(sfd, cmd, argp)						WSHELPioctlsocket(sfd, cmd, argp)
-#define listen(sfd, backlog)							WSHELPlisten(sfd, backlog)
-#define bind(sfd, name, namelen)						WSHELPbind(sfd, name, namelen)
-#define connect(sfd, name, namelen)						WSHELPconnect(sfd, name, namelen)
-#define shutdown(sfd, how)							WSHELPshutdown(sfd, how)
-#define accept(sfd, addr, addrlen)						WSHELPaccept(sfd, addr, addrlen)
-#define select(sfds, readsfds, writesfds, exceptsfds, timeout)		        WSHELPselect(sfds, readsfds, writesfds, exceptsfds, timeout)
-#else /* NEED_FUNC_MACROS */
+
 //#define isatty				WSHELPisatty
-#define fstat                           WSHELPfstat
+#define fstat                           _WSHELPfstat
 #define fdopen                          WSHELPfdopen
-#define pipe				WSHELPpipe
+#define pipe				_WSHELPpipe
 #define socket				WSHELPsocket
 #define dup                             WSHELPdup
 #define dup2                            WSHELPdup2
 #define open                            WSHELPopen
-#define creat                           WSHELPcreat
+#define creat                           _WSHELPcreat
 #define setsockopt			WSHELPsetsockopt
 #define getsockopt			WSHELPgetsockopt
 #define getsockname			WSHELPgetsockname
@@ -87,7 +69,7 @@ void allocate_standard_descriptor(int fd);
 #define shutdown			WSHELPshutdown
 #define accept				WSHELPaccept
 #define select				WSHELPselect
-#endif /* NEED_FUNC_MACROS */
+//#endif /* NEED_FUNC_MACROS */
 
 /* Declare new functions */
 int socketpair(int socks[2]);

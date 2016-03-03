@@ -154,6 +154,7 @@
     <ClInclude Include="debug.h" />
     <ClInclude Include="inc\defs.h" />
     <ClInclude Include="inc\fcntl.h" />
+    <ClInclude Include="inc\sys\select.h" />
     <ClInclude Include="inc\sys\socket.h" />
     <ClInclude Include="inc\sys\stat.h" />
     <ClInclude Include="inc\unistd.h" />

@@ -62,5 +62,8 @@
     <ClInclude Include="inc\defs.h">
       <Filter>inc</Filter>
     </ClInclude>
+    <ClInclude Include="inc\sys\select.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

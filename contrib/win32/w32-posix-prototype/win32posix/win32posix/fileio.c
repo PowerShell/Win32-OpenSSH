@@ -91,10 +91,7 @@ int fileio_pipe(struct w32_io* pio[2]) {
     memset(pio_write, 0, sizeof(struct w32_io));
 
     pio_read->handle = read_handle;
-    pio_read->type = PIPE_FD;
-
     pio_write->handle = write_handle;
-    pio_write->type = PIPE_FD;
 
     pio[0] = pio_read;
     pio[1] = pio_write;
@@ -222,7 +219,6 @@ struct w32_io* fileio_open(const char *pathname, int flags, int mode) {
         pio->fd_status_flags = O_NONBLOCK;
 
     pio->handle = handle;
-    pio->type = FILE_FD;
     return pio;
 }
 
@@ -419,6 +415,10 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 }
 
 int fileio_fstat(struct w32_io* pio, struct stat *buf) {
+
+    errno = ENOTSUP;
+    return -1;
+
     int fd = _open_osfhandle((intptr_t)pio->handle, 0);
     debug2("pio:%p", pio);
     if (fd == -1) {
@@ -474,17 +474,13 @@ FILE* fileio_fdopen(struct w32_io* pio, const char *mode) {
 }
 
 int fileio_on_select(struct w32_io* pio, BOOL rd) {
-    if (rd && pio->read_details.pending)
+
+    if (!rd)
         return 0;
 
-    if (!rd && pio->write_details.pending)
-        return 0;
-    
-    if (rd)
+    if (!pio->read_details.pending && !fileio_is_io_available(pio, rd))
         return fileio_ReadFileEx(pio);
-    else
-        //nothing to do with write
-        return 0;
+    
 }
 
 

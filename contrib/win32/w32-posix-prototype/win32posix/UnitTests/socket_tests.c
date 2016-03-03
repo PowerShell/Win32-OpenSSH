@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/select.h>
 #include "test_helper.h"
 
 #define PORT "34912"  
@@ -56,6 +57,18 @@ set_nonblock(int fd)
     return (0);
 
 }
+
+void prep_input_buffer(char* buf, int size, int seed)
+{
+    int ctr = 1;
+    int *cur = (int*)buf;
+    for (; size; size -= 4) {
+        *(cur++) = ctr;
+        ctr += seed;
+    }
+}
+
+
 
 void socket_fd_tests()
 {
@@ -358,16 +371,6 @@ void socket_nonblocking_io_tests()
 
     free(send_buf);
     freeaddrinfo(servinfo);
-}
-
-void prep_input_buffer(char* buf, int size, int seed)
-{
-    int ctr = 1;
-    int *cur = (int*)buf;
-    for (; size; size -= 4) {
-        *(cur++) = ctr;
-        ctr += seed;
-    }
 }
 
 void socket_select_tests() {

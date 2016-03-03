@@ -164,6 +164,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="file_tests.c" />
     <ClCompile Include="tests.c" />
     <ClCompile Include="test_helper.c" />
     <ClCompile Include="socket_tests.c" />

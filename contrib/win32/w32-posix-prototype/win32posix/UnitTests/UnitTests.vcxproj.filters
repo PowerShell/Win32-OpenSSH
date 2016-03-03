@@ -24,6 +24,9 @@
     <ClCompile Include="socket_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="file_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="test_helper.h">
