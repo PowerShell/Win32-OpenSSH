@@ -435,136 +435,135 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 			}
 	}
 
-    if (writefds) {
-        for (i = 0; i < fds; i++) 
-            if (FD_ISSET(i, writefds)) {
-                CHECK_FD(i);
-                in_set_fds++;
-            }
-    }
+	if (writefds) {
+		for (i = 0; i < fds; i++) 
+			if (FD_ISSET(i, writefds)) {
+				CHECK_FD(i);
+				in_set_fds++;
+			}
+	}
 
-    //if none of input fds are set return error
-    if (in_set_fds == 0) {
-        errno = EINVAL;
-        debug("ERROR: empty fd_sets");
-        return -1;
-    }
+	//if none of input fds are set return error
+	if (in_set_fds == 0) {
+		errno = EINVAL;
+		debug("ERROR: empty fd_sets");
+		return -1;
+	}
 
-    debug2("Total in fds:%d", in_set_fds);
-    //start async io on selected fds if needed and pick up any events that select needs to listen on
-    for (int i = 0; i < fds; i++) {
+	debug2("Total in fds:%d", in_set_fds);
+	//start async io on selected fds if needed and pick up any events that select needs to listen on
+	for (int i = 0; i < fds; i++) {
 
-        if (readfds && FD_ISSET(i, readfds)) {
-            if (w32_io_on_select(fd_table.w32_ios[i], TRUE) == -1)
-                return -1;
-            if ((fd_table.w32_ios[i]->type == SOCK_FD) && (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
-                events[num_events++] = fd_table.w32_ios[i]->read_overlapped.hEvent;
-            }
-        }
+		if (readfds && FD_ISSET(i, readfds)) {
+			if (w32_io_on_select(fd_table.w32_ios[i], TRUE) == -1)
+				return -1;
+			if ((fd_table.w32_ios[i]->type == SOCK_FD) && (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
+				events[num_events++] = fd_table.w32_ios[i]->read_overlapped.hEvent;
+			}
+		}
 
-        if (writefds && FD_ISSET(i, writefds)) {
-            if (w32_io_on_select(fd_table.w32_ios[i], FALSE) == -1)
-                return -1;
-            if ((fd_table.w32_ios[i]->type == SOCK_FD) && (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
-                events[num_events++] = fd_table.w32_ios[i]->write_overlapped.hEvent;
-            }
-        }
-    }
+		if (writefds && FD_ISSET(i, writefds)) {
+			if (w32_io_on_select(fd_table.w32_ios[i], FALSE) == -1)
+				return -1;
+			if ((fd_table.w32_ios[i]->type == SOCK_FD) && (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
+				events[num_events++] = fd_table.w32_ios[i]->write_overlapped.hEvent;
+			}
+		}
+	}
 
-    //excute any scheduled APCs
-    if (0 != wait_for_any_event(NULL, 0, 0)) {
-            return -1;
-    }
+	//excute any scheduled APCs
+	if (0 != wait_for_any_event(NULL, 0, 0)) 
+		return -1;
 
-    //see if any io is ready
-    for (i = 0; i < fds; i++) {
+	//see if any io is ready
+	for (i = 0; i < fds; i++) {
 
-        if (readfds && FD_ISSET(i, readfds)) {
-            if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
-                FD_SET(i, &read_ready_fds);
-                out_ready_fds++;
-            }
-        }
+		if (readfds && FD_ISSET(i, readfds)) {
+			if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
+				FD_SET(i, &read_ready_fds);
+				out_ready_fds++;
+			}
+		}
 
-        if (writefds && FD_ISSET(i, writefds)) {
-            if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
-                FD_SET(i, &write_ready_fds);
-                out_ready_fds++;
-            }
-        }
-    }
+		if (writefds && FD_ISSET(i, writefds)) {
+			if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
+			FD_SET(i, &write_ready_fds);
+			out_ready_fds++;
+			}
+		}
+	}
 
-    //if io on some fds is already ready, return
-    if (out_ready_fds)
-    {
-        if (readfds)
-            *readfds = read_ready_fds;
-        if (writefds)
-            *writefds = write_ready_fds;
-        debug2("IO ready:%d, no wait", out_ready_fds);
-        return out_ready_fds;
-    }
+	//if io on some fds is already ready, return
+	if (out_ready_fds) {
+		if (readfds)
+			*readfds = read_ready_fds;
+		if (writefds)
+			*writefds = write_ready_fds;
+		debug2("IO ready:%d, no wait", out_ready_fds);
+		return out_ready_fds;
+	}
     
-    do {
-        ticks_now = GetTickCount64();
-        if (time_milliseconds < (ticks_now - ticks_start)) {
-            errno = ETIMEDOUT;
-            debug("select timing out");
-            return -1;
-        }
+	do {
+		ticks_now = GetTickCount64();
+		if (time_milliseconds < (ticks_now - ticks_start)) {
+			errno = ETIMEDOUT;
+			debug("select timing out");
+			return -1;
+		}
             
-        if (0 != wait_for_any_event(events, num_events, time_milliseconds - ((ticks_now - ticks_start) & 0xffffffff))) {
-            return -1;
-        }
+		if (0 != wait_for_any_event(events, num_events, time_milliseconds - ((ticks_now - ticks_start) & 0xffffffff))) 
+			return -1;
 
-        //check on fd status
-        out_ready_fds = 0;
-        for (int i = 0; i < fds; i++) {
+		//check on fd status
+		out_ready_fds = 0;
+		for (int i = 0; i < fds; i++) {
 
-            if (readfds && FD_ISSET(i, readfds)) {
-                in_set_fds++;
-                if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
-                    FD_SET(i, &read_ready_fds);
-                    out_ready_fds++;
-                }
-            }
+			if (readfds && FD_ISSET(i, readfds)) {
+				in_set_fds++;
+				if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
+					FD_SET(i, &read_ready_fds);
+					out_ready_fds++;
+				}
+			}
 
-            if (writefds && FD_ISSET(i, writefds)) {
-                in_set_fds++;
-                if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
-                    FD_SET(i, &write_ready_fds);
-                    out_ready_fds++;
-                }
-            }
-        }
+			if (writefds && FD_ISSET(i, writefds)) {
+				in_set_fds++;
+				if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
+					FD_SET(i, &write_ready_fds);
+					out_ready_fds++;
+				}
+			}
+		}
 
-        if (out_ready_fds)
-            break;
+		if (out_ready_fds)
+			break;
 
-        debug2("wait ended without any IO completion, looping again");
+		debug2("wait ended without any IO completion, looping again");
 
-    } while (1);
+	} while (1);
 
-    if (readfds)
-        *readfds = read_ready_fds;
-    if (writefds)
-        *writefds = write_ready_fds;
+	if (readfds)
+		*readfds = read_ready_fds;
+	if (writefds)
+		*writefds = write_ready_fds;
     
-    return out_ready_fds;
+	return out_ready_fds;
  
 }
 
 
-int w32_dup(int oldfd) {
-    CHECK_FD(oldfd);
-    errno = EOPNOTSUPP;
-    debug("ERROR: dup is not implemented yet");
-    return -1;
+int 
+w32_dup(int oldfd) {
+	CHECK_FD(oldfd);
+	errno = EOPNOTSUPP;
+	debug("ERROR: dup is not implemented yet");
+	return -1;
 }
 
-int w32_dup2(int oldfd, int newfd) {
-    CHECK_FD(oldfd);
-    errno = EOPNOTSUPP;
-    debug("ERROR: dup2 is not implemented yet");
-    return -1;
+int 
+w32_dup2(int oldfd, int newfd) {
+	CHECK_FD(oldfd);
+	errno = EOPNOTSUPP;
+	debug("ERROR: dup2 is not implemented yet");
+	return -1;
 }
