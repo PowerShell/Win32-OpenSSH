@@ -27,7 +27,7 @@ void fd_table_set(struct w32_io* pio, int index);
 
 #pragma warning(disable:4312)
 /* initializes mapping table*/
-static int 
+static int
 fd_table_initialize() {
 	memset(&fd_table, 0, sizeof(fd_table));
 	memset(&w32_io_stdin, 0, sizeof(w32_io_stdin));
@@ -46,13 +46,13 @@ fd_table_initialize() {
 }
 
 /* get a free slot in mapping table with least index*/
-static int 
+static int
 fd_table_get_min_index() {
 	int min_index = 0;
 	unsigned char* bitmap = fd_table.occupied.bitmap;
 	unsigned char tmp;
 
-	while (*bitmap == 0xff)  {
+	while (*bitmap == 0xff) {
 		bitmap++;
 		min_index += 8;
 		if (min_index >= MAX_FDS) {
@@ -66,14 +66,14 @@ fd_table_get_min_index() {
 
 	while (tmp & 0x80)
 	{
-	tmp <<= 1;
-	min_index++;
+		tmp <<= 1;
+		min_index++;
 	}
 
 	return min_index;
 }
 
-static void 
+static void
 fd_table_set(struct w32_io* pio, int index) {
 	fd_table.w32_ios[index] = pio;
 	pio->table_index = index;
@@ -81,7 +81,7 @@ fd_table_set(struct w32_io* pio, int index) {
 	FD_SET(index, &(fd_table.occupied));
 }
 
-static void 
+static void
 fd_table_clear(int index)
 {
 	fd_table.w32_ios[index]->table_index = -1;
@@ -89,40 +89,40 @@ fd_table_clear(int index)
 	FD_CLR(index, &(fd_table.occupied));
 }
 
-void 
+void
 w32posix_initialize() {
 	if ((debug_initialize() != 0)
-	    || (fd_table_initialize() != 0)
-	    || (socketio_initialize() != 0))
+		|| (fd_table_initialize() != 0)
+		|| (socketio_initialize() != 0))
 		abort();
 }
 
-void 
+void
 w32posix_done() {
 	debug_done();
 	socketio_done();
 }
 
-BOOL 
+BOOL
 w32_io_is_blocking(struct w32_io* pio)
 {
 	return (pio->fd_status_flags & O_NONBLOCK) ? FALSE : TRUE;
 }
 
-BOOL 
+BOOL
 w32_io_is_io_available(struct w32_io* pio, BOOL rd) {
-	if (pio->type == SOCK_FD) 
+	if (pio->type == SOCK_FD)
 		return socketio_is_io_available(pio, rd);
-	else 
+	else
 		return fileio_is_io_available(pio, rd);
 }
 
-int 
+int
 w32_io_on_select(struct w32_io* pio, BOOL rd)
 {
 	if ((pio->type == SOCK_FD))
 		return socketio_on_select(pio, rd);
-	else 
+	else
 		return fileio_on_select(pio, rd);
 }
 
@@ -144,7 +144,7 @@ w32_io_on_select(struct w32_io* pio, BOOL rd)
 	}                                                                   \
 } while (0)
 
-int 
+int
 w32_socket(int domain, int type, int protocol) {
 	int min_index = fd_table_get_min_index();
 	struct w32_io* pio = NULL;
@@ -154,7 +154,7 @@ w32_socket(int domain, int type, int protocol) {
 		return -1;
 
 	pio = socketio_socket(domain, type, protocol);
-	if (pio == NULL) 
+	if (pio == NULL)
 		return -1;
 
 	pio->type = SOCK_FD;
@@ -163,7 +163,7 @@ w32_socket(int domain, int type, int protocol) {
 	return min_index;
 }
 
-int 
+int
 w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 {
 	debug3("fd:%d", fd);
@@ -176,7 +176,7 @@ w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 		return -1;
 
 	pio = socketio_accept(fd_table.w32_ios[fd], addr, addrlen);
-	if (!pio) 
+	if (!pio)
 		return -1;
 
 	pio->type = SOCK_FD;
@@ -185,15 +185,15 @@ w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 	return min_index;
 }
 
-int 
+int
 w32_setsockopt(int fd, int level, int optname, const char* optval, int optlen) {
-	debug3("fd:%d", fd); 
+	debug3("fd:%d", fd);
 	CHECK_FD(fd);
 	CHECK_SOCK_IO(fd_table.w32_ios[fd]);
 	return socketio_setsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
 }
 
-int 
+int
 w32_getsockopt(int fd, int level, int optname, char* optval, int* optlen) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -201,7 +201,7 @@ w32_getsockopt(int fd, int level, int optname, char* optval, int* optlen) {
 	return socketio_getsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
 }
 
-int 
+int
 w32_getsockname(int fd, struct sockaddr* name, int* namelen) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -209,7 +209,7 @@ w32_getsockname(int fd, struct sockaddr* name, int* namelen) {
 	return socketio_getsockname(fd_table.w32_ios[fd], name, namelen);
 }
 
-int 
+int
 w32_getpeername(int fd, struct sockaddr* name, int* namelen) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -217,7 +217,7 @@ w32_getpeername(int fd, struct sockaddr* name, int* namelen) {
 	return socketio_getpeername(fd_table.w32_ios[fd], name, namelen);
 }
 
-int 
+int
 w32_listen(int fd, int backlog) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -225,7 +225,7 @@ w32_listen(int fd, int backlog) {
 	return socketio_listen(fd_table.w32_ios[fd], backlog);
 }
 
-int 
+int
 w32_bind(int fd, const struct sockaddr *name, int namelen) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -233,7 +233,7 @@ w32_bind(int fd, const struct sockaddr *name, int namelen) {
 	return socketio_bind(fd_table.w32_ios[fd], name, namelen);
 }
 
-int 
+int
 w32_connect(int fd, const struct sockaddr* name, int namelen) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -241,7 +241,7 @@ w32_connect(int fd, const struct sockaddr* name, int namelen) {
 	return socketio_connect(fd_table.w32_ios[fd], name, namelen);
 }
 
-int 
+int
 w32_recv(int fd, void *buf, size_t len, int flags) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -249,7 +249,7 @@ w32_recv(int fd, void *buf, size_t len, int flags) {
 	return socketio_recv(fd_table.w32_ios[fd], buf, len, flags);
 }
 
-int 
+int
 w32_send(int fd, const void *buf, size_t len, int flags) {
 	debug3("fd:%d", fd);
 	CHECK_FD(fd);
@@ -257,7 +257,7 @@ w32_send(int fd, const void *buf, size_t len, int flags) {
 }
 
 
-int 
+int
 w32_shutdown(int fd, int how) {
 	debug3("fd:%d how:%d", fd, how);
 	CHECK_FD(fd);
@@ -266,8 +266,8 @@ w32_shutdown(int fd, int how) {
 }
 
 
-int 
-w32_pipe(int *pfds){
+int
+w32_pipe(int *pfds) {
 	int read_index, write_index;
 	struct w32_io* pio[2];
 
@@ -297,15 +297,15 @@ w32_pipe(int *pfds){
 	return 0;
 }
 
-int 
+int
 w32_open(const char *pathname, int flags, ...) {
 	int min_index = fd_table_get_min_index();
 	struct w32_io* pio;
-    
+
 	errno = 0;
 	if (min_index == -1)
 		return -1;
-    
+
 	pio = fileio_open(pathname, flags, 0);
 	if (pio == NULL)
 		return -1;
@@ -316,7 +316,7 @@ w32_open(const char *pathname, int flags, ...) {
 	return min_index;
 }
 
-int 
+int
 w32_read(int fd, void *dst, unsigned int max) {
 	CHECK_FD(fd);
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
@@ -324,7 +324,7 @@ w32_read(int fd, void *dst, unsigned int max) {
 	return fileio_read(fd_table.w32_ios[fd], dst, max);
 }
 
-int 
+int
 w32_write(int fd, const void *buf, unsigned int max) {
 	CHECK_FD(fd);
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
@@ -332,52 +332,52 @@ w32_write(int fd, const void *buf, unsigned int max) {
 	return fileio_write(fd_table.w32_ios[fd], buf, max);
 }
 
-int 
+int
 w32_fstat(int fd, struct stat *buf) {
 	CHECK_FD(fd);
 	return fileio_fstat(fd_table.w32_ios[fd], buf);
 }
 
-int 
+int
 w32_isatty(int fd) {
 	CHECK_FD(fd);
 	return fileio_isatty(fd_table.w32_ios[fd]);
 }
 
-FILE* 
+FILE*
 w32_fdopen(int fd, const char *mode) {
-	errno = 0;                                                              
+	errno = 0;
 	if ((fd < 0) || (fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
-		errno = EBADF;                                                     
-		debug("bad fd: %d", fd);                                           
-		return NULL; 
-	}                                                                       
+		errno = EBADF;
+		debug("bad fd: %d", fd);
+		return NULL;
+	}
 	return fileio_fdopen(fd_table.w32_ios[fd], mode);
 }
 
-int 
+int
 w32_close(int fd) {
 	struct w32_io* pio;
 
 	CHECK_FD(fd);
 	pio = fd_table.w32_ios[fd];
-    
+
 	debug("io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd, pio->table_index);
 	fd_table_clear(pio->table_index);
-	if ((pio->type == SOCK_FD)) 
+	if ((pio->type == SOCK_FD))
 		return socketio_close(pio);
 	else
 		return fileio_close(pio);
 }
 
-int 
+int
 w32_fcntl(int fd, int cmd, ... /* arg */) {
 	va_list valist;
 	va_start(valist, cmd);
 
 	CHECK_FD(fd);
 
-	switch (cmd){
+	switch (cmd) {
 	case F_GETFL:
 		return fd_table.w32_ios[fd]->fd_status_flags;
 	case F_SETFL:
@@ -393,10 +393,10 @@ w32_fcntl(int fd, int cmd, ... /* arg */) {
 		errno = EINVAL;
 		debug("ERROR: cmd:%d", cmd);
 		return -1;
-    }
+	}
 }
 
-int 
+int
 w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const struct timeval *timeout) {
 	ULONGLONG ticks_start = GetTickCount64(), ticks_now;
 	fd_set read_ready_fds, write_ready_fds;
@@ -409,7 +409,7 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 	memset(&read_ready_fds, 0, sizeof(fd_set));
 	memset(&write_ready_fds, 0, sizeof(fd_set));
 
-	if (fds > MAX_FDS ) {
+	if (fds > MAX_FDS) {
 		errno = EINVAL;
 		debug("ERROR: fds: %d", fds);
 		return -1;
@@ -428,7 +428,7 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 	}
 
 	if (readfds) {
-		for (i = 0; i < fds; i++) 
+		for (i = 0; i < fds; i++)
 			if (FD_ISSET(i, readfds)) {
 				CHECK_FD(i);
 				in_set_fds++;
@@ -436,7 +436,7 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 	}
 
 	if (writefds) {
-		for (i = 0; i < fds; i++) 
+		for (i = 0; i < fds; i++)
 			if (FD_ISSET(i, writefds)) {
 				CHECK_FD(i);
 				in_set_fds++;
@@ -472,7 +472,7 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 	}
 
 	//excute any scheduled APCs
-	if (0 != wait_for_any_event(NULL, 0, 0)) 
+	if (0 != wait_for_any_event(NULL, 0, 0))
 		return -1;
 
 	//see if any io is ready
@@ -487,8 +487,8 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 
 		if (writefds && FD_ISSET(i, writefds)) {
 			if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
-			FD_SET(i, &write_ready_fds);
-			out_ready_fds++;
+				FD_SET(i, &write_ready_fds);
+				out_ready_fds++;
 			}
 		}
 	}
@@ -502,7 +502,7 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 		debug2("IO ready:%d, no wait", out_ready_fds);
 		return out_ready_fds;
 	}
-    
+
 	do {
 		ticks_now = GetTickCount64();
 		if (time_milliseconds < (ticks_now - ticks_start)) {
@@ -510,8 +510,8 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 			debug("select timing out");
 			return -1;
 		}
-            
-		if (0 != wait_for_any_event(events, num_events, time_milliseconds - ((ticks_now - ticks_start) & 0xffffffff))) 
+
+		if (0 != wait_for_any_event(events, num_events, time_milliseconds - ((ticks_now - ticks_start) & 0xffffffff)))
 			return -1;
 
 		//check on fd status
@@ -546,13 +546,13 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 		*readfds = read_ready_fds;
 	if (writefds)
 		*writefds = write_ready_fds;
-    
+
 	return out_ready_fds;
- 
+
 }
 
 
-int 
+int
 w32_dup(int oldfd) {
 	CHECK_FD(oldfd);
 	errno = EOPNOTSUPP;
@@ -560,7 +560,7 @@ w32_dup(int oldfd) {
 	return -1;
 }
 
-int 
+int
 w32_dup2(int oldfd, int newfd) {
 	CHECK_FD(oldfd);
 	errno = EOPNOTSUPP;
