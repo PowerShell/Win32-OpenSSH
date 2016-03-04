@@ -271,6 +271,13 @@ w32_shutdown(int fd, int how) {
 	return socketio_shutdown(fd_table.w32_ios[fd], how);
 }
 
+int 
+w32_socketpair(int domain, int type, int sv[2]) {
+	errno = ENOTSUP;
+	debug("ERROR:%d", errno);
+	return -1;
+}
+
 
 int
 w32_pipe(int *pfds) {

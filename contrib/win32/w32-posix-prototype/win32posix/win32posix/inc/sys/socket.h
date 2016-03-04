@@ -18,3 +18,4 @@
 #define recv w32_recv
 #define send w32_send
 #define shutdown w32_shutdown
+#define socketpair w32_socketpair
