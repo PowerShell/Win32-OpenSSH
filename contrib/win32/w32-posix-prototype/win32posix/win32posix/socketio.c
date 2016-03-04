@@ -52,6 +52,7 @@ struct acceptEx_context {
 	char lpOutputBuf[1024];
 	SOCKET accept_socket;
 	LPFN_ACCEPTEX lpfnAcceptEx;
+	LPFN_GETACCEPTEXSOCKADDRS lpfnGuidGetAcceptExSockaddrs;
 	DWORD bytes_received;
 };
 
@@ -63,6 +64,7 @@ socketio_acceptEx(struct w32_io* pio) {
 	debug2("io:%p", pio);
 	if (pio->internal.context == NULL) {
 		GUID GuidAcceptEx = WSAID_ACCEPTEX;
+		GUID GuidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
 		DWORD dwBytes;
 
 		context = 
@@ -84,6 +86,20 @@ socketio_acceptEx(struct w32_io* pio) {
 			debug("ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
+
+		if (SOCKET_ERROR == WSAIoctl(pio->sock,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			&GuidGetAcceptExSockaddrs, sizeof(GuidGetAcceptExSockaddrs),
+			&context->lpfnGuidGetAcceptExSockaddrs, sizeof(context->lpfnGuidGetAcceptExSockaddrs),
+			&dwBytes, NULL, NULL))
+		{
+			free(context);
+			errno = errno_from_WSALastError();
+			debug("ERROR:%d, io:%p", errno, pio);
+			return -1;
+		}
+
+
 
 		context->accept_socket = INVALID_SOCKET;
 		pio->internal.context = context;
@@ -114,8 +130,8 @@ socketio_acceptEx(struct w32_io* pio) {
 		context->accept_socket,
 		context->lpOutputBuf,
 		0,
-		sizeof(struct sockaddr_in6) + 16,
-		sizeof(struct sockaddr_in6) + 16,
+		sizeof(SOCKADDR_STORAGE) + 16,
+		sizeof(SOCKADDR_STORAGE) + 16,
 		&context->bytes_received,
 		&pio->read_overlapped))
 	{
@@ -616,6 +632,8 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
 	struct w32_io *accept_io = NULL;
 	int iResult = 0;
 	struct acceptEx_context* context;
+	struct sockaddr *local_address,*remote_address;
+	int local_address_len, remote_address_len;
 
 	debug2("io:%p", pio);
 	/* start io if not already started */
@@ -676,7 +694,16 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
 	context->accept_socket = INVALID_SOCKET;
 	debug2("accept io:%p", accept_io);
 
-	/* TODO : fill in addr */
+	if ((addr != NULL) && (addrlen != NULL)) {
+		context->lpfnGuidGetAcceptExSockaddrs(context->lpOutputBuf, 0,
+			sizeof(SOCKADDR_STORAGE) + 16,
+			sizeof(SOCKADDR_STORAGE) + 16, &local_address,
+			&local_address_len, &remote_address, &remote_address_len);
+		if (remote_address_len) {
+			memcpy(addr, remote_address, remote_address_len);
+			addrlen = remote_address_len;
+		}
+	}
 	return accept_io;
 
 on_error:
