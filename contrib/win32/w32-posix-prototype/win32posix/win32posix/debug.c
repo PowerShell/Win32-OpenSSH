@@ -1,3 +1,7 @@
+/*
+* Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
+*/
+
 #include <Windows.h>
 #include <stdarg.h>
 #include <stdio.h>

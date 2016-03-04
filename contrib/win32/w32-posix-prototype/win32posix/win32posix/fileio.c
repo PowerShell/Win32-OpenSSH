@@ -1,3 +1,7 @@
+/*
+* Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
+*/
+
 #define __STDC__ 1
 #include <fcntl.h>
 #include <sys/stat.h>
