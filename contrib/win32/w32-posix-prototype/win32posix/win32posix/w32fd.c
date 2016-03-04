@@ -229,7 +229,6 @@ int w32_recv(int fd, void *buf, size_t len, int flags) {
 int w32_send(int fd, const void *buf, size_t len, int flags) {
     debug3("fd:%d", fd);
     CHECK_FD(fd);
-    CHECK_SOCK_IO(fd_table.w32_ios[fd]);
     return socketio_send(fd_table.w32_ios[fd], buf, len, flags);
 }
 

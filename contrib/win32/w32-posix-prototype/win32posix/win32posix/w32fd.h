@@ -21,6 +21,11 @@ enum w32_io_sock_state {
     SOCK_CONNECTED = 4
 };
 
+enum w32_io_pipe_state {
+    PIPE_READ_END = 1,
+    PIPE_WRITE_END = 2
+};
+
 struct w32_io {
 	OVERLAPPED read_overlapped;
     OVERLAPPED write_overlapped;

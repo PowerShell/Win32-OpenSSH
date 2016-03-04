@@ -91,7 +91,9 @@ int fileio_pipe(struct w32_io* pio[2]) {
     memset(pio_write, 0, sizeof(struct w32_io));
 
     pio_read->handle = read_handle;
+    pio_read->internal.state = PIPE_READ_END;
     pio_write->handle = write_handle;
+    pio_write->internal.state = PIPE_WRITE_END;
 
     pio[0] = pio_read;
     pio[1] = pio_write;
@@ -269,6 +271,11 @@ int fileio_ReadFileEx(struct w32_io* pio) {
 int fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
     int bytes_copied;
 
+    if ((pio->type == PIPE_FD) && (pio->internal.state == PIPE_WRITE_END)) {
+        errno = EBADF;
+        return -1;
+    }
+
     //if read is pending 
     if (pio->read_details.pending) {
         errno = EAGAIN;
@@ -342,6 +349,11 @@ VOID CALLBACK WriteCompletionRoutine(
 #define WRITE_BUFFER_SIZE 100*1024
 int fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
     int bytes_copied;
+
+    if ((pio->type == PIPE_FD) && (pio->internal.state == PIPE_READ_END)) {
+        errno = EBADF;
+        return -1;
+    }
 
     if (pio->write_details.pending) {
         if (w32_io_is_blocking(pio))
@@ -431,7 +443,7 @@ int fileio_fstat(struct w32_io* pio, struct stat *buf) {
 
 
 int fileio_isatty(struct w32_io* pio) {
-    return (pio->type == CONSOLE_FD) ? TRUE : FALSE;
+    return (GetFileType(pio->handle) == FILE_TYPE_CHAR) ? TRUE : FALSE;
 }
 
 
@@ -481,6 +493,7 @@ int fileio_on_select(struct w32_io* pio, BOOL rd) {
     if (!pio->read_details.pending && !fileio_is_io_available(pio, rd))
         return fileio_ReadFileEx(pio);
     
+    return 0;
 }
 
 
@@ -489,7 +502,8 @@ int fileio_close(struct w32_io* pio) {
     CancelIo(pio->handle);
     //let queued APCs (if any) drain
     SleepEx(0, TRUE);
-    CloseHandle(pio->handle);
+    if (pio->type != STD_IO_FD) //STD handles are never explicitly closed
+        CloseHandle(pio->handle);
 
     if (pio->read_details.buf)
         free(pio->read_details.buf);
