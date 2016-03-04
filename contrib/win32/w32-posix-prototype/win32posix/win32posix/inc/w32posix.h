@@ -1,3 +1,8 @@
+/*
+* Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
+*
+* Win32 renamed POSIX APIs
+*/
 #pragma once
 
 #include <WinSock2.h>
