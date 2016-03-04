@@ -46,7 +46,8 @@ FILE* w32_fdopen(int fd, const char *mode);
 
 /*common i/o*/
 int w32_close(int fd);
-int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const struct timeval *timeout);
+int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, 
+	const struct timeval *timeout);
 int w32_fcntl(int fd, int cmd, ... /* arg */);
 int w32_dup(int oldfd);
 int w32_dup2(int oldfd, int newfd);

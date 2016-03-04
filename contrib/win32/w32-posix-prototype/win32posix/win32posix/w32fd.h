@@ -32,7 +32,8 @@ enum w32_io_pipe_state {
 };
 
 /*
-* This sturcture encapsulates the state info needed to map a File Descriptor to Win32 Handle
+* This sturcture encapsulates the state info needed to map a File Descriptor 
+* to Win32 Handle
 */
 struct w32_io {
 	OVERLAPPED read_overlapped;
@@ -41,22 +42,27 @@ struct w32_io {
 		/*internal read buffer*/
 		char *buf;
 		DWORD buf_size;
-		DWORD remaining;	/*bytes in internal buffer remaining to be read by application*/
-		DWORD completed;	/*bytes in internal buffer already read by application*/
-		BOOL pending;		/*waiting on a read operation to complete*/
-		DWORD error;		/*error reported on async read or accept completion*/
+		/*bytes in internal buffer remaining to be read by application*/
+		DWORD remaining;
+		/*bytes in internal buffer already read by application*/
+		DWORD completed; 
+		BOOL pending;	 /*waiting on a read operation to complete*/
+		DWORD error;	 /*error reported on async read or accept completion*/
 	}read_details;
 	struct {
 		/*internal write buffer*/
 		char *buf;
 		DWORD buf_size;
-		DWORD remaining;	/*bytes in internal buffer remaining to be written to network*/
-		DWORD completed;	/*bytes in internal buffer already written to network*/
-		BOOL pending;		/*waiting on a write operation to complete*/
-		DWORD error;		/*error reported on async write or connect completion*/
+		/*bytes in internal buffer remaining to be written to network*/
+		DWORD remaining;
+		/*bytes in internal buffer already written to network*/
+		DWORD completed; 
+		BOOL pending;	 /*waiting on a write operation to complete*/
+		DWORD error;	 /*error reported on async write or connect completion*/
 	}write_details;
-
-	int table_index;		/*index at which this object is stored in fd_table*/
+	
+	/*index at which this object is stored in fd_table*/
+	int table_index;		
 	enum w32_io_type type;		/*hanldle type*/
 	DWORD fd_flags;			/*fd flags from POSIX*/
 	DWORD fd_status_flags;		/*fd status flags from POSIX*/
@@ -74,16 +80,8 @@ struct w32_io {
 	}internal;
 };
 
-/* Check if the corresponding fd is set blocking */
 BOOL w32_io_is_blocking(struct w32_io*);
-/* 
- * Check if io is ready/available. This function is primarily used by select() as it decides on what fds can be set.
- */
 BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd);
-
-/*
- * Main wait routine used by all blocking calls. It wakes up on IO completions, timers, timeouts and signals.
- */
 int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds);
 
 /*POSIX mimic'ing socket API*/
@@ -93,8 +91,10 @@ BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd);
 int socketio_on_select(struct w32_io* pio, BOOL rd);
 struct w32_io* socketio_socket(int domain, int type, int protocol);
 struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen);
-int socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optval, int optlen);
-int socketio_getsockopt(struct w32_io* pio, int level, int optname, char* optval, int* optlen);
+int socketio_setsockopt(struct w32_io* pio, int level, int optname, 
+	const char* optval, int optlen);
+int socketio_getsockopt(struct w32_io* pio, int level, int optname, 
+	char* optval, int* optlen);
 int socketio_getsockname(struct w32_io* pio, struct sockaddr* name, int* namelen);
 int socketio_getpeername(struct w32_io* pio, struct sockaddr* name, int* namelen);
 int socketio_listen(struct w32_io* pio, int backlog);
@@ -104,7 +104,6 @@ int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags);
 int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags);
 int socketio_shutdown(struct w32_io* pio, int how);
 int socketio_close(struct w32_io* pio);
-
 
 /*POSIX mimic'ing file API*/
 BOOL fileio_is_io_available(struct w32_io* pio, BOOL rd);

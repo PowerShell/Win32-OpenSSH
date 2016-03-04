@@ -22,7 +22,6 @@ static struct w32fd_table fd_table;
 /* static table entries representing std in, out and error*/
 static struct w32_io w32_io_stdin, w32_io_stdout, w32_io_stderr;
 
-/* maps pio to fd (specified by index)*/
 void fd_table_set(struct w32_io* pio, int index);
 
 #pragma warning(disable:4312)
@@ -73,6 +72,7 @@ fd_table_get_min_index() {
 	return min_index;
 }
 
+/* maps pio to fd (specified by index)*/
 static void
 fd_table_set(struct w32_io* pio, int index) {
 	fd_table.w32_ios[index] = pio;
@@ -81,6 +81,7 @@ fd_table_set(struct w32_io* pio, int index) {
 	FD_SET(index, &(fd_table.occupied));
 }
 
+/* removes entry at index from mapping table*/
 static void
 fd_table_clear(int index)
 {
@@ -92,8 +93,8 @@ fd_table_clear(int index)
 void
 w32posix_initialize() {
 	if ((debug_initialize() != 0)
-		|| (fd_table_initialize() != 0)
-		|| (socketio_initialize() != 0))
+	    || (fd_table_initialize() != 0)
+	    || (socketio_initialize() != 0))
 		abort();
 }
 
@@ -103,12 +104,17 @@ w32posix_done() {
 	socketio_done();
 }
 
+/* Check if the corresponding fd is set blocking */
 BOOL
 w32_io_is_blocking(struct w32_io* pio)
 {
 	return (pio->fd_status_flags & O_NONBLOCK) ? FALSE : TRUE;
 }
 
+/*
+* Check if io is ready/available. This function is primarily used by select() 
+* as it decides on what fds can be set.
+*/
 BOOL
 w32_io_is_io_available(struct w32_io* pio, BOOL rd) {
 	if (pio->type == SOCK_FD)
@@ -362,7 +368,8 @@ w32_close(int fd) {
 	CHECK_FD(fd);
 	pio = fd_table.w32_ios[fd];
 
-	debug("io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd, pio->table_index);
+	debug("io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd, 
+	    pio->table_index);
 	fd_table_clear(pio->table_index);
 	if ((pio->type == SOCK_FD))
 		return socketio_close(pio);
@@ -397,7 +404,8 @@ w32_fcntl(int fd, int cmd, ... /* arg */) {
 }
 
 int
-w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const struct timeval *timeout) {
+w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, 
+    const struct timeval *timeout) {
 	ULONGLONG ticks_start = GetTickCount64(), ticks_now;
 	fd_set read_ready_fds, write_ready_fds;
 	HANDLE events[32];
@@ -443,7 +451,7 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 			}
 	}
 
-	//if none of input fds are set return error
+	/* if none of input fds are set return error */
 	if (in_set_fds == 0) {
 		errno = EINVAL;
 		debug("ERROR: empty fd_sets");
@@ -451,13 +459,17 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 	}
 
 	debug2("Total in fds:%d", in_set_fds);
-	//start async io on selected fds if needed and pick up any events that select needs to listen on
+	/*
+	 * start async io on selected fds if needed and pick up any events 
+	 * that select needs to listen on
+	 */
 	for (int i = 0; i < fds; i++) {
 
 		if (readfds && FD_ISSET(i, readfds)) {
 			if (w32_io_on_select(fd_table.w32_ios[i], TRUE) == -1)
 				return -1;
-			if ((fd_table.w32_ios[i]->type == SOCK_FD) && (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
+			if ((fd_table.w32_ios[i]->type == SOCK_FD) 
+			    && (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
 				events[num_events++] = fd_table.w32_ios[i]->read_overlapped.hEvent;
 			}
 		}
@@ -465,17 +477,18 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 		if (writefds && FD_ISSET(i, writefds)) {
 			if (w32_io_on_select(fd_table.w32_ios[i], FALSE) == -1)
 				return -1;
-			if ((fd_table.w32_ios[i]->type == SOCK_FD) && (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
+			if ((fd_table.w32_ios[i]->type == SOCK_FD) 
+			    && (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
 				events[num_events++] = fd_table.w32_ios[i]->write_overlapped.hEvent;
 			}
 		}
 	}
 
-	//excute any scheduled APCs
+	/* excute any scheduled APCs */
 	if (0 != wait_for_any_event(NULL, 0, 0))
 		return -1;
 
-	//see if any io is ready
+	/* see if any io is ready */
 	for (i = 0; i < fds; i++) {
 
 		if (readfds && FD_ISSET(i, readfds)) {
@@ -493,7 +506,7 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 		}
 	}
 
-	//if io on some fds is already ready, return
+	/* if io on some fds is already ready, return */
 	if (out_ready_fds) {
 		if (readfds)
 			*readfds = read_ready_fds;
@@ -511,10 +524,11 @@ w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, const 
 			return -1;
 		}
 
-		if (0 != wait_for_any_event(events, num_events, time_milliseconds - ((ticks_now - ticks_start) & 0xffffffff)))
+		if (0 != wait_for_any_event(events, num_events, 
+			time_milliseconds - ((ticks_now - ticks_start) & 0xffffffff)))
 			return -1;
 
-		//check on fd status
+		/* check on fd status */
 		out_ready_fds = 0;
 		for (int i = 0; i < fds; i++) {
 

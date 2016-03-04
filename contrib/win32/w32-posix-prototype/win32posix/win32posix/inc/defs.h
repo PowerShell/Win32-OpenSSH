@@ -21,26 +21,32 @@
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
-//fcntl commands
+/*fcntl commands*/
 #define F_GETFL 0x1
 #define F_SETFL 0x2
 #define F_GETFD 0x4
 #define F_SETFD 0x8
 
-//fd flags
+/*fd flags*/
 #define FD_CLOEXEC 0x1
 
 
-//open access modes. only one of these can be specified
+/*open access modes. only one of these can be specified*/
 #define O_RDONLY    0x1
 #define O_WRONLY    0x2
 #define O_RDWR      0x4
-//open file creation and file status flags // can be bitwise-or'd
-#define O_NONBLOCK  0x10    //io operations wont block
-#define O_APPEND    0x20    //file is opened in append mode
-#define O_CREAT     0x40    //If the file does not exist it will be created
-#define O_TRUNC     0x80    //If the file exists and is a regular file, and the file is successfully opened O_RDWR or O_WRONLY, its length shall be truncated to 0, and the mode and owner shall be unchanged
-#define O_EXCL      0x100   //If O_CREAT and O_EXCL are set, open() shall fail if the file exists
+/*open file creation and file status flags // can be bitwise-or'd*/
+#define O_NONBLOCK  0x10    /*io operations wont block*/
+#define O_APPEND    0x20    /*file is opened in append mode*/
+#define O_CREAT     0x40    /*If the file does not exist it will be created*/
+/* 
+ * If the file exists and is a regular file, and the file is successfully 
+ * opened O_RDWR or O_WRONLY, its length shall be truncated to 0, and the mode 
+ * and owner shall be unchanged
+ */
+#define O_TRUNC     0x80    
+ //If O_CREAT and O_EXCL are set, open() shall fail if the file exists
+#define O_EXCL      0x100   
 #define O_BINARY    0x200   //Gives raw data (while O_TEXT normalises line endings
 // open modes
 #define S_IRUSR     00400   //user has read permission 
