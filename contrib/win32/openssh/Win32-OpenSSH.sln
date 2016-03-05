@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssh", "ssh.vcxproj", "{74E69D5E-A1EF-46EA-9173-19A412774104}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -109,6 +109,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scp", "scp.vcxproj", "{29B9
 		{DD483F7D-C553-4740-BC1A-903805AD0174} = {DD483F7D-C553-4740-BC1A-903805AD0174}
 		{8660C2FE-9874-432D-B047-E042BB41DBE0} = {8660C2FE-9874-432D-B047-E042BB41DBE0}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "win32compatUnittests", "win32compatUnittests.vcxproj", "{780CAFE4-4BC5-407B-B3A6-71C4114826A7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -246,6 +248,14 @@ Global
 		{29B98ADF-1285-49CE-BF6C-AA92C5D2FB24}.Release|x64.Build.0 = Release|x64
 		{29B98ADF-1285-49CE-BF6C-AA92C5D2FB24}.Release|x86.ActiveCfg = Release|Win32
 		{29B98ADF-1285-49CE-BF6C-AA92C5D2FB24}.Release|x86.Build.0 = Release|Win32
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Debug|x64.ActiveCfg = Debug|x64
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Debug|x64.Build.0 = Debug|x64
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Debug|x86.ActiveCfg = Debug|Win32
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Debug|x86.Build.0 = Debug|Win32
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Release|x64.ActiveCfg = Release|x64
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Release|x64.Build.0 = Release|x64
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Release|x86.ActiveCfg = Release|Win32
+		{780CAFE4-4BC5-407B-B3A6-71C4114826A7}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

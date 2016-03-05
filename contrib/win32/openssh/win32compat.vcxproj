@@ -152,6 +152,10 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\pwd.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\sfds.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\socket.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\socketio.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\fileio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\startupneeds.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\strcasecmp.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\stringhelp.c" />
@@ -178,6 +182,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsalogon.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsastring.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\sfds.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\stringhelp.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.h" />
