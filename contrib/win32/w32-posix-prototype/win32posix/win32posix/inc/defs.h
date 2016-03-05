@@ -7,7 +7,6 @@
 
 #include <memory.h>
 
-#define fd_set w32_fd_set
 #undef FD_ZERO
 #define FD_ZERO(set) (memset( (set), 0, sizeof(w32_fd_set)))
 #undef FD_SET

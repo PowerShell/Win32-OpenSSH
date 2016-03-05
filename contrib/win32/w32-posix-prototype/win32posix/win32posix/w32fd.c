@@ -411,18 +411,18 @@ w32_fcntl(int fd, int cmd, ... /* arg */) {
 }
 
 int
-w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, 
+w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
     const struct timeval *timeout) {
 	ULONGLONG ticks_start = GetTickCount64(), ticks_now;
-	fd_set read_ready_fds, write_ready_fds;
+	w32_fd_set read_ready_fds, write_ready_fds;
 	HANDLE events[32];
 	int num_events = 0;
 	int in_set_fds = 0, out_ready_fds = 0, i;
 	unsigned int time_milliseconds = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
 
 	errno = 0;
-	memset(&read_ready_fds, 0, sizeof(fd_set));
-	memset(&write_ready_fds, 0, sizeof(fd_set));
+	memset(&read_ready_fds, 0, sizeof(w32_fd_set));
+	memset(&write_ready_fds, 0, sizeof(w32_fd_set));
 
 	if (fds > MAX_FDS) {
 		errno = EINVAL;

@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include "defs.h"
 
-//File Descriptor definitions
-#define MAX_FDS 128 //a 2^n number
+/* total fds that can be allotted */
+#define MAX_FDS 256  /* a 2^n number */
 
 typedef struct w32_fd_set_ {
 	unsigned char bitmap[MAX_FDS >> 3];
@@ -50,7 +50,7 @@ FILE* w32_fdopen(int fd, const char *mode);
 /*common i/o*/
 #define fcntl w32_fcntl
 int w32_close(int fd);
-int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, 
+int w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
 	const struct timeval *timeout);
 int w32_fcntl(int fd, int cmd, ... /* arg */);
 int w32_dup(int oldfd);
