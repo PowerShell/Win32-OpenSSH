@@ -701,7 +701,7 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
 			&local_address_len, &remote_address, &remote_address_len);
 		if (remote_address_len) {
 			memcpy(addr, remote_address, remote_address_len);
-			addrlen = remote_address_len;
+			*addrlen = remote_address_len;
 		}
 	}
 	return accept_io;
