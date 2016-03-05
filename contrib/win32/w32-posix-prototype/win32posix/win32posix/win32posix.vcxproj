@@ -153,6 +153,7 @@
   <ItemGroup>
     <ClInclude Include="debug.h" />
     <ClInclude Include="inc\defs.h" />
+    <ClInclude Include="inc\signal.h" />
     <ClInclude Include="inc\sys\select.h" />
     <ClInclude Include="inc\sys\socket.h" />
     <ClInclude Include="inc\unistd.h" />

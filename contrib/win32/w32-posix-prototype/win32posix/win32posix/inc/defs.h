@@ -43,7 +43,9 @@
 /* #define O_RDWR      0x2 */
 /* open file creation and file status flags can be bitwise-or'd*/
 /* #define O_APPEND    0x8    /*file is opened in append mode*/
-#define O_NONBLOCK  0x10    /*io operations wont block*/
+#ifndef O_NONBLOCK
+#define O_NONBLOCK  0x0004    /*io operations wont block*/
+#endif
 /* #define O_CREAT     0x100   /*If the file does not exist it will be created*/
 /* 
  * If the file exists and is a regular file, and the file is successfully 
@@ -55,7 +57,15 @@
 /* #define O_EXCL      0x400   */  
 /* #define O_BINARY    0x8000   //Gives raw data (while O_TEXT normalises line endings */
 // open modes
+#ifndef  S_IRUSR
 #define S_IRUSR     00400   //user has read permission 
+#endif // ! S_IRUSR
+#ifndef S_IWUSR
 #define S_IWUSR     00200   //user has write permission 
+#endif
+#ifndef S_IRGRP
 #define S_IRGRP     00040   //group has read permission 
+#endif
+#ifndef S_IROTH
 #define S_IROTH     00004   //others have read permission
+#endif

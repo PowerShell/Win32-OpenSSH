@@ -59,5 +59,8 @@
     <ClInclude Include="inc\sys\select.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
+    <ClInclude Include="inc\signal.h">
+      <Filter>inc</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
