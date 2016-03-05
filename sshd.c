@@ -2750,8 +2750,10 @@ main(int ac, char **av)
 
 	/* Chdir to the root directory so that the current disk can be
 	   unmounted if desired. */
+	#ifndef WIN32_FIXME
 	if (chdir("/") == -1)
 		error("chdir(\"/\"): %s", strerror(errno));
+	#endif
 
 	/* ignore SIGPIPE */
 	signal(SIGPIPE, SIG_IGN);

@@ -346,6 +346,10 @@ local_do_shell(const char *args)
 static void
 local_do_ls(const char *args)
 {
+#ifdef WIN32_FIXME
+#undef _PATH_LS
+#define _PATH_LS			"dir"
+#endif
 	if (!args || !*args)
 		local_do_shell(_PATH_LS);
 	else {

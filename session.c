@@ -42,6 +42,7 @@
   #undef GSSAPI
   #undef KRB5
   #define WIN32_USER_AUTH 1
+  //#define WIN32_PRAGMA_REMCON
 #endif
 
 #include <sys/types.h>
@@ -116,6 +117,9 @@ FIXME: GFPZR: Function stat() may be undeclared.
 #include <Userenv.h>
 #include <shlobj.h>
 
+#ifdef WIN32_PRAGMA_REMCON
+#include <shlwapi.h>
+#endif
 extern char HomeDirLsaW[MAX_PATH];
 
 #endif
@@ -589,11 +593,28 @@ do_exec_no_pty(Session *s, const char *command)
   char buf[256];
   int prot_scr_width = 80;
   int prot_scr_height = 25;
+  #ifdef WIN32_PRAGMA_REMCON
+  char exec_command_str[512];
+  #endif
 
   if (!command)
   {
+	#ifndef WIN32_PRAGMA_REMCON
     exec_command = s->pw->pw_shell;
-	//exec_command = "c:\\tools\\echoit.exe"; // temp
+	#else
+	if ( PathFileExists("\\program files\\pragma\\shared files\\cmdserver.exe") )
+	 snprintf(exec_command_str, sizeof(exec_command_str),
+		"\\program files\\pragma\\shared files\\cmdserver.exe SSHD %d %d", s->row, s->col );
+	else {
+		// find base path of our executable
+		char basepath[MAX_PATH];
+		strcpy_s(basepath, MAX_PATH, __progname);
+		PathRemoveFileSpec(basepath); // get the full dir part of the name
+		snprintf(exec_command_str, sizeof(exec_command_str),
+			"%s\\cmdserver.exe SSHD %d %d", basepath,s->row, s->col);
+	}
+	exec_command = exec_command_str;
+	#endif
   }  
   else
   {
@@ -606,28 +627,42 @@ do_exec_no_pty(Session *s, const char *command)
    * Create three socket pairs for stdin, stdout and stderr 
    */
 
-  HANDLE wfdtocmd = -1;
+  #ifdef WIN32_PRAGMA_REMCON
+
   int retcode = -1;
   if ( (!s -> is_subsystem) && (s ->ttyfd != -1))
   {
-	//FreeConsole();
-	//AllocConsole();
-	MakeNewConsole();
 	prot_scr_width = s->col;
 	prot_scr_height = s->row;
 	extern HANDLE hConsole ;
 	hConsole = GetStdHandle (STD_OUTPUT_HANDLE);
 	ConSetScreenSize( s->col, s->row );
-	s->ptyfd = hConsole ; // the pty is the Windows console output handle in our Win32 port
-
-	wfdtocmd = GetStdHandle (STD_INPUT_HANDLE) ; // we use this console handle to feed input to Windows shell cmd.exe
-	sockin[1] = allocate_sfd((int)wfdtocmd); // put the std input handle in our global general handle table
-	//if (sockin[1] >= 0)
-	//	  sfd_set_to_console(sockin[1]); // mark it as Console type
-
+	socketpair(sockin);
+	s->ptyfd = sockin[1]; // hConsole; // the pty is the Windows console output handle in our Win32 port
   }
   else
 	socketpair(sockin);
+  #else
+  HANDLE wfdtocmd = -1;
+  int retcode = -1;
+  if ((!s->is_subsystem) && (s->ttyfd != -1))
+  {
+	  //FreeConsole();
+	  //AllocConsole();
+	  MakeNewConsole();
+	  prot_scr_width = s->col;
+	  prot_scr_height = s->row;
+	  extern HANDLE hConsole;
+	  hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	  ConSetScreenSize(s->col, s->row);
+	  s->ptyfd = hConsole; // the pty is the Windows console output handle in our Win32 port
+
+	  wfdtocmd = GetStdHandle(STD_INPUT_HANDLE); // we use this console handle to feed input to Windows shell cmd.exe
+	  sockin[1] = allocate_sfd((int)wfdtocmd); // put the std input handle in our global general handle table
+  }
+  else
+	  socketpair(sockin);
+  #endif
 
   socketpair(sockout);
   socketpair(sockerr);
@@ -636,12 +671,14 @@ do_exec_no_pty(Session *s, const char *command)
   debug3("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
   debug3("sockerr[0]: %d sockerr[1]: %d", sockerr[0], sockerr[1]);
 
+  #ifndef WIN32_PRAGMA_REMCON
   if ( (s -> is_subsystem) || (s ->ttyfd == -1))
 	crlf_sfd(sockin[1]);
 
   crlf_sfd(sockout[1]);
 
   if ( (s -> is_subsystem) || (s ->ttyfd == -1))
+  #endif
 	  SetHandleInformation(sfd_to_handle(sockin[1]), HANDLE_FLAG_INHERIT, 0);
 
   SetHandleInformation(sfd_to_handle(sockout[1]), HANDLE_FLAG_INHERIT, 0);
@@ -668,11 +705,16 @@ do_exec_no_pty(Session *s, const char *command)
   si.cbReserved2      = 0;
   si.lpReserved2      = 0;
 
+  #ifdef WIN32_PRAGMA_REMCON
+  if (0) {
+  #else
   if ( (!s -> is_subsystem) && (s ->ttyfd != -1) ) {
+  
 	  si.hStdInput = GetStdHandle (STD_INPUT_HANDLE) ; // shell tty interactive session gets a console input for Win32
 	  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
 	  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
 	  si.lpDesktop = NULL ; //winstadtname_w ;
+  #endif
   }
   else {
 	  si.hStdInput = (HANDLE) sfd_to_handle(sockin[0]);
@@ -804,25 +846,25 @@ do_exec_no_pty(Session *s, const char *command)
    * Get user homedir if needed.
    */
   
-  if (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
+  if (1) // (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
   {
     /*
      * If there is homedir from LSA use it.
      */
 
-    if (HomeDirLsaW[0] != '\0')
-    {
-      s -> pw -> pw_dir = HomeDirLsaW;
-    }
+    //if (HomeDirLsaW[0] != '\0')
+    //{
+      //s -> pw -> pw_dir = HomeDirLsaW;
+    //}
     
     /*
      * If not get homedir from token.
      */
     
-    else
-    {
+    //else
+    //{
       s -> pw -> pw_dir = GetHomeDirFromToken(s -> pw -> pw_name, hToken);
-    }
+    //}
   }
 
   /*
@@ -832,6 +874,16 @@ do_exec_no_pty(Session *s, const char *command)
   _wchdir(s -> pw -> pw_dir);
 
   SetEnvironmentVariableW(L"HOME", s -> pw -> pw_dir);
+  wchar_t *wstr, wchr;
+  wstr = wcschr(s->pw->pw_dir, ':');
+  if (wstr) {
+	  wchr = *(wstr + 1);
+	  *(wstr + 1) = '\0';
+	  SetEnvironmentVariableW(L"HOMEDRIVE", s->pw->pw_dir);
+	  *(wstr + 1) = wchr;
+	  SetEnvironmentVariableW(L"HOMEPATH", (wstr+1));
+  }
+
   SetEnvironmentVariableW(L"USERPROFILE", s -> pw -> pw_dir);
   
   // find the server name of the domain controller which created this token
@@ -879,6 +931,7 @@ do_exec_no_pty(Session *s, const char *command)
   
   GetUserName(name, &size);
 
+#ifndef WIN32_PRAGMA_REMCON
   if ( (!s -> is_subsystem) && (s ->ttyfd != -1)) {
 	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
 	  char *inittermseq = "\033[20h\033[?7h\0" ; // LFtoCRLF AUTOWRAPON
@@ -886,6 +939,7 @@ do_exec_no_pty(Session *s, const char *command)
 	  buffer_append(&c->input, inittermseq, strlen(inittermseq));
 	  channel_output_poll();
   }
+#endif
 
   //if (s ->ttyfd != -1) {
   	  // set the channel to tty interactive type
@@ -965,8 +1019,12 @@ do_exec_no_pty(Session *s, const char *command)
   /* 
    * We are the parent.  Close the child sides of the socket pairs. 
    */
+  #ifndef WIN32_PRAGMA_REMCON
   if ( (s -> is_subsystem) || (s ->ttyfd == -1))
 	close(sockin[0]);
+  #else
+	close(sockin[0]);
+  #endif
 
   close(sockout[0]);
   close(sockerr[0]);
@@ -2724,7 +2782,9 @@ session_pty_req(Session *s)
 	/* for SSH1 the tty modes length is not given */
 	if (!compat20)
 		n_bytes = packet_remaining();
+	#ifndef WIN32_PRAGMA_REMCON
 	tty_parse_modes(s->ttyfd, &n_bytes);
+	#endif
 
 	if (!use_privsep)
 		pty_setowner(s->pw, s->tty);
@@ -2734,7 +2794,9 @@ session_pty_req(Session *s)
 	pty_change_window_size(s->ptyfd, s->row, s->col, s->xpixel, s->ypixel);
 	#endif
 
+	#ifndef WIN32_PRAGMA_REMCON
 	packet_check_eom();
+	#endif
 	session_proctitle(s);
 	return 1;
 }

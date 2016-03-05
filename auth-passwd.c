@@ -223,8 +223,65 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
   /*
    * Identify domain or local login.
    */
-   
-  domain_UTF16 = strchr(authctxt -> user, '@') ? NULL : L".";
+
+  char *username = authctxt->user;
+
+  char *domainslash = strchr(authctxt->user, '\\');
+  if (domainslash) {
+	  // domain\username format
+	  char *domainname = authctxt->user;
+	  *domainslash = '\0';
+	  username = ++domainslash; // username is past the domain \ is the username
+
+ 	  // Convert domainname from UTF-8 to UTF-16
+	  buffer_size = MultiByteToWideChar(CP_UTF8, 0, domainname, -1, NULL, 0);
+
+	  if (buffer_size > 0)
+	  {
+		  domain_UTF16 = xmalloc(4 * buffer_size);
+	  }
+	  else
+	  {
+		  return 0;
+	  }
+
+	  if (0 == MultiByteToWideChar(CP_UTF8, 0, domainname,
+		  -1, domain_UTF16, buffer_size))
+	  {
+		  free(domain_UTF16);
+
+		  return 0;
+	  }
+  }
+  else if (domainslash = strchr(authctxt->user, '@')) {
+	  // username@domain format
+	  username = authctxt->user;
+	  *domainslash = '\0';
+	  char *domainname = ++domainslash; // domainname is past the user@
+
+								// Convert domainname from UTF-8 to UTF-16
+	  buffer_size = MultiByteToWideChar(CP_UTF8, 0, domainname, -1, NULL, 0);
+
+	  if (buffer_size > 0)
+	  {
+		  domain_UTF16 = xmalloc(4 * buffer_size);
+	  }
+	  else
+	  {
+		  return 0;
+	  }
+
+	  if (0 == MultiByteToWideChar(CP_UTF8, 0, domainname,
+		  -1, domain_UTF16, buffer_size))
+	  {
+		  free(domain_UTF16);
+
+		  return 0;
+	  }
+  }
+  else {
+	  domain_UTF16 = strchr(authctxt->user, '@') ? NULL : L".";
+  }
   
   authctxt -> methoddata = hToken;
  
@@ -237,7 +294,7 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
    * Convert username from UTF-8 to UTF-16
    */
  
-  buffer_size = MultiByteToWideChar(CP_UTF8, 0, authctxt -> user, -1, NULL, 0);
+  buffer_size = MultiByteToWideChar(CP_UTF8, 0, username, -1, NULL, 0);
 
   if (buffer_size > 0)
   {
@@ -248,7 +305,7 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
     return 0;
   }
   
-  if (0 == MultiByteToWideChar(CP_UTF8, 0, authctxt -> user,
+  if (0 == MultiByteToWideChar(CP_UTF8, 0, username,
                                    -1, user_UTF16, buffer_size))
   {
     free(user_UTF16);
@@ -296,7 +353,7 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
     HANDLE weakToken = INVALID_HANDLE_VALUE;
     
     debug3("Netork login attemp [%s][%ls]...", 
-               authctxt -> user, domain_UTF16);
+               username, domain_UTF16);
     
     worked = LogonUserW(user_UTF16, domain_UTF16, password_UTF16,
                            LOGON32_LOGON_NETWORK,
@@ -314,6 +371,7 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
   
   free(user_UTF16);
   free(password_UTF16);
+  if (domainslash) free(domain_UTF16);
   
   /*
    * If login still fails, go out.

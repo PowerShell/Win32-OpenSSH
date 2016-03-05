@@ -288,15 +288,18 @@
     <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\openssl-dh.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)openssl-bn.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\openssl-bn.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)openssl-dh.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\openssl-epoint.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\crypto-wrap.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

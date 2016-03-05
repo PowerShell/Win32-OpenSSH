@@ -6,6 +6,10 @@ struct sshdh;
 struct sshbn;
 struct sshbuf;
 struct ssh;
+struct sshedh;
+struct sshepoint;
+struct sshecurve;
+
 
 struct sshdh *sshdh_new(void);
 void sshdh_free(struct sshdh *dh);
@@ -20,6 +24,27 @@ int sshdh_generate(struct sshdh *dh, size_t len);
 int sshdh_new_group_hex(const char *gen, const char *modulus,
 struct sshdh **dhp);
 struct sshdh *sshdh_new_group(struct sshbn *gen, struct sshbn *modulus);
+
+struct sshedh *sshedh_new(void);
+void sshedh_free(struct sshdh *dh);
+struct sshepoint *sshedh_pubkey(struct sshedh *dh);
+void sshedh_dump(struct sshedh *dh);
+size_t sshedh_shared_key_size(struct sshedh *dh);
+int sshedh_compute_key(struct sshedh *dh, struct sshepoint *pubkey,
+struct sshbn **shared_secretp);
+int sshedh_generate(struct sshedh *dh, size_t len);
+struct sshedh *sshedh_new_curve(int nid);
+
+struct sshepoint * sshepoint_new(void);
+int sshepoint_from(struct sshbn * x, struct sshbn * y, struct sshecurve * sshecurve, struct sshepoint **retp);
+int sshepoint_to(struct sshepoint * pt, struct sshbn  **retx, struct sshbn **rety, struct sshecurve ** retcurve);
+void sshepoint_free(struct sshepoint * pt);
+
+struct sshecurve * sshecurve_new(void);
+void sshecurve_free(struct sshecurve * curve);
+struct sshecurve * sshecurve_new_curve(int nid);
+
+
 
 struct sshbn *sshbn_new(void);
 void sshbn_free(struct sshbn *bn);
