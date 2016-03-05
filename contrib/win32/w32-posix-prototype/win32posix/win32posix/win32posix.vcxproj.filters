@@ -50,12 +50,6 @@
     <ClInclude Include="inc\sys\socket.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
-    <ClInclude Include="inc\sys\stat.h">
-      <Filter>inc\sys</Filter>
-    </ClInclude>
-    <ClInclude Include="inc\fcntl.h">
-      <Filter>inc</Filter>
-    </ClInclude>
     <ClInclude Include="inc\w32posix.h">
       <Filter>inc</Filter>
     </ClInclude>

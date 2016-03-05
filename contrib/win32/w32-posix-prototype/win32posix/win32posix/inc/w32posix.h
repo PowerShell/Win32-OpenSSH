@@ -37,6 +37,8 @@ int w32_socketpair(int domain, int type, int sv[2]);
 
 /*non-network (file) i/o*/
 #define fdopen w32_fdopen
+#define fstat w32_fstat
+
 int w32_pipe(int *pfds);
 int w32_open(const char *pathname, int flags, ...);
 int w32_read(int fd, void *dst, unsigned int max);
@@ -46,12 +48,18 @@ int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 
 /*common i/o*/
+#define fcntl w32_fcntl
 int w32_close(int fd);
 int w32_select(int fds, fd_set* readfds, fd_set* writefds, fd_set* exceptfds, 
 	const struct timeval *timeout);
 int w32_fcntl(int fd, int cmd, ... /* arg */);
 int w32_dup(int oldfd);
 int w32_dup2(int oldfd, int newfd);
+
+/* misc */
+unsigned int w32_alarm(unsigned int seconds);
+#define signal w32_signal
+#define mysignal w32_signal
 
 
 /* Shutdown constants */

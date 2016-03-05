@@ -16,3 +16,4 @@
 #define dup2 w32_dup2
 
 #define sleep(sec) Sleep(1000 * sec)
+#define alarm w32_alarm

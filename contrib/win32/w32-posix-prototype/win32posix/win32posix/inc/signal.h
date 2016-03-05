@@ -4,6 +4,6 @@
 * POSIX header and needed function definitions
 */
 
-#include "..\w32posix.h"
+#include "w32posix.h"
 
-#define fstat w32_fstat
+#define signal w32_signal

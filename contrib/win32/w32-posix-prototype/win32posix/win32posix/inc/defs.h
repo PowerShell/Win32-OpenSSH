@@ -31,23 +31,29 @@
 #define FD_CLOEXEC 0x1
 
 
+/*
+ * open() flags and modes
+ * all commented out macros are defined in fcntl.h
+ * they are listed here so as to cross check any conflicts with macros explicitly 
+ * defined below.
+ */
 /*open access modes. only one of these can be specified*/
-#define O_RDONLY    0x1
-#define O_WRONLY    0x2
-#define O_RDWR      0x4
-/*open file creation and file status flags // can be bitwise-or'd*/
+/* #define O_RDONLY    0x0  */
+/* #define O_WRONLY    0x1 */
+/* #define O_RDWR      0x2 */
+/* open file creation and file status flags can be bitwise-or'd*/
+/* #define O_APPEND    0x8    /*file is opened in append mode*/
 #define O_NONBLOCK  0x10    /*io operations wont block*/
-#define O_APPEND    0x20    /*file is opened in append mode*/
-#define O_CREAT     0x40    /*If the file does not exist it will be created*/
+/* #define O_CREAT     0x100   /*If the file does not exist it will be created*/
 /* 
  * If the file exists and is a regular file, and the file is successfully 
  * opened O_RDWR or O_WRONLY, its length shall be truncated to 0, and the mode 
  * and owner shall be unchanged
  */
-#define O_TRUNC     0x80    
- //If O_CREAT and O_EXCL are set, open() shall fail if the file exists
-#define O_EXCL      0x100   
-#define O_BINARY    0x200   //Gives raw data (while O_TEXT normalises line endings
+/* #define O_TRUNC     0x200    */
+/* If O_CREAT and O_EXCL are set, open() shall fail if the file exists */
+/* #define O_EXCL      0x400   */  
+/* #define O_BINARY    0x8000   //Gives raw data (while O_TEXT normalises line endings */
 // open modes
 #define S_IRUSR     00400   //user has read permission 
 #define S_IWUSR     00200   //user has write permission 
