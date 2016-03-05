@@ -92,15 +92,13 @@ fd_table_clear(int index)
 
 void
 w32posix_initialize() {
-	if ((debug_initialize() != 0)
-	    || (fd_table_initialize() != 0)
+	if ( (fd_table_initialize() != 0)
 	    || (socketio_initialize() != 0))
 		abort();
 }
 
 void
 w32posix_done() {
-	debug_done();
 	socketio_done();
 }
 

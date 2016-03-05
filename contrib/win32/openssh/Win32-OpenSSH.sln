@@ -111,6 +111,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scp", "scp.vcxproj", "{29B9
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "win32compatUnittests", "win32compatUnittests.vcxproj", "{780CAFE4-4BC5-407B-B3A6-71C4114826A7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{05E1115F-8529-46D0-AAAF-52A404CE79A7} = {05E1115F-8529-46D0-AAAF-52A404CE79A7}
+		{8660C2FE-9874-432D-B047-E042BB41DBE0} = {8660C2FE-9874-432D-B047-E042BB41DBE0}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
