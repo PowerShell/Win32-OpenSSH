@@ -328,8 +328,9 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 		/* Workaround for - ReadFileEx is restting file pointer to beginning upon encoutering a EOF*/
 		/* If there was a previous read and if the file pointer is at 0, then its been reset*/
 		if ((pio->type == FILE_FD) && (pio->read_details.completed > 0)){
-			DWORD fp = SetFilePointer(pio->handle, 0, NULL, FILE_CURRENT);
-			if (fp == 0) {
+			LARGE_INTEGER to_move, new_fp;
+			to_move.QuadPart = 0;
+			if (SetFilePointerEx(pio->handle, to_move, &new_fp, FILE_CURRENT) && (new_fp.QuadPart == 0)) {
 				errno = 0;
 				return 0;
 			}
