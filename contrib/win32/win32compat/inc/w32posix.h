@@ -97,6 +97,14 @@ typedef void(*sighandler_t)(int);
  * these should move to a internal header.
  */
 int w32_temp_DelChildToWatch(HANDLE processtowatch);
+int w32_temp_AddChildToWatch(HANDLE processtowatch);
 HANDLE w32_fd_to_handle(int fd);
 int w32_allocate_fd_for_handle(HANDLE h);
+
+/* temporary definitions to aid in transition */
+#define WSHELPDelChildToWatch w32_temp_DelChildToWatch
+#define WSHELPAddChildToWatch w32_temp_AddChildToWatch
+#define sfd_to_handle w32_fd_to_handle
+#define allocate_sfd w32_allocate_fd_for_handle
+#define WSHELPwopen w32_open
 

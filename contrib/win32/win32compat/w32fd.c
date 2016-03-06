@@ -603,6 +603,10 @@ w32_temp_DelChildToWatch(HANDLE processtowatch) {
 	return 0;
 }
 
+int w32_temp_AddChildToWatch(HANDLE processtowatch) {
+    return 0;
+}
+
 HANDLE 
 w32_fd_to_handle(int fd) {
 	return fd_table.w32_ios[fd]->handle;
