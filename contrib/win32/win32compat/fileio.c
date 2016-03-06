@@ -325,6 +325,15 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 	}
 
 	if (fileio_is_io_available(pio, TRUE) == FALSE) {
+		/* Workaround for - ReadFileEx is restting file pointer to beginning upon encoutering a EOF*/
+		/* If there was a previous read and if the file pointer is at 0, then its been reset*/
+		if ((pio->type == FILE_FD) && (pio->read_details.completed > 0)){
+			DWORD fp = SetFilePointer(pio->handle, 0, NULL, FILE_CURRENT);
+			if (fp == 0) {
+				errno = 0;
+				return 0;
+			}
+		}
 		if (-1 == fileio_ReadFileEx(pio)) {
 			if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) {
 				/* write end of the pipe closed */
@@ -355,7 +364,8 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 	if (pio->read_details.error) {
 		errno = errno_from_Win32Error(pio->read_details.error);
 		/*write end of the pipe is closed or pipe broken or eof reached*/
-		if ((errno == ERROR_BROKEN_PIPE) || (errno == ERROR_HANDLE_EOF)) { 
+		if ((pio->read_details.error == ERROR_BROKEN_PIPE) || 
+			(pio->read_details.error == ERROR_HANDLE_EOF)) {
 			debug2("no more data");
 			errno = 0;
 			pio->read_details.error = 0;

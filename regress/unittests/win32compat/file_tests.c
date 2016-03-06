@@ -64,6 +64,40 @@ file_blocking_io_tests()
 	TEST_DONE();
 }
 
+void file_simple_fileio()
+{
+	char* small_write_buf = "sample payload";
+	char small_read_buf[SMALL_RECV_BUF_SIZE];
+
+	int f;
+	TEST_START("file io");
+	f = open("e:\\tmp.txt", O_WRONLY | O_CREAT | O_TRUNC);
+	ASSERT_INT_NE(f, -1);
+	close(f);
+	f = open("e:\\tmp.txt", O_RDONLY);
+	ASSERT_INT_NE(f, -1);
+	ret = read(f, small_read_buf, SMALL_RECV_BUF_SIZE);
+	ASSERT_INT_EQ(ret, 0);
+	close(f);
+	f = open("e:\\tmp.txt", O_WRONLY | O_CREAT | O_TRUNC);
+	ASSERT_INT_NE(f, -1);
+	ret = write(f, small_write_buf, strlen(small_write_buf));
+	ASSERT_INT_EQ(ret, strlen(small_write_buf));
+	close(f);
+	f = open("e:\\tmp.txt", O_RDONLY);
+	ASSERT_INT_NE(f, -1);
+	ret = read(f, small_read_buf, SMALL_RECV_BUF_SIZE);
+	ASSERT_INT_EQ(ret, strlen(small_write_buf));
+	small_read_buf[ret] = '\0';
+	ASSERT_STRING_EQ(small_write_buf, small_read_buf);
+	ret = read(f, small_read_buf, SMALL_RECV_BUF_SIZE);
+	ASSERT_INT_EQ(ret, 0);
+	close(f);
+	TEST_DONE();
+
+
+}
+
 void 
 file_nonblocking_io_tests()
 {
@@ -188,6 +222,7 @@ void
 file_tests()
 {
 	w32posix_initialize();
+	//file_simple_fileio();
 	file_blocking_io_tests();
 	file_nonblocking_io_tests();
 	file_select_tests();

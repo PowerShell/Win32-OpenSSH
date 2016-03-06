@@ -603,10 +603,7 @@ socketio_close(struct w32_io* pio) {
 			struct acceptEx_context *ctx = (struct acceptEx_context*)pio->internal.context;
 			if (ctx->accept_socket != INVALID_SOCKET)
 				closesocket(ctx->accept_socket);
-			if (ctx->lpOutputBuf)
-				free(ctx->lpOutputBuf);
-			/* TODO: check why this is crashing */
-			//free(pio->internal.context);
+			free(pio->internal.context);
 		}
 
 	}

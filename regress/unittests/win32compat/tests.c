@@ -4,6 +4,7 @@
 
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys\stat.h>
 #include <io.h>
 #include "test_helper.h"
 
@@ -17,9 +18,9 @@ void tests(void)
 {
     _set_abort_behavior(0, 1);
     log_init(NULL, 7, 2, 0);
-    logfd = _open("unittests.log", O_WRONLY | O_CREAT );
+    logfd = _open("unittests.log", _O_WRONLY | _O_CREAT | _O_TRUNC, S_IREAD | S_IWRITE | _O_NOINHERIT);
     socket_tests();
     file_tests();
-    _close(logfd);
+    if (logfd > 0) _close(logfd);
     return;
 }
