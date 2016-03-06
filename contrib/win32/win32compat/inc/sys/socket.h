@@ -17,6 +17,6 @@
 #define bind(a,b,c)		w32_bind((a), (b), (c))
 #define connect(a,b,c)		w32_connect((a), (b), (c))
 #define recv(a,b,c,d)		w32_recv((a), (b), (c), (d))
-#define send(a,b,c,d)		w32_send(((a), (b), (c), (d))
+#define send(a,b,c,d)		w32_send((a), (b), (c), (d))
 #define shutdown(a,b)		w32_shutdown((a), (b))
 #define socketpair(a,b,c)	w32_socketpair((a), (b), (c))
