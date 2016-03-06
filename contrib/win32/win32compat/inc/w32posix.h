@@ -58,6 +58,7 @@ int w32_dup2(int oldfd, int newfd);
 
 /* misc */
 unsigned int w32_alarm(unsigned int seconds);
+typedef void(*sighandler_t)(int);
 #define signal w32_signal
 #define mysignal w32_signal
 
@@ -88,4 +89,14 @@ unsigned int w32_alarm(unsigned int seconds);
 #ifndef EPFNOSUPPORT
 #define EPFNOSUPPORT	        WSAEPFNOSUPPORT
 #endif
+
+
+/* 
+ * these routines are temporarily defined here to allow transition 
+ * from older POSIX wrapper to the newer one. After complete transition 
+ * these should move to a internal header.
+ */
+int w32_temp_DelChildToWatch(HANDLE processtowatch);
+HANDLE w32_fd_to_handle(int fd);
+int w32_allocate_fd_for_handle(HANDLE h);
 

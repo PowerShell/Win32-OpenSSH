@@ -586,3 +586,45 @@ w32_dup2(int oldfd, int newfd) {
 	debug("ERROR: dup2 is not implemented yet");
 	return -1;
 }
+
+unsigned int 
+w32_alarm(unsigned int seconds) {
+	/*TODO -  implement alarm */
+	return 0;
+}
+
+sighandler_t w32_signal(int signum, sighandler_t handler) {
+	/*TODO - implement signal()*/
+	return 0;
+}
+
+int 
+w32_temp_DelChildToWatch(HANDLE processtowatch) {
+	return 0;
+}
+
+HANDLE 
+w32_fd_to_handle(int fd) {
+	return fd_table.w32_ios[fd]->handle;
+}
+
+int w32_allocate_fd_for_handle(HANDLE h) {
+	int min_index = fd_table_get_min_index();
+	struct w32_io* pio;
+	
+	if (min_index == -1) {
+		return -1;
+	}
+
+	pio = malloc(sizeof(struct w32_io));
+	if (pio == NULL) {
+		errno = ENOMEM;
+		return -1;
+	}
+	memset(pio, 0, sizeof(struct w32_io));
+
+	pio->type = FILE_FD;
+	pio->handle = h;
+	fd_table_set(pio, min_index);
+	return min_index;
+}
