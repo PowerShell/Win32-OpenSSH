@@ -32,16 +32,8 @@
 #ifndef LsaLogon_H
 #define LsaLogon_H
 
-#include <winsock2.h>
-#include <stdio.h>
-#include <openssl/rsa.h>
-#include <openssl/dsa.h>
 #include <windows.h>
-#include <Ntsecapi.h>
 
-#include "Debug.h"
-#include "lsastring.h"
-#include "win32auth.h"
 
 typedef struct _LsaAuth
 {

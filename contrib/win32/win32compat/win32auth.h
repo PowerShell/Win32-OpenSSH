@@ -32,7 +32,7 @@
 #ifndef WIN32AUTH_H
 #define WIN32AUTH_H 1
 
-#include <winsock2.h>
+
 #include <windows.h>
 #include <winnt.h>
 #include <Lmcons.h>

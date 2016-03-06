@@ -32,7 +32,7 @@
 #ifndef LsaString_H
 #define LsaString_H
 
-#include <winsock2.h>
+
 #include <stdio.h>
 #include <windows.h>
 #include <Ntsecapi.h>
