@@ -13,6 +13,9 @@
 #define BACKLOG 2  
 #define SMALL_RECV_BUF_SIZE 128
 
+/* remove this later once right header is included*/
+#define O_NONBLOCK  0x0004
+
 #pragma warning(disable:4267)
 
 int listen_fd, accept_fd, connect_fd, ret;
