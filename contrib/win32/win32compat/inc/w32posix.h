@@ -17,6 +17,8 @@ typedef struct w32_fd_set_ {
 	unsigned char bitmap[MAX_FDS >> 3];
 }w32_fd_set;
 
+#define fd_set w32_fd_set
+
 void w32posix_initialize();
 void w32posix_done();
 
@@ -36,8 +38,8 @@ int w32_shutdown(int fd, int how);
 int w32_socketpair(int domain, int type, int sv[2]);
 
 /*non-network (file) i/o*/
-#define fdopen w32_fdopen
-#define fstat w32_fstat
+#define fdopen(a,b)	w32_fdopen((a), (b))
+#define fstat(a,b)	w32_fstat((a), (b))
 
 int w32_pipe(int *pfds);
 int w32_open(const char *pathname, int flags, ...);
@@ -48,7 +50,8 @@ int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 
 /*common i/o*/
-#define fcntl w32_fcntl
+#define fcntl(a,b,...)		w32_fcntl((a), (b),  __VA_ARGS__)
+#define select(a,b,c,d,e)	w32_select((a), (b), (c), (d), (e))
 int w32_close(int fd);
 int w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
 	const struct timeval *timeout);
@@ -56,11 +59,12 @@ int w32_fcntl(int fd, int cmd, ... /* arg */);
 int w32_dup(int oldfd);
 int w32_dup2(int oldfd, int newfd);
 
+
 /* misc */
 unsigned int w32_alarm(unsigned int seconds);
 typedef void(*sighandler_t)(int);
-#define signal w32_signal
-#define mysignal w32_signal
+#define signal(a,b)	w32_signal((a), (b))
+#define mysignal(a,b)	w32_signal((a), (b))
 
 
 /* Shutdown constants */
@@ -102,9 +106,9 @@ HANDLE w32_fd_to_handle(int fd);
 int w32_allocate_fd_for_handle(HANDLE h);
 
 /* temporary definitions to aid in transition */
-#define WSHELPDelChildToWatch w32_temp_DelChildToWatch
-#define WSHELPAddChildToWatch w32_temp_AddChildToWatch
-#define sfd_to_handle w32_fd_to_handle
-#define allocate_sfd w32_allocate_fd_for_handle
-#define WSHELPwopen w32_open
+#define WSHELPDelChildToWatch(a) w32_temp_DelChildToWatch((a))
+#define WSHELPAddChildToWatch(a) w32_temp_AddChildToWatch((a))
+#define sfd_to_handle(a) w32_fd_to_handle((a))
+#define allocate_sfd(a) w32_allocate_fd_for_handle((a))
+#define WSHELPwopen(a) w32_open((a))
 
