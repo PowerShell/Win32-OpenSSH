@@ -33,7 +33,7 @@
 #define DeskRight_H
 
 #include "Debug.h"
-#include <winsock2.h>
+
 #include <windows.h>
 
 #define ADD_RIGHT    1

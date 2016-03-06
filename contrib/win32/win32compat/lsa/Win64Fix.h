@@ -34,7 +34,7 @@
 
 #undef STRING
 
-#include <winsock2.h>
+
 #include <windows.h>
   
 #define SECURITY_WIN32
