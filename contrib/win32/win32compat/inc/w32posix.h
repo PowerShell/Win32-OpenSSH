@@ -45,7 +45,7 @@ int w32_pipe(int *pfds);
 int w32_open(const char *pathname, int flags, ...);
 int w32_read(int fd, void *dst, unsigned int max);
 int w32_write(int fd, const void *buf, unsigned int max);
-int w32_fstat(int fd, struct stat *buf);
+int w32_fstat(int fd, struct w32_stat *buf);
 int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 

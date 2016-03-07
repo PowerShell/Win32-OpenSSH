@@ -487,10 +487,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 
 /* fstat() implemetation */
 int 
-fileio_fstat(struct w32_io* pio, struct stat *buf) {
-
-	errno = ENOTSUP;
-	return -1;
+fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 
 	int fd = _open_osfhandle((intptr_t)pio->handle, 0);
 	debug2("pio:%p", pio);
@@ -499,13 +496,18 @@ fileio_fstat(struct w32_io* pio, struct stat *buf) {
 		return -1;
 	}
 
-	return _fstat(fd, (struct _stat*)&buf);
+	return _fstat64(fd, buf);
 }
 
 /* isatty() implementation */
 int 
 fileio_isatty(struct w32_io* pio) {
-	return (GetFileType(pio->handle) == FILE_TYPE_CHAR) ? TRUE : FALSE;
+	if (GetFileType(pio->handle) == FILE_TYPE_CHAR)
+		return 1; 
+	else {
+		errno = EINVAL;
+		return 0;
+	}
 }
 
 /* fdopen implementation */

@@ -344,14 +344,17 @@ w32_write(int fd, const void *buf, unsigned int max) {
 }
 
 int
-w32_fstat(int fd, struct stat *buf) {
+w32_fstat(int fd, struct w32_stat *buf) {
 	CHECK_FD(fd);
-	return fileio_fstat(fd_table.w32_ios[fd], buf);
+	return fileio_fstat(fd_table.w32_ios[fd], (struct _stat64*)buf);
 }
 
 int
 w32_isatty(int fd) {
-	CHECK_FD(fd);
+	if ((fd < 0) || (fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
+		errno = EBADF;
+		return 0;
+	}
 	return fileio_isatty(fd_table.w32_ios[fd]);
 }
 
