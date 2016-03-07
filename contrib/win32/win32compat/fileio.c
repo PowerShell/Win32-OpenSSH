@@ -270,12 +270,13 @@ VOID CALLBACK ReadCompletionRoutine(
 	pio->read_details.remaining = dwNumberOfBytesTransfered;
 	pio->read_details.completed = 0;
 	pio->read_details.pending = FALSE;
+	*((__int64*)&lpOverlapped->Offset) += dwNumberOfBytesTransfered;
 }
 
 /* initiate an async read */
 int 
 fileio_ReadFileEx(struct w32_io* pio) {
-
+	HANDLE h = pio->handle;
 	debug2("io:%p", pio);
 	if (pio->read_details.buf == NULL){
 		pio->read_details.buf = malloc(READ_BUFFER_SIZE);
@@ -287,7 +288,11 @@ fileio_ReadFileEx(struct w32_io* pio) {
 		pio->read_details.buf_size = READ_BUFFER_SIZE;
 	}
 
-	if (ReadFileEx(pio->handle, pio->read_details.buf, pio->read_details.buf_size, 
+	/* get underlying handle for standard io */
+	if (pio->type == STD_IO_FD)
+		h = GetStdHandle(pio->std_handle);
+	
+	if (ReadFileEx(h, pio->read_details.buf, pio->read_details.buf_size, 
 	    &pio->read_overlapped, &ReadCompletionRoutine)) 
 		pio->read_details.pending = TRUE;
 	else {
@@ -325,16 +330,6 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 	}
 
 	if (fileio_is_io_available(pio, TRUE) == FALSE) {
-		/* Workaround for - ReadFileEx is restting file pointer to beginning upon encoutering a EOF*/
-		/* If there was a previous read and if the file pointer is at 0, then its been reset*/
-		if ((pio->type == FILE_FD) && (pio->read_details.completed > 0)){
-			LARGE_INTEGER to_move, new_fp;
-			to_move.QuadPart = 0;
-			if (SetFilePointerEx(pio->handle, to_move, &new_fp, FILE_CURRENT) && (new_fp.QuadPart == 0)) {
-				errno = 0;
-				return 0;
-			}
-		}
 		if (-1 == fileio_ReadFileEx(pio)) {
 			if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) {
 				/* write end of the pipe closed */
@@ -406,6 +401,7 @@ VOID CALLBACK WriteCompletionRoutine(
 int 
 fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	int bytes_copied;
+	HANDLE h = pio->handle;
 
 	debug2("io:%p", pio);
 	if ((pio->type == PIPE_FD) && (pio->internal.state == PIPE_READ_END)) {
@@ -450,7 +446,11 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	bytes_copied = min(max, pio->write_details.buf_size);
 	memcpy(pio->write_details.buf, buf, bytes_copied);
 
-	if (WriteFileEx(pio->handle, pio->write_details.buf, bytes_copied, 
+	/* get underlying handle for standard io */
+	if (pio->type == STD_IO_FD)
+		h = GetStdHandle(pio->std_handle);
+
+	if (WriteFileEx(h, pio->write_details.buf, bytes_copied, 
 	    &pio->write_overlapped, &WriteCompletionRoutine)) {
 		pio->write_details.pending = TRUE;
 		/* execute APC if write has completed */

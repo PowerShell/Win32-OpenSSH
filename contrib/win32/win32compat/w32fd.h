@@ -71,6 +71,7 @@ struct w32_io {
 	union {
 		SOCKET sock;
 		HANDLE handle;
+		DWORD std_handle;  /* ex. STD_INPUT_HANDLE */
 	};
 
 	/*handle specific internal state context, used by sockets and pipes*/

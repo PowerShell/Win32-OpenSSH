@@ -24,21 +24,20 @@ static struct w32_io w32_io_stdin, w32_io_stdout, w32_io_stderr;
 
 void fd_table_set(struct w32_io* pio, int index);
 
-#pragma warning(disable:4312)
 /* initializes mapping table*/
 static int
 fd_table_initialize() {
 	memset(&fd_table, 0, sizeof(fd_table));
 	memset(&w32_io_stdin, 0, sizeof(w32_io_stdin));
-	w32_io_stdin.handle = (HANDLE)STD_INPUT_HANDLE;
+	w32_io_stdin.std_handle = STD_INPUT_HANDLE;
 	w32_io_stdin.type = STD_IO_FD;
 	fd_table_set(&w32_io_stdin, STDIN_FILENO);
 	memset(&w32_io_stdout, 0, sizeof(w32_io_stdout));
-	w32_io_stdout.handle = (HANDLE)STD_OUTPUT_HANDLE;
+	w32_io_stdout.std_handle = STD_OUTPUT_HANDLE;
 	w32_io_stdout.type = STD_IO_FD;
 	fd_table_set(&w32_io_stdout, STDOUT_FILENO);
 	memset(&w32_io_stderr, 0, sizeof(w32_io_stderr));
-	w32_io_stderr.handle = (HANDLE)STD_ERROR_HANDLE;
+	w32_io_stderr.std_handle = STD_ERROR_HANDLE;
 	w32_io_stderr.type = STD_IO_FD;
 	fd_table_set(&w32_io_stderr, STDERR_FILENO);
 	return 0;
@@ -425,7 +424,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	HANDLE events[SELECT_EVENT_LIMIT];
 	int num_events = 0;
 	int in_set_fds = 0, out_ready_fds = 0, i;
-	unsigned int time_ms_rem = 0;
+	unsigned int timeout_ms = 0, time_rem = 0;
 
 	errno = 0;
 	/* TODO - the size of these can be reduced based on fds */
@@ -433,7 +432,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	memset(&write_ready_fds, 0, sizeof(w32_fd_set));
 
 	if (timeout)
-		time_ms_rem = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
+		timeout_ms = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
 
 	if (fds > MAX_FDS) {
 		errno = EINVAL;
@@ -538,17 +537,18 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	/* wait for io if none is already ready */
 	while (out_ready_fds == 0) {
 		ticks_spent = GetTickCount64() - ticks_start;
+		time_rem = 0;
 
 		if (timeout != NULL) {
-			if (time_ms_rem < ticks_spent) {
+			if (timeout_ms < ticks_spent) {
 				errno = ETIMEDOUT;
 				debug("select timing out");
 				return -1;
 			}
-			time_ms_rem -= ticks_spent & 0xffffffff;
+			time_rem = timeout_ms - (ticks_spent & 0xffffffff);
 		}
 
-		if (0 != wait_for_any_event(events, num_events, time_ms_rem))
+		if (0 != wait_for_any_event(events, num_events, time_rem))
 			return -1;
 
 		/* check on fd status */

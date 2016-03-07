@@ -224,12 +224,23 @@ file_select_tests() {
 
 }
 
+void console_io_test()
+{
+	char tmp[10];
+	TEST_START("console io test");
+	ret = read(STDIN_FILENO, tmp, 10);
+	ret = write(STDOUT_FILENO, "sample output", 13);
+	ASSERT_INT_EQ(errno, 0);
+	ASSERT_INT_EQ(ret, 13);
+	TEST_DONE();
+}
 
 void 
 file_tests()
 {
 	w32posix_initialize();
-	file_simple_fileio();
+	//console_io_test();
+	//file_simple_fileio();
 	file_blocking_io_tests();
 	file_nonblocking_io_tests();
 	file_select_tests();
