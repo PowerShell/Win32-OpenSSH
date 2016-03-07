@@ -416,17 +416,19 @@ w32_fcntl(int fd, int cmd, ... /* arg */) {
 	}
 }
 
+#define SELECT_EVENT_LIMIT 32
 int
 w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
     const struct timeval *timeout) {
 	ULONGLONG ticks_start = GetTickCount64(), ticks_now;
 	w32_fd_set read_ready_fds, write_ready_fds;
-	HANDLE events[32];
+	HANDLE events[SELECT_EVENT_LIMIT];
 	int num_events = 0;
 	int in_set_fds = 0, out_ready_fds = 0, i;
 	unsigned int time_milliseconds = 0;
 
 	errno = 0;
+	/* TODO - the size of these can be reduced based on fds */
 	memset(&read_ready_fds, 0, sizeof(w32_fd_set));
 	memset(&write_ready_fds, 0, sizeof(w32_fd_set));
 
@@ -487,6 +489,11 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 				return -1;
 			if ((fd_table.w32_ios[i]->type == SOCK_FD) 
 			    && (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
+				if (num_events == SELECT_EVENT_LIMIT) {
+					debug("ERROR: max #events reached for select");
+					errno = ENOMEM;
+					return -1;
+				}
 				events[num_events++] = fd_table.w32_ios[i]->read_overlapped.hEvent;
 			}
 		}
@@ -496,6 +503,11 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 				return -1;
 			if ((fd_table.w32_ios[i]->type == SOCK_FD) 
 			    && (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
+				if (num_events == SELECT_EVENT_LIMIT) {
+					debug("ERROR: max #events reached for select");
+					errno = ENOMEM;
+					return -1;
+				}
 				events[num_events++] = fd_table.w32_ios[i]->write_overlapped.hEvent;
 			}
 		}
@@ -523,17 +535,8 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		}
 	}
 
-	/* if io on some fds is already ready, return */
-	if (out_ready_fds) {
-		if (readfds)
-			*readfds = read_ready_fds;
-		if (writefds)
-			*writefds = write_ready_fds;
-		debug2("IO ready:%d, no wait", out_ready_fds);
-		return out_ready_fds;
-	}
-
-	do {
+	/* wait for io if none is already ready */
+	while (out_ready_fds == 0) {
 		ticks_now = GetTickCount64();
 		if (time_milliseconds < (ticks_now - ticks_start)) {
 			errno = ETIMEDOUT;
@@ -566,17 +569,21 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 			}
 		}
 
-		if (out_ready_fds)
-			break;
-
-		debug2("wait ended without any IO completion, looping again");
-
-	} while (1);
-
+		if (out_ready_fds == 0)
+			debug2("wait ended without any IO completion, looping again");
+	};
+	
+	/* clear out fds that are not ready yet */
 	if (readfds)
-		*readfds = read_ready_fds;
+		for (i = 0; i < fds; i++)
+			if (FD_ISSET(i, readfds) && (!FD_ISSET(i, &read_ready_fds)))
+				FD_CLR(i, readfds);			
+	
 	if (writefds)
-		*writefds = write_ready_fds;
+		for (i = 0; i < fds; i++)
+			if (FD_ISSET(i, writefds) && (!FD_ISSET(i, &write_ready_fds)))
+				FD_CLR(i, writefds);
+
 
 	return out_ready_fds;
 
