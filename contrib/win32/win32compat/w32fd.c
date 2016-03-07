@@ -424,11 +424,14 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	HANDLE events[32];
 	int num_events = 0;
 	int in_set_fds = 0, out_ready_fds = 0, i;
-	unsigned int time_milliseconds = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
+	unsigned int time_milliseconds = 0;
 
 	errno = 0;
 	memset(&read_ready_fds, 0, sizeof(w32_fd_set));
 	memset(&write_ready_fds, 0, sizeof(w32_fd_set));
+
+	if (timeout)
+		time_milliseconds = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
 
 	if (fds > MAX_FDS) {
 		errno = EINVAL;
@@ -445,6 +448,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	if (exceptfds) {
 		errno = EOPNOTSUPP;
 		debug("ERROR: exceptfds not supported");
+		abort();
 		return -1;
 	}
 
