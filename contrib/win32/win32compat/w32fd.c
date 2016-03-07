@@ -420,12 +420,12 @@ w32_fcntl(int fd, int cmd, ... /* arg */) {
 int
 w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
     const struct timeval *timeout) {
-	ULONGLONG ticks_start = GetTickCount64(), ticks_now;
+	ULONGLONG ticks_start = GetTickCount64(), ticks_spent;
 	w32_fd_set read_ready_fds, write_ready_fds;
 	HANDLE events[SELECT_EVENT_LIMIT];
 	int num_events = 0;
 	int in_set_fds = 0, out_ready_fds = 0, i;
-	unsigned int time_milliseconds = 0;
+	unsigned int time_ms_rem = 0;
 
 	errno = 0;
 	/* TODO - the size of these can be reduced based on fds */
@@ -433,7 +433,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	memset(&write_ready_fds, 0, sizeof(w32_fd_set));
 
 	if (timeout)
-		time_milliseconds = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
+		time_ms_rem = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
 
 	if (fds > MAX_FDS) {
 		errno = EINVAL;
@@ -477,7 +477,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		return -1;
 	}
 
-	debug2("Total in fds:%d", in_set_fds);
+	debug3("Total in fds:%d", in_set_fds);
 	/*
 	 * start async io on selected fds if needed and pick up any events 
 	 * that select needs to listen on
@@ -537,15 +537,18 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 
 	/* wait for io if none is already ready */
 	while (out_ready_fds == 0) {
-		ticks_now = GetTickCount64();
-		if (time_milliseconds < (ticks_now - ticks_start)) {
-			errno = ETIMEDOUT;
-			debug("select timing out");
-			return -1;
+		ticks_spent = GetTickCount64() - ticks_start;
+
+		if (timeout != NULL) {
+			if (time_ms_rem < ticks_spent) {
+				errno = ETIMEDOUT;
+				debug("select timing out");
+				return -1;
+			}
+			time_ms_rem -= ticks_spent & 0xffffffff;
 		}
 
-		if (0 != wait_for_any_event(events, num_events, 
-			time_milliseconds - ((ticks_now - ticks_start) & 0xffffffff)))
+		if (0 != wait_for_any_event(events, num_events, time_ms_rem))
 			return -1;
 
 		/* check on fd status */
@@ -569,8 +572,15 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 			}
 		}
 
-		if (out_ready_fds == 0)
+		if (out_ready_fds == 0) {
+			if (timeout == 0) {
+				/* not timeout specified, return EAGAIN if none of fds are ready */
+				errno = EAGAIN;
+				return -1;
+			}
 			debug2("wait ended without any IO completion, looping again");
+		}
+
 	};
 	
 	/* clear out fds that are not ready yet */
