@@ -602,10 +602,44 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 
 int
 w32_dup(int oldfd) {
+	int min_index;
+	struct w32_io* pio;
+	HANDLE src, target;
 	CHECK_FD(oldfd);
-	errno = EOPNOTSUPP;
-	debug("ERROR: dup is not implemented yet");
-	return -1;
+	if (oldfd > STDERR_FILENO) {
+		errno = EOPNOTSUPP;
+		debug("ERROR: dup only supported for std io, fd:%d", oldfd);
+		return -1;
+	}
+
+	if ((min_index = fd_table_get_min_index()) == -1)
+		return -1;
+
+	src = GetStdHandle(fd_table.w32_ios[oldfd]->std_handle);
+	if (src == INVALID_HANDLE_VALUE) {
+		errno = EINVAL;
+		debug("ERROR: unable to get underlying handle for std fd:%d", oldfd);
+		return -1;
+	}
+
+	if (!DuplicateHandle(GetCurrentProcess(), src, GetCurrentProcess(), &target, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
+		errno = EOTHER;
+		debug("ERROR: Duplicated Handle failed, error:%d", GetLastError());
+		return -1;
+	}
+
+	pio = (struct w32_io*) malloc(sizeof(struct w32_io));
+	if (pio == NULL) {
+		CloseHandle(target);
+		errno = ENOMEM;
+		debug("ERROR: %d", errno);
+		return -1;
+	}
+
+	pio->handle = target;
+	pio->type = FILE_FD;
+	fd_table_set(pio, min_index);
+	return min_index;
 }
 
 int
