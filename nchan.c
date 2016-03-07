@@ -77,7 +77,7 @@
 
 #ifdef WIN32_FIXME      
 
-  void StopSocketThreads();
+  //void StopSocketThreads();
 
 #endif
 
@@ -136,7 +136,7 @@ chan_rcvd_oclose1(Channel *c)
 
   #ifdef WIN32_FIXME
 
-    StopSocketThreads();
+    //StopSocketThreads();
 
   #endif
 

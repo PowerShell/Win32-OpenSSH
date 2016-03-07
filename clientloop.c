@@ -118,7 +118,7 @@
 #ifdef WIN32_FIXME
 #include <sys/stat.h>
 
-#define isatty(a) WSHELPisatty(a)
+//#define isatty(a) WSHELPisatty(a)
 
 // Windows Console screen size change related
 extern int ScreenX;

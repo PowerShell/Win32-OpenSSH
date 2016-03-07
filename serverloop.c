@@ -91,7 +91,7 @@
 #include "ssherr.h"
 
 #ifdef WIN32_FIXME
-#define isatty(a) WSHELPisatty(a)
+//#define isatty(a) WSHELPisatty(a)
 #endif
 
 extern ServerOptions options;

@@ -88,8 +88,8 @@ void ConInputInitParams(void)
 	SetConsoleMode(hInput, (dwMode & ~(ENABLE_LINE_INPUT |
 							ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT)) | ENABLE_WINDOW_INPUT );
 
-	extern int glob_itissshclient;
-	glob_itissshclient = 1; // tell our contrib/win32/win32compat/socket.c code it is for ssh client side
+	//extern int glob_itissshclient;
+	//glob_itissshclient = 1; // tell our contrib/win32/win32compat/socket.c code it is for ssh client side
 
 }
 

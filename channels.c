@@ -101,10 +101,10 @@
 #include "authfd.h"
 #include "pathnames.h"
 
-#ifdef WIN32_FIXME
-#define isatty(a) WSHELPisatty(a)
-#define SFD_TYPE_CONSOLE    4
-#endif
+//#ifdef WIN32_FIXME
+//#define isatty(a) WSHELPisatty(a)
+//#define SFD_TYPE_CONSOLE    4
+//#endif
 
 
 /* -- channel core */
@@ -1700,7 +1700,9 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 		len = read(c->rfd, buf, sizeof(buf));
 		#ifdef WIN32_FIXME
 		if (len == 0) {
-			if ( get_sfd_type(c->rfd) == SFD_TYPE_CONSOLE)
+
+			//if ( get_sfd_type(c->rfd) == SFD_TYPE_CONSOLE)
+			if(isatty(c->rfd))
 			return 1; // in Win32 console read, there may be no data, but is ok
 		}
 		#endif
@@ -2239,7 +2241,7 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
    * Winsock can't support this sort of fdset reallocation 
    */
    
-#ifndef WIN32_FIXME
+#if(1)//ndef WIN32_FIXME
   
 	nfdset = howmany(n+1, NFDBITS);
 	/* Explicitly test here, because xrealloc isn't always called */
@@ -2257,7 +2259,7 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 
 	*maxfdp = n;
 
-#ifdef WIN32_FIXME
+#if(0)//def WIN32_FIXME
     
     if (*readsetp == NULL) 
     {

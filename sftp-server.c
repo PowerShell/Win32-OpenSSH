@@ -85,7 +85,7 @@
   
   #include <sys/stat.h>
 
-  #define isatty(a) WSHELPisatty(a)
+ // #define isatty(a) WSHELPisatty(a)
   
   #define mkdir(a, b) _mkdir(a)
 
