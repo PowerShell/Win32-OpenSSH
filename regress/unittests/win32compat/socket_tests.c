@@ -2,6 +2,7 @@
 * Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
 */
 
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -144,7 +145,7 @@ socket_fd_tests()
 	ASSERT_INT_EQ(errno, EBADF);
 	ASSERT_INT_EQ(fstat(11, NULL), -1);
 	ASSERT_INT_EQ(errno, EBADF);
-	ASSERT_INT_EQ(isatty(12), -1);
+	ASSERT_INT_EQ(isatty(12), 0);
 	ASSERT_INT_EQ(errno, EBADF);
 	ASSERT_PTR_EQ(fdopen(13, NULL), NULL);
 	ASSERT_INT_EQ(errno, EBADF);
