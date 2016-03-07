@@ -335,7 +335,7 @@ read_passphrase(const char *prompt, int flags)
    * Show prompt for user.
    */
 
-  write(STDERR_FILENO, prompt, strlen(prompt));
+  write(STDOUT_FILENO, prompt, strlen(prompt));
 
   len = retr = 0;
   int bufsize = sizeof(buf);
@@ -368,7 +368,7 @@ read_passphrase(const char *prompt, int flags)
 	}
 
 	buf[len] = '\0' ; // get rid of the cr/lf
-	write(STDERR_FILENO,"\n", strlen("\n")); // show a newline as we do not echo password or the line
+	write(STDOUT_FILENO,"\n", strlen("\n")); // show a newline as we do not echo password or the line
 
   ret = xstrdup(buf);
 

@@ -1314,7 +1314,7 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	struct timeval timeout, start, *timeoutp = NULL;
 
 	DBG(debug("packet_read()"));
-#if(0)//ndef WIN32_FIXME
+#if(1)//ndef WIN32_FIXME
 	int d = howmany(state->connection_in + 1, NFDBITS);
 	 d = sizeof(fd_mask);
 	setp = calloc(howmany(state->connection_in + 1,
@@ -1354,7 +1354,7 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		 * Otherwise, wait for some data to arrive, add it to the
 		 * buffer, and try again.
 		 */
-#if(0)//ndef WIN32_FIXME
+#if(1)//ndef WIN32_FIXME
 		memset(setp, 0, howmany(state->connection_in + 1,
 		    NFDBITS) * sizeof(fd_mask));
 #else

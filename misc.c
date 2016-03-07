@@ -81,7 +81,7 @@ chop(char *s)
 int
 set_nonblock(int fd)
 {
-#ifdef WIN32_FIXME
+#if(0)//def WIN32_FIXME
   
   int on = 1;
   
@@ -115,7 +115,7 @@ set_nonblock(int fd)
 int
 unset_nonblock(int fd)
 {
-#ifdef WIN32_FIXME
+#if(0)//def WIN32_FIXME
   
   int on = 0;
   
