@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssh", "ssh.vcxproj", "{74E69D5E-A1EF-46EA-9173-19A412774104}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -114,6 +114,7 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "win32compatUnittests", "win32compatUnittests.vcxproj", "{780CAFE4-4BC5-407B-B3A6-71C4114826A7}"
 	ProjectSection(ProjectDependencies) = postProject
 		{05E1115F-8529-46D0-AAAF-52A404CE79A7} = {05E1115F-8529-46D0-AAAF-52A404CE79A7}
+		{0D02F0F0-013B-4EE3-906D-86517F3822C0} = {0D02F0F0-013B-4EE3-906D-86517F3822C0}
 		{8660C2FE-9874-432D-B047-E042BB41DBE0} = {8660C2FE-9874-432D-B047-E042BB41DBE0}
 	EndProjectSection
 EndProject
