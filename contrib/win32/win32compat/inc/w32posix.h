@@ -40,12 +40,15 @@ int w32_socketpair(int domain, int type, int sv[2]);
 /*non-network (file) i/o*/
 #define fdopen(a,b)	w32_fdopen((a), (b))
 #define fstat(a,b)	w32_fstat((a), (b))
+//#define stat(a,b)	w32_stat((a), (b))
 
+struct w32_stat;
 int w32_pipe(int *pfds);
 int w32_open(const char *pathname, int flags, ...);
 int w32_read(int fd, void *dst, unsigned int max);
 int w32_write(int fd, const void *buf, unsigned int max);
 int w32_fstat(int fd, struct w32_stat *buf);
+int w32_stat(const char *path, struct w32_stat *buf);
 int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 

@@ -499,6 +499,11 @@ fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 	return _fstat64(fd, buf);
 }
 
+int 
+fileio_stat(const char *path, struct _stat64 *buf) {
+	return _stat64(path, buf);
+}
+
 /* isatty() implementation */
 int 
 fileio_isatty(struct w32_io* pio) {
