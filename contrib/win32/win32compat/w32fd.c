@@ -622,7 +622,15 @@ w32_dup(int oldfd) {
 		return -1;
 	}
 
-	if (!DuplicateHandle(GetCurrentProcess(), src, GetCurrentProcess(), &target, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
+	if ((oldfd == STDIN_FILENO) && (GetFileType(GetStdHandle(STD_INPUT_HANDLE)) == FILE_TYPE_CHAR)) {
+		target = CreateFile(L"CONIN$", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_FLAG_OVERLAPPED, NULL);
+		if (target == INVALID_HANDLE_VALUE) {
+			errno = EOTHER;
+			debug("ERROR: CreateFile CONIN$ failed, error:%d", GetLastError());
+			return -1;
+		}
+	}
+	else if (!DuplicateHandle(GetCurrentProcess(), src, GetCurrentProcess(), &target, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
 		errno = EOTHER;
 		debug("ERROR: Duplicated Handle failed, error:%d", GetLastError());
 		return -1;
@@ -636,6 +644,7 @@ w32_dup(int oldfd) {
 		return -1;
 	}
 
+	memset(pio, 0, sizeof(struct w32_io));
 	pio->handle = target;
 	pio->type = FILE_FD;
 	fd_table_set(pio, min_index);

@@ -393,6 +393,8 @@ VOID CALLBACK WriteCompletionRoutine(
 	    pio->write_details.remaining);
 	pio->write_details.error = dwErrorCode;
 	/* TODO - assert that remaining == dwNumberOfBytesTransfered */
+	if (pio->write_details.remaining != dwNumberOfBytesTransfered)
+		abort();
 	pio->write_details.remaining -= dwNumberOfBytesTransfered;
 	pio->write_details.pending = FALSE;
 }
@@ -453,6 +455,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	if (WriteFileEx(h, pio->write_details.buf, bytes_copied, 
 	    &pio->write_overlapped, &WriteCompletionRoutine)) {
 		pio->write_details.pending = TRUE;
+		pio->write_details.remaining = bytes_copied;
 		/* execute APC if write has completed */
 		if (wait_for_any_event(NULL, 0, 0) == -1)
 			return -1;
