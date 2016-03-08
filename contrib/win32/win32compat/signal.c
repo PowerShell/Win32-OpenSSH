@@ -15,8 +15,8 @@
  * - any signals (errno = EINTR ) - TODO
  * - any of the supplied events set 
  * - any APCs caused by IO completions 
- * - time out (errno = ETIMEOUT)
- * - Returns 0 on IO completion and -1 on rest
+ * - time out 
+ * - Returns 0 on IO completion, timeout -1 on rest
  *  if milli_seconds is 0, this function returns 0, its called with 0 
  *  to execute any scheduled APCs
 */
@@ -35,11 +35,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 			return 0;
 		}
 		else if (ret == WAIT_TIMEOUT) {
-			if (milli_seconds == 0)
-				return 0;
-			errno = ETIMEDOUT;
-			debug("ERROR: wait timed out");
-			return -1;
+			return 0;
 		}
 		/* some other error*/
 		else { 
@@ -54,11 +50,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 			return 0;
 		}
 		else if (ret == 0) {
-			if (milli_seconds == 0)
-				return 0;
-			errno = ETIMEDOUT;
-			debug("ERROR: wait timed out");
-			return -1;
+			return 0;
 		}
 		else { //some other error
 			errno = EOTHER;

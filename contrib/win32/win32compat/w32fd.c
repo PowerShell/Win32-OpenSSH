@@ -91,8 +91,8 @@ fd_table_clear(int index)
 
 void
 w32posix_initialize() {
-	if ( (fd_table_initialize() != 0)
-	    || (socketio_initialize() != 0))
+	if ((fd_table_initialize() != 0)
+		|| (socketio_initialize() != 0))
 		abort();
 }
 
@@ -109,7 +109,7 @@ w32_io_is_blocking(struct w32_io* pio)
 }
 
 /*
-* Check if io is ready/available. This function is primarily used by select() 
+* Check if io is ready/available. This function is primarily used by select()
 * as it decides on what fds can be set.
 */
 BOOL
@@ -268,7 +268,7 @@ w32_shutdown(int fd, int how) {
 	return socketio_shutdown(fd_table.w32_ios[fd], how);
 }
 
-int 
+int
 w32_socketpair(int domain, int type, int sv[2]) {
 	errno = ENOTSUP;
 	debug("ERROR:%d", errno);
@@ -348,7 +348,7 @@ w32_fstat(int fd, struct w32_stat *buf) {
 	return fileio_fstat(fd_table.w32_ios[fd], (struct _stat64*)buf);
 }
 
-int 
+int
 w32_stat(const char *path, struct w32_stat *buf) {
 	return fileio_stat(path, (struct _stat64*)buf);
 }
@@ -380,8 +380,8 @@ w32_close(int fd) {
 	CHECK_FD(fd);
 	pio = fd_table.w32_ios[fd];
 
-	debug("io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd, 
-	    pio->table_index);
+	debug("io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd,
+		pio->table_index);
 	fd_table_clear(pio->table_index);
 	if ((pio->type == SOCK_FD))
 		return socketio_close(pio);
@@ -417,8 +417,8 @@ w32_fcntl(int fd, int cmd, ... /* arg */) {
 
 #define SELECT_EVENT_LIMIT 32
 int
-w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
-    const struct timeval *timeout) {
+w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds,
+	const struct timeval *timeout) {
 	ULONGLONG ticks_start = GetTickCount64(), ticks_spent;
 	w32_fd_set read_ready_fds, write_ready_fds;
 	HANDLE events[SELECT_EVENT_LIMIT];
@@ -478,7 +478,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 
 	debug3("Total in fds:%d", in_set_fds);
 	/*
-	 * start async io on selected fds if needed and pick up any events 
+	 * start async io on selected fds if needed and pick up any events
 	 * that select needs to listen on
 	 */
 	for (int i = 0; i < fds; i++) {
@@ -486,8 +486,8 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		if (readfds && FD_ISSET(i, readfds)) {
 			if (w32_io_on_select(fd_table.w32_ios[i], TRUE) == -1)
 				return -1;
-			if ((fd_table.w32_ios[i]->type == SOCK_FD) 
-			    && (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
+			if ((fd_table.w32_ios[i]->type == SOCK_FD)
+				&& (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
 				if (num_events == SELECT_EVENT_LIMIT) {
 					debug("ERROR: max #events reached for select");
 					errno = ENOMEM;
@@ -500,8 +500,8 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		if (writefds && FD_ISSET(i, writefds)) {
 			if (w32_io_on_select(fd_table.w32_ios[i], FALSE) == -1)
 				return -1;
-			if ((fd_table.w32_ios[i]->type == SOCK_FD) 
-			    && (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
+			if ((fd_table.w32_ios[i]->type == SOCK_FD)
+				&& (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
 				if (num_events == SELECT_EVENT_LIMIT) {
 					debug("ERROR: max #events reached for select");
 					errno = ENOMEM;
@@ -534,61 +534,60 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		}
 	}
 
-	/* wait for io if none is already ready */
-	while (out_ready_fds == 0) {
-		ticks_spent = GetTickCount64() - ticks_start;
-		time_rem = 0;
 
-		if (timeout != NULL) {
-			if (timeout_ms < ticks_spent) {
-				errno = ETIMEDOUT;
-				debug("select timing out");
-				return -1;
+	/* timeout specified and both fields are 0 - polling mode*/
+	/* proceed with further wait if not in polling mode*/
+	if ((timeout == NULL) || (timeout_ms != 0))
+		/* wait for io if none is already ready */
+		while (out_ready_fds == 0) {
+			ticks_spent = GetTickCount64() - ticks_start;
+			time_rem = 0;
+
+			if (timeout != NULL) {
+				if (timeout_ms < ticks_spent) {
+					debug("select timing out");
+					break;
+				}
+				time_rem = timeout_ms - (ticks_spent & 0xffffffff);
 			}
-			time_rem = timeout_ms - (ticks_spent & 0xffffffff);
-		}
+			else
+				time_rem = INFINITE;
 
-		if (0 != wait_for_any_event(events, num_events, time_rem))
-			return -1;
+			if (0 != wait_for_any_event(events, num_events, time_rem))
+				return -1;
 
-		/* check on fd status */
-		out_ready_fds = 0;
-		for (int i = 0; i < fds; i++) {
+			/* check on fd status */
+			out_ready_fds = 0;
+			for (int i = 0; i < fds; i++) {
 
-			if (readfds && FD_ISSET(i, readfds)) {
-				in_set_fds++;
-				if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
-					FD_SET(i, &read_ready_fds);
-					out_ready_fds++;
+				if (readfds && FD_ISSET(i, readfds)) {
+					in_set_fds++;
+					if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
+						FD_SET(i, &read_ready_fds);
+						out_ready_fds++;
+					}
+				}
+
+				if (writefds && FD_ISSET(i, writefds)) {
+					in_set_fds++;
+					if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
+						FD_SET(i, &write_ready_fds);
+						out_ready_fds++;
+					}
 				}
 			}
 
-			if (writefds && FD_ISSET(i, writefds)) {
-				in_set_fds++;
-				if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
-					FD_SET(i, &write_ready_fds);
-					out_ready_fds++;
-				}
-			}
+			if (out_ready_fds == 0) 
+				debug2("wait ended without any IO completion, looping again");
+
 		}
 
-		if (out_ready_fds == 0) {
-			if (timeout == 0) {
-				/* not timeout specified, return EAGAIN if none of fds are ready */
-				errno = EAGAIN;
-				return -1;
-			}
-			debug2("wait ended without any IO completion, looping again");
-		}
-
-	};
-	
 	/* clear out fds that are not ready yet */
 	if (readfds)
 		for (i = 0; i < fds; i++)
 			if (FD_ISSET(i, readfds) && (!FD_ISSET(i, &read_ready_fds)))
-				FD_CLR(i, readfds);			
-	
+				FD_CLR(i, readfds);
+
 	if (writefds)
 		for (i = 0; i < fds; i++)
 			if (FD_ISSET(i, writefds) && (!FD_ISSET(i, &write_ready_fds)))
@@ -659,7 +658,7 @@ w32_dup2(int oldfd, int newfd) {
 	return -1;
 }
 
-unsigned int 
+unsigned int
 w32_alarm(unsigned int seconds) {
 	/*TODO -  implement alarm */
 	return 0;
@@ -670,16 +669,16 @@ sighandler_t w32_signal(int signum, sighandler_t handler) {
 	return 0;
 }
 
-int 
+int
 w32_temp_DelChildToWatch(HANDLE processtowatch) {
 	return 0;
 }
 
 int w32_temp_AddChildToWatch(HANDLE processtowatch) {
-    return 0;
+	return 0;
 }
 
-HANDLE 
+HANDLE
 w32_fd_to_handle(int fd) {
 	return fd_table.w32_ios[fd]->handle;
 }
@@ -687,7 +686,7 @@ w32_fd_to_handle(int fd) {
 int w32_allocate_fd_for_handle(HANDLE h) {
 	int min_index = fd_table_get_min_index();
 	struct w32_io* pio;
-	
+
 	if (min_index == -1) {
 		return -1;
 	}
