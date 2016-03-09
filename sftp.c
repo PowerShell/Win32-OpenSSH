@@ -2473,10 +2473,11 @@ main(int argc, char **argv)
      
     WSHELPinitialize();
     
-    allocate_standard_descriptor(STDIN_FILENO);
-    allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);
-    
+    //allocate_standard_descriptor(STDIN_FILENO);
+    //allocate_standard_descriptor(STDOUT_FILENO);
+    //allocate_standard_descriptor(STDERR_FILENO);
+	setvbuf(stdout, NULL, _IONBF, 0);
+
     LoadLibrary("libwindbg.dll");
     
     //sfd_start = 3;
