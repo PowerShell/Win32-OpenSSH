@@ -889,15 +889,17 @@ socketio_on_select(struct w32_io* pio, BOOL rd) {
 		return 0;
 
 	//listening socket - acceptEx if needed
-	if ((sock_state == SOCK_LISTENING)
-		&& (!pio->read_details.pending)
-		&& (socketio_acceptEx(pio) != 0))
-		return -1;
-	//connected socket - WSARecv if needed
-	else if ((!pio->read_details.pending)
-		&& (!socketio_is_io_available(pio, rd))
-		&& (socketio_WSARecv(pio, NULL) != 0))
-		return -1;
+	if (sock_state == SOCK_LISTENING) {
+		if ((!pio->read_details.pending) && (socketio_acceptEx(pio) != 0))
+			return -1;
+	}
+	else {
+		//connected socket - WSARecv if needed
+		if ((!pio->read_details.pending)
+		    && (!socketio_is_io_available(pio, rd))
+		    && (socketio_WSARecv(pio, NULL) != 0))
+			return -1;
+	}
 
 	return 0;
 }
