@@ -622,7 +622,7 @@ w32_dup(int oldfd) {
 	}
 
 	if ((oldfd == STDIN_FILENO) && (GetFileType(GetStdHandle(STD_INPUT_HANDLE)) == FILE_TYPE_CHAR)) {
-		target = CreateFile(L"CONIN$", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_FLAG_OVERLAPPED, NULL);
+		target = CreateFileA("CONIN$", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_FLAG_OVERLAPPED, NULL);
 		if (target == INVALID_HANDLE_VALUE) {
 			errno = EOTHER;
 			debug("ERROR: CreateFile CONIN$ failed, error:%d", GetLastError());

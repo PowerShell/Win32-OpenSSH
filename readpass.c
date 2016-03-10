@@ -53,7 +53,7 @@
   #include <sys/socket.h>
   
   //extern int PassInputFd;
-  extern int PassOutputFd;
+  //extern int PassOutputFd;
   //extern int PassErrorFd;
 
 #endif
