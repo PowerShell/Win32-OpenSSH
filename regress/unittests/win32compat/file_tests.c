@@ -239,7 +239,7 @@ void
 file_tests()
 {
 	w32posix_initialize();
-	console_io_test();
+	//console_io_test();
 	//file_simple_fileio();
 	file_blocking_io_tests();
 	file_nonblocking_io_tests();

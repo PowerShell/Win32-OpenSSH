@@ -461,6 +461,8 @@ CALLBACK WSASendCompletionRoutine(
 	    pio->write_details.remaining);
 	pio->write_details.error = dwError;
 	/* TODO - assert that remaining == cbTransferred */
+	if ((dwError == 0) && (pio->write_details.remaining != cbTransferred))
+		abort();
 	pio->write_details.remaining -= cbTransferred;
 	pio->write_details.pending = FALSE;
 }

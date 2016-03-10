@@ -393,7 +393,7 @@ VOID CALLBACK WriteCompletionRoutine(
 	    pio->write_details.remaining);
 	pio->write_details.error = dwErrorCode;
 	/* TODO - assert that remaining == dwNumberOfBytesTransfered */
-	if (pio->write_details.remaining != dwNumberOfBytesTransfered)
+	if ((dwErrorCode == 0) && (pio->write_details.remaining != dwNumberOfBytesTransfered))
 		abort();
 	pio->write_details.remaining -= dwNumberOfBytesTransfered;
 	pio->write_details.pending = FALSE;
