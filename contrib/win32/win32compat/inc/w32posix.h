@@ -40,7 +40,6 @@ int w32_socketpair(int domain, int type, int sv[2]);
 /*non-network (file) i/o*/
 #define fdopen(a,b)	w32_fdopen((a), (b))
 #define fstat(a,b)	w32_fstat((a), (b))
-//#define stat(a,b)	w32_stat((a), (b))
 
 struct w32_stat;
 int w32_pipe(int *pfds);
@@ -51,6 +50,7 @@ int w32_fstat(int fd, struct w32_stat *buf);
 int w32_stat(const char *path, struct w32_stat *buf);
 int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
+int w32_mkdir(const char *pathname, unsigned short mode);
 
 /*common i/o*/
 #define fcntl(a,b,...)		w32_fcntl((a), (b),  __VA_ARGS__)

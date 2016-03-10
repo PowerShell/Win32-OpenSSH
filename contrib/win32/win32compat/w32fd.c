@@ -353,6 +353,10 @@ w32_stat(const char *path, struct w32_stat *buf) {
 	return fileio_stat(path, (struct _stat64*)buf);
 }
 
+int 
+w32_mkdir(const char *pathname, unsigned short mode) {
+	return _mkdir(pathname);
+}
 int
 w32_isatty(int fd) {
 	if ((fd < 0) || (fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
