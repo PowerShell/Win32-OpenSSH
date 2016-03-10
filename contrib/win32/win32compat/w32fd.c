@@ -353,6 +353,12 @@ w32_stat(const char *path, struct w32_stat *buf) {
 	return fileio_stat(path, (struct _stat64*)buf);
 }
 
+long 
+w32_lseek(int fd, long offset, int origin) {
+	CHECK_FD(fd);
+	return fileio_lseek(fd_table.w32_ios[fd], offset, origin);
+}
+
 int 
 w32_mkdir(const char *pathname, unsigned short mode) {
 	return _mkdir(pathname);

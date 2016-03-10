@@ -31,6 +31,7 @@
 
 #define sleep(sec) Sleep(1000 * sec)
 #define alarm w32_alarm
+#define lseek w32_lseek
 
 /* Compatibility header to avoid lots of #ifdefs in includes.h on Win32 */
 

@@ -75,11 +75,11 @@ typedef void EditLine;
 
 #ifdef WIN32_FIXME
   
-  #define mkdir(a, b) _mkdir(a)
+//  #define mkdir(a, b) _mkdir(a)
 
   #define FAIL(X) if (X) goto fail
 
-  extern int sfd_start;
+  //extern int sfd_start;
   
 #endif
 
@@ -2308,9 +2308,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
     si.cb          = sizeof(STARTUPINFO);
     si.hStdInput   = sfd_to_handle(sockout[0]);
     si.hStdOutput  = sfd_to_handle(sockin[1]);//GetStdHandle(STD_OUTPUT_HANDLE);//sfd_to_handle(sockin[1]);
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    si.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
+    si.hStdError   =  GetStdHandle(STD_ERROR_HANDLE);
     si.wShowWindow = SW_HIDE;
     si.dwFlags     = STARTF_USESTDHANDLES;
     si.lpDesktop   = NULL;

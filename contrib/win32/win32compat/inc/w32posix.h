@@ -48,6 +48,8 @@ int w32_read(int fd, void *dst, unsigned int max);
 int w32_write(int fd, const void *buf, unsigned int max);
 int w32_fstat(int fd, struct w32_stat *buf);
 int w32_stat(const char *path, struct w32_stat *buf);
+long w32_lseek( int fd, long offset, int origin);
+
 int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 int w32_mkdir(const char *pathname, unsigned short mode);

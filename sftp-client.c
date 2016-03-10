@@ -1556,7 +1556,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 		}
 #endif
 	}
-	  #ifdef WIN32_FIXME
+	  #if(0)//def WIN32_FIXME
   
   _close(local_fd);
   

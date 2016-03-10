@@ -116,6 +116,7 @@ int fileio_read(struct w32_io* pio, void *dst, unsigned int max);
 int fileio_write(struct w32_io* pio, const void *buf, unsigned int max);
 int fileio_fstat(struct w32_io* pio, struct _stat64 *buf);
 int fileio_stat(const char *path, struct _stat64 *buf);
+long fileio_lseek(struct w32_io* pio, long offset, int origin);
 int fileio_isatty(struct w32_io* pio);
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
 

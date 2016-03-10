@@ -397,6 +397,7 @@ VOID CALLBACK WriteCompletionRoutine(
 		abort();
 	pio->write_details.remaining -= dwNumberOfBytesTransfered;
 	pio->write_details.pending = FALSE;
+	*((__int64*)&lpOverlapped->Offset) += dwNumberOfBytesTransfered;
 }
 
 /* write() implementation */
@@ -505,6 +506,18 @@ fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 int 
 fileio_stat(const char *path, struct _stat64 *buf) {
 	return _stat64(path, buf);
+}
+
+long 
+fileio_lseek(struct w32_io* pio, long offset, int origin) {
+	int fd = _open_osfhandle((intptr_t)pio->handle, 0);
+	debug2("pio:%p", pio);
+	if (fd == -1) {
+		errno = EOTHER;
+		return -1;
+	}
+
+	return _lseek(fd, offset, origin);
 }
 
 /* isatty() implementation */
