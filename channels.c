@@ -2511,11 +2511,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 							}
 						}
 						else {
-							// avoid echoing if echo is tuned off by the current running application
-							DWORD dwGlobalConsoleMode;
-							GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwGlobalConsoleMode);
-							if (dwGlobalConsoleMode &  (ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT))
-								buffer_append(&c->input, data, data_len);
+							buffer_append(&c->input, data, data_len);
 							charinline += data_len; // one more char on the line
 						}
 						
