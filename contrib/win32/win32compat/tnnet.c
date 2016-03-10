@@ -60,6 +60,9 @@ size_t telProcessNetwork ( char *buf, size_t len )
 	size_t Result;
 	unsigned char* pszNewHead;
 
+	if ((len == 1) && (buf[0] == 13))
+		buf[0] = 10;
+
 	if (1)
 	{
 		Result = len ;

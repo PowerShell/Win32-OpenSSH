@@ -2479,7 +2479,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	if (c->datagram)
 		buffer_put_string(&c->output, data, data_len);
 	else {
-		#ifndef WIN32_FIXME
+		#if(1)//ndef WIN32_FIXME
 		buffer_append(&c->output, data, data_len);
 		#else
 		if ( c->client_tty )
