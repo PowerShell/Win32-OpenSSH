@@ -1602,7 +1602,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			sighup_restart();
 		if (fdset != NULL)
 			free(fdset);
-#ifndef WIN32_FIXME
+#if(1)//ndef WIN32_FIXME
 		fdset = xcalloc(howmany(maxfd + 1, NFDBITS),
 		    sizeof(fd_mask));
 #else
@@ -1968,15 +1968,16 @@ main(int ac, char **av)
 
     SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
   
+    w32posix_initialize();
     //authctxt -> hTokenLsa_ = NULL;
    
-    WSHELPinitialize();
+    /*WSHELPinitialize();
     
     allocate_standard_descriptor(STDIN_FILENO);
     allocate_standard_descriptor(STDOUT_FILENO);
     allocate_standard_descriptor(STDERR_FILENO);
 
-    sfd_start = 3;
+    sfd_start = 3;*/
 
     /*
      * Initialize log.
@@ -2192,7 +2193,8 @@ main(int ac, char **av)
      * Win32 only.
      */
      
-    WSHELPinitialize();
+    //WSHELPinitialize();
+	w32posix_initialize();
 
     /* 
      * Handle install and uninstall service options 

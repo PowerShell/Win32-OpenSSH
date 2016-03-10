@@ -647,7 +647,7 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 	int fd;
 	FILE *f;
 	
-#ifdef WIN32_FIXME
+#if(0)def WIN32_FIXME
     if ((fd = WSHELPwopen(file, O_RDONLY|O_NONBLOCK)) == -1) {
 #else
 	if ((fd = open(file, O_RDONLY|O_NONBLOCK)) == -1) {

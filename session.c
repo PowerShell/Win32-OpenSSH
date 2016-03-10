@@ -661,21 +661,21 @@ do_exec_no_pty(Session *s, const char *command)
 	  sockin[1] = allocate_sfd((int)wfdtocmd); // put the std input handle in our global general handle table
   }
   else
-	  socketpair(sockin);
+	  pipe(sockin);
   #endif
 
-  socketpair(sockout);
-  socketpair(sockerr);
+  pipe(sockout);
+  pipe(sockerr);
 
   debug3("sockin[0]: %d sockin[1]: %d", sockin[0], sockin[1]);
   debug3("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
   debug3("sockerr[0]: %d sockerr[1]: %d", sockerr[0], sockerr[1]);
 
   #ifndef WIN32_PRAGMA_REMCON
-  if ( (s -> is_subsystem) || (s ->ttyfd == -1))
-	crlf_sfd(sockin[1]);
+ // if ( (s -> is_subsystem) || (s ->ttyfd == -1))
+	//crlf_sfd(sockin[1]);
 
-  crlf_sfd(sockout[1]);
+ // crlf_sfd(sockout[1]);
 
   if ( (s -> is_subsystem) || (s ->ttyfd == -1))
   #endif
@@ -1006,8 +1006,9 @@ do_exec_no_pty(Session *s, const char *command)
   s -> processId = pi.dwProcessId;
   
   // Add the child process created to select mux so that during our select data call we know if the process has exited
-  int WSHELPAddChildToWatch ( HANDLE processtowatch);
-  WSHELPAddChildToWatch ( pi.hProcess);
+  /* TODO - fix thi s*/
+  //int WSHELPAddChildToWatch ( HANDLE processtowatch);
+  //WSHELPAddChildToWatch ( pi.hProcess);
 
   /* 
    * Set interactive/non-interactive mode. 

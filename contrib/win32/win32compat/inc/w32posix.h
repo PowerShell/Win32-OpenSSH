@@ -115,5 +115,5 @@ int w32_allocate_fd_for_handle(HANDLE h);
 #define WSHELPAddChildToWatch(a) w32_temp_AddChildToWatch((a))
 #define sfd_to_handle(a) w32_fd_to_handle((a))
 #define allocate_sfd(a) w32_allocate_fd_for_handle((a))
-#define WSHELPwopen(a) w32_open((a))
+//#define WSHELPwopen(a, b) w32_open((a, b))
 
