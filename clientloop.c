@@ -1522,7 +1522,8 @@ client_simple_escape_filter(Channel *c, char *buf, int len)
 
 #ifdef WIN32_FIXME
 u_char * client_ansi_parser_filter(Channel *c, u_char **buf, u_int *len) {
-	if (c->isatty) {
+	/* TODO - account fo error/extended stream*/
+	if (isatty(c->wfd)) {
 		telProcessNetwork(buffer_ptr(&c->output), buffer_len(&c->output));
 		buffer_clear(&c->output);
 		buffer_append(&c->output, " \b", 2);
