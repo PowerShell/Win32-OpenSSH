@@ -590,16 +590,17 @@ fileio_close(struct w32_io* pio) {
 	CancelIo(pio->handle);
 	//let queued APCs (if any) drain
 	SleepEx(0, TRUE);
-	if (pio->type != STD_IO_FD) //STD handles are never explicitly closed
+	if (pio->type != STD_IO_FD) {//STD handles are never explicitly closed
 		CloseHandle(pio->handle);
 
-	if (pio->read_details.buf)
-		free(pio->read_details.buf);
+		if (pio->read_details.buf)
+			free(pio->read_details.buf);
 
-	if (pio->write_details.buf)
-		free(pio->write_details.buf);
+		if (pio->write_details.buf)
+			free(pio->write_details.buf);
 
-	free(pio);
+		free(pio);
+	}
 	return 0;
 }
 

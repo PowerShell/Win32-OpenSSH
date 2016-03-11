@@ -693,7 +693,7 @@ w32_fd_to_handle(int fd) {
 	return fd_table.w32_ios[fd]->handle;
 }
 
-int w32_allocate_fd_for_handle(HANDLE h) {
+int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock) {
 	int min_index = fd_table_get_min_index();
 	struct w32_io* pio;
 
@@ -708,7 +708,7 @@ int w32_allocate_fd_for_handle(HANDLE h) {
 	}
 	memset(pio, 0, sizeof(struct w32_io));
 
-	pio->type = FILE_FD;
+	pio->type = is_sock? SOCK_FD : FILE_FD;
 	pio->handle = h;
 	fd_table_set(pio, min_index);
 	return min_index;

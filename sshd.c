@@ -1699,6 +1699,32 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					startups++;
 					break;
 				}
+
+			/*
+			* Got connection.  Fork a child to handle it, unless
+			* we are in debugging mode.
+			*/
+			if (debug_flag) {
+				/*
+				* In debugging mode.  Close the listening
+				* socket, and start processing the
+				* connection without forking.
+				*/
+				debug("Server will not fork when running in debugging mode.");
+				close_listen_socks();
+				*sock_in = *newsock;
+				*sock_out = *newsock;
+				close(startup_p[0]);
+				close(startup_p[1]);
+				startup_pipe = -1;
+				pid = getpid();
+				if (rexec_flag) {
+					send_rexec_state(config_s[0],
+						&cfg);
+					close(config_s[0]);
+				}
+				break;
+			}
       #ifdef WIN32_FIXME
   
         /*
@@ -1769,32 +1795,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
          * Original OpenSSH code.
          */
 
-
-			/*
-			 * Got connection.  Fork a child to handle it, unless
-			 * we are in debugging mode.
-			 */
-			if (debug_flag) {
-				/*
-				 * In debugging mode.  Close the listening
-				 * socket, and start processing the
-				 * connection without forking.
-				 */
-				debug("Server will not fork when running in debugging mode.");
-				close_listen_socks();
-				*sock_in = *newsock;
-				*sock_out = *newsock;
-				close(startup_p[0]);
-				close(startup_p[1]);
-				startup_pipe = -1;
-				pid = getpid();
-				if (rexec_flag) {
-					send_rexec_state(config_s[0],
-					    &cfg);
-					close(config_s[0]);
-				}
-				break;
-			}
 
 			/*
 			 * Normal production daemon.  Fork, and have
@@ -2820,7 +2820,7 @@ main(int ac, char **av)
         int remotesochandle ;
         remotesochandle = atoi( getenv("SSHD_REMSOC") );
 
-        sock_in = sock_out = newsock = allocate_sfd(remotesochandle) ; //si.hStdInput);
+        sock_in = sock_out = newsock = w32_allocate_fd_for_handle(remotesochandle, TRUE) ; //si.hStdInput);
 		
 		// we have the socket handle, delete it for child processes we create like shell 
 		SetEnvironmentVariable("SSHD_REMSOC", NULL);

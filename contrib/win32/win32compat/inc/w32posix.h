@@ -108,12 +108,12 @@ typedef void(*sighandler_t)(int);
 int w32_temp_DelChildToWatch(HANDLE processtowatch);
 int w32_temp_AddChildToWatch(HANDLE processtowatch);
 HANDLE w32_fd_to_handle(int fd);
-int w32_allocate_fd_for_handle(HANDLE h);
+int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock);
 
 /* temporary definitions to aid in transition */
 #define WSHELPDelChildToWatch(a) w32_temp_DelChildToWatch((a))
 #define WSHELPAddChildToWatch(a) w32_temp_AddChildToWatch((a))
 #define sfd_to_handle(a) w32_fd_to_handle((a))
-#define allocate_sfd(a) w32_allocate_fd_for_handle((a))
+#define allocate_sfd(a, b) w32_allocate_fd_for_handle((a, b))
 //#define WSHELPwopen(a, b) w32_open((a, b))
 
