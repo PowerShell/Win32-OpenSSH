@@ -598,8 +598,10 @@ socketio_close(struct w32_io* pio) {
 	closesocket(pio->sock);
 	/* wait for pending io to abort */
 	SleepEx(0, TRUE);
-	if (pio->read_details.pending || pio->write_details.pending) {
-		debug2("close - IO is still pending on closed socket. read:%d, write:%d, io:%p", pio->read_details.pending, pio->write_details.pending, pio);
+	if ( ((pio->internal.state == SOCK_CONNECTED) || (pio->internal.state == SOCK_ACCEPTED))
+		&& (pio->read_details.pending || pio->write_details.pending)) {
+		debug2("close - IO is still pending on closed socket. read:%d, write:%d, io:%p", 
+		    pio->read_details.pending, pio->write_details.pending, pio);
 		DebugBreak();
 	}
 	if (pio->internal.state == SOCK_LISTENING) {
