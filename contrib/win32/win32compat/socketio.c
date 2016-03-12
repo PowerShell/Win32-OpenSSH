@@ -61,7 +61,7 @@ int
 socketio_acceptEx(struct w32_io* pio) {
 	struct acceptEx_context *context;
 
-	debug2("io:%p", pio);
+	debug3("acceptEx - io:%p", pio);
 	if (pio->internal.context == NULL) {
 		GUID GuidAcceptEx = WSAID_ACCEPTEX;
 		GUID GuidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
@@ -71,7 +71,7 @@ socketio_acceptEx(struct w32_io* pio) {
 		    (struct acceptEx_context*)malloc(sizeof(struct acceptEx_context));
 		if (context == NULL) {
 			errno = ENOMEM;
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("acceptEx - ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 		memset(context, 0, sizeof(struct acceptEx_context));
@@ -83,7 +83,7 @@ socketio_acceptEx(struct w32_io* pio) {
 		{
 			free(context);
 			errno = errno_from_WSALastError();
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("acceptEx - Ioctl1 ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 
@@ -95,7 +95,7 @@ socketio_acceptEx(struct w32_io* pio) {
 		{
 			free(context);
 			errno = errno_from_WSALastError();
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("acceptEx - Ioctl2 ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 
@@ -112,7 +112,7 @@ socketio_acceptEx(struct w32_io* pio) {
 		pio->read_overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 		if ((pio->read_overlapped.hEvent) == NULL) {
 			errno = ENOMEM;
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("acceptEx - CreateEvent() ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 	}
@@ -122,7 +122,7 @@ socketio_acceptEx(struct w32_io* pio) {
 	context->accept_socket = socket(AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
 	if (context->accept_socket == INVALID_SOCKET) {
 		errno = errno_from_WSALastError();
-		debug("ERROR:%d, io:%p", errno, pio);
+		debug("acceptEx - socket() ERROR:%d, io:%p", errno, pio);
 		return -1;
 	}
 
@@ -142,7 +142,7 @@ socketio_acceptEx(struct w32_io* pio) {
 		/* if overlapped io is in progress, we are good */
 		if (WSAGetLastError() != ERROR_IO_PENDING) {
 			errno = errno_from_WSALastError();
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("acceptEx - AcceptEx() ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 	}
@@ -161,7 +161,7 @@ CALLBACK WSARecvCompletionRoutine(
 {
 	struct w32_io* pio = 
 	    (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, read_overlapped));
-	debug2("io:%p, pending_state:%d, flags:%d, error:%d, received:%d",
+	debug2("WSARecvCompletionCB - io:%p, pending_state:%d, flags:%d, error:%d, received:%d",
 		pio, pio->read_details.pending, dwFlags, dwError, cbTransferred);
 	if (!dwError && !cbTransferred)
 		dwError = ERROR_GRACEFUL_DISCONNECT;
@@ -178,7 +178,7 @@ socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
 	WSABUF wsabuf;
 	DWORD recv_flags = 0;
 
-	debug2("pio: %p", pio);
+	debug3("WSARecv - pio: %p", pio);
 	if (completed)
 		*completed = FALSE;
 
@@ -191,7 +191,7 @@ socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
 		if (!wsabuf.buf)
 		{
 			errno = ENOMEM;
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("WSARecv - ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 
@@ -208,7 +208,7 @@ socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
 	{
 		pio->read_details.pending = TRUE;
 		/* receive has completed but APC is pending to be scheduled */
-		debug2("WSARecv returned 0, io:%p", pio);
+		debug2("WSARecv - WSARecv() returned 0, io:%p", pio);
 		if (completed)
 			*completed = TRUE;
 	}
@@ -216,12 +216,12 @@ socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
 		if (WSAGetLastError() == WSA_IO_PENDING)
 		{
 			/* io is initiated and pending */
-			debug2("WSARecv reported IO pending");
+			debug2("WSARecv - reported IO pending");
 			pio->read_details.pending = TRUE;
 		}
 		else {
 			errno = errno_from_WSALastError();
-			debug("ERROR: io:%p %d", pio, errno);
+			debug("WSARecv - WSARecv() ERROR: io:%p %d", pio, errno);
 			return -1;
 		}
 	}
@@ -235,7 +235,7 @@ socketio_socket(int domain, int type, int protocol) {
 	struct w32_io *pio = (struct w32_io*)malloc(sizeof(struct w32_io));
 	if (!pio) {
 		errno = ENOMEM;
-		debug("ERROR:%d, io:%p", errno, pio);
+		debug("socket - ERROR:%d, io:%p", errno, pio);
 		return NULL;
 	}
 
@@ -244,7 +244,7 @@ socketio_socket(int domain, int type, int protocol) {
 	if (pio->sock == INVALID_SOCKET) {
 		errno = errno_from_WSALastError();
 		free(pio);
-		debug("ERROR:%d, io:%p", errno, pio);
+		debug("socket - socket() ERROR:%d, io:%p", errno, pio);
 		return NULL;
 	}
 
@@ -256,7 +256,7 @@ socketio_socket(int domain, int type, int protocol) {
     int ret = (expr);                                   \
     if (ret == SOCKET_ERROR) {                          \
         errno = errno_from_WSALastError();              \
-        debug("ERROR:%d", errno);                       \
+        debug("%s - ERROR:%d", __FUNCTION__, errno);                       \
     }                                                   \
     return ret;                                         \
 } while (0) 
@@ -269,7 +269,7 @@ socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optv
 	    (optname == TCP_NODELAY) || (optname == IPV6_V6ONLY))
 		SET_ERRNO_ON_ERROR(setsockopt(pio->sock, level, optname, optval, optlen));
 	else {
-		debug("ERROR: unsupported optname:%d io:%p", optname, pio);
+		debug("setsockop - ERROR: unsupported optname:%d io:%p", optname, pio);
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -298,7 +298,7 @@ int
 socketio_listen(struct w32_io* pio, int backlog) {
 	if (SOCKET_ERROR == listen(pio->sock, backlog)) {
 		errno = errno_from_WSALastError();
-		debug("ERROR:%d io:%p", errno, pio);
+		debug("listen - listen() ERROR:%d io:%p", errno, pio);
 		return -1;
 	}
 	pio->internal.state = SOCK_LISTENING;
@@ -316,17 +316,17 @@ int
 socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 	BOOL completed = FALSE;
 
-	debug2("io:%p", pio);
+	debug3("recv - io:%p", pio);
 
 	if ((buf == NULL) || (len == 0)) {
 		errno = EINVAL;
-		debug("ERROR, buf:%p, len:%d, io:%p", buf, len, pio);
+		debug("recv - ERROR: invalid arguments, buf:%p, len:%d, io:%p", buf, len, pio);
 		return -1;
 	}
 
 	if (flags != 0) {
 		errno = ENOTSUP;
-		debug("ERROR: flags are not currently supported, io:%p", pio);
+		debug("recv - ERROR: flags are not currently supported, io:%p", pio);
 		return -1;
 	}
 
@@ -334,7 +334,7 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 	if (pio->read_details.pending) {
 		/* if recv is now in blocking mode, wait for data to be available */
 		if (w32_io_is_blocking(pio)) {
-			debug2("io is pending, call is blocking, io:%p", pio);
+			debug2("recv - io is pending, call is blocking, io:%p", pio);
 			while (socketio_is_io_available(pio, TRUE) == FALSE) {
 				if (0 != wait_for_any_event(NULL, 0, INFINITE))
 					return -1;
@@ -342,7 +342,7 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 		}
 		else {
 			errno = EAGAIN;
-			debug2("Read is already pending, io:%p", pio);
+			debug2("recv - io is already pending, io:%p", pio);
 			return -1;
 		}
 	}
@@ -355,7 +355,7 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 		    num_bytes_copied);
 		pio->read_details.remaining -= num_bytes_copied;
 		pio->read_details.completed += num_bytes_copied;
-		debug2("returning %d bytes from prior completed IO, remaining:%d, io:%p", 
+		debug2("recv - returning %d bytes from prior completed IO, remaining:%d, io:%p", 
 		    num_bytes_copied, pio->read_details.remaining, pio);
 		return num_bytes_copied;
 	}
@@ -364,14 +364,14 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 	/* if there was an error on async call, return */
 	if (pio->read_details.error) {
 		if (pio->read_details.error == ERROR_GRACEFUL_DISCONNECT) {
-			debug2("connection closed, io:%p", pio);
+			debug2("recv - connection closed, io:%p", pio);
 			/* connection is closed */
 			return 0;
 		}
 		else {
 			errno = errno_from_WSAError(pio->read_details.error);
 			pio->read_details.error = 0;
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("recv - from CB ERROR:%d, io:%p", pio->read_details.error, pio);
 			return -1;
 		}
 	}
@@ -381,13 +381,13 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 
 	if (completed) {
 		/* Let APC be scheduled */
-		debug2("Letting APC to execute");
+		debug2("recv - Letting APC to execute, io:%p", pio);
 		if (wait_for_any_event(NULL, 0, 0) == -1)
 			return -1;
 		if (pio->read_details.pending) {
 			/* this shouldn't be happening */
 			errno = EOTHER;
-			debug("ERROR: Unexpected IO state, io:%p", pio);
+			debug("recv - ERROR: Unexpected IO state, io:%p", pio);
 			return -1;
 		}
 	}
@@ -395,7 +395,7 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 	if (w32_io_is_blocking(pio))
 	{
 		/* wait until io is done */
-		debug3("socket in blocking mode");
+		debug3("recv - socket in blocking mode, io:%p", pio);
 		while (socketio_is_io_available(pio, TRUE) == FALSE) {
 			if (0 != wait_for_any_event(NULL, 0, INFINITE))
 				return -1;
@@ -404,7 +404,7 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 	else {
 		if (socketio_is_io_available(pio, TRUE) == FALSE) {
 			errno = EAGAIN;
-			debug2("IO is pending, io:%p", pio);
+			debug2("recv - IO is pending, io:%p", pio);
 			return -1;
 		}
 	}
@@ -417,13 +417,13 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 	{
 		if (pio->read_details.error == ERROR_GRACEFUL_DISCONNECT) {
 			/* connection is closed */
-			debug2("connection closed, io:%p", pio);
+			debug2("recv - connection closed(2), io:%p", pio);
 			return 0;
 		}
 		else {
 			errno = errno_from_WSAError(pio->read_details.error);
 			pio->read_details.error = 0;
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("recv - from CB(2) ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 	}
@@ -433,14 +433,14 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 		memcpy(buf, pio->read_details.buf, num_bytes_copied);
 		pio->read_details.remaining -= num_bytes_copied;
 		pio->read_details.completed = num_bytes_copied;
-		debug2("returning %d bytes from completed IO, remaining:%d, io:%p", 
+		debug2("recv - (2) returning %d bytes from completed IO, remaining:%d, io:%p", 
 		    num_bytes_copied, pio->read_details.remaining, pio);
 		return num_bytes_copied;
 	}
 	else {
 		/* this should not happen */
 		errno = EOTHER;
-		debug("ERROR:Unexpected IO stated, io:%p", pio);
+		debug("recv - (2) ERROR:Unexpected IO stated, io:%p", pio);
 		return -1;
 	}
 
@@ -456,13 +456,16 @@ CALLBACK WSASendCompletionRoutine(
 {
 	struct w32_io* pio = 
 	    (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, write_overlapped));
-	debug2("io:%p, pending_state:%d, error:%d, sent:%d of remaining:%d", 
+	debug2("WSASendCB - io:%p, pending_state:%d, error:%d, sent:%d of remaining:%d", 
 	    pio, pio->write_details.pending, dwError, cbTransferred, 
 	    pio->write_details.remaining);
 	pio->write_details.error = dwError;
 	/* TODO - assert that remaining == cbTransferred */
-	if ((dwError == 0) && (pio->write_details.remaining != cbTransferred))
+	if ((dwError == 0) && (pio->write_details.remaining != cbTransferred)) {
+		debug("WSASendCB - ERROR: broken assumption, io:%p, sent:%d, remaining:%d", pio, 
+		    cbTransferred, pio->write_details.remaining);
 		abort();
+	}
 	pio->write_details.remaining -= cbTransferred;
 	pio->write_details.pending = FALSE;
 }
@@ -473,17 +476,17 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 	int ret = 0;
 	WSABUF wsabuf;
 
-	debug2("io:%p", pio);
+	debug2("send - io:%p", pio);
 
 	if ((buf == NULL) || (len == 0)) {
 		errno = EINVAL;
-		debug("ERROR, buf:%p, len:%d, io:%p", buf, len, pio);
+		debug("send - ERROR invalid arguments, buf:%p, len:%d, io:%p", buf, len, pio);
 		return -1;
 	}
 
 	if (flags != 0) {
 		errno = ENOTSUP;
-		debug("ERROR: flags are not currently supported, io:%p", pio);
+		debug("send - ERROR: flags are not currently supported, io:%p", pio);
 		return -1;
 	}
 
@@ -492,7 +495,7 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 	{
 		if (w32_io_is_blocking(pio))
 		{
-			debug2("io is pending, call is blocking, io:%p", pio);
+			debug2("send - io is pending, call is blocking, io:%p", pio);
 			while (pio->write_details.pending) {
 				if (wait_for_any_event(NULL, 0, INFINITE) == -1)
 					return -1;
@@ -500,7 +503,7 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 		}
 		else {
 			errno = EAGAIN;
-			debug2("IO currently pending, EAGAIN, io:%p", pio);
+			debug2("send - IO currently pending, EAGAIN, io:%p", pio);
 			return -1;
 		}
 	}
@@ -520,7 +523,7 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 		if (!wsabuf.buf)
 		{
 			errno = ENOMEM;
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("send - ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 
@@ -541,14 +544,14 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 	if (ret == 0)
 	{
 		/* send has completed and APC is scheduled, let it run */
-		debug2("WSASend returned 0, APC scheduled io:%p", pio);
+		debug2("send - WSASend() returned 0, APC scheduled io:%p", pio);
 		pio->write_details.pending = TRUE;
 		pio->write_details.remaining = wsabuf.len;
 		if (wait_for_any_event(NULL, 0, 0) == -1)
 			return -1;
 		if ((pio->write_details.pending) || (pio->write_details.remaining != 0)) {
 			errno = EOTHER;
-			debug("ERROR: Unexpected IO state, io:%p", pio);
+			debug("send - ERROR: Unexpected IO state, io:%p", pio);
 			return -1;
 		}
 
@@ -559,24 +562,24 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 		if (WSAGetLastError() == WSA_IO_PENDING)
 		{
 			/* io is initiated and pending */
-			debug2("WSASend reported IO pending, io:%p", pio);
+			debug2("send - WSASend reported IO pending, io:%p", pio);
 			pio->write_details.pending = TRUE;
 			pio->write_details.remaining = wsabuf.len;
 			if (w32_io_is_blocking(pio))
 			{
 				/* wait until io is done */
-				debug3("waiting as socket is in blocking mode, io:%p", pio);
+				debug3("send - waiting as socket is in blocking mode, io:%p", pio);
 				while (pio->write_details.pending)
 					if (wait_for_any_event(NULL, 0,INFINITE) == -1)
 						return -1;
 			}
 
-			debug3("returning %d", wsabuf.len);
+			debug3("send - returning %d, io:%p", wsabuf.len, pio);
 			return wsabuf.len;
 		}
 		else { 
 			errno = errno_from_WSALastError();
-			debug("ERROR:%d, io:%p", errno, pio);
+			debug("send - WSASend() ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 	}
@@ -591,12 +594,14 @@ socketio_shutdown(struct w32_io* pio, int how) {
 /* socket close() implementation */
 int 
 socketio_close(struct w32_io* pio) {
-	debug2("io:%p", pio);
+	debug2("close - io:%p", pio);
 	closesocket(pio->sock);
 	/* wait for pending io to abort */
 	SleepEx(0, TRUE);
-	if (pio->read_details.pending || pio->write_details.pending)
-		debug2("IO is still pending on closed socket. read:%d, write:%d, io:%p", pio->read_details.pending, pio->write_details.pending, pio);
+	if (pio->read_details.pending || pio->write_details.pending) {
+		debug2("close - IO is still pending on closed socket. read:%d, write:%d, io:%p", pio->read_details.pending, pio->write_details.pending, pio);
+		DebugBreak();
+	}
 	if (pio->internal.state == SOCK_LISTENING) {
 		if (pio->read_overlapped.hEvent)
 			CloseHandle(pio->read_overlapped.hEvent);
@@ -634,7 +639,7 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
 	struct sockaddr *local_address,*remote_address;
 	int local_address_len, remote_address_len;
 
-	debug2("io:%p", pio);
+	debug3("accept - io:%p", pio);
 	/* start io if not already started */
 	if (pio->read_details.pending == FALSE) {
 		if (socketio_acceptEx(pio) != 0) {
@@ -646,7 +651,7 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
 		/* block until accept io is complete */
 		while (FALSE == socketio_is_io_available(pio, TRUE))
 		{
-			if (0 != wait_for_any_event(&pio->read_overlapped.hEvent, 
+			if (-1 == wait_for_any_event(&pio->read_overlapped.hEvent, 
 			    1, INFINITE))
 			{
 				return NULL;
@@ -669,21 +674,21 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
 
 	if (pio->read_details.error) {
 		errno = errno_from_WSAError(pio->read_details.error);
-		debug("ERROR: async io completed with error: %d, io:%p", errno, pio);
+		debug("accept - ERROR: async io completed with error: %d, io:%p", errno, pio);
 		goto on_error;
 	}
 
 	if (0 != setsockopt(context->accept_socket, SOL_SOCKET, 
 	    SO_UPDATE_ACCEPT_CONTEXT, (char*)&pio->sock, sizeof(pio->sock))) {
 		errno = errno_from_WSALastError();
-		debug("ERROR: setsockopt failed:%d, io:%p", errno, pio);
+		debug("accept - ERROR: setsockopt failed:%d, io:%p", errno, pio);
 		goto on_error;
 	}
 
 	accept_io = (struct w32_io*)malloc(sizeof(struct w32_io));
 	if (!accept_io) {
 		errno = ENOMEM;
-		debug("ERROR:%d, io:%p", errno, pio);
+		debug("accept - ERROR:%d, io:%p", errno, pio);
 		goto on_error;
 	}
 	memset(accept_io, 0, sizeof(struct w32_io));
@@ -726,7 +731,7 @@ socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int namelen)
 	GUID connectex_guid = WSAID_CONNECTEX;
 	LPFN_CONNECTEX ConnectEx;
 
-	debug("io:%p", pio);
+	debug3("connectex - io:%p", pio);
 	if (name->sa_family == AF_INET6) {
 		ZeroMemory(&tmp_addr6, sizeof(tmp_addr6));
 		tmp_addr6.sin6_family = AF_INET6;
@@ -743,14 +748,14 @@ socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int namelen)
 	}
 	else {
 		errno = ENOTSUP;
-		debug("ERROR: unsuppored address family:%d, io:%p", name->sa_family, pio);
+		debug("connectex - ERROR: unsuppored address family:%d, io:%p", name->sa_family, pio);
 		return -1;
 	}
 
 	if (SOCKET_ERROR == bind(pio->sock, tmp_addr, (int)tmp_addr_len))
 	{
 		errno = errno_from_WSALastError();
-		debug("ERROR: bind failed :%d, io:%p", errno, pio);
+		debug("connectex - ERROR: bind failed :%d, io:%p", WSAGetLastError(), pio);
 		return -1;
 	}
 
@@ -760,14 +765,14 @@ socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int namelen)
 		&tmp_bytes, NULL, NULL))
 	{
 		errno = errno_from_WSALastError();
-		debug("ERROR:%d, io:%p", errno, pio);
+		debug("connectex - ioctl ERROR:%d, io:%p", WSAGetLastError(), pio);
 		return -1;
 	}
 
 	if ((!pio->write_overlapped.hEvent) 
 	    && ((pio->write_overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)) {
 		errno = ENOMEM;
-		debug("ERROR:%d, io:%p", errno, pio);
+		debug("connectex - ERROR CreateEvent failed:%d, io:%p", errno, pio);
 		return -1;
 	}
 
@@ -782,7 +787,7 @@ socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int namelen)
 			CloseHandle(pio->write_overlapped.hEvent);
 			pio->write_overlapped.hEvent = 0;
 			errno = errno_from_WSALastError();
-			debug("ERROR ConnectEx :%d, io:%p", errno, pio);
+			debug("connectex - ERROR ConnectEx() :%d, io:%p", errno, pio);
 			return -1;
 		}
 	}
@@ -796,6 +801,7 @@ socketio_connectex(struct w32_io* pio, const struct sockaddr* name, int namelen)
 int 
 socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namelen) {
 
+	debug3("connect - io:%p", pio);
 	if (pio->write_details.pending == FALSE) {
 		if (-1 == socketio_connectex(pio, name, namelen))
 			return -1;
@@ -804,7 +810,7 @@ socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namelen) {
 	if (w32_io_is_blocking(pio)) {
 		/*  block until connect io is complete */
 		while (FALSE == socketio_is_io_available(pio, TRUE)) {
-			if (0 != wait_for_any_event(&pio->write_overlapped.hEvent, 
+			if (-1 == wait_for_any_event(&pio->write_overlapped.hEvent, 
 			    1, INFINITE)) 
 				return -1;
 		}
@@ -813,7 +819,7 @@ socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namelen) {
 		/* if i/o is not ready */
 		if (FALSE == socketio_is_io_available(pio, TRUE)) {
 			errno = EINPROGRESS;
-			debug2("connect is in progress, io:%p", pio);
+			debug2("connect - in progress, io:%p", pio);
 			return -1;
 		}
 
@@ -821,13 +827,13 @@ socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namelen) {
 
 	if (pio->write_details.error) {
 		errno = errno_from_WSAError(pio->write_details.error);
-		debug("ERROR: async io completed with error: %d, io:%p", errno, pio);
+		debug("connect - ERROR: async io completed with error: %d, io:%p", errno, pio);
 		return -1;
 	}
 
 	if (0 != setsockopt(pio->sock, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, NULL, 0)) {
 		errno = errno_from_WSALastError();
-		debug("ERROR: setsockopt failed:%d, io:%p", errno, pio);
+		debug("connect - ERROR: setsockopt failed:%d, io:%p", errno, pio);
 		return -1;
 	}
 
@@ -884,7 +890,7 @@ socketio_on_select(struct w32_io* pio, BOOL rd) {
 
 	enum w32_io_sock_state sock_state = pio->internal.state;
 
-	debug2("io:%p type:%d rd:%d", pio, pio->type, rd);
+	debug2("on_select - io:%p type:%d rd:%d", pio, pio->type, rd);
 
 	//nothing to do for writes (that includes connect)
 	if (!rd)

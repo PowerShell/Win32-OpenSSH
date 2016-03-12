@@ -40,7 +40,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		/* some other error*/
 		else { 
 			errno = EOTHER;
-			debug("ERROR: unxpected wait end with error: %d", ret);
+			debug("ERROR: unxpected wait end: %d", ret);
 			return -1;
 		}
 	}
