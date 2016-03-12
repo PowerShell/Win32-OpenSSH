@@ -464,7 +464,7 @@ CALLBACK WSASendCompletionRoutine(
 	if ((dwError == 0) && (pio->write_details.remaining != cbTransferred)) {
 		debug("WSASendCB - ERROR: broken assumption, io:%p, sent:%d, remaining:%d", pio, 
 		    cbTransferred, pio->write_details.remaining);
-		abort();
+		DebugBreak();
 	}
 	pio->write_details.remaining -= cbTransferred;
 	pio->write_details.pending = FALSE;

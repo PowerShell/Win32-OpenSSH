@@ -49,10 +49,9 @@ fileio_pipe(struct w32_io* pio[2]) {
 	char pipe_name[MAX_PATH];
 	SECURITY_ATTRIBUTES sec_attributes;
 
-	debug2("");
 	if (pio == NULL) {
 		errno = EINVAL;
-		debug("ERROR:%d", errno);
+		debug("pipe - ERROR invalid parameter");
 		return -1;
 	}
 
@@ -60,7 +59,7 @@ fileio_pipe(struct w32_io* pio[2]) {
 	if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\W32PosixPipe.%08x.%08x", 
 		GetCurrentProcessId(), pipe_counter++)) {
 		errno = EOTHER;
-		debug("ERROR:%d", errno);
+		debug("pipe - ERROR sprintf_s %d", errno);
 		goto error;
 	}
 
@@ -79,7 +78,7 @@ fileio_pipe(struct w32_io* pio[2]) {
 		&sec_attributes);
 	if (read_handle == INVALID_HANDLE_VALUE) {
 		errno = errno_from_Win32LastError();
-		debug("ERROR:%d", errno);
+		debug("pipe - CreateNamedPipe() ERROR:%d", errno);
 		goto error;
 	}
 
@@ -93,7 +92,7 @@ fileio_pipe(struct w32_io* pio[2]) {
 		NULL);
 	if (write_handle == INVALID_HANDLE_VALUE) {
 		errno = errno_from_Win32LastError();
-		debug("ERROR:%d", errno);
+		debug("pipe - ERROR CreateFile() :%d", errno);
 		goto error;
 	}
 
@@ -103,7 +102,7 @@ fileio_pipe(struct w32_io* pio[2]) {
 
 	if (!pio_read || !pio_write) {
 		errno = ENOMEM;
-		debug("ERROR:%d", errno);
+		debug("pip - ERROR:%d", errno);
 		goto error;
 	}
 
@@ -152,7 +151,7 @@ createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 	* O_RDONLY, O_WRONLY, or O_RDWR
 	*/
 	if ((rwflags != O_RDONLY) && (rwflags != O_WRONLY) && (rwflags != O_RDWR)) {
-		debug("ERROR: wrong rw flags");
+		debug("open - flags ERROR: wrong rw flags: %d", flags);
 		errno = EINVAL;
 		return -1;
 	}
@@ -160,14 +159,14 @@ createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 	/*only following create and status flags currently supported*/
 	if (c_s_flags & ~(O_NONBLOCK | O_APPEND | O_CREAT | O_TRUNC
 	    | O_EXCL | O_BINARY)) {
-		debug("ERROR: Unsupported flags: %d", flags);
+		debug("open - ERROR: Unsupported flags: %d", flags);
 		errno = ENOTSUP;
 		return -1;
 	}
 
 	/*validate mode*/
 	if (mode &~(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) {
-		debug("ERROR: unsupported mode: %d", mode);
+		debug("open - ERROR: unsupported mode: %d", mode);
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -217,11 +216,11 @@ fileio_open(const char *pathname, int flags, int mode) {
 	struct createFile_flags cf_flags;
 	HANDLE handle;
 
-	debug2("pathname:%s, flags:%d, mode:%d", pathname, flags, mode);
+	debug2("open - pathname:%s, flags:%d, mode:%d", pathname, flags, mode);
 	/* check input params*/
 	if (pathname == NULL) {
 		errno = EINVAL;
-		debug("ERROR:%d", errno);
+		debug("open - ERROR:%d", errno);
 		return NULL;
 	}
 
@@ -236,7 +235,7 @@ fileio_open(const char *pathname, int flags, int mode) {
 
 	if (handle == INVALID_HANDLE_VALUE) {
 		errno = errno_from_Win32LastError();
-		debug("ERROR:%d", errno);
+		debug("open - CreateFile ERROR:%d", GetLastError());
 		return NULL;
 	}
 
@@ -244,7 +243,7 @@ fileio_open(const char *pathname, int flags, int mode) {
 	if (pio == NULL) {
 		CloseHandle(handle);
 		errno = ENOMEM;
-		debug("ERROR:%d", errno);
+		debug("open - ERROR:%d", errno);
 		return NULL;
 	}
 	memset(pio, 0, sizeof(struct w32_io));
@@ -264,7 +263,7 @@ VOID CALLBACK ReadCompletionRoutine(
 	) {
 	struct w32_io* pio = 
 	    (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, read_overlapped));
-	debug2("pio:%p, pending_state:%d, error:%d, received:%d", 
+	debug2("ReadCB pio:%p, pending_state:%d, error:%d, received:%d", 
 		pio, pio->read_details.pending, dwErrorCode, dwNumberOfBytesTransfered);
 	pio->read_details.error = dwErrorCode;
 	pio->read_details.remaining = dwNumberOfBytesTransfered;
@@ -277,12 +276,12 @@ VOID CALLBACK ReadCompletionRoutine(
 int 
 fileio_ReadFileEx(struct w32_io* pio) {
 	HANDLE h = pio->handle;
-	debug2("io:%p", pio);
+	debug2("ReadFileEx io:%p", pio);
 	if (pio->read_details.buf == NULL){
 		pio->read_details.buf = malloc(READ_BUFFER_SIZE);
 		if (!pio->read_details.buf) {
 			errno = ENOMEM;
-			debug2("ERROR: %d", errno);
+			debug2("ReadFileEx - ERROR: %d, io:%p", errno, pio);
 			return -1;
 		}
 		pio->read_details.buf_size = READ_BUFFER_SIZE;
@@ -297,6 +296,7 @@ fileio_ReadFileEx(struct w32_io* pio) {
 		pio->read_details.pending = TRUE;
 	else {
 		errno = errno_from_Win32LastError();
+		debug("ReadFileEx() ERROR:%d, io:%p", GetLastError(), pio);
 		return -1;
 	}
 
@@ -308,9 +308,9 @@ int
 fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 	int bytes_copied;
 
-	debug2("io:%p remaining:%d", pio, pio->read_details.remaining);
+	debug3("read - io:%p remaining:%d", pio, pio->read_details.remaining);
 	if ((pio->type == PIPE_FD) && (pio->internal.state == PIPE_WRITE_END)) {
-		debug("ERROR: read called on write end of pipe, io:%p", pio);
+		debug("read - ERROR: called on write end of pipe, io:%p", pio);
 		errno = EBADF;
 		return -1;
 	}
@@ -318,14 +318,14 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 	/* if read is pending */
 	if (pio->read_details.pending) {
 		if (w32_io_is_blocking(pio)) {
-			debug2("io is pending, blocking call made, io:%p", pio);
+			debug2("read - io is pending, blocking call made, io:%p", pio);
 			while (fileio_is_io_available(pio, TRUE) == FALSE) {
 				if (-1 == wait_for_any_event(NULL, 0, INFINITE))
 					return -1;
 			}
 		}
 		errno = EAGAIN;
-		debug2("io is already pending");
+		debug2("read - io is already pending, io:%p", pio);
 		return -1;
 	}
 
@@ -333,7 +333,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 		if (-1 == fileio_ReadFileEx(pio)) {
 			if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) {
 				/* write end of the pipe closed */
-				debug2("no more data");
+				debug2("read - no more data, io:%p", pio);
 				errno = 0;
 				return 0;
 			}
@@ -352,7 +352,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 		}
 		else if (pio->read_details.pending) {
 			errno = EAGAIN;
-			debug2("IO is pending");
+			debug2("read - IO is pending, io:%p", pio);
 			return -1;
 		}
 	}
@@ -362,12 +362,12 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 		/*write end of the pipe is closed or pipe broken or eof reached*/
 		if ((pio->read_details.error == ERROR_BROKEN_PIPE) || 
 			(pio->read_details.error == ERROR_HANDLE_EOF)) {
-			debug2("no more data");
+			debug2("read - (2) no more data, io:%p", pio);
 			errno = 0;
 			pio->read_details.error = 0;
 			return 0;
 		}
-		debug("ERROR:%d", errno);
+		debug("read - ERROR from cb :%d, io:%p", errno, pio);
 		pio->read_details.error = 0;
 		return -1;
 	}
@@ -376,7 +376,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 	memcpy(dst, pio->read_details.buf + pio->read_details.completed, bytes_copied);
 	pio->read_details.remaining -= bytes_copied;
 	pio->read_details.completed += bytes_copied;
-	debug2("io:%p read: %d remaining: %d", pio, bytes_copied, 
+	debug2("read - io:%p read: %d remaining: %d", pio, bytes_copied, 
 	    pio->read_details.remaining);
 	return bytes_copied;
 }
@@ -388,13 +388,16 @@ VOID CALLBACK WriteCompletionRoutine(
 	) {
 	struct w32_io* pio = 
 	    (struct w32_io*)((char*)lpOverlapped - offsetof(struct w32_io, write_overlapped));
-	debug2("pio:%p, pending_state:%d, error:%d, transferred:%d of remaining: %d", 
+	debug2("WriteCB - pio:%p, pending_state:%d, error:%d, transferred:%d of remaining: %d", 
 	    pio, pio->write_details.pending, dwErrorCode, dwNumberOfBytesTransfered, 
 	    pio->write_details.remaining);
 	pio->write_details.error = dwErrorCode;
 	/* TODO - assert that remaining == dwNumberOfBytesTransfered */
-	if ((dwErrorCode == 0) && (pio->write_details.remaining != dwNumberOfBytesTransfered))
-		abort();
+	if ((dwErrorCode == 0) && (pio->write_details.remaining != dwNumberOfBytesTransfered)) {
+		debug("WriteCB - ERROR: broken assumption, io:%p, wrote:%d, remaining:%d", pio,
+			dwNumberOfBytesTransfered, pio->write_details.remaining);
+		DebugBreak();
+	}	
 	pio->write_details.remaining -= dwNumberOfBytesTransfered;
 	pio->write_details.pending = FALSE;
 	*((__int64*)&lpOverlapped->Offset) += dwNumberOfBytesTransfered;
@@ -406,9 +409,9 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	int bytes_copied;
 	HANDLE h = pio->handle;
 
-	debug2("io:%p", pio);
+	debug2("write - io:%p", pio);
 	if ((pio->type == PIPE_FD) && (pio->internal.state == PIPE_READ_END)) {
-		debug("ERROR: write called on a read end of pipe, io:%p", pio);
+		debug("write - ERROR: write called on a read end of pipe, io:%p", pio);
 		errno = EBADF;
 		return -1;
 	}
@@ -416,7 +419,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	if (pio->write_details.pending) {
 		if (w32_io_is_blocking(pio))
 		{
-			debug2("io pending, blocking call made, io:%p", pio);
+			debug2("write - io pending, blocking call made, io:%p", pio);
 			while (pio->write_details.pending) {
 				if (wait_for_any_event(NULL, 0, INFINITE) == -1)
 					return -1;
@@ -424,14 +427,14 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 		}
 		else {
 			errno = EAGAIN;
-			debug2("IO is already pending");
+			debug2("write - IO is already pending, io:%p", pio);
 			return -1;
 		}
 	}
 
 	if (pio->write_details.error) {
 		errno = errno_from_Win32Error(pio->write_details.error);
-		debug("ERROR:%d on prior unblocking write", errno);
+		debug("write - ERROR:%d on prior unblocking write, io:%p", errno, pio);
 		pio->write_details.error = 0;
 		return -1;
 	}
@@ -440,7 +443,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 		pio->write_details.buf = malloc(WRITE_BUFFER_SIZE);
 		if (pio->write_details.buf == NULL) {
 			errno = ENOMEM;
-			debug("ERROR:%d", errno);
+			debug("write - ERROR:%d, io:%p", errno, pio);
 			return -1;
 		}
 		pio->write_details.buf_size = WRITE_BUFFER_SIZE;
@@ -469,21 +472,21 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 		}
 		if (!pio->write_details.pending && pio->write_details.error) {
 			errno = errno_from_Win32Error(pio->write_details.error);
+			debug("write - ERROR from cb:%d, io:%p", pio->write_details.error, pio);
 			pio->write_details.error = 0;
-			debug("ERROR:%d", errno);
 			return -1;
 		}
-		debug2("reporting %d bytes written", bytes_copied);
+		debug2("write - reporting %d bytes written, io:%p", bytes_copied, pio);
 		return bytes_copied;
 	}
 	else {
 		errno = errno_from_Win32LastError();
 		/* read end of the pipe closed    */
 		if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) {
-			debug("ERROR:read end of the pipe closed");
+			debug("write - ERROR:read end of the pipe closed, io:%p", pio);
 			errno = EPIPE;
 		}
-		debug("ERROR:%d", errno);
+		debug("write ERROR from cb(2):%d, io:%p", errno, pio);
 		return -1;
 	}
 
@@ -494,7 +497,7 @@ int
 fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 
 	int fd = _open_osfhandle((intptr_t)pio->handle, 0);
-	debug2("pio:%p", pio);
+	debug2("fstat - pio:%p", pio);
 	if (fd == -1) {
 		errno = EOTHER;
 		return -1;
@@ -510,14 +513,16 @@ fileio_stat(const char *path, struct _stat64 *buf) {
 
 long 
 fileio_lseek(struct w32_io* pio, long offset, int origin) {
-	int fd = _open_osfhandle((intptr_t)pio->handle, 0);
-	debug2("pio:%p", pio);
-	if (fd == -1) {
-		errno = EOTHER;
+	debug2("lseek - pio:%p", pio);
+	if (origin != SEEK_SET) {
+		debug("lseek - ERROR, origin is not supported %d", origin);
+		errno = ENOTSUP;
 		return -1;
 	}
 
-	return _lseek(fd, offset, origin);
+	//NO-OP as we automatically move file pointer in async io callbacks for files
+	//assert current postion in overlapped struct
+	return 0;
 }
 
 /* isatty() implementation */
@@ -536,7 +541,7 @@ FILE*
 fileio_fdopen(struct w32_io* pio, const char *mode) {
 
 	int fd_flags = 0;
-	debug2("pio:%p", pio);
+	debug2("fdopen - io:%p", pio);
 
 	if (mode[1] == '\0') {
 		switch (*mode) {
@@ -550,13 +555,13 @@ fileio_fdopen(struct w32_io* pio, const char *mode) {
 			break;
 		default:
 			errno = ENOTSUP;
-			debug("ERROR:%d", errno);
+			debug("fdopen - ERROR unsupported mode %s", mode);
 			return NULL;
 		}
 	}
 	else {
 		errno = ENOTSUP;
-		debug("ERROR:%d", errno);
+		debug("fdopen - ERROR unsupported mode %s", mode);
 		return NULL;
 	}
 
@@ -564,7 +569,7 @@ fileio_fdopen(struct w32_io* pio, const char *mode) {
 
 	if (fd == -1) {
 		errno = EOTHER;
-		debug("ERROR:%d", errno);
+		debug("fdopen - ERROR:%d _open_osfhandle()", errno);
 		return NULL;
 	}
 
@@ -586,7 +591,7 @@ fileio_on_select(struct w32_io* pio, BOOL rd) {
 
 int 
 fileio_close(struct w32_io* pio) {
-	debug2("pio:%p", pio);
+	debug2("fileclose - pio:%p", pio);
 	CancelIo(pio->handle);
 	//let queued APCs (if any) drain
 	SleepEx(0, TRUE);

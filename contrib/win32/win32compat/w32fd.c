@@ -93,7 +93,7 @@ void
 w32posix_initialize() {
 	if ((fd_table_initialize() != 0)
 		|| (socketio_initialize() != 0))
-		abort();
+		DebugBreak();
 }
 
 void
@@ -462,7 +462,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	if (exceptfds) {
 		errno = EOPNOTSUPP;
 		debug("select - ERROR: exceptfds not supported");
-		abort();
+		DebugBreak();
 		return -1;
 	}
 
