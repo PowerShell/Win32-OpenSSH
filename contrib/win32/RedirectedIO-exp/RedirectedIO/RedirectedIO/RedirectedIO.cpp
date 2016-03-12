@@ -30,16 +30,17 @@ DWORD WINAPI InThreadProc(
 	)
 {
 	DWORD mode;
-	GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode);
-	//SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
-	GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode);
+	
 	char buf[1024];
+	char *cmd = "dir/r/n";
 	DWORD tmp;
 	BOOL ret = TRUE;
 	while (ret) {
-		ret = ReadFile(GetStdHandle(STD_INPUT_HANDLE), buf, 1024, &tmp, NULL);
+		//ret = ReadFile(GetStdHandle(STD_INPUT_HANDLE), buf, 1024, &tmp, NULL);
 		if (ret)
-			ret = WriteFile(in[1], buf, tmp, &tmp, NULL);
+			//WriteFile(in[1], buf, tmp, &tmp, NULL);
+			ret = WriteFile(in[1], cmd, 5, &tmp, NULL);
+			Sleep(3000);
 	}
 
 	return ret;
@@ -130,26 +131,58 @@ int main()
 	si.lpReserved = 0;
 	si.lpTitle = NULL; /* NULL means use exe name as title */
 	si.dwFillAttribute = 0;
-	si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS | STARTF_USESHOWWINDOW ;
+	si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW ;
 	si.wShowWindow = 1; // FALSE ;
 	si.cbReserved2 = 0;
 	si.lpReserved2 = 0;
-	si.hStdInput = in[0];
+	//si.hStdInput = in[0];
+	si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 	si.hStdOutput = out[1];
 	si.hStdError = err[1];
 
 	swprintf(cmd, L"%ls", L"cmd.exe");
+
 	ret = CreateProcessW(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
 	if (!ret)
 		exit(-1);
 
+	DWORD mode;
+	GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode);
+	SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), mode & ~( ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT));
+	GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode);
+
 	HANDLE t[2];
 	t[0] = CreateThread(NULL, 0, OutThreadProc, NULL, 0, NULL);
-	t[1] = CreateThread(NULL, 0, InThreadProc, NULL, 0, NULL);
+	//t[1] = CreateThread(NULL, 0, InThreadProc, NULL, 0, NULL);
+
+	//WriteFile(in[1], "dir\n", 4, &tmp, NULL);
+	//WriteFile(in[1], "d", 1, &tmp, NULL);
+	//WriteFile(in[1], "i", 1, &tmp, NULL);
+	//WriteFile(in[1], "r", 1, &tmp, NULL);
+	//WriteFile(in[1], "\r", 1, &tmp, NULL);
+	//WriteFile(in[1], "\n", 1, &tmp, NULL);
+	
+
+
+	ret = true;
+	while (ret) {
+		ret = ReadFile(GetStdHandle(STD_INPUT_HANDLE), buf, 1024, &tmp, NULL);
+		if (ret) {
+			ret = WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), buf, tmp, &tmp, NULL);
+			
+			if ((tmp == 1) && (buf[0] == 13))
+				buf[0] = 10;
+
+			if (ret)
+				//ret = WriteFile(in[1], buf, tmp, &tmp, NULL);
+				WriteFile(GetStdHandle(STD_INPUT_HANDLE), buf, tmp, &tmp, NULL);
+			//ret = WriteFile(in[1], "dir\r\n", 5, &tmp, NULL);
+		}
+	}
 
 	//SetConsoleCtrlHandler(HandlerRoutine, TRUE);
 	
-	WaitForMultipleObjects(2, t, TRUE, INFINITE);
+	//	WaitForMultipleObjects(2, t, TRUE, INFINITE);
 
 
 }
