@@ -38,6 +38,10 @@ main(int argc, char **argv)
 {
 	struct passwd *user_pw;
 
+#ifdef WIN32_FIXME
+	w32posix_initialize();
+#endif
+
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
