@@ -129,7 +129,11 @@ int main()
 	si.hStdOutput = out[1];
 	si.hStdError = err[1];
 
+	//swprintf(cmd, L"%ls", L"shell-host.exe ping -t 127.0.0.1");
 	swprintf(cmd, L"%ls", L"shell-host.exe");
+	SetHandleInformation(in[1], HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(out[0], HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(out[0], HANDLE_FLAG_INHERIT, 0);
 
 
 	ret = CreateProcessW(NULL, cmd, NULL, NULL, TRUE, DETACHED_PROCESS, NULL, NULL, &si, &pi);

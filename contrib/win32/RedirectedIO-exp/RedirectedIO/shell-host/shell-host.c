@@ -53,13 +53,18 @@ DWORD WINAPI MonitorChild(
 	return 0;
 }
 
-#define GOTO_CLEANUP_ON_ERR(exp) do {			\
+#define GOTO_CLEANUP_ON_FALSE(exp) do {			\
 	ret = (exp);					\
 	if (ret == FALSE)				\
 		goto cleanup;				\
 } while(0)						\
 
-int main() {
+#define GOTO_CLEANUP_ON_ERR(exp) do {			\
+	if ((exp) != 0)				\
+		goto cleanup;				\
+} while(0)						\
+
+int wmain(int ac, wchar_t **av) {
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
 	wchar_t cmd[MAX_PATH];
@@ -95,8 +100,8 @@ int main() {
 	si.hStdError = pipe_err;
 
 	/* disable inheritance on child_pipe_write and pipe_in*/
-	SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0);
-	SetHandleInformation(child_pipe_write, HANDLE_FLAG_INHERIT, 0);
+	GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
+	GOTO_CLEANUP_ON_FALSE(SetHandleInformation(child_pipe_write, HANDLE_FLAG_INHERIT, 0));
 
 	/* create job to hold all child processes */
 	{
@@ -110,8 +115,20 @@ int main() {
 		CloseHandle(job);
 	}
 
+	/*TODO - pick this up from system32*/
 	swprintf(cmd, L"%ls", L"cmd.exe");
-	GOTO_CLEANUP_ON_ERR(CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi));
+	ac--;
+	av++;
+	if (ac)
+		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" /c"));
+	while (ac) {
+		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" "));
+		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, *av));
+		ac--;
+		av++;
+	}
+	
+	GOTO_CLEANUP_ON_FALSE(CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi));
 
 	/* close unwanted handles*/
 	CloseHandle(child_pipe_read);
@@ -130,10 +147,10 @@ int main() {
 	while (1) {
 		char buf[128];
 		DWORD rd = 0, wr = 0, i = 0;
-		GOTO_CLEANUP_ON_ERR(ReadFile(pipe_in, buf, 128, &rd, NULL));
+		GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, 128, &rd, NULL));
 
 		if (!istty) { /* no tty, juet send it accross */
-			GOTO_CLEANUP_ON_ERR(WriteFile(child_pipe_write, buf, rd, &wr, NULL));
+			GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, buf, rd, &wr, NULL));
 			continue;
 		}
 
@@ -147,7 +164,7 @@ int main() {
 
 			// Ctrl +C
 			if (buf[i] == '\003') {
-				GOTO_CLEANUP_ON_ERR(GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0));
+				GOTO_CLEANUP_ON_FALSE(GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0));
 				in_cmd_len = 0;
 				i++;
 				continue;
@@ -156,7 +173,7 @@ int main() {
 			// for backspace, we need to send space and another backspace for visual erase
 			if (buf[i] == '\b') {
 				if (in_cmd_len > 0) {
-					GOTO_CLEANUP_ON_ERR(WriteFile(pipe_out, "\b \b", 3, &wr, NULL));
+					GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, "\b \b", 3, &wr, NULL));
 					in_cmd_len--;
 				}
 				i++;
@@ -168,21 +185,21 @@ int main() {
 
 				/* TODO - do a much accurate mapping */
 				buf[i] = '\n';
-				GOTO_CLEANUP_ON_ERR(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
+				GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
 				in_cmd[in_cmd_len] = buf[i];
 				in_cmd_len++;
-				GOTO_CLEANUP_ON_ERR(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
+				GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
 				in_cmd_len = 0;
 				i++;
 				continue;
 			}
 
 
-			GOTO_CLEANUP_ON_ERR(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
+			GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
 			in_cmd[in_cmd_len] = buf[i];
 			in_cmd_len++;
 			if (in_cmd_len == MAX_CMD_LEN - 1) {
-				GOTO_CLEANUP_ON_ERR(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
+				GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
 				in_cmd_len = 0;
 			}
 
