@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.23107.0
+VisualStudioVersion = 14.0.24720.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssh", "ssh.vcxproj", "{74E69D5E-A1EF-46EA-9173-19A412774104}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -121,6 +121,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "win32compatUnittests", "win
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "win32iocompat", "win32iocompat.vcxproj", "{0D02F0F0-013B-4EE3-906D-86517F3822C0}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssh-shellhost", "ssh-shellhost.vcxproj", "{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -274,6 +276,14 @@ Global
 		{0D02F0F0-013B-4EE3-906D-86517F3822C0}.Release|x64.Build.0 = Release|x64
 		{0D02F0F0-013B-4EE3-906D-86517F3822C0}.Release|x86.ActiveCfg = Release|Win32
 		{0D02F0F0-013B-4EE3-906D-86517F3822C0}.Release|x86.Build.0 = Release|Win32
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Debug|x64.ActiveCfg = Debug|x64
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Debug|x64.Build.0 = Debug|x64
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Debug|x86.ActiveCfg = Debug|Win32
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Debug|x86.Build.0 = Debug|Win32
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Release|x64.ActiveCfg = Release|x64
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Release|x64.Build.0 = Release|x64
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Release|x86.ActiveCfg = Release|Win32
+		{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

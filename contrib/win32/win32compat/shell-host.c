@@ -116,7 +116,8 @@ int wmain(int ac, wchar_t **av) {
 	}
 
 	/*TODO - pick this up from system32*/
-	swprintf(cmd, L"%ls", L"cmd.exe");
+	cmd[0] = L'\0';
+	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L"cmd.exe"));
 	ac--;
 	av++;
 	if (ac)
