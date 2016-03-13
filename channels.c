@@ -2479,53 +2479,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	if (c->datagram)
 		buffer_put_string(&c->output, data, data_len);
 	else {
-		#if(0)//ndef WIN32_FIXME
 		buffer_append(&c->output, data, data_len);
-		#else
-		if ( c->client_tty )
-			buffer_append(&c->output, data, data_len);
-			//telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
-		else {
-				#ifdef WIN32_PRAGMA_REMCON
-				buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-				#else
-				if  ( ( c->isatty) && (data_len ==1) && (data[0] == '\003') ) {
-						/* send control-c to the shell process */
-						if ( GenerateConsoleCtrlEvent ( CTRL_C_EVENT, 0 ) ) {
-						}
-						else {
-							debug3("GenerateConsoleCtrlEvent failed with %d\n",GetLastError());
-						}
-				}
-				else {
-					// avoid sending the 4 arrow keys out to remote for now "ESC[A" ..
-					if ( (c->isatty) && (data_len ==3) && (data[0] == '\033') && (data[1] == '[')) {
-						if ( ( data[2] == 'A') ||  (data[2] == 'B') ||  (data[2] == 'C') ||  (data[2] == 'D'))
-								packet_check_eom();
-								return 0;
-					}
-					buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode			
-					
-						if ( (data_len ==1) && (data[0] == '\b') ) {
-							if (charinline >0) {
-								buffer_append(&c->input, "\b \b", 3); // for backspace, we need to send space and another backspace for visual erase
-								charinline--;
-							}
-						}
-						else {
-							buffer_append(&c->input, data, data_len);
-							charinline += data_len; // one more char on the line
-						}
-						
-						if ( (data[data_len-1] == '\r') || (data[data_len-1] == '\n') )
-							charinline = 0;  // a line has ended, begin char in line count again
-					}
-				}
-				#endif // WIN32_PRAGMA_REMCON
-		}
-
-		#endif
 	}
 	packet_check_eom();
 	return 0;

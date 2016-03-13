@@ -286,13 +286,13 @@ struct passwd *getpwuid(uid_t uid)
    * Get default shell path.
    */
   
-  GetSystemDirectory(pw_shellpath, MAX_PATH);
+  //GetSystemDirectory(pw_shellpath, MAX_PATH);
   
-  debug3("getpwuid: system dir [%s]", pw_shellpath);
+  //debug3("getpwuid: system dir [%s]", pw_shellpath);
+  pw_shellpath[0] = '\0';
+  strcat(pw_shellpath, "ssh-shellhost.exe");
   
-  strcat(pw_shellpath, "\\cmd.exe");
-  
-  debug3("getpwuid: shell path [%s]", pw_shellpath);
+  //debug3("getpwuid: shell path [%s]", pw_shellpath);
 
   /*
    * Get home directory path (if this fails,
@@ -381,13 +381,14 @@ struct passwd *getpwnam(const char *userin)
    * Get default shell path.
    */
   
-  GetSystemDirectory(pw_shellpath, MAX_PATH);
+   //GetSystemDirectory(pw_shellpath, MAX_PATH);
 
-  debug3("getpwnam: system dir [%s]", pw_shellpath);
-  
-  strcat(pw_shellpath, "\\cmd.exe");
-  
-  debug3("getpwnam: shell path [%s]", pw_shellpath);
+   //debug3("getpwuid: system dir [%s]", pw_shellpath);
+
+  pw_shellpath[0] = '\0';
+  strcat(pw_shellpath, "ssh-shellhost.exe");
+
+  //debug3("getpwuid: shell path [%s]", pw_shellpath);
 
   /*
    * Copy user name to static structure.

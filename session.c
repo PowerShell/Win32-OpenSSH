@@ -501,45 +501,6 @@ do_authenticated1(Authctxt *authctxt)
 #define USE_PIPES 1
 #endif
 
-#ifdef WIN32_FIXME
-HANDLE hConIn = NULL;
-HANDLE hConOut = NULL;
-HANDLE hConErr = NULL;
-
-BOOL MakeNewConsole(void)
-{
-	BOOL bRet = TRUE;
-
-	if (!(bRet = FreeConsole())) return bRet;
-	if (!(bRet = AllocConsole())) return bRet;
-	HANDLE hTemp;
-
-	hTemp = CreateFile("CONIN$",GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
-	if (INVALID_HANDLE_VALUE != hTemp)
-	{
-		DuplicateHandle(GetCurrentProcess(),hTemp,GetCurrentProcess(),&hConIn, 0,TRUE,DUPLICATE_SAME_ACCESS);
-		CloseHandle(hTemp);
-	} else
-		return FALSE;
-
-	hTemp = CreateFile("CONOUT$",GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,0,OPEN_EXISTING,0,0);
-	if (INVALID_HANDLE_VALUE != hTemp)
-	{
-		DuplicateHandle(GetCurrentProcess(),hTemp,GetCurrentProcess(),&hConOut, 0,TRUE,DUPLICATE_SAME_ACCESS);
-		DuplicateHandle(GetCurrentProcess(),hTemp,GetCurrentProcess(),&hConErr, 0,TRUE,DUPLICATE_SAME_ACCESS);
-		CloseHandle(hTemp);
-
-	} else
-		return FALSE;
-
-	SetStdHandle(STD_INPUT_HANDLE,hConIn);
-	SetStdHandle(STD_OUTPUT_HANDLE,hConOut);
-	SetStdHandle(STD_ERROR_HANDLE,hConErr);
-
-	return TRUE;
-
-}
-#endif
 /*
  * This is called to fork and execute a command when we have no tty.  This
  * will call do_child from the child, and server_loop from the parent after
@@ -575,9 +536,9 @@ do_exec_no_pty(Session *s, const char *command)
   PROCESS_INFORMATION pi;
   STARTUPINFOW si;
   
-  int sockin[2];
-  int sockout[2];
-  int sockerr[2];
+  int pipein[2];
+  int pipeout[2];
+  int pipeerr[2];
   
   BOOL b;
   
@@ -626,8 +587,10 @@ do_exec_no_pty(Session *s, const char *command)
   /*
    * Create three socket pairs for stdin, stdout and stderr 
    */
+  pipe(pipein);
 
-  #ifdef WIN32_PRAGMA_REMCON
+  pipe(pipeout);
+  pipe(pipeerr);
 
   int retcode = -1;
   if ( (!s -> is_subsystem) && (s ->ttyfd != -1))
@@ -637,52 +600,17 @@ do_exec_no_pty(Session *s, const char *command)
 	extern HANDLE hConsole ;
 	hConsole = GetStdHandle (STD_OUTPUT_HANDLE);
 	ConSetScreenSize( s->col, s->row );
-	socketpair(sockin);
-	s->ptyfd = sockin[1]; // hConsole; // the pty is the Windows console output handle in our Win32 port
+	s->ptyfd = pipein[1]; // hConsole; // the pty is the Windows console output handle in our Win32 port
   }
-  else
-	socketpair(sockin);
-  #else
-  HANDLE wfdtocmd = -1;
-  int retcode = -1;
-  if ((!s->is_subsystem) && (s->ttyfd != -1))
-  {
-	  //FreeConsole();
-	  //AllocConsole();
-	  MakeNewConsole();
-	  prot_scr_width = s->col;
-	  prot_scr_height = s->row;
-	  extern HANDLE hConsole;
-	  hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	  ConSetScreenSize(s->col, s->row);
-	  s->ptyfd = hConsole; // the pty is the Windows console output handle in our Win32 port
 
-	  wfdtocmd = GetStdHandle(STD_INPUT_HANDLE); // we use this console handle to feed input to Windows shell cmd.exe
-	  sockin[1] = allocate_sfd((int)wfdtocmd); // put the std input handle in our global general handle table
-  }
-  else
-	  pipe(sockin);
-  #endif
+  debug3("sockin[0]: %d sockin[1]: %d", pipein[0], pipein[1]);
+  debug3("sockout[0]: %d sockout[1]: %d", pipeout[0], pipeout[1]);
+  debug3("sockerr[0]: %d sockerr[1]: %d", pipeerr[0], pipeerr[1]);
 
-  pipe(sockout);
-  pipe(sockerr);
 
-  debug3("sockin[0]: %d sockin[1]: %d", sockin[0], sockin[1]);
-  debug3("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
-  debug3("sockerr[0]: %d sockerr[1]: %d", sockerr[0], sockerr[1]);
-
-  #ifndef WIN32_PRAGMA_REMCON
- // if ( (s -> is_subsystem) || (s ->ttyfd == -1))
-	//crlf_sfd(sockin[1]);
-
- // crlf_sfd(sockout[1]);
-
-  if ( (s -> is_subsystem) || (s ->ttyfd == -1))
-  #endif
-	  SetHandleInformation(sfd_to_handle(sockin[1]), HANDLE_FLAG_INHERIT, 0);
-
-  SetHandleInformation(sfd_to_handle(sockout[1]), HANDLE_FLAG_INHERIT, 0);
-  SetHandleInformation(sfd_to_handle(sockerr[1]), HANDLE_FLAG_INHERIT, 0);
+  SetHandleInformation(sfd_to_handle(pipein[1]), HANDLE_FLAG_INHERIT, 0);
+  SetHandleInformation(sfd_to_handle(pipeout[0]), HANDLE_FLAG_INHERIT, 0);
+  SetHandleInformation(sfd_to_handle(pipeerr[0]), HANDLE_FLAG_INHERIT, 0);
 
   /*
    * Assign sockets to StartupInfo 
@@ -705,23 +633,11 @@ do_exec_no_pty(Session *s, const char *command)
   si.cbReserved2      = 0;
   si.lpReserved2      = 0;
 
-  #ifdef WIN32_PRAGMA_REMCON
-  if (0) {
-  #else
-  if ( (!s -> is_subsystem) && (s ->ttyfd != -1) ) {
-  
-	  si.hStdInput = GetStdHandle (STD_INPUT_HANDLE) ; // shell tty interactive session gets a console input for Win32
-	  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
-	  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
-	  si.lpDesktop = NULL ; //winstadtname_w ;
-  #endif
-  }
-  else {
-	  si.hStdInput = (HANDLE) sfd_to_handle(sockin[0]);
-	  si.hStdOutput = (HANDLE) sfd_to_handle(sockout[0]);
-	  si.hStdError = (HANDLE) sfd_to_handle(sockerr[0]);
-	  si.lpDesktop = NULL; //L"winsta0\\default";
-  }
+	si.hStdInput = (HANDLE) sfd_to_handle(pipein[0]);
+	si.hStdOutput = (HANDLE) sfd_to_handle(pipeout[1]);
+	si.hStdError = (HANDLE) sfd_to_handle(pipeerr[1]);
+	si.lpDesktop = NULL; //L"winsta0\\default";
+
   //si.wShowWindow = SW_HIDE;
   //si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
 
@@ -767,14 +683,14 @@ do_exec_no_pty(Session *s, const char *command)
     }
   }
 
-  #if 0
+  #if 1
   
-  set_nonblock(sockin[0]);
-  set_nonblock(sockin[1]);
-  set_nonblock(sockout[0]);
-  set_nonblock(sockout[1]);
-  set_nonblock(sockerr[0]);
-  set_nonblock(sockerr[1]);
+  set_nonblock(pipein[0]);
+  set_nonblock(pipein[1]);
+  set_nonblock(pipeout[0]);
+  set_nonblock(pipeout[1]);
+  set_nonblock(pipeerr[0]);
+  set_nonblock(pipeerr[1]);
   
   #endif
 
@@ -931,15 +847,15 @@ do_exec_no_pty(Session *s, const char *command)
   
   GetUserName(name, &size);
 
-#ifndef WIN32_PRAGMA_REMCON
-  if ( (!s -> is_subsystem) && (s ->ttyfd != -1)) {
-	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
-	  char *inittermseq = "\033[20h\033[?7h\0" ; // LFtoCRLF AUTOWRAPON
-	  Channel *c=channel_by_id ( s->chanid );
-	  buffer_append(&c->input, inittermseq, strlen(inittermseq));
-	  channel_output_poll();
-  }
-#endif
+//#ifndef WIN32_PRAGMA_REMCON
+//  if ( (!s -> is_subsystem) && (s ->ttyfd != -1)) {
+//	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
+//	  char *inittermseq = "\033[20h\033[?7h\0" ; // LFtoCRLF AUTOWRAPON
+//	  Channel *c=channel_by_id ( s->chanid );
+//	  buffer_append(&c->input, inittermseq, strlen(inittermseq));
+//	  channel_output_poll();
+//  }
+//#endif
 
   //if (s ->ttyfd != -1) {
   	  // set the channel to tty interactive type
@@ -962,7 +878,7 @@ do_exec_no_pty(Session *s, const char *command)
   wchar_t exec_command_w[MAX_PATH];
   
   MultiByteToWideChar(CP_UTF8, 0, exec_command, -1, exec_command_w, MAX_PATH);
-  DWORD	dwStartupFlags = CREATE_SUSPENDED ;  // 0
+  DWORD	dwStartupFlags = 0;// CREATE_SUSPENDED;  // 0
  
   SetConsoleCtrlHandler(NULL, FALSE);
   b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
@@ -1020,15 +936,10 @@ do_exec_no_pty(Session *s, const char *command)
   /* 
    * We are the parent.  Close the child sides of the socket pairs. 
    */
-  #ifndef WIN32_PRAGMA_REMCON
-  if ( (s -> is_subsystem) || (s ->ttyfd == -1))
-	close(sockin[0]);
-  #else
-	close(sockin[0]);
-  #endif
 
-  close(sockout[0]);
-  close(sockerr[0]);
+  close(pipein[0]);
+  close(pipeout[1]);
+  close(pipeout[1]);
 
   ResumeThread ( pi.hThread ); /* now let cmd shell main thread be active s we have closed all i/o file handle that cmd will use */
   SetConsoleCtrlHandler(NULL, TRUE);
@@ -1057,13 +968,13 @@ do_exec_no_pty(Session *s, const char *command)
   if (compat20) 
   {
 	if ( s->ttyfd == -1)
-		session_set_fds(s, sockin[1], sockout[1], sockerr[1], s -> is_subsystem, 0);
+		session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s -> is_subsystem, 0);
 	else
-		session_set_fds(s, sockin[1], sockout[1], sockerr[1], s -> is_subsystem, 1); // tty interctive session
+		session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s -> is_subsystem, 1); // tty interctive session
   } 
   else 
   {
-    server_loop(pi.hProcess, sockin[1], sockout[1], sockerr[1]);
+    server_loop(pi.hProcess, pipein[1], pipeout[0], pipeerr[0]);
     
     /* 
      * server_loop has closed inout[0] and err[0]. 
@@ -1380,7 +1291,7 @@ do_exec_pty(Session *s, const char *command)
 
 	/* Enter interactive session. */
 	s->ptymaster = ptymaster;
-	packet_set_interactive(1, 
+	packet_set_interactive(1,
 	    options.ip_qos_interactive, options.ip_qos_bulk);
 	if (compat20) {
 		session_set_fds(s, ptyfd, fdout, -1, 1, 1);

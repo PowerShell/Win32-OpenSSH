@@ -156,6 +156,8 @@ int wmain(int ac, wchar_t **av) {
 		}
 
 		while (i < rd) {
+			/* TODO - handle any pty data*/
+
 			/* skip them for now*/
 			if ((rd - i >= 3) && (buf[i] == '\033') && (buf[i + 1] == '[')
 				&& (buf[i + 2] >= 'A') && (buf[i + 2] <= 'D')) {
