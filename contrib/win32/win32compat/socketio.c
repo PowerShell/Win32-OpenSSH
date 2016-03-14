@@ -41,24 +41,6 @@
 
 #define errno_from_WSALastError() errno_from_WSAError(WSAGetLastError())
 
-
-#ifdef WIN32_FIXME
-//#define WIN32_PRAGMA_REMCON
-#ifdef ECONNABORTED
-#undef ECONNABORTED
-#endif
-#define ECONNABORTED WSAECONNABORTED
-#ifdef ECONNREFUSED
-#undef ECONNREFUSED
-#endif
-#define ECONNREFUSED WSAECONNREFUSED
-#ifdef EINPROGRESS
-#undef EINPROGRESS
-#endif
-#define EINPROGRESS WSAEINPROGRESS
-#define _CRT_NO_POSIX_ERROR_CODES
-#endif
-
 /* maps WSAError to errno */
 static 
 int errno_from_WSAError(int wsaerrno)
