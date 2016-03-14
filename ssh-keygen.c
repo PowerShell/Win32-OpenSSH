@@ -58,10 +58,6 @@
 #include "krl.h"
 #include "digest.h"
 
-#ifdef WIN32_FIXME
-#define mkdir(a, b) _mkdir(a)
-#endif
-
 
 #ifdef WITH_OPENSSL
 # define DEFAULT_KEY_TYPE_NAME "rsa"
@@ -2233,12 +2229,7 @@ main(int argc, char **argv)
      * Init wrapped stdio.
      */
      
-    WSHELPinitialize();
-    
-    allocate_standard_descriptor(STDIN_FILENO);
-    allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);
-  
+	w32posix_initialize();
     /*
      * -rand option used for generate random password.
      */
