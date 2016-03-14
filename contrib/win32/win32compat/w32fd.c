@@ -610,6 +610,10 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 				if (writefds && FD_ISSET(i, writefds)) {
 					in_set_fds++;
 					if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
+						/* for connect() completed sockets finish WSA connect process*/
+						if ((fd_table.w32_ios[i]->type == SOCK_FD)
+							&& ((fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)))
+							socketio_finish_connect(fd_table.w32_ios[i]);
 						FD_SET(i, &write_ready_fds);
 						out_ready_fds++;
 					}

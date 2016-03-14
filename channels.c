@@ -41,23 +41,6 @@
 
 #include "includes.h"
 
-#ifdef WIN32_FIXME
-//#define WIN32_PRAGMA_REMCON
-#ifdef ECONNABORTED
-#undef ECONNABORTED
-#endif
-#define ECONNABORTED WSAECONNABORTED
-#ifdef ECONNREFUSED
-#undef ECONNREFUSED
-#endif
-#define ECONNREFUSED WSAECONNREFUSED
-#ifdef EINPROGRESS
-#undef EINPROGRESS
-#endif
-#define EINPROGRESS WSAEINPROGRESS
-#define _CRT_NO_POSIX_ERROR_CODES
-#endif
-
 
 #include <sys/types.h>
 #include <sys/param.h>	/* MIN MAX */

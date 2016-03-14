@@ -41,6 +41,24 @@
 
 #define errno_from_WSALastError() errno_from_WSAError(WSAGetLastError())
 
+
+#ifdef WIN32_FIXME
+//#define WIN32_PRAGMA_REMCON
+#ifdef ECONNABORTED
+#undef ECONNABORTED
+#endif
+#define ECONNABORTED WSAECONNABORTED
+#ifdef ECONNREFUSED
+#undef ECONNREFUSED
+#endif
+#define ECONNREFUSED WSAECONNREFUSED
+#ifdef EINPROGRESS
+#undef EINPROGRESS
+#endif
+#define EINPROGRESS WSAEINPROGRESS
+#define _CRT_NO_POSIX_ERROR_CODES
+#endif
+
 /* maps WSAError to errno */
 static 
 int errno_from_WSAError(int wsaerrno)
@@ -52,10 +70,19 @@ int errno_from_WSAError(int wsaerrno)
 		return EFAULT;
 	case WSAEINVAL:
 		return EINVAL;
+	case WSAECONNABORTED:
+		return ECONNABORTED;
+	case WSAECONNREFUSED:
+		return ECONNREFUSED;
+	case WSAEINPROGRESS:
+		return EINPROGRESS;
 	case WSAESHUTDOWN:
 		return ECONNRESET;
+	case WSAENOTCONN:
+		return ENOTCONN;
 	default:
-		return wsaerrno;
+		/* */
+		return wsaerrno - 10000;
 	}
 }
 
@@ -356,6 +383,8 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 		return -1;
 	}
 
+	/* TODO - ensure socket is in accepted or connected state */
+
 	/* /io is initiated and pending */
 	if (pio->read_details.pending) {
 		/* if recv is now in blocking mode, wait for data to be available */
@@ -466,7 +495,7 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 	else {
 		/* this should not happen */
 		errno = EOTHER;
-		debug("recv - (2) ERROR:Unexpected IO stated, io:%p", pio);
+		debug("recv - (2) ERROR:Unexpected IO state, io:%p", pio);
 		return -1;
 	}
 
@@ -515,6 +544,8 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 		debug("send - ERROR: flags are not currently supported, io:%p", pio);
 		return -1;
 	}
+
+	/* TODO - ensure socket is in accepted or connected state */
 
 	/* if io is already pending */
 	if (pio->write_details.pending)
@@ -853,15 +884,23 @@ socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namelen) {
 
 	}
 
+	return socketio_finish_connect(pio);
+}
+
+int 
+socketio_finish_connect(struct w32_io* pio) {
+
+	debug3("finish_connect, io:%p", pio);
+
 	if (pio->write_details.error) {
 		errno = errno_from_WSAError(pio->write_details.error);
-		debug("connect - ERROR: async io completed with error: %d, io:%p", errno, pio);
+		debug("finish_connect - ERROR: async io completed with error: %d, io:%p", errno, pio);
 		return -1;
 	}
 
 	if (0 != setsockopt(pio->sock, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, NULL, 0)) {
 		errno = errno_from_WSALastError();
-		debug("connect - ERROR: setsockopt failed:%d, io:%p", errno, pio);
+		debug("finish_connect - ERROR: setsockopt failed:%d, io:%p", errno, pio);
 		return -1;
 	}
 

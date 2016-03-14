@@ -101,6 +101,7 @@ int socketio_getpeername(struct w32_io* pio, struct sockaddr* name, int* namelen
 int socketio_listen(struct w32_io* pio, int backlog);
 int socketio_bind(struct w32_io* pio, const struct sockaddr *name, int namelen);
 int socketio_connect(struct w32_io* pio, const struct sockaddr* name, int namelen);
+int socketio_finish_connect(struct w32_io* pio);
 int socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags);
 int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags);
 int socketio_shutdown(struct w32_io* pio, int how);
