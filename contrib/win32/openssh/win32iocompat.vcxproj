@@ -145,6 +145,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\socketio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\fileio.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\termio.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />

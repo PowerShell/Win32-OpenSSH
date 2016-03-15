@@ -152,8 +152,13 @@ w32_io_on_select(struct w32_io* pio, BOOL rd)
 {
 	if ((pio->type == SOCK_FD))
 		return socketio_on_select(pio, rd);
-	else
-		return fileio_on_select(pio, rd);
+	else 
+		switch (FILETYPE(pio)) {
+		case FILE_TYPE_CHAR:
+			return termio_on_select(pio, rd);
+		default:
+			return fileio_on_select(pio, rd);
+		}
 }
 
 #define CHECK_FD(fd) do {							\
@@ -284,6 +289,7 @@ int
 w32_send(int fd, const void *buf, size_t len, int flags) {
 	
 	CHECK_FD(fd);
+	CHECK_SOCK_IO(fd_table.w32_ios[fd]);
 	return socketio_send(fd_table.w32_ios[fd], buf, len, flags);
 }
 
@@ -324,8 +330,8 @@ w32_pipe(int *pfds) {
 	if (-1 == fileio_pipe(pio))
 		return -1;
 
-	pio[0]->type = PIPE_FD;
-	pio[1]->type = PIPE_FD;
+	pio[0]->type = NONSOCK_FD;
+	pio[1]->type = NONSOCK_FD;
 	fd_table_set(pio[0], read_index);
 	fd_table_set(pio[1], write_index);
 	pfds[0] = read_index;
@@ -348,7 +354,7 @@ w32_open(const char *pathname, int flags, ...) {
 	if (pio == NULL)
 		return -1;
 
-	pio->type = FILE_FD;
+	pio->type = NONSOCK_FD;
 	fd_table_set(pio, min_index);
 	debug("open - handle:%p, io:%p, fd:%d", pio->handle, pio, min_index);
 	debug3("open - path:%s", pathname);
@@ -358,17 +364,31 @@ w32_open(const char *pathname, int flags, ...) {
 int
 w32_read(int fd, void *dst, unsigned int max) {
 	CHECK_FD(fd);
+
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
 		return socketio_recv(fd_table.w32_ios[fd], dst, max, 0);
-	return fileio_read(fd_table.w32_ios[fd], dst, max);
+	else
+		switch (FILETYPE(fd_table.w32_ios[fd])) {
+		case FILE_TYPE_CHAR:
+			return termio_read(fd_table.w32_ios[fd], dst, max);
+		default:
+			return fileio_read(fd_table.w32_ios[fd], dst, max);
+		}	
 }
 
 int
 w32_write(int fd, const void *buf, unsigned int max) {
 	CHECK_FD(fd);
+	
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
 		return socketio_send(fd_table.w32_ios[fd], buf, max, 0);
-	return fileio_write(fd_table.w32_ios[fd], buf, max);
+	else
+		switch (FILETYPE(fd_table.w32_ios[fd])) {
+		case FILE_TYPE_CHAR:
+			return termio_write(fd_table.w32_ios[fd], buf, max);
+		default:
+			return fileio_write(fd_table.w32_ios[fd], buf, max);
+		}
 }
 
 int
@@ -395,11 +415,20 @@ w32_mkdir(const char *pathname, unsigned short mode) {
 
 int
 w32_isatty(int fd) {
+	struct w32_io* pio;
 	if ((fd < 0) || (fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
 		errno = EBADF;
 		return 0;
 	}
-	return fileio_isatty(fd_table.w32_ios[fd]);
+	
+	pio = fd_table.w32_ios[fd];
+
+	if (FILETYPE(pio) == FILE_TYPE_CHAR)
+		return 1;
+	else {
+		errno = EINVAL;
+		return 0;
+	}
 }
 
 FILE*
@@ -423,10 +452,16 @@ w32_close(int fd) {
 	debug("close - io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd,
 		pio->table_index);
 	fd_table_clear(pio->table_index);
-	if ((pio->type == SOCK_FD))
+
+	if (pio->type == SOCK_FD)
 		return socketio_close(pio);
 	else
-		return fileio_close(pio);
+		switch (FILETYPE(pio)) {
+		case FILE_TYPE_CHAR:
+			return termio_close(pio);
+		default:
+			return fileio_close(pio);
+		}
 }
 
 int
@@ -690,7 +725,7 @@ w32_dup(int oldfd) {
 
 	memset(pio, 0, sizeof(struct w32_io));
 	pio->handle = target;
-	pio->type = FILE_FD;
+	pio->type = NONSOCK_FD;
 	fd_table_set(pio, min_index);
 	return min_index;
 }
@@ -746,7 +781,7 @@ int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock) {
 	}
 	memset(pio, 0, sizeof(struct w32_io));
 
-	pio->type = is_sock? SOCK_FD : FILE_FD;
+	pio->type = is_sock? SOCK_FD : NONSOCK_FD;
 	pio->handle = h;
 	fd_table_set(pio, min_index);
 	return min_index;

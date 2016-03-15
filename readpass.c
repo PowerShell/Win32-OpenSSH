@@ -334,57 +334,44 @@ read_passphrase(const char *prompt, int flags)
   /*
    * Show prompt for user.
    */
-  HANDLE c_in = CreateFileA("CONIN$", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
-  HANDLE c_out = CreateFileA("CONOUT$", GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, 0, NULL);
-  int tmp;
-  int originalMode, tmpMode;
+  _cputs(prompt);
 
-  GetConsoleMode(c_in, &originalMode);
-  SetConsoleMode(c_in, ENABLE_LINE_INPUT);
-  //SetConsoleMode(c_in, (originalMode & ~(ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT)));
+   len = retr = 0;
+  int bufsize = sizeof(buf);
 
-  GetConsoleMode(c_in, &tmpMode);
+	while (_kbhit())
+		_getch();
 
-  WriteFile(c_out, prompt, strlen(prompt), &tmp, NULL);
- // write(STDOUT_FILENO, prompt, strlen(prompt));
-  ReadFile(c_in, buf, 1024, &tmp, NULL);
-  buf[tmp - 2] = '\0';
-  SetConsoleMode(c_in, originalMode);
-  CloseHandle(c_in);
-  CloseHandle(c_out);
+	while ( len < bufsize ) {
 
- // len = retr = 0;
- // int bufsize = sizeof(buf);
-
-	//while (_kbhit())
-	//	_getch();
-
-	//while ( len < bufsize ) {
-
-	// 	buf[len] = (unsigned char) _getch() ;
+	 	buf[len] = (unsigned char) _getch() ;
 
 
-	//	if ( buf[len] == '\r' ) {
-	//		if (_kbhit() )
-	//			_getch(); // read linefeed if its there
-	//		break;
-	//	}
-	//	else if ( buf[len] == '\n' ) {
-	//		break;
-	//	}
-	//	else if ( buf[len] == '\b' ) { // backspace
-	//		if (len > 0 )
-	//			len--; // overwrite last character
-	//	}
-	//	else {
+		if ( buf[len] == '\r' ) {
+			if (_kbhit() )
+				_getch(); // read linefeed if its there
+			break;
+		}
+		else if ( buf[len] == '\n' ) {
+			break;
+		}
+		else if ( buf[len] == '\b' ) { // backspace
+			if (len > 0 )
+				len--; // overwrite last character
+		}
+		else if (buf[len] == '\003') {
+			/* exit on Ctrl+C */
+			fatal("");
+		}
+		else {
 
-	//		//_putch( (int) '*' ); // show a star in place of what is typed
-	//		len++; // keep reading in the loop
-	//	}
-	//}
+			//_putch( (int) '*' ); // show a star in place of what is typed
+			len++; // keep reading in the loop
+		}
+	}
 
-	//buf[len] = '\0' ; // get rid of the cr/lf
-	//write(STDOUT_FILENO,"\n", strlen("\n")); // show a newline as we do not echo password or the line
+	buf[len] = '\0' ; // get rid of the cr/lf
+	_cputs("\n"); // show a newline as we do not echo password or the line
 
   ret = xstrdup(buf);
 

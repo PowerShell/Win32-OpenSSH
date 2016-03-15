@@ -136,9 +136,7 @@ fileio_pipe(struct w32_io* pio[2]) {
 	memset(pio_write, 0, sizeof(struct w32_io));
 
 	pio_read->handle = read_handle;
-	pio_read->internal.state = PIPE_READ_END;
 	pio_write->handle = write_handle;
-	pio_write->internal.state = PIPE_WRITE_END;
 
 	pio[0] = pio_read;
 	pio[1] = pio_write;
@@ -281,7 +279,6 @@ fileio_open(const char *pathname, int flags, int mode) {
 	return pio;
 }
 
-
 VOID CALLBACK ReadCompletionRoutine(
     _In_    DWORD        dwErrorCode,
     _In_    DWORD        dwNumberOfBytesTransfered,
@@ -301,8 +298,8 @@ VOID CALLBACK ReadCompletionRoutine(
 /* initiate an async read */
 int 
 fileio_ReadFileEx(struct w32_io* pio) {
-	HANDLE h = pio->handle;
 	debug2("ReadFileEx io:%p", pio);
+
 	if (pio->read_details.buf == NULL){
 		pio->read_details.buf = malloc(READ_BUFFER_SIZE);
 		if (!pio->read_details.buf) {
@@ -313,11 +310,7 @@ fileio_ReadFileEx(struct w32_io* pio) {
 		pio->read_details.buf_size = READ_BUFFER_SIZE;
 	}
 
-	/* get underlying handle for standard io */
-	if (pio->type == STD_IO_FD)
-		h = GetStdHandle(pio->std_handle);
-	
-	if (ReadFileEx(h, pio->read_details.buf, pio->read_details.buf_size, 
+	if (ReadFileEx(WINHANDLE(pio), pio->read_details.buf, pio->read_details.buf_size,
 	    &pio->read_overlapped, &ReadCompletionRoutine)) 
 		pio->read_details.pending = TRUE;
 	else {
@@ -335,11 +328,6 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 	int bytes_copied;
 
 	debug3("read - io:%p remaining:%d", pio, pio->read_details.remaining);
-	if ((pio->type == PIPE_FD) && (pio->internal.state == PIPE_WRITE_END)) {
-		debug("read - ERROR: called on write end of pipe, io:%p", pio);
-		errno = EBADF;
-		return -1;
-	}
 
 	/* if read is pending */
 	if (pio->read_details.pending) {
@@ -357,7 +345,8 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 
 	if (fileio_is_io_available(pio, TRUE) == FALSE) {
 		if (-1 == fileio_ReadFileEx(pio)) {
-			if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) {
+			if ((FILETYPE(pio) == FILE_TYPE_PIPE)
+			    && (errno == ERROR_NEGATIVE_SEEK)) {
 				/* write end of the pipe closed */
 				debug2("read - no more data, io:%p", pio);
 				errno = 0;
@@ -433,14 +422,8 @@ VOID CALLBACK WriteCompletionRoutine(
 int 
 fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	int bytes_copied;
-	HANDLE h = pio->handle;
 
 	debug2("write - io:%p", pio);
-	if ((pio->type == PIPE_FD) && (pio->internal.state == PIPE_READ_END)) {
-		debug("write - ERROR: write called on a read end of pipe, io:%p", pio);
-		errno = EBADF;
-		return -1;
-	}
 
 	if (pio->write_details.pending) {
 		if (w32_io_is_blocking(pio))
@@ -478,11 +461,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	bytes_copied = min(max, pio->write_details.buf_size);
 	memcpy(pio->write_details.buf, buf, bytes_copied);
 
-	/* get underlying handle for standard io */
-	if (pio->type == STD_IO_FD)
-		h = GetStdHandle(pio->std_handle);
-
-	if (WriteFileEx(h, pio->write_details.buf, bytes_copied, 
+	if (WriteFileEx(WINHANDLE(pio), pio->write_details.buf, bytes_copied,
 	    &pio->write_overlapped, &WriteCompletionRoutine)) {
 		pio->write_details.pending = TRUE;
 		pio->write_details.remaining = bytes_copied;
@@ -507,8 +486,8 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 	}
 	else {
 		errno = errno_from_Win32LastError();
-		/* read end of the pipe closed    */
-		if ((pio->type == PIPE_FD) && (errno == ERROR_NEGATIVE_SEEK)) {
+		/* read end of the pipe closed ?   */
+		if ((FILETYPE(pio) == FILE_TYPE_PIPE) && (errno == ERROR_NEGATIVE_SEEK))  {
 			debug("write - ERROR:read end of the pipe closed, io:%p", pio);
 			errno = EPIPE;
 		}
@@ -549,17 +528,6 @@ fileio_lseek(struct w32_io* pio, long offset, int origin) {
 	//NO-OP as we automatically move file pointer in async io callbacks for files
 	//assert current postion in overlapped struct
 	return 0;
-}
-
-/* isatty() implementation */
-int 
-fileio_isatty(struct w32_io* pio) {
-	if (GetFileType(pio->handle) == FILE_TYPE_CHAR)
-		return 1; 
-	else {
-		errno = EINVAL;
-		return 0;
-	}
 }
 
 /* fdopen implementation */
@@ -617,12 +585,14 @@ fileio_on_select(struct w32_io* pio, BOOL rd) {
 
 int 
 fileio_close(struct w32_io* pio) {
+
 	debug2("fileclose - pio:%p", pio);
-	CancelIo(pio->handle);
+
+	CancelIo(WINHANDLE(pio));
 	//let queued APCs (if any) drain
 	SleepEx(0, TRUE);
 	if (pio->type != STD_IO_FD) {//STD handles are never explicitly closed
-		CloseHandle(pio->handle);
+		CloseHandle(WINHANDLE(pio));
 
 		if (pio->read_details.buf)
 			free(pio->read_details.buf);

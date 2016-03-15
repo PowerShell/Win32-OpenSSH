@@ -13,9 +13,8 @@
 enum w32_io_type {
 	UNKNOWN_FD = 0,
 	SOCK_FD = 1,	/*maps a socket fd*/
-	FILE_FD = 2,	/*maps a file fd*/
-	PIPE_FD = 3,	/*maps a pipe fd*/
-	STD_IO_FD = 5	/*maps a std fd*/
+	NONSOCK_FD = 2,	/*maps a file fd, pipe fd or a tty fd*/
+	STD_IO_FD = 5	/*maps a std fd - ex. STDIN_FILE*/
 };
 
 enum w32_io_sock_state {
@@ -24,11 +23,6 @@ enum w32_io_sock_state {
 	SOCK_ACCEPTED = 2,	/*socket retruned from accept()*/
 	SOCK_CONNECTING = 3,	/*connect called on socket, connect is in progress*/
 	SOCK_CONNECTED = 4	/*connect completed on socket*/
-};
-
-enum w32_io_pipe_state {
-	PIPE_READ_END = 1,	/*read end of a pipe()*/
-	PIPE_WRITE_END = 2	/*write end of a pipe()*/
 };
 
 /*
@@ -81,6 +75,9 @@ struct w32_io {
 	}internal;
 };
 
+#define WINHANDLE(pio) (((pio)->type == STD_IO_FD)? GetStdHandle((pio)->std_handle):(pio)->handle)
+#define FILETYPE(pio) (GetFileType(WINHANDLE(pio)))
+
 BOOL w32_io_is_blocking(struct w32_io*);
 BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd);
 int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds);
@@ -118,8 +115,13 @@ int fileio_write(struct w32_io* pio, const void *buf, unsigned int max);
 int fileio_fstat(struct w32_io* pio, struct _stat64 *buf);
 int fileio_stat(const char *path, struct _stat64 *buf);
 long fileio_lseek(struct w32_io* pio, long offset, int origin);
-int fileio_isatty(struct w32_io* pio);
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
+
+/* terminal io specific versions */
+int termio_on_select(struct w32_io* pio, BOOL rd);
+int termio_read(struct w32_io* pio, void *dst, unsigned int max);
+int termio_write(struct w32_io* pio, const void *buf, unsigned int max);
+int termio_close(struct w32_io* pio);
 
 /* signal related APIs*/
 void signalio_initialize();
