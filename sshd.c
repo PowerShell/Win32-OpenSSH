@@ -51,8 +51,6 @@
 #ifdef WIN32_FIXME
   #undef GSSAPI
   #undef KRB5
-  #define ECONNABORTED WSAECONNABORTED
-  #define ECONNREFUSED WSAECONNREFUSED
 #endif
 
 #include <sys/types.h>

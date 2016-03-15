@@ -41,10 +41,10 @@ file_blocking_io_tests()
 	w = pipeio[1];
 	ret = write(r, small_send_buf, strlen(small_send_buf));
 	ASSERT_INT_EQ(ret, -1);
-	ASSERT_INT_EQ(errno, EBADF);
+	ASSERT_INT_EQ(errno, EACCES);
 	ret = read(w, small_recv_buf, SMALL_RECV_BUF_SIZE);
 	ASSERT_INT_EQ(ret, -1);
-	ASSERT_INT_EQ(errno, EBADF);
+	ASSERT_INT_EQ(errno, EACCES);
 	ret = write(w, small_send_buf, strlen(small_send_buf));
 	ASSERT_INT_EQ(ret, strlen(small_send_buf));
 	ret = read(r, small_recv_buf, SMALL_RECV_BUF_SIZE);
