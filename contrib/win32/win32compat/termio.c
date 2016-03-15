@@ -2,25 +2,58 @@
 #include "w32fd.h"
 #include "inc/defs.h"
 
-/* Win7 - Read Term Support - START*/
+#define TERM_IO_BUF_SIZE 2048
+int errno_from_Win32Error(int win32_error);
 
-int
-fileio_initiateReadTerm_Win7(struct w32_io* pio) {
+struct io_status {
+	char* buf[TERM_IO_BUF_SIZE];
+	DWORD transferred;
+	DWORD error;
+};
 
-	if (pio->read_details.pending || w32_io_is_io_available(pio, TRUE)) {
-		debug("Win7 term read - ERROR - called in wrong state");
-		errno = EINVAL;
+static struct io_status read_status, write_status;
+
+static VOID CALLBACK ReadAPCProc(
+	_In_ ULONG_PTR dwParam
+	) {
+	struct w32_io* pio = (struct w32_io*)dwParam;
+	pio->read_details.error = read_status.error;
+	pio->read_details.remaining = read_status.transferred;
+	pio->read_details.completed = 0;
+	pio->read_details.pending = FALSE;
+}
+
+static DWORD WINAPI ReadThread(
+	_In_ LPVOID lpParameter
+	) {
+	struct w32_io* pio = (struct w32_io*)lpParameter;
+	memset(&read_status, 0, sizeof(read_status));
+	if (!ReadFile(WINHANDLE(pio), read_status.buf, TERM_IO_BUF_SIZE, &read_status.transferred, NULL)) {
+		read_status.error = GetLastError();
+	}
+	
+	if (0 == QueueUserAPC(ReadAPCProc, main_thread, pio))
+		DebugBreak();
+}
+
+static int
+termio_initiate_read(struct w32_io* pio) {
+	HANDLE read_thread = CreateThread(NULL, 0, ReadThread, pio, 0, NULL);
+	if (read_thread == NULL) {
+		errno = errno_from_Win32Error(GetLastError());
 		return -1;
 	}
 
 	return 0;
 }
 
-/* Win7 - Read Term Support - END*/
-
 int 
 termio_on_select(struct w32_io* pio, BOOL rd) {
-	return fileio_on_select(pio, rd);
+	if (!rd)
+		return 0;
+
+	if ((!fileio_is_io_available(pio, rd)) && (!pio->read_details.pending))
+		return termio_initiate_read(pio);
 }
 
 int 

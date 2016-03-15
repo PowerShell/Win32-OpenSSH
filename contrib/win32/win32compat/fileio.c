@@ -44,7 +44,7 @@
 #define errno_from_Win32LastError() errno_from_Win32Error(GetLastError())
 
 /* maps Win32 error to errno */
-static int 
+int 
 errno_from_Win32Error(int win32_error)
 {
 	switch (win32_error) {

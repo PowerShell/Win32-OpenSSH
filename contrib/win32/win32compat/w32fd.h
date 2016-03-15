@@ -77,6 +77,7 @@ struct w32_io {
 
 #define WINHANDLE(pio) (((pio)->type == STD_IO_FD)? GetStdHandle((pio)->std_handle):(pio)->handle)
 #define FILETYPE(pio) (GetFileType(WINHANDLE(pio)))
+extern HANDLE main_thread;
 
 BOOL w32_io_is_blocking(struct w32_io*);
 BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd);

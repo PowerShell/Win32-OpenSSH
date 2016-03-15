@@ -48,6 +48,9 @@ static struct w32fd_table fd_table;
 /* static table entries representing std in, out and error*/
 static struct w32_io w32_io_stdin, w32_io_stdout, w32_io_stderr;
 
+/* main thread handle*/
+HANDLE main_thread;
+
 void fd_table_set(struct w32_io* pio, int index);
 
 /* initializes mapping table*/
@@ -120,6 +123,7 @@ w32posix_initialize() {
 	if ((fd_table_initialize() != 0)
 		|| (socketio_initialize() != 0))
 		DebugBreak();
+	main_thread = GetCurrentThread();
 	signalio_initialize();
 }
 
