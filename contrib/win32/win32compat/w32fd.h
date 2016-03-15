@@ -121,7 +121,10 @@ long fileio_lseek(struct w32_io* pio, long offset, int origin);
 int fileio_isatty(struct w32_io* pio);
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
 
-
+/* signal related APIs*/
+void signalio_initialize();
+//int signalio_add_child(HANDLE child);
+//int signalio_remove_child(HANDLE child);
 
 /*
 * open() flags and modes

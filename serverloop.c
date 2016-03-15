@@ -882,11 +882,8 @@ collect_children(void)
         
         session_close_by_pid(s->pid, status);
         
-        if (s->pid)
-			CloseHandle(process);
-	/*TODO - fix this*/
-		//int WSHELPDelChildToWatch (HANDLE processtowatch);
-		//WSHELPDelChildToWatch (process); // take the process off from watch list in select mux
+        signalio_remove_child(process);
+
       }
     }
   } while (i > 0);

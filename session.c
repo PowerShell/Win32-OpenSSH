@@ -920,6 +920,7 @@ do_exec_no_pty(Session *s, const char *command)
    
   s -> pid = pi.hProcess;
   s -> processId = pi.dwProcessId;
+  signalio_add_child(pi.hProcess);
   
   // Add the child process created to select mux so that during our select data call we know if the process has exited
   /* TODO - fix thi s*/
@@ -939,7 +940,7 @@ do_exec_no_pty(Session *s, const char *command)
 
   close(pipein[0]);
   close(pipeout[1]);
-  close(pipeout[1]);
+  close(pipeerr[1]);
 
   ResumeThread ( pi.hThread ); /* now let cmd shell main thread be active s we have closed all i/o file handle that cmd will use */
   SetConsoleCtrlHandler(NULL, TRUE);

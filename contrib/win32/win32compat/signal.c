@@ -35,6 +35,62 @@
 
 /* signal queue */
 
+/* child processes */
+#define MAX_CHILDREN 50
+struct _children {
+	HANDLE handles[MAX_CHILDREN];
+	DWORD num_children;
+} children;
+
+void 
+signalio_initialize() {
+	memset(&children, 0, sizeof(children));
+}
+
+int
+signalio_add_child(HANDLE child) {
+	if (children.num_children == MAX_CHILDREN) {
+		errno = ENOTSUP;
+		return -1;
+	}
+	children.handles[children.num_children++] = child;
+	return 0;
+}
+
+int
+signalio_remove_child_at_index(DWORD index) {
+	if (index >= children.num_children) {
+		errno = EINVAL;
+		return -1;
+	}
+	
+	CloseHandle(children.handles[index]);
+	if ((children.num_children > 1) && (index != (children.num_children - 1))) {
+		children.handles[index] = children.handles[children.num_children - 1];
+	}
+
+	children.num_children--;
+	return 0;
+}
+
+
+int
+signalio_remove_child(HANDLE child) {
+	HANDLE* handles = children.handles;
+	DWORD num_children = children.num_children;
+
+	while (num_children) {
+		if (*handles == child)
+			return signalio_remove_child_at_index(children.num_children - num_children);
+		handles++;
+		num_children--;
+	}
+
+	errno = EINVAL;
+	return -1;
+}
+
+
 /*
  * Main wait routine used by all blocking calls. 
  * It wakes up on 
@@ -49,12 +105,31 @@
 int 
 wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 {
+	HANDLE all_events[MAXIMUM_WAIT_OBJECTS];
+	DWORD num_all_events = num_events + children.num_children;
+
+	if (num_all_events > MAXIMUM_WAIT_OBJECTS) {
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	memcpy(all_events, children.handles, children.num_children * sizeof(HANDLE));
+	memcpy(all_events + children.num_children, events, num_events * sizeof(HANDLE));
+
 	/* TODO - implement signal catching and handling */
-	if (num_events) {
-		DWORD ret = WaitForMultipleObjectsEx(num_events, events, FALSE, 
+	if (num_all_events) {
+		DWORD ret = WaitForMultipleObjectsEx(num_all_events, all_events, FALSE,
 		    milli_seconds, TRUE);
-		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_events - 1)) {
+		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_all_events - 1)) {
 			//woken up by event signalled
+			/* is this due to a child process going down*/
+			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
+				/* TODO - enable this once all direct closes are removed in core code*/
+				//signalio_remove_child(ret - WAIT_OBJECT_0);
+				errno = EINTR;
+				return -1;
+			}
+
 			return 0;
 		}
 		else if (ret == WAIT_IO_COMPLETION) {

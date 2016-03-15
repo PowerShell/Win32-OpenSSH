@@ -120,6 +120,7 @@ w32posix_initialize() {
 	if ((fd_table_initialize() != 0)
 		|| (socketio_initialize() != 0))
 		DebugBreak();
+	signalio_initialize();
 }
 
 void
