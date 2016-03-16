@@ -43,8 +43,8 @@
 # define _PATH_HOST_ECDSA_KEY_FILE "ssh_host_ecdsa_key"
 # define _PATH_HOST_ED25519_KEY_FILE	"ssh_host_ed25519_key"
 # define _PATH_HOST_RSA_KEY_FILE   "ssh_host_rsa_key"
-# define _PATH_DH_MODULI           "/moduli"
-# define _PATH_DH_PRIMES           "/primes"
+# define _PATH_DH_MODULI           "moduli"
+# define _PATH_DH_PRIMES           "primes"
 # define _PATH_SSH_PROGRAM         "ssh.exe"
 
 #else
