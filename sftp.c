@@ -2481,6 +2481,9 @@ main(int argc, char **argv)
     allocate_standard_descriptor(STDERR_FILENO);
     
     LoadLibrary("libwindbg.dll");*/
+
+	setvbuf(stdout, NULL, _IONBF, 0);
+
     
     //sfd_start = 3;
     
