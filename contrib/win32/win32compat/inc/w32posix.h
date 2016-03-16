@@ -67,10 +67,7 @@ int w32_dup2(int oldfd, int newfd);
 
 /* misc */
 unsigned int w32_alarm(unsigned int seconds);
-typedef void(*sighandler_t)(int);
-#define signal(a,b)	w32_signal((a), (b))
-#define mysignal(a,b)	w32_signal((a), (b))
-
+sighandler_t w32_signal(int signum, sighandler_t handler);
 
 /* Shutdown constants */
 #define SHUT_WR SD_SEND

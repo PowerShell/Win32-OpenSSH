@@ -30,6 +30,7 @@
 
 #include "w32fd.h"
 #include <errno.h>
+#include "inc\defs.h"
 
 /* signal handlers */
 
@@ -45,6 +46,11 @@ struct _children {
 void 
 signalio_initialize() {
 	memset(&children, 0, sizeof(children));
+}
+
+sighandler_t w32_signal(int signum, sighandler_t handler) {
+	/*TODO - implement signal()*/
+	return 0;
 }
 
 int

@@ -453,6 +453,28 @@ w32_close(int fd) {
 		}
 }
 
+static int
+w32_io_process_fd_flags(struct w32_io* pio, int flags) {
+	DWORD shi_flags;
+	if (flags & ~FD_CLOEXEC) {
+		debug("fcntl - ERROR unsupported flags %d, io:%p", flags, pio);
+		errno = ENOTSUP;
+		return -1;
+	}
+
+	shi_flags = (flags & FD_CLOEXEC) ? 0 : HANDLE_FLAG_INHERIT;
+
+	if (SetHandleInformation(WINHANDLE(pio), HANDLE_FLAG_INHERIT, shi_flags) == FALSE) {
+		debug("fcntl - SetHandleInformation failed  %d, io:%p", 
+			GetLastError(), pio);
+		errno = EOTHER;
+		return -1;
+	}
+
+	pio->fd_flags = flags;
+	return 0;
+}
+
 int
 w32_fcntl(int fd, int cmd, ... /* arg */) {
 	va_list valist;
@@ -467,11 +489,9 @@ w32_fcntl(int fd, int cmd, ... /* arg */) {
 		fd_table.w32_ios[fd]->fd_status_flags = va_arg(valist, int);
 		return 0;
 	case F_GETFD:
-		return fd_table.w32_ios[fd]->fd_flags;
-		return 0;
+		return fd_table.w32_ios[fd]->fd_flags;		
 	case F_SETFD:
-		fd_table.w32_ios[fd]->fd_flags = va_arg(valist, int);
-		return 0;
+		return w32_io_process_fd_flags(fd_table.w32_ios[fd], va_arg(valist, int));		
 	default:
 		errno = EINVAL;
 		debug("fcntl - ERROR not supported cmd:%d", cmd);
@@ -722,11 +742,6 @@ w32_dup2(int oldfd, int newfd) {
 unsigned int
 w32_alarm(unsigned int seconds) {
 	/*TODO -  implement alarm */
-	return 0;
-}
-
-sighandler_t w32_signal(int signum, sighandler_t handler) {
-	/*TODO - implement signal()*/
 	return 0;
 }
 
