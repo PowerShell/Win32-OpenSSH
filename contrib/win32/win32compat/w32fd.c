@@ -123,7 +123,7 @@ w32posix_initialize() {
 	if ((fd_table_initialize() != 0)
 		|| (socketio_initialize() != 0))
 		DebugBreak();
-	main_thread = GetCurrentThread();
+	main_thread = OpenThread(THREAD_SET_CONTEXT, FALSE, GetCurrentThreadId());
 	signalio_initialize();
 }
 
@@ -156,13 +156,8 @@ w32_io_on_select(struct w32_io* pio, BOOL rd)
 {
 	if ((pio->type == SOCK_FD))
 		return socketio_on_select(pio, rd);
-	else 
-		switch (FILETYPE(pio)) {
-		case FILE_TYPE_CHAR:
-			return termio_on_select(pio, rd);
-		default:
-			return fileio_on_select(pio, rd);
-		}
+	
+	return fileio_on_select(pio, rd);
 }
 
 #define CHECK_FD(fd) do {							\
@@ -371,13 +366,8 @@ w32_read(int fd, void *dst, unsigned int max) {
 
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
 		return socketio_recv(fd_table.w32_ios[fd], dst, max, 0);
-	else
-		switch (FILETYPE(fd_table.w32_ios[fd])) {
-		case FILE_TYPE_CHAR:
-			return termio_read(fd_table.w32_ios[fd], dst, max);
-		default:
-			return fileio_read(fd_table.w32_ios[fd], dst, max);
-		}	
+	
+	return fileio_read(fd_table.w32_ios[fd], dst, max);
 }
 
 int
@@ -386,13 +376,8 @@ w32_write(int fd, const void *buf, unsigned int max) {
 	
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
 		return socketio_send(fd_table.w32_ios[fd], buf, max, 0);
-	else
-		switch (FILETYPE(fd_table.w32_ios[fd])) {
-		case FILE_TYPE_CHAR:
-			return termio_write(fd_table.w32_ios[fd], buf, max);
-		default:
-			return fileio_write(fd_table.w32_ios[fd], buf, max);
-		}
+	
+	return fileio_write(fd_table.w32_ios[fd], buf, max);
 }
 
 int

@@ -119,9 +119,6 @@ long fileio_lseek(struct w32_io* pio, long offset, int origin);
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
 
 /* terminal io specific versions */
-int termio_on_select(struct w32_io* pio, BOOL rd);
-int termio_read(struct w32_io* pio, void *dst, unsigned int max);
-int termio_write(struct w32_io* pio, const void *buf, unsigned int max);
 int termio_close(struct w32_io* pio);
 
 /* signal related APIs*/
