@@ -68,6 +68,10 @@ int w32_dup2(int oldfd, int newfd);
 /* misc */
 unsigned int w32_alarm(unsigned int seconds);
 sighandler_t w32_signal(int signum, sighandler_t handler);
+int w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int w32_raise(int sig);
+int w32_kill(int pid, int sig);
+
 
 /* Shutdown constants */
 #define SHUT_WR SD_SEND
@@ -106,7 +110,7 @@ int w32_temp_DelChildToWatch(HANDLE processtowatch);
 int w32_temp_AddChildToWatch(HANDLE processtowatch);
 HANDLE w32_fd_to_handle(int fd);
 int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock);
-int signalio_add_child(HANDLE child);
+int sw_add_child(HANDLE child);
 
 /* temporary definitions to aid in transition */
 #define WSHELPDelChildToWatch(a) w32_temp_DelChildToWatch((a))

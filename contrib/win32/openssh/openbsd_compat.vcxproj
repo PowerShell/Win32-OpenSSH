@@ -75,7 +75,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\setproctitle.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\sha1.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\sha2.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\sigact.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strlcat.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strlcpy.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strmode.c" />
@@ -121,7 +120,6 @@
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\rmd160.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sha1.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sha2.h" />
-    <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sigact.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sys-queue.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sys-tree.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\vis.h" />

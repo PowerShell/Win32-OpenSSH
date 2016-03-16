@@ -920,7 +920,7 @@ do_exec_no_pty(Session *s, const char *command)
    
   s -> pid = pi.hProcess;
   s -> processId = pi.dwProcessId;
-  signalio_add_child(pi.hProcess);
+  sw_add_child(pi.hProcess);
   
   // Add the child process created to select mux so that during our select data call we know if the process has exited
   /* TODO - fix thi s*/

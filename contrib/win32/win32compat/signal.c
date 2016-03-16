@@ -44,17 +44,12 @@ struct _children {
 } children;
 
 void 
-signalio_initialize() {
+sw_initialize() {
 	memset(&children, 0, sizeof(children));
 }
 
-sighandler_t w32_signal(int signum, sighandler_t handler) {
-	/*TODO - implement signal()*/
-	return 0;
-}
-
 int
-signalio_add_child(HANDLE child) {
+sw_add_child(HANDLE child) {
 	if (children.num_children == MAX_CHILDREN) {
 		errno = ENOTSUP;
 		return -1;
@@ -64,7 +59,7 @@ signalio_add_child(HANDLE child) {
 }
 
 int
-signalio_remove_child_at_index(DWORD index) {
+sw_remove_child_at_index(DWORD index) {
 	if (index >= children.num_children) {
 		errno = EINVAL;
 		return -1;
@@ -81,13 +76,13 @@ signalio_remove_child_at_index(DWORD index) {
 
 
 int
-signalio_remove_child(HANDLE child) {
+sw_remove_child(HANDLE child) {
 	HANDLE* handles = children.handles;
 	DWORD num_children = children.num_children;
 
 	while (num_children) {
 		if (*handles == child)
-			return signalio_remove_child_at_index(children.num_children - num_children);
+			return sw_remove_child_at_index(children.num_children - num_children);
 		handles++;
 		num_children--;
 	}
@@ -96,6 +91,32 @@ signalio_remove_child(HANDLE child) {
 	return -1;
 }
 
+
+unsigned int 
+sw_alarm(unsigned int seconds) {
+	return 0;
+}
+
+
+sighandler_t 
+sw_signal(int signum, sighandler_t handler) {
+	return NULL;
+}
+
+int 
+sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
+	return 0;
+}
+
+int 
+sw_raise(int sig) {
+	return 0;
+}
+
+int 
+sw_kill(int pid, int sig) {
+	return 0;
+}
 
 /*
  * Main wait routine used by all blocking calls. 
@@ -131,7 +152,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 			/* is this due to a child process going down*/
 			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
 				/* TODO - enable this once all direct closes are removed in core code*/
-				//signalio_remove_child(ret - WAIT_OBJECT_0);
+				//sw_remove_child(ret - WAIT_OBJECT_0);
 				errno = EINTR;
 				return -1;
 			}

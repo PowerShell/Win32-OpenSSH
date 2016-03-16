@@ -8,7 +8,7 @@
 
 #include <Windows.h>
 #include <stdio.h>
-#include "debug.h"
+#include "inc\defs.h"
 
 enum w32_io_type {
 	UNKNOWN_FD = 0,
@@ -122,9 +122,14 @@ FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
 int termio_close(struct w32_io* pio);
 
 /* signal related APIs*/
-void signalio_initialize();
-//int signalio_add_child(HANDLE child);
-//int signalio_remove_child(HANDLE child);
+void sw_initialize();
+int sw_add_child(HANDLE child);
+int sw_remove_child(HANDLE child);
+unsigned int sw_alarm(unsigned int seconds);
+sighandler_t sw_signal(int signum, sighandler_t handler);
+int sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int sw_raise(int sig);
+int sw_kill(int pid, int sig);
 
 /*
 * open() flags and modes

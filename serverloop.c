@@ -882,7 +882,7 @@ collect_children(void)
         
         session_close_by_pid(s->pid, status);
         
-        signalio_remove_child(process);
+        sw_remove_child(process);
 
       }
     }

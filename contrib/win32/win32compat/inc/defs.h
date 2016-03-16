@@ -30,44 +30,34 @@
 #define FD_CLOEXEC 0x1
 
 /* signal related defs*/
+/* signal types */
+#define W32_SIGINT		0   
+#define W32_SIGSEGV		1	  
+
+#define W32_SIGPIPE		2
+#define W32_SIGCHLD		3
+#define W32_SIGALRM		4
+#define W32_SIGTSTP		5 
+
+#define W32_SIGHUP		6 
+#define W32_SIGQUIT		7 
+#define W32_SIGTERM		8
+#define W32_SIGTTIN		9
+#define W32_SIGTTOU		10
+
+#define W32_SIGMAX		11
+
+/* signal action codes*/
+#define W32_SIG_DFL		0
+#define W32_SIG_IGN		1
+
+/* singprocmask "how" codes*/
+#define SIG_BLOCK		0
+#define SIG_UNBLOCK		1
+#define SIG_SETMASK		2
+
 typedef void(*sighandler_t)(int);
-// Signal types
-#define SIGINT          2   // interrupt
-#define SIGSEGV         11  // segment violation
-
-#define SIGPIPE		27
-#define SIGCHLD		26
-#define SIGALRM		14
-#define SIGTSTP		5 //"CTRL+Z" - no portable number
-
-#define SIGHUP		1 //Terminate from console
-#define SIGQUIT		3 
-#define SIGTERM		15// Software termination signal from kill
-#define SIGTTIN		6//noportabel number
-#define SIGTTOU		7 //no portable number
-
-
-
-//#define SIGINT          2   // interrupt
-//#define SIGILL          4   // illegal instruction - invalid function image
-//#define SIGFPE          8   // floating point exception
-//#define SIGSEGV         11  // segment violation
-//#define SIGTERM         15  // Software termination signal from kill
-//#define SIGBREAK        21  // Ctrl-Break sequence
-//#define SIGABRT         22  // abnormal termination triggered by abort call
-//#define SIGWINCH 
-//
-//#define SIGABRT_COMPAT  6   // SIGABRT compatible with other platforms, same as SIGABRT
-//
-//#define SIGALRM 14
-//#define SIGCHLD 26
-//#define SIGHUP  1
-//#define SIGPIPE 27
-//#define SIGQUIT 3
-
-// Signal action codes
-#define SIG_DFL (0)     // default signal action
-#define SIG_IGN (1)     // ignore signal
-#define SIG_GET (2)     // return current value
-#define SIG_SGE (3)     // signal gets error
-#define SIG_ACK (4)     // acknowledge
+typedef int sigset_t;
+#define sigemptyset(set) (memset( (set), 0, sizeof(sigset_t)))
+#define sigaddset(set, sig) ( (*(set)) |= (0x80000000 >> (sig)))
+#define sigismember(set, sig) ( (*(set) & (0x80000000 >> (sig)))?1:0 )

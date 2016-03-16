@@ -124,7 +124,7 @@ w32posix_initialize() {
 		|| (socketio_initialize() != 0))
 		DebugBreak();
 	main_thread = OpenThread(THREAD_SET_CONTEXT, FALSE, GetCurrentThreadId());
-	signalio_initialize();
+	sw_initialize();
 }
 
 void
@@ -739,21 +739,6 @@ w32_dup2(int oldfd, int newfd) {
 	return -1;
 }
 
-unsigned int
-w32_alarm(unsigned int seconds) {
-	/*TODO -  implement alarm */
-	return 0;
-}
-
-int
-w32_temp_DelChildToWatch(HANDLE processtowatch) {
-	return 0;
-}
-
-int w32_temp_AddChildToWatch(HANDLE processtowatch) {
-	return 0;
-}
-
 HANDLE
 w32_fd_to_handle(int fd) {
 	HANDLE h = fd_table.w32_ios[fd]->handle;
@@ -781,4 +766,29 @@ int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock) {
 	pio->handle = h;
 	fd_table_set(pio, min_index);
 	return min_index;
+}
+
+
+unsigned int 
+w32_alarm(unsigned int seconds) {
+	return 0;
+}
+sighandler_t 
+w32_signal(int signum, sighandler_t handler) {
+	return sw_signal(signum, handler);
+}
+
+int 
+w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
+	return sw_sigprocmask(how, set, oldset);
+}
+
+int 
+w32_raise(int sig) {
+	return sw_raise(sig);
+}
+
+int 
+w32_kill(int pid, int sig) {
+	return sw_kill(pid, sig);
 }

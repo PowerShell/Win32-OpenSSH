@@ -180,9 +180,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\sha2.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\sigact.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strlcat.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -312,9 +309,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sha2.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sigact.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\sys-queue.h">
