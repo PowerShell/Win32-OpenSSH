@@ -690,15 +690,7 @@ w32_dup(int oldfd) {
 		return -1;
 	}
 
-	if ((oldfd == STDIN_FILENO) && (GetFileType(GetStdHandle(STD_INPUT_HANDLE)) == FILE_TYPE_CHAR)) {
-		target = CreateFileA("CONIN$", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_FLAG_OVERLAPPED, NULL);
-		if (target == INVALID_HANDLE_VALUE) {
-			errno = EOTHER;
-			debug("dup - ERROR: CreateFile CONIN$ :%d", GetLastError());
-			return -1;
-		}
-	}
-	else if (!DuplicateHandle(GetCurrentProcess(), src, GetCurrentProcess(), &target, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
+	if (!DuplicateHandle(GetCurrentProcess(), src, GetCurrentProcess(), &target, 0, TRUE, DUPLICATE_SAME_ACCESS)) {
 		errno = EOTHER;
 		debug("dup - ERROR: DuplicatedHandle() :%d", GetLastError());
 		return -1;
