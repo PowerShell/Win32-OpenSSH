@@ -41,23 +41,6 @@
 
 #include "includes.h"
 
-#ifdef WIN32_FIXME
-//#define WIN32_PRAGMA_REMCON
-#ifdef ECONNABORTED
-#undef ECONNABORTED
-#endif
-#define ECONNABORTED WSAECONNABORTED
-#ifdef ECONNREFUSED
-#undef ECONNREFUSED
-#endif
-#define ECONNREFUSED WSAECONNREFUSED
-#ifdef EINPROGRESS
-#undef EINPROGRESS
-#endif
-#define EINPROGRESS WSAEINPROGRESS
-#define _CRT_NO_POSIX_ERROR_CODES
-#endif
-
 
 #include <sys/types.h>
 #include <sys/param.h>	/* MIN MAX */
@@ -101,10 +84,10 @@
 #include "authfd.h"
 #include "pathnames.h"
 
-#ifdef WIN32_FIXME
-#define isatty(a) WSHELPisatty(a)
-#define SFD_TYPE_CONSOLE    4
-#endif
+//#ifdef WIN32_FIXME
+//#define isatty(a) WSHELPisatty(a)
+//#define SFD_TYPE_CONSOLE    4
+//#endif
 
 
 /* -- channel core */
@@ -1700,7 +1683,9 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 		len = read(c->rfd, buf, sizeof(buf));
 		#ifdef WIN32_FIXME
 		if (len == 0) {
-			if ( get_sfd_type(c->rfd) == SFD_TYPE_CONSOLE)
+
+			//if ( get_sfd_type(c->rfd) == SFD_TYPE_CONSOLE)
+			if(isatty(c->rfd))
 			return 1; // in Win32 console read, there may be no data, but is ok
 		}
 		#endif
@@ -2239,7 +2224,7 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
    * Winsock can't support this sort of fdset reallocation 
    */
    
-#ifndef WIN32_FIXME
+#if(1)//ndef WIN32_FIXME
   
 	nfdset = howmany(n+1, NFDBITS);
 	/* Explicitly test here, because xrealloc isn't always called */
@@ -2257,7 +2242,7 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 
 	*maxfdp = n;
 
-#ifdef WIN32_FIXME
+#if(0)//def WIN32_FIXME
     
     if (*readsetp == NULL) 
     {
@@ -2477,52 +2462,7 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	if (c->datagram)
 		buffer_put_string(&c->output, data, data_len);
 	else {
-		#ifndef WIN32_FIXME
 		buffer_append(&c->output, data, data_len);
-		#else
-		if ( c->client_tty )
-			telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
-		else {
-				#ifdef WIN32_PRAGMA_REMCON
-				buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-				#else
-				if  ( ( c->isatty) && (data_len ==1) && (data[0] == '\003') ) {
-						/* send control-c to the shell process */
-						if ( GenerateConsoleCtrlEvent ( CTRL_C_EVENT, 0 ) ) {
-						}
-						else {
-							debug3("GenerateConsoleCtrlEvent failed with %d\n",GetLastError());
-						}
-				}
-				else {
-					// avoid sending the 4 arrow keys out to remote for now "ESC[A" ..
-					if ( (c->isatty) && (data_len ==3) && (data[0] == '\033') && (data[1] == '[')) {
-						if ( ( data[2] == 'A') ||  (data[2] == 'B') ||  (data[2] == 'C') ||  (data[2] == 'D'))
-								packet_check_eom();
-								return 0;
-					}
-					buffer_append(&c->output, data, data_len); // it is the sshd server, so pass it on
-					if ( c->isatty ) {  // we echo the data if it is sshd server and pty interactive mode			
-					
-						if ( (data_len ==1) && (data[0] == '\b') ) {
-							if (charinline >0) {
-								buffer_append(&c->input, "\b \b", 3); // for backspace, we need to send space and another backspace for visual erase
-								charinline--;
-							}
-						}
-						else {
-							buffer_append(&c->input, data, data_len);
-							charinline += data_len; // one more char on the line
-						}
-						
-						if ( (data[data_len-1] == '\r') || (data[data_len-1] == '\n') )
-							charinline = 0;  // a line has ended, begin char in line count again
-					}
-				}
-				#endif // WIN32_PRAGMA_REMCON
-		}
-
-		#endif
 	}
 	packet_check_eom();
 	return 0;

@@ -37,7 +37,7 @@
 
 #include "Win64Fix.h"
 
-#include <winsock2.h>
+
 #include <windows.h>
 
 #include <NTSecPkg.h>

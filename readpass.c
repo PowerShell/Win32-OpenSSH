@@ -52,9 +52,9 @@
   #include <conio.h>
   #include <sys/socket.h>
   
-  extern int PassInputFd;
-  extern int PassOutputFd;
-  extern int PassErrorFd;
+  //extern int PassInputFd;
+  //extern int PassOutputFd;
+  //extern int PassErrorFd;
 
 #endif
 
@@ -334,10 +334,9 @@ read_passphrase(const char *prompt, int flags)
   /*
    * Show prompt for user.
    */
+  _cputs(prompt);
 
-  _write(PassErrorFd, prompt, strlen(prompt));
-
-  len = retr = 0;
+   len = retr = 0;
   int bufsize = sizeof(buf);
 
 	while (_kbhit())
@@ -360,6 +359,10 @@ read_passphrase(const char *prompt, int flags)
 			if (len > 0 )
 				len--; // overwrite last character
 		}
+		else if (buf[len] == '\003') {
+			/* exit on Ctrl+C */
+			fatal("");
+		}
 		else {
 
 			//_putch( (int) '*' ); // show a star in place of what is typed
@@ -368,7 +371,7 @@ read_passphrase(const char *prompt, int flags)
 	}
 
 	buf[len] = '\0' ; // get rid of the cr/lf
-	_write(PassErrorFd,"\n", strlen("\n")); // show a newline as we do not echo password or the line
+	_cputs("\n"); // show a newline as we do not echo password or the line
 
   ret = xstrdup(buf);
 

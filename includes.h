@@ -24,7 +24,7 @@
 
 #ifdef WIN32
   #undef __USE_W32_SOCKETS
-  #include <winsock2.h>
+  //#include <winsock2.h>
   #include <sys/compat-types.h>
 #endif
 
@@ -189,10 +189,10 @@
 
 #include "entropy.h"
 
-#ifdef WIN32_FIXME
-  #define signal(X, Y)
-  #define alarm(X)
-  #define mysignal(X, Y)
-#endif
+//#ifdef WIN32_FIXME
+//  #define signal(X, Y)
+//  #define alarm(X)
+//  #define mysignal(X, Y)
+//#endif
 
 #endif /* INCLUDES_H */

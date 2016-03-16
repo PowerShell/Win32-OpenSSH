@@ -65,11 +65,11 @@
 
 #ifdef WIN32_FIXME
   
-  #include <sys/socket.h>
+  //#include <sys/socket.h>
   
-  #define mkdir(a, b) _mkdir(a)
+  //#define mkdir(a, b) _mkdir(a)
 
-  #define lstat(PATH, BUF) _stat(PATH, BUF)
+  //#define lstat(PATH, BUF) _stat(PATH, BUF)
   
   /*
    * Don't use fstat() function redefined
@@ -77,9 +77,9 @@
    * in this context.
    */
 
-  #ifdef fstat
-  #undef fstat
-  #endif
+  //#ifdef fstat
+  //#undef fstat
+  //#endif
 
   int glob(const char *pattern, int flags, int (*errfunc)(const char *epath, int eerrno),
                glob_t *pglob)
@@ -1315,7 +1315,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 		return(-1);
 	}
 
- #ifdef WIN32_FIXME
+ #if(0)//def WIN32_FIXME
 
   local_fd = _open(local_path, 
 		O_WRONLY | O_CREAT | O_BINARY | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
@@ -1433,7 +1433,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 				fatal("Received more data than asked for "
 				    "%zu > %zu", len, req->len);
 			if ((lseek(local_fd, req->offset, SEEK_SET) == -1 ||
-			         #ifdef WIN32_FIXME
+			         #if(0)//def WIN32_FIXME
 
       atomicio(_write, local_fd, data, len) != len) &&
 
@@ -1556,7 +1556,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 		}
 #endif
 	}
-	  #ifdef WIN32_FIXME
+	  #if(0)//def WIN32_FIXME
   
   _close(local_fd);
   
@@ -1709,7 +1709,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 
 	TAILQ_INIT(&acks);
 
-	  #ifdef WIN32_FIXME
+	  #if(0)//def WIN32_FIXME
 
   if ((local_fd = _open(local_path, O_RDONLY | O_BINARY, 0)) == -1) {
 
@@ -1730,7 +1730,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	}
 	if (!S_ISREG(sb.st_mode)) {
 		error("%s is not a regular file", local_path);
-		    #ifdef WIN32_FIXME
+		    #if(0)//def WIN32_FIXME
     
     _close(local_fd);
     
@@ -1789,7 +1789,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	handle = get_handle(conn, id, &handle_len,
 	    "remote open(\"%s\")", remote_path);
 	if (handle == NULL) {
-		   #ifdef WIN32_FIXME
+		   #if(0)//def WIN32_FIXME
 
     _close(local_fd);
     
@@ -1824,7 +1824,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 		if (interrupted || status != SSH2_FX_OK)
 			len = 0;
 		else do
-			    #ifdef WIN32_FIXME
+			    #if(0)//def WIN32_FIXME
       
       len = _read(local_fd, data, conn->transfer_buflen);
       
@@ -1916,7 +1916,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 		status = SSH2_FX_FAILURE;
 	}
 
-	 #ifdef WIN32_FIXME
+	 #if(0)//def WIN32_FIXME
 
   if (_close(local_fd) == -1) 
   {

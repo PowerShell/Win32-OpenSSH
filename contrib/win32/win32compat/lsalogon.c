@@ -29,11 +29,18 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
+#include "includes.h"
 #include "lsalogon.h"
+#include <stdio.h>
+#include <openssl/rsa.h>
+#include <openssl/dsa.h>
+
+#include "Debug.h"
+#include "lsastring.h"
+#include "win32auth.h"
 #include "Debug.h"
 
-#include "includes.h"
+
 #include "log.h"
 #include "servconf.h"
 

@@ -50,7 +50,7 @@
 #include <cstring>
 #include <cstdio>
 
-#include <winsock2.h>
+
 #include <windows.h>
 
 #include <NTSecPkg.h>

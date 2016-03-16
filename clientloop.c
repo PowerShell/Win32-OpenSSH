@@ -118,7 +118,7 @@
 #ifdef WIN32_FIXME
 #include <sys/stat.h>
 
-#define isatty(a) WSHELPisatty(a)
+//#define isatty(a) WSHELPisatty(a)
 
 // Windows Console screen size change related
 extern int ScreenX;
@@ -1520,6 +1520,25 @@ client_simple_escape_filter(Channel *c, char *buf, int len)
 	    buf, len);
 }
 
+#ifdef WIN32_FIXME
+u_char * client_ansi_parser_filter(Channel *c, u_char **buf, u_int *len) {
+	/* TODO - account fo error/extended stream*/
+	if (c->client_tty) {
+		telProcessNetwork(buffer_ptr(&c->output), buffer_len(&c->output));
+		buffer_clear(&c->output);
+		buffer_append(&c->output, " \b", 2);
+		*buf = buffer_ptr(&c->output);
+		*len = buffer_len(&c->output);
+		return *buf;
+	}
+	else {
+		*buf = buffer_ptr(&c->output);
+		*len = buffer_len(&c->output);
+		return *buf;
+	}
+}
+#endif
+
 static void
 client_channel_closed(int id, void *arg)
 {
@@ -1606,7 +1625,11 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 		if (session_ident != -1) {
 			if (escape_char_arg != SSH_ESCAPECHAR_NONE) {
 				channel_register_filter(session_ident,
+#ifdef WIN32_FIXME
+				    client_simple_escape_filter, client_ansi_parser_filter,
+#else
 				    client_simple_escape_filter, NULL,
+#endif
 				    client_filter_cleanup,
 				    client_new_escape_filter_ctx(
 				    escape_char_arg));

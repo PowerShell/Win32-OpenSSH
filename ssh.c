@@ -117,14 +117,14 @@
 #ifdef WIN32_FIXME
 
   #include <sys/stat.h>
-  #define isatty(a) WSHELPisatty(a)
+  //#define isatty(a) WSHELPisatty(a)
   #define mkdir(a, b) _mkdir(a)
 
   extern HANDLE proxy_command_handle;
   extern DWORD proxy_command_pid;
   
-  extern int PassInputFd;
-  extern int PassOutputFd;
+  //extern int PassInputFd;
+  //extern int PassOutputFd;
 
   char dotsshdir[MAX_PATH];
 
@@ -640,11 +640,11 @@ main(int ac, char **av)
      * Initialize wrapped stdio.
      */
 
-    WSHELPinitialize();
+    w32posix_initialize();
    
-    allocate_standard_descriptor(STDIN_FILENO);
+   /* allocate_standard_descriptor(STDIN_FILENO);
     allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);
+    allocate_standard_descriptor(STDERR_FILENO);*/
     
   #endif
 
@@ -1082,15 +1082,15 @@ main(int ac, char **av)
     if (options.passInputHandle_)
     {
       debug3("Redirecting pass input to %d...\n", options.passInputHandle_);
-    
-      PassInputFd = _open_osfhandle(options.passInputHandle_, O_RDONLY);
+      abort();
+      //PassInputFd = _open_osfhandle(options.passInputHandle_, O_RDONLY);
     }
 
     if (options.passOutputHandle_)
     { 
       debug3("Redirecting pass prompt output to %d...\n", options.passOutputHandle_);
-    
-      PassOutputFd = _open_osfhandle(options.passOutputHandle_, O_WRONLY);
+      abort();
+      //PassOutputFd = _open_osfhandle(options.passOutputHandle_, O_WRONLY);
     }
 
  	// create various Windows user home directory based file names
@@ -1544,8 +1544,8 @@ main(int ac, char **av)
 	    ConInit( STD_OUTPUT_HANDLE, TRUE ); //init the output console surface for us to write
 	}
 	else {
-		extern int glob_itissshclient;
-		glob_itissshclient = 1; // tell our contrib/win32/win32compat/socket.c code it is for ssh client side
+		//extern int glob_itissshclient;
+		//glob_itissshclient = 1; // tell our contrib/win32/win32compat/socket.c code it is for ssh client side
 	}
 	#endif
 
@@ -2066,8 +2066,8 @@ ssh_session2_open(void)
 	#ifdef WIN32_FIXME
 	else {
 		// make stdio duplicated ports of above binary mode so no CRLF xlate
-		_setmode(sfd_to_fd(in), O_BINARY);
-		_setmode(sfd_to_fd(out), O_BINARY);
+		//_setmode(sfd_to_fd(in), O_BINARY);
+		//_setmode(sfd_to_fd(out), O_BINARY);
 	}
 	#endif
 	

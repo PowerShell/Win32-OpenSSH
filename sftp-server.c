@@ -79,28 +79,6 @@
 
 #ifdef WIN32_FIXME
 
-  #undef select
-  #undef send
-  #undef recv
-  
-  #include <sys/stat.h>
-
-  #define isatty(a) WSHELPisatty(a)
-  
-  #define mkdir(a, b) _mkdir(a)
-
-  #define open(NAME, FLAGS, MODE) _open(NAME, FLAGS | O_BINARY, MODE)
-
-  #define close(FD) _close(FD)
-
-  #define write(FD, BUF, LEN) _write(FD, BUF, LEN)
-
-  #define read(FD, BUF, LEN) _read(FD, BUF, LEN)
-  
-  #define lstat(PATH, BUF) _stat(PATH, BUF)
-
-  #define stat(PATH, BUF) _stat(PATH, BUF)
-
   char * get_inside_path(char *, BOOL, BOOL);
   int readlink(const char *path, char *link, int linklen);
 
@@ -112,15 +90,6 @@
 
   #define realpath realpathWin32
 
-  /*
-   * Don't use fstat() function redefined
-   * in socket.h ported header. It is wrong
-   * in this context.
-   */
-
-  #ifdef fstat
-  #undef fstat
-  #endif
 
   /*
    * Handle to log file.
@@ -2043,27 +2012,6 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
     
     log_init(__progname, log_level, log_facility, log_stderr);
 
-    /*
-     * Initialize Win32 I/O wrapper.
-     */
-     
-     //WSHELPinitialize();
-     
-     {
-       WSADATA wsaData;
-  
-       if (WSAStartup(MAKEWORD(2, 2), &wsaData))
-       {  
-         fatal("ERROR: Cannot initialize WinSock DLL.");
-       }
-     }  
-
-//    allocate_standard_descriptor(STDIN_FILENO);
-//    allocate_standard_descriptor(STDOUT_FILENO);
-//    allocate_standard_descriptor(STDERR_FILENO);
-
-//    sfd_start = 3;
-
   #else
 
 	__progname = ssh_get_progname(argv[0]);
@@ -2174,22 +2122,9 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	in = STDIN_FILENO;
 	out = STDOUT_FILENO;
 
-#ifdef WIN32_FIXME
-  //in  = GetStdHandle(STD_INPUT_HANDLE);
-  //out = GetStdHandle(STD_OUTPUT_HANDLE);
-  //setmode(in, O_BINARY);
-  //setmode(out, O_BINARY);
-	in = STDIN_FILENO;
-	out = STDOUT_FILENO;
-	_setmode(in,O_BINARY); // avoid CrLf translations of text mode
-	_setmode(out,O_BINARY); // avoid CrLf translation
-
-  HANDLE in_handle = (HANDLE) _get_osfhandle (in);
-#else
 #ifdef HAVE_CYGWIN
 	setmode(in, O_BINARY);
 	setmode(out, O_BINARY);
-#endif
 #endif
 
 	max = 0;
@@ -2202,7 +2137,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((oqueue = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-#ifdef WIN32_FIXME
+#if(0)//def WIN32_FIXME
   //rset = (fd_set *)xmalloc(sizeof(fd_set));
   //wset = (fd_set *)xmalloc(sizeof(fd_set));
 #else
@@ -2220,7 +2155,6 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	}
 
 	for (;;) {
-	#ifndef WIN32_FIXME
    
 		memset(rset, 0, set_size);
 		memset(wset, 0, set_size);
@@ -2237,66 +2171,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 		else if (r != SSH_ERR_NO_BUFFER_SPACE)
 			fatal("%s: sshbuf_check_reserve failed: %s",
 			    __func__, ssh_err(r));
-	#endif
 	
-#ifdef WIN32_FIXME
-  
-		int select_read = 0;
-		if ((r = sshbuf_check_reserve(iqueue, sizeof(buf))) == 0 &&
-		    (r = sshbuf_check_reserve(oqueue,
-		    SFTP_MAX_MSG_LENGTH)) == 0)
-			select_read = 1;
-		else if (r != SSH_ERR_NO_BUFFER_SPACE)
-			fatal("%s: sshbuf_check_reserve failed: %s",
-			    __func__, ssh_err(r));
-
-				
-		/* send oqueue to stdout */
-		olen = sshbuf_len(oqueue);
-
-		if (olen > 0) {
-			len = _write(out, sshbuf_ptr(oqueue), olen);
-			if (len < 0) {
-				error("write: %s", strerror(errno));
-				sftp_server_cleanup_exit(1);
-			} else if ((r = sshbuf_consume(oqueue, len)) != 0) {
-				fatal("%s: buffer error: %s",
-				    __func__, ssh_err(r));
-			}
-		}
-
-		/* copy stdin to iqueue */
-		if ( select_read ) {
-		 if (  readsomemore || ( sshbuf_len(iqueue) <= 0)) {
-			len = _read(in, buf, sizeof buf);
-			if (len == 0) {
-				debug("read eof");
-				sftp_server_cleanup_exit(0);
-			} else if (len < 0) {
-				error("read: %s", strerror(errno));
-				sftp_server_cleanup_exit(1);
-			} else if ((r = sshbuf_put(iqueue, buf, len)) != 0) {
-				fatal("%s: buffer error: %s",
-				    __func__, ssh_err(r));
-			}
-		 }
-		}
-
-
-		/*
-		 * Process requests from client if we can fit the results
-		 * into the output buffer, otherwise stop processing input
-		 * and let the output queue drain.
-		 */
-		r = sshbuf_check_reserve(oqueue, SFTP_MAX_MSG_LENGTH);
-		if (r == 0)
-			process();
-		else if (r != SSH_ERR_NO_BUFFER_SPACE)
-			fatal("%s: sshbuf_check_reserve: %s",
-			    __func__, ssh_err(r));
-	}
-#else /* WIN32_FIXME */
-
 		olen = sshbuf_len(oqueue);
 		if (olen > 0)
 			FD_SET(out, wset);
@@ -2346,5 +2221,5 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 			fatal("%s: sshbuf_check_reserve: %s",
 			    __func__, ssh_err(r));
 	}
-#endif /* else WIN32 */
+//#endif /* else WIN32 */
 }

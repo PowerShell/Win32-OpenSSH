@@ -91,7 +91,7 @@
 #include "ssherr.h"
 
 #ifdef WIN32_FIXME
-#define isatty(a) WSHELPisatty(a)
+//#define isatty(a) WSHELPisatty(a)
 #endif
 
 extern ServerOptions options;
@@ -882,10 +882,8 @@ collect_children(void)
         
         session_close_by_pid(s->pid, status);
         
-        if (s->pid)
-			CloseHandle(process);
-		int WSHELPDelChildToWatch (HANDLE processtowatch);
-		WSHELPDelChildToWatch (process); // take the process off from watch list in select mux
+        signalio_remove_child(process);
+
       }
     }
   } while (i > 0);

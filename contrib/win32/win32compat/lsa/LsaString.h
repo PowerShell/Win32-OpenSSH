@@ -40,7 +40,7 @@
 
 #include <stdio.h>
 #include <wchar.h>
-#include <winsock2.h>
+
 #include <windows.h>
 #include <Ntsecapi.h>
 #include <NTSecPkg.h>

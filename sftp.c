@@ -75,11 +75,11 @@ typedef void EditLine;
 
 #ifdef WIN32_FIXME
   
-  #define mkdir(a, b) _mkdir(a)
+//  #define mkdir(a, b) _mkdir(a)
 
   #define FAIL(X) if (X) goto fail
 
-  extern int sfd_start;
+  //extern int sfd_start;
   
 #endif
 
@@ -2211,7 +2211,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
     HANDLE childInput  = NULL;
     HANDLE childOutput = NULL;
 
-    int i = 0;
+    int i = 0, tmp;
   
     char fullCmd[MAX_PATH] = {0};
 
@@ -2227,8 +2227,9 @@ connect_to_server(char *path, char **args, int *in, int *out)
 
     debug3("Creating socket pairs for child ssh process...");
 
-    socketpair(sockin);
-    socketpair(sockout);
+    pipe(sockin);
+    pipe(sockout);
+
     
     debug3("sockin[0]: %d sockin[1]: %d", sockin[0], sockin[1]);
     debug3("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
@@ -2264,15 +2265,15 @@ connect_to_server(char *path, char **args, int *in, int *out)
                                  TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
     */
 
-    FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(STDIN_FILENO),
-                             GetCurrentProcess(), &childInput, 0, 
-                                 TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
+    //FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(STDIN_FILENO),
+    //                         GetCurrentProcess(), &childInput, 0, 
+    //                             TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
 
-    debug3("Duplicating stdout sockets for child ssh process...\n");
-    
-    FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(STDOUT_FILENO),
-                             GetCurrentProcess(), &childOutput, 0,
-                                 TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
+    //debug3("Duplicating stdout sockets for child ssh process...\n");
+    //
+    //FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(STDOUT_FILENO),
+    //                         GetCurrentProcess(), &childOutput, 0,
+    //                             TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
     
     
     //childInput  = sfd_to_handle(STDIN_FILENO);
@@ -2307,7 +2308,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
     si.cb          = sizeof(STARTUPINFO);
     si.hStdInput   = sfd_to_handle(sockout[0]);
     si.hStdOutput  = sfd_to_handle(sockin[1]);//GetStdHandle(STD_OUTPUT_HANDLE);//sfd_to_handle(sockin[1]);
-    si.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
+    si.hStdError   =  GetStdHandle(STD_ERROR_HANDLE);
     si.wShowWindow = SW_HIDE;
     si.dwFlags     = STARTF_USESTDHANDLES;
     si.lpDesktop   = NULL;
@@ -2470,15 +2471,19 @@ main(int argc, char **argv)
     /*
      * Initialize I/O wrappers.
      */
+
+	w32posix_initialize();
      
-    WSHELPinitialize();
+   /* WSHELPinitialize();
     
-    //allocate_standard_descriptor(STDIN_FILENO);
-    //allocate_standard_descriptor(STDOUT_FILENO);
-    //allocate_standard_descriptor(STDERR_FILENO);
+    allocate_standard_descriptor(STDIN_FILENO);
+    allocate_standard_descriptor(STDOUT_FILENO);
+    allocate_standard_descriptor(STDERR_FILENO);
+    
+    LoadLibrary("libwindbg.dll");*/
+
 	setvbuf(stdout, NULL, _IONBF, 0);
 
-    LoadLibrary("libwindbg.dll");
     
     //sfd_start = 3;
     

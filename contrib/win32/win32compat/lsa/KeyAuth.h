@@ -36,14 +36,14 @@
 
 #ifdef __VS_BUILD__
 #define UMDF_USING_NTSTATUS 
-#include <winsock2.h>
+
 #include <Windows.h>
 #include <LsaLookup.h>
 #include <Ntsecapi.h>
 #endif
 
 
-#include <winsock2.h>
+
 
 #include "Win64Fix.h"
 

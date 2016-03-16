@@ -239,8 +239,8 @@ ssh_proxy_connect(const char *host, u_short port, const char *proxy_command)
 
     debug("Creating socket pairs for proxy process...");
 
-    socketpair(sockin);
-    socketpair(sockout);
+    pipe(sockin);
+    pipe(sockout);
     
     debug("sockin[0]: %d sockin[1]: %d", sockin[0], sockin[1]);
     debug("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
@@ -492,7 +492,7 @@ timeout_connect(int sockfd, const struct sockaddr *serv_addr,
 		goto done;
 	}
 	
-#ifndef WIN32_FIXME
+#if(1)//ndef WIN32_FIXME
 	fdset = xcalloc(howmany(sockfd + 1, NFDBITS),
 	    sizeof(fd_mask));
 #else

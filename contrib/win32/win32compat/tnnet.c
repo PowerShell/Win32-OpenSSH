@@ -38,7 +38,7 @@
 #include <ctype.h>
 #include <string.h>
 
-#include <winsock2.h>
+
 #include <windows.h>
 
 #include "ansiprsr.h"
@@ -59,6 +59,9 @@ size_t telProcessNetwork ( char *buf, size_t len )
 	unsigned char* pszTail = szBuffer;
 	size_t Result;
 	unsigned char* pszNewHead;
+
+	if ((len == 1) && (buf[0] == 13))
+		buf[0] = 10;
 
 	if (1)
 	{

@@ -33,7 +33,7 @@
 #define Kerberos_H
 
 #include "Debug.h"
-#include <winsock2.h>
+
 #include <windows.h>
 #include <krb5.h>
 #include <gssapi/gssapi.h>

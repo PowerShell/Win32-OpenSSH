@@ -30,13 +30,13 @@
  */
 
 #ifdef __VS_BUILD__
-#include <winsock2.h>
+
 #include <Windows.h>
 #include <LsaLookup.h>
 #include <Ntsecapi.h>
 #endif
 
-#include <winsock2.h>
+
 #include "Key.h"
 
 #ifdef __VS_BUILD__

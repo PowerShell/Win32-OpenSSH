@@ -35,7 +35,7 @@
 
 int startup_handler(void)
 {
-  WSHELPinitialize();
+  //WSHELPinitialize();
 
   return 0;
 }
