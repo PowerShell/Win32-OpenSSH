@@ -24,9 +24,6 @@
 #ifdef HAVE_SYS_TIME_H
 # include <sys/time.h>
 #endif
-#ifdef WIN32_FIXME
-#include <sys/utime.h>
-#endif
 
 #include <string.h>
 #include <signal.h>

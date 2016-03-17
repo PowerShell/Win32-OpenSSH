@@ -1,4 +1,4 @@
-
+#include <Windows.h>
 #include "w32fd.h"
 #include "inc/defs.h"
 
@@ -128,6 +128,7 @@ termio_initiate_write(struct w32_io* pio, DWORD num_bytes) {
 
 int termio_close(struct w32_io* pio) {
 	debug2("termio_close - pio:%p", pio);
+	HANDLE h;
 
 	CancelIoEx(WINHANDLE(pio), NULL);
 	/* If io is pending, let worker threads exit*/

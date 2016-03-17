@@ -4,14 +4,11 @@
 * Win32 renamed POSIX APIs
 */
 #pragma once
-
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <stdio.h>
 #include "defs.h"
 
-/* total fds that can be allotted */
-#define MAX_FDS 256  /* a 2^n number */
 
 typedef struct w32_fd_set_ {
 	unsigned char bitmap[MAX_FDS >> 3];
@@ -60,6 +57,7 @@ int w32_mkdir(const char *pathname, unsigned short mode);
 int w32_close(int fd);
 int w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
 	const struct timeval *timeout);
+int w32_poll(struct pollfd *fds, unsigned int nfds, int timeout);
 int w32_fcntl(int fd, int cmd, ... /* arg */);
 int w32_dup(int oldfd);
 int w32_dup2(int oldfd, int newfd);
@@ -119,3 +117,4 @@ int sw_add_child(HANDLE child);
 #define allocate_sfd(a, b) w32_allocate_fd_for_handle((a, b))
 //#define WSHELPwopen(a, b) w32_open((a, b))
 
+#define environ _environ

@@ -7,4 +7,7 @@
 
 #include "..\w32posix.h"
 
+#undef FD_SETSIZE
+#define FD_SETSIZE MAX_FDS
+
 

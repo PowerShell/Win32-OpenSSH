@@ -244,7 +244,7 @@ pwcopy(struct passwd *pw)
 #endif
 
 #ifdef WIN32_FIXME
-  copy -> pw_dir = _wcsdup(pw -> pw_dir);
+  copy -> pw_dir = (char*)_wcsdup((wchar_t*)pw->pw_dir);
 #else
 	copy->pw_dir = xstrdup(pw->pw_dir);
 #endif
@@ -576,12 +576,12 @@ tilde_expand_filename(const char *filename, uid_t uid)
   // e.g. for SYSTEM user. Then, redirect path to NUL.
   //
 
-  if (wcslen(pw -> pw_dir) == 0)
+  if (wcslen((wchar_t*)pw -> pw_dir) == 0)
   {
     snprintf(ret, sizeof(ret), "NUL");
   }
 
-  else if (snprintf(ret, sizeof(ret), "%ls", pw -> pw_dir) <= 0)
+  else if (snprintf(ret, sizeof(ret), "%ls", (wchar_t*)pw -> pw_dir) <= 0)
 #endif
 	/* Make sure directory has a trailing '/' */
 #ifndef WIN32_FIXME

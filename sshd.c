@@ -1982,7 +1982,7 @@ main(int ac, char **av)
      */
   
     logfd = _open("sshd.log", O_WRONLY | O_CREAT | O_APPEND, 
-                      S_IREAD | S_IWRITE | _O_NOINHERIT);
+                      S_IREAD | S_IWRITE );
 
     /*
      * Forbid to inherit log file handle.

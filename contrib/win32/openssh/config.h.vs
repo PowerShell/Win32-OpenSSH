@@ -529,7 +529,7 @@
 /* #undef HAVE_INET_NTOA */
 
 /* Define to 1 if you have the `inet_ntop' function. */
-/* #undef HAVE_INET_NTOP */
+#define HAVE_INET_NTOP 1
 
 /* Define to 1 if you have the `innetgr' function. */
 /* #undef HAVE_INNETGR */
@@ -711,7 +711,7 @@
 #define HAVE_PID_T 1
 
 /* Define to 1 if you have the `poll' function. */
-/* #undef HAVE_POLL */
+#define HAVE_POLL 1
 
 /* Define to 1 if you have the <poll.h> header file. */
 /* #undef HAVE_POLL_H */
@@ -1017,7 +1017,7 @@
 /* #undef HAVE_SYS_NERR */
 
 /* Define to 1 if you have the <sys/poll.h> header file. */
-/* #undef HAVE_SYS_POLL_H */
+#define HAVE_SYS_POLL_H 1
 
 /* Define to 1 if you have the <sys/prctl.h> header file. */
 /* #undef HAVE_SYS_PRCTL_H */
@@ -1056,7 +1056,7 @@
 /* #undef HAVE_SYS_TIMERS_H */
 
 /* Define to 1 if you have the <sys/time.h> header file. */
-/* #undef HAVE_SYS_TIME_H 
+#define HAVE_SYS_TIME_H  1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #define HAVE_SYS_TYPES_H 1
@@ -1707,6 +1707,7 @@ struct iovec
 
 // define building with MS Visual Studio Compiler and runtime and not with MingW/gcc compiler
 #define WIN32_VS 1
+#define __STDC__ 1
 // Use Pragma Systems Remote Console modules for shell sessions so that cmd/powershell fully
 // works remotely over SSH like they operate in a local machine
 //#define WIN32_PRAGMA_REMCON

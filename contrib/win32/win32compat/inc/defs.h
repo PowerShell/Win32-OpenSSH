@@ -7,6 +7,9 @@
 
 #include <memory.h>
 
+/* total fds that can be allotted */
+#define MAX_FDS 256  /* a 2^n number */
+
 #undef FD_ZERO
 #define FD_ZERO(set) (memset( (set), 0, sizeof(w32_fd_set)))
 #undef FD_SET
