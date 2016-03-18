@@ -58,6 +58,10 @@
 #include "krl.h"
 #include "digest.h"
 
+#ifdef	WIN32_FIXME
+#define open(a,b,...) _open((a), (b), __VA_ARGS__)
+#define fdopen(a,b) _fdopen((a), (b))
+#endif
 
 #ifdef WITH_OPENSSL
 # define DEFAULT_KEY_TYPE_NAME "rsa"

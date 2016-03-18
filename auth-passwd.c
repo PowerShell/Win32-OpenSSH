@@ -335,39 +335,11 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
 
     return 0;
   }
-
-  /*
-   * First, try logon in INTERACTIVE mode.
-   */
   
   worked = LogonUserW(user_UTF16, domain_UTF16, password_UTF16,
-                         LOGON32_LOGON_INTERACTIVE, 
+	  LOGON32_LOGON_NETWORK,
                              LOGON32_PROVIDER_DEFAULT, &hToken);
                              
-  /*
-   * If no success, try NETWORK mode.
-   */
-   
-  if (!worked)
-  {
-    HANDLE weakToken = INVALID_HANDLE_VALUE;
-    
-    debug3("Netork login attemp [%s][%ls]...", 
-               username, domain_UTF16);
-    
-    worked = LogonUserW(user_UTF16, domain_UTF16, password_UTF16,
-                           LOGON32_LOGON_NETWORK,
-                               LOGON32_PROVIDER_DEFAULT, &weakToken);
-
-    if (worked)
-    {
-      debug("Duplicating token...");
-  
-      debug3(DuplicateTokenEx(weakToken, MAXIMUM_ALLOWED,
-                                  NULL, SecurityImpersonation,
-                                      TokenPrimary, &hToken) == 0);
-    }                                  
-  }
   
   free(user_UTF16);
   free(password_UTF16);

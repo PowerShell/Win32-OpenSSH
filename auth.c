@@ -647,8 +647,8 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 	int fd;
 	FILE *f;
 	
-#if(0)def WIN32_FIXME
-    if ((fd = WSHELPwopen(file, O_RDONLY|O_NONBLOCK)) == -1) {
+#ifdef WIN32_FIXME
+    if ((fd = _wopen(file, O_RDONLY|O_NONBLOCK)) == -1) {
 #else
 	if ((fd = open(file, O_RDONLY|O_NONBLOCK)) == -1) {
 #endif
@@ -658,6 +658,13 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 		return NULL;
 	}
 
+#ifdef WIN32_FIXME
+	if ((f = _fdopen(fd, "r")) == NULL) {
+		_close(fd);
+		return NULL;
+	}
+
+#else
 	if (fstat(fd, &st) < 0) {
 		close(fd);
 		return NULL;
@@ -668,13 +675,13 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 		close(fd);
 		return NULL;
 	}
-#ifndef WIN32_FIXME
 	unset_nonblock(fd);
-#endif
+
 	if ((f = fdopen(fd, "r")) == NULL) {
 		close(fd);
 		return NULL;
 	}
+#endif
 	if (strict_modes &&
 	    secure_filename(f, file, pw, line, sizeof(line)) != 0) {
 		fclose(f);
