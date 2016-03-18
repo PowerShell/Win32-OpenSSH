@@ -46,6 +46,7 @@ static DWORD WINAPI ReadThread(
 	return 0;
 }
 
+/* TODO - make this a void func*/
 int
 termio_initiate_read(struct w32_io* pio) {
 	HANDLE read_thread;
@@ -73,6 +74,7 @@ termio_initiate_read(struct w32_io* pio) {
 	return 0;
 }
 
+/* TODO - make this a void func*/
 static VOID CALLBACK WriteAPCProc(
 	_In_ ULONG_PTR dwParam
 	) {

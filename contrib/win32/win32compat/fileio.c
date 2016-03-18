@@ -299,6 +299,7 @@ VOID CALLBACK ReadCompletionRoutine(
 }
 
 /* initiate an async read */
+/* TODO:  make this a void func, store error in context */
 int
 fileio_ReadFileEx(struct w32_io* pio) {
 	debug2("ReadFileEx io:%p", pio);

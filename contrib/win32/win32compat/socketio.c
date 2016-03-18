@@ -92,6 +92,7 @@ struct acceptEx_context {
 };
 
 /* initiate async acceptEx*/
+/* TODO - always return 0, set error in context, accept() will pick it up*/
 int 
 socketio_acceptEx(struct w32_io* pio) {
 	struct acceptEx_context *context;
@@ -207,6 +208,7 @@ CALLBACK WSARecvCompletionRoutine(
 }
 
 /* initiates async receive operation*/
+/* TODO - always return 0, or make this a void func. any error should be put in context*/
 int 
 socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
 	int ret = 0;
@@ -255,9 +257,10 @@ socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
 			pio->read_details.pending = TRUE;
 		}
 		else {
-			errno = errno_from_WSALastError();
-			debug("WSARecv - WSARecv() ERROR: io:%p %d", pio, errno);
-			return -1;
+			/* io has completed due to error, recv() will pick it up */
+			debug("WSARecv - WSARecv() ERROR:%d io:%p", WSAGetLastError(), pio);
+			pio->read_details.error = WSAGetLastError();
+			return 0;
 		}
 	}
 
@@ -407,8 +410,8 @@ socketio_recv(struct w32_io* pio, void *buf, size_t len, int flags) {
 		}
 		else {
 			errno = errno_from_WSAError(pio->read_details.error);
-			pio->read_details.error = 0;
 			debug("recv - from CB ERROR:%d, io:%p", pio->read_details.error, pio);
+			pio->read_details.error = 0;
 			return -1;
 		}
 	}

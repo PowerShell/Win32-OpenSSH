@@ -20,7 +20,13 @@ char recvbuf[DEFAULT_BUFLEN];
 char sendbuf[DEFAULT_BUFLEN];
 bool keep_going = true;
 __int64 rec_bytes = 0, sent_bytes = 0;
-bool server = true;
+enum _mode {
+	server,
+	client,
+	child
+};
+enum _mode mode = server;
+bool rec_live = true, send_live = true;
 
 
 void prep_send_buf()
@@ -40,6 +46,7 @@ DWORD WINAPI RecvThread(
 		rec = recv(ConnectSocket, recvbuf, DEFAULT_BUFLEN, 0);
 		rec_bytes += rec;
 	}
+	rec_live = false;
 	return 0;
 }
 
@@ -52,6 +59,7 @@ DWORD WINAPI SendThread(
 		rec = send(ConnectSocket, sendbuf + rnd, DEFAULT_BUFLEN - rnd, 0);
 		sent_bytes += rec;
 	}
+	send_live = false;
 	return 0;
 }
 
@@ -64,7 +72,7 @@ int __cdecl main(int argc, char **argv)
 		hints;
 
 	int iResult;
-	
+
 
 	// Validate the parameters
 	if ((argc < 2) || (strlen(argv[1]) > 1)) {
@@ -73,7 +81,9 @@ int __cdecl main(int argc, char **argv)
 	}
 
 	if (argv[1][0] == 'c')
-		server = false;
+		mode = client;
+	else if (argv[1][0] == 'o')
+		mode = child;
 
 	// Initialize Winsock
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -87,15 +97,19 @@ int __cdecl main(int argc, char **argv)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 
+	prep_send_buf();
+
 	// Resolve the server address and port
-	iResult = getaddrinfo(argv[2], argv[3], &hints, &result);
-	if (iResult != 0) {
-		printf("getaddrinfo failed with error: %d\n", iResult);
-		WSACleanup();
-		return 1;
+	if (mode != child) {
+		iResult = getaddrinfo(argv[2], argv[3], &hints, &result);
+		if (iResult != 0) {
+			printf("getaddrinfo failed with error: %d\n", iResult);
+			WSACleanup();
+			return 1;
+		}
 	}
 
-	if (!server) {
+	if (mode == client) {
 		// Attempt to connect to an address until one succeeds
 		for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
 
@@ -124,7 +138,11 @@ int __cdecl main(int argc, char **argv)
 			return 1;
 		}
 	}
+	else if (mode == child) {
+		ConnectSocket = atoi(argv[2]);
+	}
 	else {
+
 		SOCKET ListenSocket;
 		// Create a SOCKET for connecting to server
 		ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
@@ -154,17 +172,34 @@ int __cdecl main(int argc, char **argv)
 		}
 
 		// Accept a client socket
-		ConnectSocket = accept(ListenSocket, NULL, NULL);
-		if (ConnectSocket == INVALID_SOCKET) {
-			printf("accept failed with error: %d\n", WSAGetLastError());
-			closesocket(ListenSocket);
-			WSACleanup();
-			return 1;
+		while (1) {
+			ConnectSocket = accept(ListenSocket, NULL, NULL);
+			if (ConnectSocket == INVALID_SOCKET) {
+				printf("accept failed with error: %d\n", WSAGetLastError());
+				closesocket(ListenSocket);
+				WSACleanup();
+				return 1;
+			}
+			if (!SetHandleInformation((HANDLE)ConnectSocket, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT))
+				printf("unable to set inheritance on socket handle: %p\n", ConnectSocket);
+			int sock_int = ConnectSocket & 0xffffffff;
+			char cmd[MAX_PATH];
+			STARTUPINFOA si;
+			PROCESS_INFORMATION pi;
+			ZeroMemory(&si, sizeof(si)); ZeroMemory(&pi, sizeof(pi));
+			si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+			si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+			si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+			sprintf(cmd, "%s o %d", argv[0], sock_int);
+			//spawn a child
+			if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
+				printf("child creation failed: %d\n", GetLastError());
+			closesocket(ConnectSocket);
 		}
+
+
 		// No longer need server socket
 		closesocket(ListenSocket);
-
-
 	}
 
 	freeaddrinfo(result);
@@ -201,10 +236,10 @@ int __cdecl main(int argc, char **argv)
 		return 1;
 	}
 
-	printf("\t Recv(Kb/s) \t\t Sent(Kb/s)\n");
+	printf("\t %-20s %-20s \n", "Recv(Kbps)", "Send(Kbps)");
 	__int64 last_recv = 0;
 	__int64 last_send = 0;
-	while (1) {
+	while (rec_live || send_live) {
 		if (WAIT_OBJECT_0 != WaitForSingleObject(timer, INFINITE)) {
 			printf("wait failed %d\n", GetLastError());
 			break;
@@ -212,11 +247,13 @@ int __cdecl main(int argc, char **argv)
 		__int64 now_recv = rec_bytes;
 		__int64 now_send = sent_bytes;
 
-		printf("\r\t %lld \t\t %lld", (now_recv - last_recv) / 2048, (now_send - last_send) / 2048);
+		printf("\r\t %-20lld %-20lld", (now_recv - last_recv) / (2*1048), (now_send - last_send) / (2*1048));
 		last_recv = now_recv;
 		last_send = now_send;
 
 	}
+
+	printf("\n\n");
 
 	closesocket(ConnectSocket);
 	WSACleanup();
