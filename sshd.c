@@ -2900,11 +2900,9 @@ main(int ac, char **av)
 #endif /* !WIN32_FIXME */
 	}
 
-#ifndef WIN32_FIXME
 	/* Executed child processes don't need these. */
 	fcntl(sock_out, F_SETFD, FD_CLOEXEC);
 	fcntl(sock_in, F_SETFD, FD_CLOEXEC);
-#endif
 
 	/*
 	 * Disable the key regeneration alarm.  We will not regenerate the

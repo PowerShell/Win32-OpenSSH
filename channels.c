@@ -253,14 +253,12 @@ channel_register_fds(Channel *c, int rfd, int wfd, int efd,
 	channel_max_fd = MAX(channel_max_fd, wfd);
 	channel_max_fd = MAX(channel_max_fd, efd);
 
-#ifndef WIN32_FIXME
 	if (rfd != -1)
 		fcntl(rfd, F_SETFD, FD_CLOEXEC);
 	if (wfd != -1 && wfd != rfd)
 		fcntl(wfd, F_SETFD, FD_CLOEXEC);
 	if (efd != -1 && efd != rfd && efd != wfd)
 		fcntl(efd, F_SETFD, FD_CLOEXEC);
-#endif
 
 	c->rfd = rfd;
 	c->wfd = wfd;

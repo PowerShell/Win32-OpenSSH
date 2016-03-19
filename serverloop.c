@@ -142,7 +142,6 @@ static int notify_pipe[2];
 static void
 notify_setup(void)
 {
-#ifndef WIN32_FIXME /* This was causing heap corruption */
 	if (pipe(notify_pipe) < 0) {
 		error("pipe(notify_pipe) failed %s", strerror(errno));
 	} else if ((fcntl(notify_pipe[0], F_SETFD, FD_CLOEXEC) == -1) ||
@@ -155,9 +154,6 @@ notify_setup(void)
 		set_nonblock(notify_pipe[1]);
 		return;
 	}
-#endif
-	notify_pipe[0] = -1;	/* read end */
-	notify_pipe[1] = -1;	/* write end */
 }
 static void
 notify_parent(void)

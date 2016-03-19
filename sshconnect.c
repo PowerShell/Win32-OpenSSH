@@ -414,9 +414,7 @@ ssh_create_socket(int privileged, struct addrinfo *ai)
 		error("socket: %s", strerror(errno));
 		return -1;
 	}
-#ifndef WIN32_FIXME
 	fcntl(sock, F_SETFD, FD_CLOEXEC);
-#endif
 
 	/* Bind the socket to an alternative local IP address */
 	if (options.bind_address == NULL && !privileged)
