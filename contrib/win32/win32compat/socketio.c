@@ -98,60 +98,8 @@ socketio_acceptEx(struct w32_io* pio) {
 	struct acceptEx_context *context;
 
 	debug3("acceptEx - io:%p", pio);
-	if (pio->internal.context == NULL) {
-		GUID GuidAcceptEx = WSAID_ACCEPTEX;
-		GUID GuidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
-		DWORD dwBytes;
+	context = (struct acceptEx_context *)pio->internal.context;
 
-		context = 
-		    (struct acceptEx_context*)malloc(sizeof(struct acceptEx_context));
-		if (context == NULL) {
-			errno = ENOMEM;
-			debug("acceptEx - ERROR:%d, io:%p", errno, pio);
-			return -1;
-		}
-		memset(context, 0, sizeof(struct acceptEx_context));
-		if (SOCKET_ERROR == WSAIoctl(pio->sock, 
-		    SIO_GET_EXTENSION_FUNCTION_POINTER,
-		    &GuidAcceptEx, sizeof(GuidAcceptEx),
-		    &context->lpfnAcceptEx, sizeof(context->lpfnAcceptEx),
-		    &dwBytes, NULL, NULL))
-		{
-			free(context);
-			errno = errno_from_WSALastError();
-			debug("acceptEx - Ioctl1 ERROR:%d, io:%p", errno, pio);
-			return -1;
-		}
-
-		if (SOCKET_ERROR == WSAIoctl(pio->sock,
-			SIO_GET_EXTENSION_FUNCTION_POINTER,
-			&GuidGetAcceptExSockaddrs, sizeof(GuidGetAcceptExSockaddrs),
-			&context->lpfnGuidGetAcceptExSockaddrs, sizeof(context->lpfnGuidGetAcceptExSockaddrs),
-			&dwBytes, NULL, NULL))
-		{
-			free(context);
-			errno = errno_from_WSALastError();
-			debug("acceptEx - Ioctl2 ERROR:%d, io:%p", errno, pio);
-			return -1;
-		}
-
-
-
-		context->accept_socket = INVALID_SOCKET;
-		pio->internal.context = context;
-	}
-	else
-		context = (struct acceptEx_context *)pio->internal.context;
-
-	/* init overlapped event */
-	if (pio->read_overlapped.hEvent == NULL) {
-		pio->read_overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-		if ((pio->read_overlapped.hEvent) == NULL) {
-			errno = ENOMEM;
-			debug("acceptEx - CreateEvent() ERROR:%d, io:%p", errno, pio);
-			return -1;
-		}
-	}
 	ResetEvent(pio->read_overlapped.hEvent);
 
 	/* create accepting socket */
@@ -257,10 +205,9 @@ socketio_WSARecv(struct w32_io* pio, BOOL* completed) {
 			pio->read_details.pending = TRUE;
 		}
 		else {
-			/* io has completed due to error, recv() will pick it up */
-			debug("WSARecv - WSARecv() ERROR:%d io:%p", WSAGetLastError(), pio);
-			pio->read_details.error = WSAGetLastError();
-			return 0;
+			errno = errno_from_WSALastError();
+			debug("WSARecv - WSARecv() ERROR: io:%p %d", pio, errno);
+			return -1;
 		}
 	}
 
@@ -334,11 +281,63 @@ socketio_getpeername(struct w32_io* pio, struct sockaddr* name, int* namelen) {
 /* implements listen() */
 int 
 socketio_listen(struct w32_io* pio, int backlog) {
+	struct acceptEx_context* context;
+
 	if (SOCKET_ERROR == listen(pio->sock, backlog)) {
 		errno = errno_from_WSALastError();
 		debug("listen - listen() ERROR:%d io:%p", errno, pio);
 		return -1;
 	}
+
+	/* prep for accept*/
+	{
+		GUID GuidAcceptEx = WSAID_ACCEPTEX;
+		GUID GuidGetAcceptExSockaddrs = WSAID_GETACCEPTEXSOCKADDRS;
+		DWORD dwBytes;
+
+		context = (struct acceptEx_context*)malloc(sizeof(struct acceptEx_context));
+		if (context == NULL) {
+			errno = ENOMEM;
+			debug("listen - ERROR:%d, io:%p", errno, pio);
+			return -1;
+		}
+		memset(context, 0, sizeof(struct acceptEx_context));
+		if (SOCKET_ERROR == WSAIoctl(pio->sock,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			&GuidAcceptEx, sizeof(GuidAcceptEx),
+			&context->lpfnAcceptEx, sizeof(context->lpfnAcceptEx),
+			&dwBytes, NULL, NULL))
+		{
+			free(context);
+			errno = errno_from_WSALastError();
+			debug("listen - Ioctl1 ERROR:%d, io:%p", errno, pio);
+			return -1;
+		}
+
+		if (SOCKET_ERROR == WSAIoctl(pio->sock,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
+			&GuidGetAcceptExSockaddrs, sizeof(GuidGetAcceptExSockaddrs),
+			&context->lpfnGuidGetAcceptExSockaddrs, sizeof(context->lpfnGuidGetAcceptExSockaddrs),
+			&dwBytes, NULL, NULL))
+		{
+			free(context);
+			errno = errno_from_WSALastError();
+			debug("listen - Ioctl2 ERROR:%d, io:%p", errno, pio);
+			return -1;
+		}
+
+		pio->read_overlapped.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+		if ((pio->read_overlapped.hEvent) == NULL) {
+			free(context);
+			errno = ENOMEM;
+			debug("listen - CreateEvent() ERROR:%d, io:%p", errno, pio);
+			return -1;
+		}
+
+		context->accept_socket = INVALID_SOCKET;
+		pio->internal.context = context;
+	}
+	
 	pio->internal.state = SOCK_LISTENING;
 	return 0;
 }
@@ -694,13 +693,9 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen) {
 	if (w32_io_is_blocking(pio)) {
 		/* block until accept io is complete */
 		while (FALSE == socketio_is_io_available(pio, TRUE))
-		{
-			if (-1 == wait_for_any_event(&pio->read_overlapped.hEvent, 
-			    1, INFINITE))
-			{
+			if (-1 == wait_for_any_event(&pio->read_overlapped.hEvent,
+				1, INFINITE))
 				return NULL;
-			}
-		}
 	}
 	else {
 		/* if i/o is not ready */
@@ -911,19 +906,29 @@ socketio_is_io_available(struct w32_io* pio, BOOL rd) {
 		BOOL pending = 
 		    sock_listening ? pio->read_details.pending : pio->write_details.pending;
 
-		if (pending && WSAGetOverlappedResult(pio->sock, overlapped, 
-		    &numBytes, FALSE, &flags))
-			return TRUE;
-		else {
-			if (pending && WSAGetLastError() != WSA_IO_INCOMPLETE) {
-				if (sock_listening)
-					pio->read_details.error = WSAGetLastError();
-				else
-					pio->write_details.error = WSAGetLastError();
-				return TRUE;
+		if (pending)
+			/* if there is an error to be picked up */
+			if (sock_listening) {
+				if (pio->read_details.error)
+					return TRUE;
 			}
-			return FALSE;
-		}
+			else {
+				if (pio->write_details.error)
+					return TRUE;
+			}
+
+			if (WSAGetOverlappedResult(pio->sock, overlapped, 
+			    &numBytes, FALSE, &flags))
+				return TRUE;
+			else if (WSAGetLastError() != WSA_IO_INCOMPLETE) {
+					if (sock_listening)
+						pio->read_details.error = WSAGetLastError();
+					else
+						pio->write_details.error = WSAGetLastError();
+					return TRUE;
+				}
+
+		return FALSE;
 	}
 	else if (rd) {
 		if (pio->read_details.remaining || pio->read_details.error)
@@ -937,7 +942,7 @@ socketio_is_io_available(struct w32_io* pio, BOOL rd) {
 
 }
 /*start async io (if needed) for accept and recv*/
-int 
+void 
 socketio_on_select(struct w32_io* pio, BOOL rd) {
 
 	enum w32_io_sock_state sock_state = pio->internal.state;
@@ -946,20 +951,29 @@ socketio_on_select(struct w32_io* pio, BOOL rd) {
 
 	//nothing to do for writes (that includes connect)
 	if (!rd)
-		return 0;
+		return;
 
 	//listening socket - acceptEx if needed
 	if (sock_state == SOCK_LISTENING) {
-		if ((!pio->read_details.pending) && (socketio_acceptEx(pio) != 0))
-			return -1;
+		if (pio->read_details.pending == FALSE) 
+			if (socketio_acceptEx(pio) != 0) {
+				/* set error, accept will pick it*/
+				pio->read_details.error = errno;
+				errno = 0;
+				pio->read_details.pending = TRUE;
+				SetEvent(pio->read_overlapped.hEvent);
+				return;
+			}
 	}
 	else {
 		//connected socket - WSARecv if needed
-		if ((!pio->read_details.pending)
-		    && (!socketio_is_io_available(pio, rd))
-		    && (socketio_WSARecv(pio, NULL) != 0))
-			return -1;
+		if ((!pio->read_details.pending) && (!socketio_is_io_available(pio, rd)))
+			if (socketio_WSARecv(pio, NULL) != 0) {
+				/* set error, recv() will pick it */
+				pio->read_details.error = errno;
+				errno = 0;
+				return;
+			}
 	}
 
-	return 0;
 }

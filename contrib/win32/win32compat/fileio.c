@@ -594,19 +594,28 @@ fileio_fdopen(struct w32_io* pio, const char *mode) {
 	return _fdopen(fd, mode);
 }
 
-int
+void
 fileio_on_select(struct w32_io* pio, BOOL rd) {
 
 	if (!rd)
-		return 0;
+		return;
 
 	if (!pio->read_details.pending && !fileio_is_io_available(pio, rd))
-		if (FILETYPE(pio) == FILE_TYPE_CHAR)
-			return termio_initiate_read(pio);
-		else
-			return fileio_ReadFileEx(pio);
-
-	return 0;
+		/* initiate read, record any error so read() will pick up */
+		if (FILETYPE(pio) == FILE_TYPE_CHAR) {
+			if (termio_initiate_read(pio) != 0) {
+				pio->read_details.error = errno;
+				errno = 0;
+				return;
+			}
+		}
+		else {
+			if (fileio_ReadFileEx(pio) != 0) {
+				pio->read_details.error = errno;
+				errno = 0;
+				return;
+			}
+		}
 }
 
 

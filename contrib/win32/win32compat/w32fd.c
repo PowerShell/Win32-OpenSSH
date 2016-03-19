@@ -151,13 +151,13 @@ w32_io_is_io_available(struct w32_io* pio, BOOL rd) {
 		return fileio_is_io_available(pio, rd);
 }
 
-int
+void
 w32_io_on_select(struct w32_io* pio, BOOL rd)
 {
 	if ((pio->type == SOCK_FD))
-		return socketio_on_select(pio, rd);
-	
-	return fileio_on_select(pio, rd);
+		socketio_on_select(pio, rd);
+	else 
+		fileio_on_select(pio, rd);
 }
 
 #define CHECK_FD(fd) do {							\
@@ -568,8 +568,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	for (int i = 0; i < fds; i++) {
 
 		if (readfds && FD_ISSET(i, readfds)) {
-			if (w32_io_on_select(fd_table.w32_ios[i], TRUE) == -1)
-				return -1;
+			w32_io_on_select(fd_table.w32_ios[i], TRUE);
 			if ((fd_table.w32_ios[i]->type == SOCK_FD)
 				&& (fd_table.w32_ios[i]->internal.state == SOCK_LISTENING)) {
 				if (num_events == SELECT_EVENT_LIMIT) {
@@ -582,8 +581,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		}
 
 		if (writefds && FD_ISSET(i, writefds)) {
-			if (w32_io_on_select(fd_table.w32_ios[i], FALSE) == -1)
-				return -1;
+			w32_io_on_select(fd_table.w32_ios[i], FALSE);
 			if ((fd_table.w32_ios[i]->type == SOCK_FD)
 				&& (fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)) {
 				if (num_events == SELECT_EVENT_LIMIT) {
@@ -622,7 +620,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	/* timeout specified and both fields are 0 - polling mode*/
 	/* proceed with further wait if not in polling mode*/
 	if ((timeout == NULL) || (timeout_ms != 0))
-		/* wait for io if none is already ready */
+		/* wait for io until any is ready */
 		while (out_ready_fds == 0) {
 			ticks_spent = GetTickCount64() - ticks_start;
 			time_rem = 0;

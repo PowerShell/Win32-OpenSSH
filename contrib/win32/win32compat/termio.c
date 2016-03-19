@@ -41,12 +41,13 @@ static DWORD WINAPI ReadThread(
 
 	if (0 == QueueUserAPC(ReadAPCProc, main_thread, (ULONG_PTR)pio)) {
 		debug("TermRead thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
+		pio->read_details.pending = FALSE;
+		pio->read_details.error = GetLastError();
 		DebugBreak();
 	}
 	return 0;
 }
 
-/* TODO - make this a void func*/
 int
 termio_initiate_read(struct w32_io* pio) {
 	HANDLE read_thread;
@@ -74,7 +75,6 @@ termio_initiate_read(struct w32_io* pio) {
 	return 0;
 }
 
-/* TODO - make this a void func*/
 static VOID CALLBACK WriteAPCProc(
 	_In_ ULONG_PTR dwParam
 	) {
@@ -99,11 +99,13 @@ static DWORD WINAPI WriteThread(
 	if (!WriteFile(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer, 
 	    &write_status.transferred, NULL)) {
 		write_status.error = GetLastError();
-		debug("TermWrite thread - ReadFile failed %d, io:%p", GetLastError(), pio);
+		debug("TermWrite thread - WriteFile failed %d, io:%p", GetLastError(), pio);
 	}
 
 	if (0 == QueueUserAPC(WriteAPCProc, main_thread, (ULONG_PTR)pio)) {
 		debug("TermWrite thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
+		pio->write_details.pending = FALSE;
+		pio->write_details.error = GetLastError();
 		DebugBreak();
 	}
 	return 0;
@@ -124,6 +126,7 @@ termio_initiate_write(struct w32_io* pio, DWORD num_bytes) {
 	}
 
 	pio->write_overlapped.hEvent = write_thread;
+	pio->write_details.pending = TRUE;
 	return 0;
 }
 
