@@ -30,23 +30,57 @@
 
 #include "w32fd.h"
 #include <errno.h>
+#include <signal.h>
 #include "inc\defs.h"
 
-/* signal handlers */
+/* pending signals to be processed s*/
+sigset_t pending_signals;
 
-/* signal queue */
+/* signal handler table*/
+struct {
+	sighandler_t handler;
+	sighandler_t default_handler;
+	DWORD disposition;
+
+} signal_info[W32_SIGMAX];
+
+static VOID CALLBACK 
+sigint_APCProc(
+	_In_ ULONG_PTR dwParam
+	) {
+	pending_signals |= W32_SIGINT;
+	sigaddset(&pending_signals, W32_SIGINT);
+}
+
+static void 
+native_sig_handler(int signal)
+{
+	if (signal == SIGINT) {
+		/* Queue signint APC */
+		QueueUserAPC(sigint_APCProc, main_thread, NULL);
+	}
+}
+
+void 
+sw_init_signal_handler_table() {
+	int i;
+
+	signal(SIGINT, sigint_APCProc);
+	sigemptyset(&pending_signals);
+	memset(&signal_info, 0, sizeof(signal_info));
+	for (i = 0; i < W32_SIGMAX; i++) {
+
+	}
+
+}
 
 /* child processes */
 #define MAX_CHILDREN 50
 struct _children {
 	HANDLE handles[MAX_CHILDREN];
+	//DWORD process_id[MAX_CHILDREN];
 	DWORD num_children;
 } children;
-
-void 
-sw_initialize() {
-	memset(&children, 0, sizeof(children));
-}
 
 int
 sw_add_child(HANDLE child) {
@@ -91,30 +125,155 @@ sw_remove_child(HANDLE child) {
 	return -1;
 }
 
+struct {
+	HANDLE timer;
+	ULONGLONG ticks_at_start; /* 0 if timer is not live */
+	__int64 run_time_sec; /* time in seconds, timer is set to go off from ticks_at_start */
+} timer_info;
+
+
+VOID CALLBACK 
+sigalrm_APC(
+	_In_opt_ LPVOID lpArgToCompletionRoutine,
+	_In_     DWORD  dwTimerLowValue,
+	_In_     DWORD  dwTimerHighValue
+	) {
+	sigaddset(&pending_signals, W32_SIGALRM);
+}
 
 unsigned int 
 sw_alarm(unsigned int seconds) {
-	return 0;
+	LARGE_INTEGER due;
+	ULONGLONG sec_passed;
+	int ret = 0;
+
+	errno = 0;
+	/* cancel any live timer if seconds is 0*/
+	if (seconds == 0) {
+		CancelWaitableTimer(timer_info.timer);
+		timer_info.ticks_at_start = 0;
+		timer_info.run_time_sec = 0;
+		return 0;
+	}
+
+	due.QuadPart = (-1) * seconds * 1000 * 1000 *10; //100 nanosec intervals
+	/* this call resets the timer if it is already active */
+	if (!SetWaitableTimer(timer_info.timer, &due, 0, sigalrm_APC, NULL, FALSE)) {
+		errno = EOTHER;
+		return -1;
+	}
+
+	/* if timer was already ative, return when it was due */
+	if (timer_info.ticks_at_start) {
+		sec_passed = (GetTickCount64() - timer_info.ticks_at_start) / 1000;
+		if (sec_passed < timer_info.run_time_sec)
+			ret = timer_info.run_time_sec - sec_passed;
+	}
+	timer_info.ticks_at_start = GetTickCount64();
+	timer_info.run_time_sec = seconds;
+	return ret;
 }
 
+static int
+sw_init_timer() {
+	memset(&timer_info, 0, sizeof(timer_info));
+	timer_info.timer = CreateWaitableTimer(NULL, FALSE, NULL);
+	if (timer_info.timer == NULL) {
+		errno = ENOMEM;
+		return -1;
+	}
+}
 
 sighandler_t 
 sw_signal(int signum, sighandler_t handler) {
-	return NULL;
+	sighandler_t prev;
+	if (signum >= W32_SIGMAX) {
+		errno = EINVAL;
+		return SIG_ERR;
+	}
+
+	prev = signal_info[signum].disposition;
+	if (prev == W32_SIG_USR)
+		prev = signal_info[signum].handler;
+
+	/* standard dispositions */
+	if ((handler == W32_SIG_DFL) || (handler == W32_SIG_DFL)) {
+		signal_info[signum].disposition = handler;
+		signal_info[signum].handler = NULL;
+	}
+	else { /* user defined handler*/
+		signal_info[signum].disposition = W32_SIG_USR;
+		signal_info[signum].handler = handler;
+	}
+	return prev;
 }
 
 int 
 sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
+	/* this is only used by sshd to block SIGCHLD while doing waitpid() */
+	/* our implementation of waidpid() is never interrupted, so no need to implement this*/
 	return 0;
 }
 
 int 
 sw_raise(int sig) {
+	if (sig == W32_SIGSEGV)
+		raise(SIGSEGV); /* raise native exception handler*/
+	
+	if (signal_info[sig].disposition == W32_SIG_IGN)
+		return 0;
+	else if (signal_info[sig].disposition == W32_SIG_DFL)
+		signal_info[sig].default_handler(sig);
+	else
+		signal_info[sig].handler(sig);
+
 	return 0;
 }
 
 int 
 sw_kill(int pid, int sig) {
+
+	if (pid == GetCurrentProcessId())
+		return sw_raise(sig);
+
+	/* only SIGTERM supported for child processes*/
+	/* TODO implement kill(SIGTERM) for child processes */
+	return 0;
+}
+
+
+/* processes pending signals, return EINTR if any are processed*/
+static int 
+sw_process_pending_signals() {
+	sigset_t pending_tmp = pending_signals;
+	BOOL sig_int = FALSE; /* has any signal actually interrupted */
+
+	int i, exp[] = { W32_SIGCHLD , W32_SIGINT , W32_SIGALRM };
+
+	/* check for expected signals*/
+	for (i = 0; i < (sizeof(exp) / sizeof(exp[0])); i++)
+		sigdelset(&pending_tmp, exp[i]);
+	
+	if (pending_tmp) {
+		/* unexpected signals queued up */
+		errno = ENOTSUP;
+		DebugBreak();
+		return -1;
+	}
+
+	for (i = 0; i < (sizeof(exp) / sizeof(exp[0])); i++) {
+		if (signal_info[exp[i]].disposition != W32_SIG_IGN) {
+			raise(exp[i]);
+			sig_int = TRUE;
+		}
+	}
+		
+	if (sig_int) {
+		/* processed a signal that was not set to be ignored */
+		errno = SIGINT;
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -140,6 +299,10 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		return -1;
 	}
 
+	/* TODO assert that there are no pending signals - signals are only caught during waits*/
+	if (pending_signals)
+		DebugBreak();
+
 	memcpy(all_events, children.handles, children.num_children * sizeof(HANDLE));
 	memcpy(all_events + children.num_children, events, num_events * sizeof(HANDLE));
 
@@ -150,19 +313,16 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_all_events - 1)) {
 			//woken up by event signalled
 			/* is this due to a child process going down*/
-			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
+			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) 
+				sigaddset(&pending_signals, W32_SIGCHLD);
 				/* TODO - enable this once all direct closes are removed in core code*/
 				//sw_remove_child(ret - WAIT_OBJECT_0);
-				errno = EINTR;
-				return -1;
-			}
-
-			return 0;
 		}
 		else if (ret == WAIT_IO_COMPLETION) {
-			return 0;
+			/* APC processed due to IO or signal*/
 		}
 		else if (ret == WAIT_TIMEOUT) {
+			/* timed out */
 			return 0;
 		}
 		/* some other error*/
@@ -175,9 +335,10 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	else {
 		DWORD ret = SleepEx(milli_seconds, TRUE);
 		if (ret == WAIT_IO_COMPLETION) {
-			return 0;
+			/* APC processed due to IO or signal*/
 		}
 		else if (ret == 0) {
+			/* timed out */
 			return 0;
 		}
 		else { //some other error
@@ -186,4 +347,20 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 			return -1;
 		}
 	}
+
+
+	if (pending_signals) {
+		return sw_process_pending_signals();
+	}
+	return;
+}
+
+
+int
+sw_initialize() {
+	memset(&children, 0, sizeof(children));
+	sw_init_signal_handler_table();
+	if (sw_init_timer() != 0)
+		return -1;
+	return 0;
 }

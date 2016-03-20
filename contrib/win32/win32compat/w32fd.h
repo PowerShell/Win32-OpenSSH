@@ -122,7 +122,7 @@ FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
 int termio_close(struct w32_io* pio);
 
 /* signal related APIs*/
-void sw_initialize();
+int sw_initialize();
 int sw_add_child(HANDLE child);
 int sw_remove_child(HANDLE child);
 unsigned int sw_alarm(unsigned int seconds);

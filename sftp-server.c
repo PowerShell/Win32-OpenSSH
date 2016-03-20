@@ -2006,7 +2006,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
      
     logfd = _open("sftp-server.log", O_WRONLY | O_CREAT | O_APPEND , S_IREAD | S_IWRITE);
       
-    log_level = SYSLOG_LEVEL_DEBUG3;
+    log_level = SYSLOG_LEVEL_INFO;
 
     __progname = ssh_get_progname(argv[0]);
     

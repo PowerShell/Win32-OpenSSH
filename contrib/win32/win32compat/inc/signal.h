@@ -28,5 +28,6 @@
 
 #define SIG_DFL	W32_SIG_DFL
 #define SIG_IGN	W32_SIG_IGN
+#define SIG_ERR W32_SIG_ERR
 
 #endif
