@@ -868,7 +868,7 @@ collect_children(void)
   {
     s = session_get(&i);
     
-    if (s != NULL) 
+    if ((s != NULL) && (s->pid != 0))
     {
       if (WaitForSingleObject(s -> pid, 0) == 0) 
       {

@@ -653,10 +653,6 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 				if (writefds && FD_ISSET(i, writefds)) {
 					in_set_fds++;
 					if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
-						/* for connect() completed sockets finish WSA connect process*/
-						if ((fd_table.w32_ios[i]->type == SOCK_FD)
-							&& ((fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)))
-							socketio_finish_connect(fd_table.w32_ios[i]);
 						FD_SET(i, &write_ready_fds);
 						out_ready_fds++;
 					}
@@ -676,9 +672,23 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 
 	if (writefds)
 		for (i = 0; i < fds; i++)
-			if (FD_ISSET(i, writefds) && (!FD_ISSET(i, &write_ready_fds)))
-				FD_CLR(i, writefds);
-
+			if (FD_ISSET(i, writefds)) {
+				if (FD_ISSET(i, &write_ready_fds)) {
+					/* for connect() completed sockets finish WSA connect process*/
+					if ((fd_table.w32_ios[i]->type == SOCK_FD)
+						&& ((fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)))
+						if (socketio_finish_connect(fd_table.w32_ios[i]) != 0) {
+							/* finalizeing connect failed - recored error */
+							/* error gets picked up later recv and/or send*/
+							fd_table.w32_ios[i]->read_details.error = errno;
+							fd_table.w32_ios[i]->write_details.error = errno;
+							fd_table.w32_ios[i]->internal.state = SOCK_CONNECTED;
+							errno = 0;
+						}
+				}
+				else
+					FD_CLR(i, writefds);
+			}
 
 	debug3("select - returning %d", out_ready_fds);
 	return out_ready_fds;
