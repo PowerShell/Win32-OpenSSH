@@ -3,13 +3,7 @@
 
 
 /* Compatibility header to allow code that uses these types to compile on Win32 */
-
-typedef unsigned int uid_t;
-typedef unsigned int gid_t;
-typedef long _off_t;
-typedef long off_t;
-typedef unsigned int _dev_t;
-typedef unsigned int dev_t;				/* device code */
+				/* device code */
 
 #if defined(__MINGW32__)
 

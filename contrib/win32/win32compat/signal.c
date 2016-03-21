@@ -48,7 +48,6 @@ static VOID CALLBACK
 sigint_APCProc(
 	_In_ ULONG_PTR dwParam
 	) {
-	pending_signals |= W32_SIGINT;
 	sigaddset(&pending_signals, W32_SIGINT);
 }
 
@@ -65,7 +64,8 @@ void
 sw_init_signal_handler_table() {
 	int i;
 
-	signal(SIGINT, sigint_APCProc);
+	/* TODO SetConsoleCtrlHandler */
+	//signal(SIGINT, native_sig_handler);
 	sigemptyset(&pending_signals);
 	memset(&signal_info, 0, sizeof(signal_info));
 	for (i = 0; i < W32_SIGMAX; i++) {
