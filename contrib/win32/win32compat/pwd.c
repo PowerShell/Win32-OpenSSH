@@ -152,14 +152,23 @@ char *GetHomeDirFromToken(char *userName, HANDLE token)
   profileInfo.hProfile = NULL;
   profileInfo.dwSize = sizeof(profileInfo);
 
-
-  
   if (LoadUserProfile(token, &profileInfo) == FALSE)
   {
-    debug("<- GetHomeDirFromToken()...");
-    debug("LoadUserProfile failure: %d", GetLastError());
-    
-    return NULL;
+    DWORD errorCode = GetLastError();
+    char currentUser[UNLEN + 1];
+    DWORD usernamelen = UNLEN + 1;
+    if (GetUserName(currentUser, &usernamelen) && strcmp(userName, currentUser) == 0)
+    {
+      debug("WARNING. Could not load user profile (%u).", errorCode);
+    }
+    else
+    {
+      debug("<- GetHomeDirFromToken()...");
+
+      debug("LoadUserProfile failure: %d", errorCode);
+
+      return NULL;
+    }
   }
 
   /*
