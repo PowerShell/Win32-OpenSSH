@@ -105,12 +105,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getrrsetbyname-ldns.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getrrsetbyname.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\glob.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\inet_aton.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -130,9 +124,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\openssl-compat.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-aix.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-irix.c">

@@ -60,8 +60,6 @@
 
 #include "includes.h"
 
-#ifndef WIN32_FIXME
-
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -1065,5 +1063,3 @@ qprintf(const char *str, Char *s)
 
 #endif /* !defined(HAVE_GLOB) || !defined(GLOB_HAS_ALTDIRFUNC) ||
           !defined(GLOB_HAS_GL_MATCHC) || !defined(GLOB_HAS_GL_STATV) */
-		  
-#endif /* WIN32_FIXME */

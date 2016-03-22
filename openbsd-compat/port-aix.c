@@ -26,8 +26,6 @@
  */
 #include "includes.h"
 
-#ifndef WIN32_FIXME
-
 #include "xmalloc.h"
 #include "buffer.h"
 #include "key.h"
@@ -473,4 +471,3 @@ out:
 
 #endif /* _AIX */
 
-#endif

@@ -70,10 +70,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-#ifdef WIN32_FIXME
-#include <getopt.h>
-#endif
-
 #include "log.h"
 
 int	opterr = 1;		/* if error message should be printed */

@@ -50,8 +50,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getopt.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getopt_long.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getrrsetbyname-ldns.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getrrsetbyname.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\glob.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\inet_aton.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\inet_ntoa.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\inet_ntop.c" />
@@ -59,7 +57,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\md5.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\mktemp.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\openssl-compat.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-aix.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-irix.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-linux.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-solaris.c" />
