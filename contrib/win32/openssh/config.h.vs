@@ -1707,8 +1707,6 @@ typedef long ssize_t;
 
 
 #define HAVE_EXPLICIT_BZERO
-#define explicit_bzero(p,l) memset((void *)(p),0,(size_t)(l))
-#define bzero(p,l) memset((void *)(p),0,(size_t)(l))
 
 #define WIN32_ZLIB_NO 1
 
