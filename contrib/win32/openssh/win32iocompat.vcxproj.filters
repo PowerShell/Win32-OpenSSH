@@ -40,6 +40,9 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\poll.h">
       <Filter>inc</Filter>
     </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\wait.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">

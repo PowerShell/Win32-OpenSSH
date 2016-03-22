@@ -138,5 +138,3 @@ struct iovec
 	size_t iov_len;
 };
 
-typedef unsigned short _mode_t;
-typedef _mode_t mode_t;

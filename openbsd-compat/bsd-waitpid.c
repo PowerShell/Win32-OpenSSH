@@ -24,8 +24,6 @@
 
 #include "includes.h"
 
-#ifndef WIN32_FIXME
-
 #ifndef HAVE_WAITPID 
 #include <errno.h>
 #include <sys/wait.h>
@@ -53,5 +51,3 @@ waitpid(int pid, int *stat_loc, int options)
 }
 
 #endif /* !HAVE_WAITPID */
-
-#endif /* WIN32_FIXME */

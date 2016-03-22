@@ -67,3 +67,8 @@ typedef int sigset_t;
 #define sigaddset(set, sig) ( (*(set)) |= (0x80000000 >> (sig)))
 #define sigismember(set, sig) ( (*(set) & (0x80000000 >> (sig)))?1:0 )
 #define sigdelset(set, sig) ( (*(set)) &= (~( 0x80000000 >> (sig)) ) )
+
+
+typedef unsigned short _mode_t;
+typedef _mode_t mode_t;
+typedef unsigned long pid_t;

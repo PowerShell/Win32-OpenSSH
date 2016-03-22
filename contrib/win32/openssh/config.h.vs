@@ -1203,7 +1203,7 @@
 #define HAVE_VSNPRINTF 1
 
 /* Define to 1 if you have the `waitpid' function. */
-/* #undef HAVE_WAITPID */
+#define HAVE_WAITPID 1
 
 /* Define to 1 if you have the `_getlong' function. */
 /* #undef HAVE__GETLONG */
@@ -1680,8 +1680,6 @@
 
 #define WIN32_ZLIB_NO 1
 #define USE_MSCNG 1
-
-typedef unsigned long pid_t;
 
 #ifndef ssize_t
 #ifdef _WIN64
