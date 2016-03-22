@@ -6,6 +6,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\socketio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\fileio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\termio.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\misc.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -36,7 +37,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\w32posix.h">
       <Filter>inc</Filter>
     </ClInclude>
-    <ClInclude Include="..\win32compat\inc\poll.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\poll.h">
       <Filter>inc</Filter>
     </ClInclude>
   </ItemGroup>

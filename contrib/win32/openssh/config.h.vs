@@ -1691,11 +1691,8 @@ typedef long ssize_t;
 #endif
 #endif
 
-#ifndef _WIN32
-#define HAVE_POLL 1
-#endif
 #define HAVE_STRTOULL 1
-#undef HAVE_USLEEP
+#define HAVE_USLEEP 1
 
 #if defined ( WIN32 )
 #define __func__ __FUNCTION__
@@ -1732,3 +1729,5 @@ typedef long ssize_t;
 // works remotely over SSH like they operate in a local machine
 //#define WIN32_PRAGMA_REMCON
 
+
+#define HAVE_MBLEN 1

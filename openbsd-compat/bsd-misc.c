@@ -167,7 +167,7 @@ int nanosleep(const struct timespec *req, struct timespec *rem)
 	return(rc);
 }
 #endif
-#ifndef WIN32_FIXME
+
 #if !defined(HAVE_USLEEP)
 int usleep(unsigned int useconds)
 {
@@ -178,16 +178,6 @@ int usleep(unsigned int useconds)
 	return nanosleep(&ts, NULL);
 }
 #endif
-#else
-#if !defined(HAVE_USLEEP)
-int usleep(unsigned int useconds)
-{
-	Sleep(useconds/1000);
-	return 1;
-}
-#endif
-#endif
-
 
 #ifndef HAVE_TCGETPGRP
 pid_t

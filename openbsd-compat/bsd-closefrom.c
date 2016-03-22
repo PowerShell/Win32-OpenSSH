@@ -51,11 +51,6 @@
 # define OPEN_MAX	256
 #endif
 
-#ifdef WIN32_FIXME
-#define getdtablesize() FD_SETSIZE
-#endif
-
-
 #if 0
 __unused static const char rcsid[] = "$Sudo: closefrom.c,v 1.11 2006/08/17 15:26:54 millert Exp $";
 #endif /* lint */

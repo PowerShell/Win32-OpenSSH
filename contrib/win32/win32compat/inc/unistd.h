@@ -33,6 +33,8 @@
 #define alarm w32_alarm
 #define lseek w32_lseek
 
+#define getdtablesize() MAX_FDS
+
 /* Compatibility header to avoid lots of #ifdefs in includes.h on Win32 */
 
 #include <conio.h>

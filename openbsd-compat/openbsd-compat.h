@@ -227,11 +227,9 @@ unsigned long long strtoull(const char *, char **, int);
 long long strtonum(const char *, long long, long long, const char **);
 #endif
 
-#ifndef WIN32_FIXME
 /* multibyte character support */
 #ifndef HAVE_MBLEN
 # define mblen(x, y)	(1)
-#endif
 #endif
 
 #if !defined(HAVE_VASPRINTF) || !defined(HAVE_VSNPRINTF)
