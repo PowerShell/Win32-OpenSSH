@@ -9,9 +9,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\poll.h">
-      <Filter>inc\sys</Filter>
-    </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\select.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
@@ -37,6 +34,9 @@
       <Filter>inc</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\w32posix.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\win32compat\inc\poll.h">
       <Filter>inc</Filter>
     </ClInclude>
   </ItemGroup>

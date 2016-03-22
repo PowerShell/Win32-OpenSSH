@@ -57,7 +57,6 @@ int w32_mkdir(const char *pathname, unsigned short mode);
 int w32_close(int fd);
 int w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* exceptfds, 
 	const struct timeval *timeout);
-int w32_poll(struct pollfd *fds, unsigned int nfds, int timeout);
 int w32_fcntl(int fd, int cmd, ... /* arg */);
 int w32_dup(int oldfd);
 int w32_dup2(int oldfd, int newfd);
@@ -117,4 +116,27 @@ int sw_add_child(HANDLE child);
 #define allocate_sfd(a, b) w32_allocate_fd_for_handle((a, b))
 //#define WSHELPwopen(a, b) w32_open((a, b))
 
+
+/* TODO - These defs need to revisited and positioned appropriately */
 #define environ _environ
+
+typedef unsigned int	nfds_t;
+
+struct w32_pollfd {
+
+	int  fd;
+	SHORT   events;
+	SHORT   revents;
+
+};
+
+#define pollfd w32_pollfd
+
+struct iovec
+{
+	void *iov_base;
+	size_t iov_len;
+};
+
+typedef unsigned short _mode_t;
+typedef _mode_t mode_t;

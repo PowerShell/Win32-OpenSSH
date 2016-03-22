@@ -182,6 +182,7 @@ sw_init_timer() {
 		errno = ENOMEM;
 		return -1;
 	}
+	return 0;
 }
 
 sighandler_t 
@@ -313,10 +314,13 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_all_events - 1)) {
 			//woken up by event signalled
 			/* is this due to a child process going down*/
-			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) 
-				sigaddset(&pending_signals, W32_SIGCHLD);
+			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
+				//sigaddset(&pending_signals, W32_SIGCHLD);
 				/* TODO - enable this once all direct closes are removed in core code*/
 				//sw_remove_child(ret - WAIT_OBJECT_0);
+				errno = EINTR;
+				return -1;
+			}
 		}
 		else if (ret == WAIT_IO_COMPLETION) {
 			/* APC processed due to IO or signal*/
@@ -349,10 +353,10 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	}
 
 
-	if (pending_signals) {
+	/*if (pending_signals) {
 		return sw_process_pending_signals();
-	}
-	return;
+	}*/
+	return 0;
 }
 
 
