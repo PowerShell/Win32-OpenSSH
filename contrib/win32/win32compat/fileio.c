@@ -357,7 +357,14 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 				if ((FILETYPE(pio) == FILE_TYPE_PIPE)
 					&& (errno == ERROR_NEGATIVE_SEEK)) {
 					/* write end of the pipe closed */
-					debug2("read - no more data, io:%p", pio);
+					debug("read - no more data, io:%p", pio);
+					errno = 0;
+					return 0;
+				}
+				/* on W2012, ReadFileEx on file throws a synchronous EOF error*/
+				else if ((FILETYPE(pio) == FILE_TYPE_DISK)
+					&& (errno == ERROR_HANDLE_EOF)) {
+					debug("read - no more data, io:%p", pio);
 					errno = 0;
 					return 0;
 				}
