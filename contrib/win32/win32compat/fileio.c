@@ -60,7 +60,7 @@ errno_from_Win32Error(int win32_error)
 	case ERROR_FILE_NOT_FOUND:
 		return ENOENT;
 	default:
-		return EOTHER;
+		return win32_error;
 	}
 }
 
@@ -355,7 +355,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 		else {
 			if (-1 == fileio_ReadFileEx(pio)) {
 				if ((FILETYPE(pio) == FILE_TYPE_PIPE)
-					&& (errno == ERROR_NEGATIVE_SEEK)) {
+					&& (errno == ERROR_BROKEN_PIPE)) {
 					/* write end of the pipe closed */
 					debug("read - no more data, io:%p", pio);
 					errno = 0;
@@ -462,6 +462,10 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 		errno = errno_from_Win32Error(pio->write_details.error);
 		debug("write - ERROR:%d on prior unblocking write, io:%p", errno, pio);
 		pio->write_details.error = 0;
+		if ((FILETYPE(pio) == FILE_TYPE_PIPE) && (errno == ERROR_BROKEN_PIPE)) {
+			debug("write - ERROR:read end of the pipe closed, io:%p", pio);
+			errno = EPIPE;
+		}
 		return -1;
 	}
 
@@ -498,7 +502,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 		else {
 			errno = errno_from_Win32LastError();
 			/* read end of the pipe closed ?   */
-			if ((FILETYPE(pio) == FILE_TYPE_PIPE) && (errno == ERROR_NEGATIVE_SEEK)) {
+			if ((FILETYPE(pio) == FILE_TYPE_PIPE) && (errno == ERROR_BROKEN_PIPE)) {
 				debug("write - ERROR:read end of the pipe closed, io:%p", pio);
 				errno = EPIPE;
 			}

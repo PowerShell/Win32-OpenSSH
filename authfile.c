@@ -121,7 +121,7 @@ sshkey_load_file(int fd, struct sshbuf *blob)
 			goto out;
 		}
 	}
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
 	    st.st_size != (off_t)sshbuf_len(blob)) {
 		r = SSH_ERR_FILE_CHANGED;
@@ -183,7 +183,7 @@ sshkey_perm_ok(int fd, const char *filename)
 	if (check_ntsec(filename))
 #endif
 
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 	if ((st.st_uid == getuid()) && (st.st_mode & 077) != 0) {
 		error("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 		error("@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @");
@@ -209,11 +209,7 @@ sshkey_load_private_type(int type, const char *filename, const char *passphrase,
 	if (commentp != NULL)
 		*commentp = NULL;
 
-#ifdef WIN32_FIXME
-	if ((fd = open(filename, O_RDONLY | O_BINARY)) < 0) {
-#else
 	if ((fd = open(filename, O_RDONLY)) < 0) {
-#endif
 	
 		if (perm_ok != NULL)
 			*perm_ok = 0;

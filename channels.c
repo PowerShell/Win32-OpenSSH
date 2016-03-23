@@ -84,11 +84,6 @@
 #include "authfd.h"
 #include "pathnames.h"
 
-//#ifdef WIN32_FIXME
-//#define isatty(a) WSHELPisatty(a)
-//#define SFD_TYPE_CONSOLE    4
-//#endif
-
 
 /* -- channel core */
 
@@ -1679,14 +1674,6 @@ channel_handle_rfd(Channel *c, fd_set *readset, fd_set *writeset)
 	if (c->rfd != -1 && (force || FD_ISSET(c->rfd, readset))) {
 		errno = 0;
 		len = read(c->rfd, buf, sizeof(buf));
-		#ifdef WIN32_FIXME
-		if (len == 0) {
-
-			//if ( get_sfd_type(c->rfd) == SFD_TYPE_CONSOLE)
-			if(isatty(c->rfd))
-			return 1; // in Win32 console read, there may be no data, but is ok
-		}
-		#endif
 		if (len < 0 && (errno == EINTR ||
 		    ((errno == EAGAIN || errno == EWOULDBLOCK) && !force)))
 			return 1;
@@ -1795,7 +1782,7 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
 			}
 			return -1;
 		}
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 #ifndef BROKEN_TCGETATTR_ICANON
 		if (compat20 && c->isatty && dlen >= 1 && buf[0] != '\r') {
 			if (tcgetattr(c->wfd, &tio) == 0 &&
@@ -2222,8 +2209,6 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
    * Winsock can't support this sort of fdset reallocation 
    */
    
-#if(1)//ndef WIN32_FIXME
-  
 	nfdset = howmany(n+1, NFDBITS);
 	/* Explicitly test here, because xrealloc isn't always called */
 	if (nfdset && SIZE_MAX / nfdset < sizeof(fd_mask))
@@ -2236,25 +2221,11 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 		*writesetp = xreallocarray(*writesetp, nfdset, sizeof(fd_mask));
 		*nallocp = sz;
 	}
-#endif /* WIN32_FIXME */
 
 	*maxfdp = n;
 
-#if(0)//def WIN32_FIXME
-    
-    if (*readsetp == NULL) 
-    {
-      *readsetp = malloc(sizeof(fd_set));
-      *writesetp = malloc(sizeof(fd_set));
-    }
-    
-    FD_ZERO(*readsetp);
-    FD_ZERO(*writesetp);
-
-#else /* WIN32_FIXME */ 
 	memset(*readsetp, 0, sz);
 	memset(*writesetp, 0, sz);
-#endif /* else WIN32_FIXME */
 
 	if (!rekeying)
 		channel_handler(channel_pre, *readsetp, *writesetp,
@@ -2408,9 +2379,6 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 	const u_char *data;
 	u_int data_len, win_len;
 	Channel *c;
-	#ifdef WIN32_FIXME
-	static charinline = 0; // counts characters in a line for sshd in tty mode
-	#endif
 
 	/* Get the channel number and verify it. */
 	id = packet_get_int();
@@ -2509,7 +2477,7 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	}
 	debug2("channel %d: rcvd ext data %d", c->self, data_len);
 	c->local_window -= data_len;
-	#ifndef WIN32_FIXME
+	#ifndef WIN32_FIXME//N
 	buffer_append(&c->extended, data, data_len);
 	#else
 	if ( c->client_tty )
@@ -3911,7 +3879,7 @@ channel_connect_to_path(const char *path, char *ctype, char *rname)
 	return connect_to(path, PORT_STREAMLOCAL, ctype, rname);
 }
 
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//N
 void
 channel_send_window_changes(void)
 {

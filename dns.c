@@ -204,7 +204,7 @@ int
 verify_host_key_dns(const char *hostname, struct sockaddr *address,
     struct sshkey *hostkey, int *flags)
 {
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 	u_int counter;
 	int result;
 	struct rrsetinfo *fingerprints = NULL;
@@ -308,7 +308,8 @@ verify_host_key_dns(const char *hostname, struct sockaddr *address,
 
 	return 0;
 #else
-	return 0;
+	error("dns host key verification is not supported in Windows");
+	return -1;
 #endif /* else !WIN32_FIXME */
 }
 

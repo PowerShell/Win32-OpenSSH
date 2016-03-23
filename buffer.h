@@ -73,14 +73,6 @@ void    buffer_put_string(Buffer *, const void *, u_int);
 char   *buffer_get_cstring(Buffer *, u_int *);
 void	buffer_put_cstring(Buffer *, const char *);
 
-#ifdef WIN32_FIXME
-  
-  void *buffer_get_string_local8_from_utf8(Buffer *, u_int *);
-  
-  void buffer_put_string_local8_to_utf8(Buffer *, const void *, u_int);
-  
-#endif /* WIN32_FIXME */
-
 #define buffer_skip_string(b) (void)buffer_get_string_ptr(b, NULL);
 
 int	buffer_put_bignum_ret(Buffer *, const BIGNUM *);
