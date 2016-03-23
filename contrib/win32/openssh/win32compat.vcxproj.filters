@@ -13,6 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
     </Filter>
+    <Filter Include="includes">
+      <UniqueIdentifier>{7eee54fc-3739-4ebb-b15e-9558c1ec91d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="includes\sys">
+      <UniqueIdentifier>{17007d09-bf66-4728-8780-b9a89f427dc8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="includes\netinet">
+      <UniqueIdentifier>{a6170aac-573e-4d21-90ac-d55b2bcb2dde}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="includes\arpa">
+      <UniqueIdentifier>{4491864e-2a50-49ad-a8a6-0e4f822a45e9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ansiprsr.c">
@@ -75,7 +87,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\win32compat\cng_dh.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_dh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_openssl_dh.c">
@@ -127,6 +139,63 @@
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kex.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\grp.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\kfwfix.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netdb.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\process.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\pwd.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\resolv.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\syslog.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\termios.h">
+      <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\ioctl.h">
+      <Filter>includes\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\param.h">
+      <Filter>includes\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\resource.h">
+      <Filter>includes\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\uio.h">
+      <Filter>includes\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\un.h">
+      <Filter>includes\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\arpa\inet.h">
+      <Filter>includes\arpa</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\arpa\nameser.h">
+      <Filter>includes\arpa</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\in.h">
+      <Filter>includes\netinet</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\in_systm.h">
+      <Filter>includes\netinet</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\ip.h">
+      <Filter>includes\netinet</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\tcp.h">
+      <Filter>includes\netinet</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

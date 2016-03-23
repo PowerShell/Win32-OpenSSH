@@ -185,6 +185,25 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_kex.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\arpa\inet.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\arpa\nameser.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\grp.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\kfwfix.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netdb.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\in.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\in_systm.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\ip.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\netinet\tcp.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\process.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\pwd.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\resolv.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\syslog.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\ioctl.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\param.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\resource.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\uio.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\un.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\termios.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

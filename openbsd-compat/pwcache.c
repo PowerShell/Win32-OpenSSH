@@ -82,7 +82,6 @@ user_from_uid(uid_t uid, int nouser)
 char *
 group_from_gid(gid_t gid, int nogroup)
 {
-#ifndef WIN32_FIXME
 	static struct ncache {
 		gid_t	gid;
 		char	*name;
@@ -119,6 +118,5 @@ group_from_gid(gid_t gid, int nogroup)
    
   return NULL;
 
-#endif
 }
 #endif

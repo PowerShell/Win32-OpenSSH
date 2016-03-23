@@ -62,10 +62,8 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-solaris.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-tun.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-uw.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\pwcache.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\readpassphrase.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\reallocarray.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\realpath.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\rmd160.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\rresvport.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\setenv.c" />

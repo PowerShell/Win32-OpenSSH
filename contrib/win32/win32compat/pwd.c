@@ -411,6 +411,38 @@ void endpwent(void)
    */
 }
 
+#define	NCACHE	64			/* power of 2 */
+#define	MASK	(NCACHE - 1)		/* bits to store with */
+
+const char *
+user_from_uid(uid_t uid, int nouser)
+{
+	static struct ncache {
+		uid_t	uid;
+		char	*name;
+	} c_uid[NCACHE];
+	static int pwopen;
+	static char nbuf[15];		/* 32 bits == 10 digits */
+	struct passwd *pw;
+	struct ncache *cp;
+
+	cp = c_uid + (uid & MASK);
+	if (cp->uid != uid || cp->name == NULL) {
+		if (pwopen == 0) {
+			pwopen = 1;
+		}
+		if ((pw = getpwuid(uid)) == NULL) {
+			if (nouser)
+				return (NULL);
+			(void)snprintf(nbuf, sizeof(nbuf), "%u", uid);
+		}
+		cp->uid = uid;
+		if (cp->name != NULL)
+			free(cp->name);
+		cp->name = strdup(pw ? pw->pw_name : nbuf);
+	}
+	return (cp->name);
+}
 
 #ifdef USE_NTCREATETOKEN
 
@@ -426,3 +458,81 @@ PWD_USER_TOKEN PwdCreateUserToken(const char *pUserName,
 }
 
 #endif
+
+/* TODO - this is moved from realpath.c in openbsdcompat. Review and finalize its position*/
+
+#include <Shlwapi.h>
+
+void backslashconvert(char *str)
+{
+	while (*str) {
+		if (*str == '/')
+			*str = '\\'; // convert forward slash to back slash
+		str++;
+	}
+
+}
+
+// convert back slash to forward slash
+void slashconvert(char *str)
+{
+	while (*str) {
+		if (*str == '\\')
+			*str = '/'; // convert back slash to forward slash
+		str++;
+	}
+}
+
+char *realpathWin32(const char *path, char resolved[PATH_MAX])
+{
+	char realpath[PATH_MAX];
+
+	strlcpy(resolved, path + 1, sizeof(realpath));
+	backslashconvert(resolved);
+	PathCanonicalizeA(realpath, resolved);
+	slashconvert(realpath);
+
+	/*
+	* Store terminating slash in 'X:/' on Windows.
+	*/
+
+	if (realpath[1] == ':' && realpath[2] == 0)
+	{
+		realpath[2] = '/';
+		realpath[3] = 0;
+	}
+
+	resolved[0] = *path; // will be our first slash in /x:/users/test1 format
+	strncpy(resolved + 1, realpath, sizeof(realpath));
+	return resolved;
+}
+
+// like realpathWin32() but takes out the first slash so that windows systems can work on the actual file or directory
+char *realpathWin32i(const char *path, char resolved[PATH_MAX])
+{
+	char realpath[PATH_MAX];
+
+	if (path[0] != '/') {
+		// absolute form x:/abc/def given, no first slash to take out
+		strlcpy(resolved, path, sizeof(realpath));
+	}
+	else
+		strlcpy(resolved, path + 1, sizeof(realpath));
+
+	backslashconvert(resolved);
+	PathCanonicalizeA(realpath, resolved);
+	slashconvert(realpath);
+
+	/*
+	* Store terminating slash in 'X:/' on Windows.
+	*/
+
+	if (realpath[1] == ':' && realpath[2] == 0)
+	{
+		realpath[2] = '/';
+		realpath[3] = 0;
+	}
+
+	strncpy(resolved, realpath, sizeof(realpath));
+	return resolved;
+}

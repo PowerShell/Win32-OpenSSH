@@ -390,7 +390,7 @@
 /* #undef HAVE_FSFILCNT_T */
 
 /* Define to 1 if you have the `fstatvfs' function. */
-/* #undef HAVE_FSTATVFS */
+#define HAVE_FSTATVFS 1
 
 /* Define to 1 if you have the `futimes' function. */
 /* #undef HAVE_FUTIMES */
@@ -770,7 +770,7 @@
 /* #undef HAVE_READPASSPHRASE_H */
 
 /* Define to 1 if you have the `realpath' function. */
-/* #undef HAVE_REALPATH */
+#define HAVE_REALPATH 1
 
 /* Define to 1 if you have the `recvmsg' function. */
 /* #undef HAVE_RECVMSG */
@@ -915,7 +915,7 @@
 /* #undef HAVE_STATFS */
 
 /* Define to 1 if you have the `statvfs' function. */
-/* #undef HAVE_STATVFS */
+#define HAVE_STATVFS 1
 
 /* Define to 1 if you have the <stddef.h> header file. */
 #define HAVE_STDDEF_H 1
@@ -1050,7 +1050,7 @@
 #define HAVE_SYS_SELECT_H 1
 
 /* Define to 1 if you have the <sys/statvfs.h> header file. */
-/* #undef HAVE_SYS_STATVFS_H */
+#define HAVE_SYS_STATVFS_H 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
@@ -1152,7 +1152,7 @@
 /* #undef HAVE_USERSEC_H */
 
 /* Define to 1 if you have the `user_from_uid' function. */
-/* #undef HAVE_USER_FROM_UID */
+#define HAVE_USER_FROM_UID 1
 
 /* Define to 1 if you have the <util.h> header file. */
 /* #undef HAVE_UTIL_H */
@@ -1619,7 +1619,6 @@
 #undef HAVE_PTY_H
 #define HAVE_NANOSLEEP 1
 #define HAVE_READPASSPHRASE 1
-#define HAVE_REALPATH 1
 #undef HAVE_SIG_ATOMIC_T
 #define HAVE_SIZE_T 1
 #undef HAVE_STRERROR
