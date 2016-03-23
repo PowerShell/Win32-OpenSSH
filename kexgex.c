@@ -30,11 +30,6 @@
  * We support only client side kerberos on Windows.
  */
 
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
-
 #include <sys/types.h>
 
 #include <openssl/evp.h>

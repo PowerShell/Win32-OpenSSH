@@ -332,21 +332,12 @@ static Authmethod *authmethod_get(char *authlist);
 static Authmethod *authmethod_lookup(const char *name);
 static char *authmethods_get(void);
 
-#ifdef WIN32_FIXME
-int userauth_sspi_kerberos(Authctxt *authctxt);
-
-void userauth_sspi_kerberos_cleanup(Authctxt *authctxt);
-#endif
-
 Authmethod authmethods[] = {
 #ifdef GSSAPI
 	{"gssapi-with-mic",
 		userauth_gssapi,
-#ifdef WIN32_FIXME
 		userauth_sspi_kerberos_cleanup,
-#else
 		NULL,
-#endif
 		&options.gss_authentication,
 		NULL},
 #endif

@@ -204,7 +204,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)hmac.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)hostfile.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)jpake.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)kerberos-sspi.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)kex.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)kexc25519.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)kexc25519c.c" />

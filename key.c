@@ -5,10 +5,6 @@
 
 #include "includes.h"
 
-#ifdef WIN32_FIXME
-#include "openbsd-compat/openssl-compat.h"
-#endif
-
 #include <sys/types.h>
 #include <errno.h>
 #include <stdarg.h>

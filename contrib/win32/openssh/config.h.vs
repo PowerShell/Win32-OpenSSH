@@ -166,7 +166,7 @@
 
 /* Define this if you want GSSAPI
  support in the version 2 protocol */
-#define GSSAPI 1
+/* #undef GSSAPI */
 
 /* Define if you want to use shadow password expire field */
 /* #undef HAS_SHADOW_EXPIRE */
@@ -1254,7 +1254,7 @@
 #define IP_TOS_IS_BROKEN 1
 
 /* Define if you want Kerberos 5 support */
-#define KRB5 1
+/* #undef KRB5 */
 
 /* Define if pututxline updates lastlog too */
 /* #undef LASTLOG_WRITE_PUTUTXLINE */

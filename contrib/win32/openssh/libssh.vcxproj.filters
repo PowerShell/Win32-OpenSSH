@@ -129,9 +129,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)jpake.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)kerberos-sspi.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kex.c">
       <Filter>Source Files</Filter>
     </ClCompile>
