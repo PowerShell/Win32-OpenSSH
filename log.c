@@ -52,15 +52,6 @@
 
 #include "log.h"
 
-#ifdef WIN32_FIXME
-
-  #include <fcntl.h>
-  #include <Shlwapi.h>
-  
-  int logfd = 0;
-
-#endif
-
 static LogLevel log_level = SYSLOG_LEVEL_INFO;
 static int log_on_stderr = 1;
 static int log_stderr_fd = STDERR_FILENO;
@@ -450,43 +441,20 @@ do_log(LogLevel level, const char *fmt, va_list args)
 	    log_on_stderr ? LOG_STDERR_VIS : LOG_SYSLOG_VIS);
 #endif
 
-#ifndef WIN32_FIXME
 	if (log_handler != NULL) {
 		/* Avoid recursion */
 		tmp_handler = log_handler;
 		log_handler = NULL;
 		tmp_handler(level, fmtbuf, log_handler_ctx);
 		log_handler = tmp_handler;
-	} else 
-#endif	
-	if (log_on_stderr) {
+	} else 	if (log_on_stderr) {
 		snprintf(msgbuf, sizeof msgbuf, "%s\r\n", fmtbuf);
 #ifdef WIN32_FIXME
-    _write(STDERR_FILENO, msgbuf, strlen(msgbuf));
+		_write(STDERR_FILENO, msgbuf, strlen(msgbuf));
 #else  
-	(void)write(log_stderr_fd, msgbuf, strlen(msgbuf));
-#endif
-		
+		(void)write(log_stderr_fd, msgbuf, strlen(msgbuf));
+#endif		
 	} else {
-
-  #ifdef WIN32_FIXME
-    
-    if (logfd > 0)
-    {
-      char msgbufTimestamp[MSGBUFSIZ];
-      
-      SYSTEMTIME st;
-      
-      GetLocalTime(&st);
-
-      snprintf(msgbufTimestamp, sizeof msgbufTimestamp, "%d %02d:%02d:%02d %03d %s\n",
-                   GetCurrentProcessId(), st.wHour, st.wMinute, st.wSecond, 
-                       st.wMilliseconds, msgbuf);
-      
-      _write(logfd, msgbufTimestamp, strlen(msgbufTimestamp));
-    }
- 
-  #else 
 #if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
 		openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);
 		syslog_r(pri, &sdata, "%.500s", fmtbuf);
@@ -495,7 +463,6 @@ do_log(LogLevel level, const char *fmt, va_list args)
 		openlog(argv0 ? argv0 : __progname, LOG_PID, log_facility);
 		syslog(pri, "%.500s", fmtbuf);
 		closelog();
-#endif
 #endif
 	}
 	errno = saved_errno;

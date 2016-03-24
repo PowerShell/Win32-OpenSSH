@@ -1,5 +1,4 @@
-#ifndef COMPAT_SYSLOG_H
-#define COMPAT_SYSLOG_H 1
+#pragma once
 
 
 /* Compatibility header to give us some syslog-like functionality on Win32 */
@@ -27,4 +26,3 @@ void openlog	(char *, unsigned int, int);
 void closelog	(void);
 void syslog		(int, const char *, const char *);
 
-#endif

@@ -147,6 +147,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\fileio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\termio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\misc.c" />
+    <ClCompile Include="..\win32compat\w32log.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -162,6 +163,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\w32posix.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\poll.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\statvfs.h" />
+    <ClInclude Include="..\win32compat\inc\syslog.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

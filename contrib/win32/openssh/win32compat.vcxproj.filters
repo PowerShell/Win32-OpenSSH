@@ -75,9 +75,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\stringhelp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\syslog.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -87,10 +84,10 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_dh.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_openssl_dh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\cng_openssl_dh.c">
+    <ClCompile Include="..\win32compat\cng_dh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -156,9 +153,6 @@
       <Filter>includes</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\resolv.h">
-      <Filter>includes</Filter>
-    </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\syslog.h">
       <Filter>includes</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\termios.h">

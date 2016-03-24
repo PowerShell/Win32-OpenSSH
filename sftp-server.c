@@ -90,14 +90,6 @@
 
   #define realpath realpathWin32
 
-
-  /*
-   * Handle to log file.
-   */
-   
-  extern int logfd;
-  extern int sfd_start;
-
 #endif /* WIN32_FIXME */
 
 /* Our verbosity */
@@ -1998,27 +1990,11 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 
 	extern char *optarg;
 	extern char *__progname;
-#ifdef WIN32_FIXME
-    
-    /*
-     * Initialize Win32 log.
-     */
-     
-    logfd = _open("sftp-server.log", O_WRONLY | O_CREAT | O_APPEND , S_IREAD | S_IWRITE);
-      
-    log_level = SYSLOG_LEVEL_INFO;
-
-    __progname = ssh_get_progname(argv[0]);
-    
-    log_init(__progname, log_level, log_facility, log_stderr);
-
-  #else
 
 	__progname = ssh_get_progname(argv[0]);
 	log_init(__progname, log_level, log_facility, log_stderr);
 
-  #endif
-	pw = pwcopy(user_pw);
+ 	pw = pwcopy(user_pw);
 
 
 	while (!skipargs && (ch = getopt(argc, argv,

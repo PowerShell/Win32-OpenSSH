@@ -193,8 +193,6 @@ FIXME: GFPZR: Function stat() may be undeclared.
 
 char *fake_fork_args;
 
-extern int logfd;
-extern int sfd_start;
 #endif
 
 /* re-exec */
@@ -1967,33 +1965,6 @@ main(int ac, char **av)
     SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
   
     w32posix_initialize();
-    //authctxt -> hTokenLsa_ = NULL;
-   
-    /*WSHELPinitialize();
-    
-    allocate_standard_descriptor(STDIN_FILENO);
-    allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);
-
-    sfd_start = 3;*/
-
-    /*
-     * Initialize log.
-     */
-  
-    logfd = _open("sshd.log", O_WRONLY | O_CREAT | O_APPEND, 
-                      S_IREAD | S_IWRITE );
-
-    /*
-     * Forbid to inherit log file handle.
-     */
-    
-    if (SetHandleInformation(_get_osfhandle(logfd), 
-                                 HANDLE_FLAG_INHERIT, 0) == FALSE)
-    {
-      debug("ERROR: Cannot clear inherit flag for logfd handle. "
-                "Error code : %u.", GetLastError());
-    }
   
   #endif /* WIN32_FIXME */
 
@@ -2190,9 +2161,6 @@ main(int ac, char **av)
     /*
      * Win32 only.
      */
-     
-    //WSHELPinitialize();
-	w32posix_initialize();
 
     /* 
      * Handle install and uninstall service options 

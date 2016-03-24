@@ -157,7 +157,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\startupneeds.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\strcasecmp.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\stringhelp.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\syslog.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.c" />
@@ -197,7 +196,6 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\process.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\pwd.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\resolv.h" />
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\syslog.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\ioctl.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\param.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\resource.h" />
