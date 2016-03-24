@@ -63,14 +63,15 @@ int fstatvfs(int fd, struct statvfs *buf) {
 }
 
 #include "inc\dlfcn.h"
-HMODULE *dlopen(const char *filename, int flags) {
+HMODULE dlopen(const char *filename, int flags) {
 	return LoadLibraryA(filename);
 }
 
-int dlclose(HMODULE *handle) {
+int dlclose(HMODULE handle) {
 	FreeLibrary(handle);
+	return 0;
 }
 
-FARPROC *dlsym(HMODULE *handle, const char *symbol) {
+FARPROC dlsym(HMODULE handle, const char *symbol) {
 	return GetProcAddress(handle, symbol);
 }

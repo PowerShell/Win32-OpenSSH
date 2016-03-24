@@ -495,9 +495,6 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 			&pio->write_overlapped, &WriteCompletionRoutine)) {
 			pio->write_details.pending = TRUE;
 			pio->write_details.remaining = bytes_copied;
-			/* execute APC if write has completed */
-			if (wait_for_any_event(NULL, 0, 0) == -1)
-				return -1;
 		}
 		else {
 			errno = errno_from_Win32LastError();
@@ -513,10 +510,23 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 
 	if (w32_io_is_blocking(pio)) {
 		while (pio->write_details.pending) {
-			if (wait_for_any_event(NULL, 0, INFINITE) == -1)
-				return -1;
+			if (wait_for_any_event(NULL, 0, INFINITE) == -1) {
+				/* if interrupted but write has completed, we are good*/
+				if ((errno != EINTR) || (pio->write_details.pending))
+					return -1;
+				errno = 0;
+			}
 		}
 	}
+	/* execute APC to give a chance for write to complete */
+	else if (wait_for_any_event(NULL, 0, 0) == -1) {
+		/* if interrupted but write has completed, we are good*/
+		if ((errno != EINTR) || (pio->write_details.pending))
+			return -1;
+		errno = 0;
+	}
+
+	/* if write has completed, pick up any error reported*/
 	if (!pio->write_details.pending && pio->write_details.error) {
 		errno = errno_from_Win32Error(pio->write_details.error);
 		debug("write - ERROR from cb:%d, io:%p", pio->write_details.error, pio);

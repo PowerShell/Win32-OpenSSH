@@ -578,7 +578,7 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 	wsabuf.len = min(wsabuf.len, (int)len);
 	memcpy(wsabuf.buf, buf, wsabuf.len);
 
-	/* implement flags support if needed */
+	/* TODO - implement flags support if needed */
 	ret = WSASend(pio->sock, &wsabuf, 1, NULL, 0, &pio->write_overlapped, 
 	    &WSASendCompletionRoutine);
 
@@ -588,8 +588,13 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 		debug2("send - WSASend() returned 0, APC scheduled io:%p", pio);
 		pio->write_details.pending = TRUE;
 		pio->write_details.remaining = wsabuf.len;
-		if (wait_for_any_event(NULL, 0, 0) == -1)
-			return -1;
+		if (wait_for_any_event(NULL, 0, 0) == -1) {
+			//interrupted but send went through
+			if (errno == EINTR)
+				errno = 0;
+			else
+				return -1;
+		}
 		if ((pio->write_details.pending) || (pio->write_details.remaining != 0)) {
 			errno = EOTHER;
 			debug("send - ERROR: Unexpected IO state, io:%p", pio);
@@ -611,8 +616,12 @@ socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags) {
 				/* wait until io is done */
 				debug3("send - waiting as socket is in blocking mode, io:%p", pio);
 				while (pio->write_details.pending)
-					if (wait_for_any_event(NULL, 0,INFINITE) == -1)
-						return -1;
+					if (wait_for_any_event(NULL, 0, INFINITE) == -1) {
+						/* if interrupted but send has completed, we are good*/
+						if ((errno != EINTR) || (pio->write_details.pending))
+							return -1;
+						errno = 0;
+					}
 			}
 
 			debug3("send - returning %d, io:%p", wsabuf.len, pio);

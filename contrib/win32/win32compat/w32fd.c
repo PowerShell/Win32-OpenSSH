@@ -779,7 +779,7 @@ int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock) {
 
 unsigned int 
 w32_alarm(unsigned int seconds) {
-	return 0;
+	return sw_alarm(seconds);;
 }
 sighandler_t 
 w32_signal(int signum, sighandler_t handler) {

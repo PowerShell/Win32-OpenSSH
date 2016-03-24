@@ -51,12 +51,6 @@
 
 #define W32_SIGMAX		12
 
-/* signal action codes*/
-#define W32_SIG_ERR		-1
-#define W32_SIG_DFL		0
-#define W32_SIG_IGN		1
-#define W32_SIG_USR		2
-
 /* singprocmask "how" codes*/
 #define SIG_BLOCK		0
 #define SIG_UNBLOCK		1
@@ -69,6 +63,10 @@ typedef int sigset_t;
 #define sigismember(set, sig) ( (*(set) & (0x80000000 >> (sig)))?1:0 )
 #define sigdelset(set, sig) ( (*(set)) &= (~( 0x80000000 >> (sig)) ) )
 
+/* signal action codes*/
+#define W32_SIG_ERR		((sighandler_t)-1)
+#define W32_SIG_DFL		((sighandler_t)0)
+#define W32_SIG_IGN		((sighandler_t)1)
 
 typedef unsigned short _mode_t;
 typedef _mode_t mode_t;

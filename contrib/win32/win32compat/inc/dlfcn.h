@@ -4,8 +4,8 @@
 
 #define dlerror() GetLastError()
 
-HMODULE *dlopen(const char *filename, int flags);
+HMODULE dlopen(const char *filename, int flags);
 
-int dlclose(HMODULE *handle);
+int dlclose(HMODULE handle);
 
-FARPROC *dlsym(HMODULE *handle, const char *symbol);
+FARPROC dlsym(HMODULE handle, const char *symbol);
