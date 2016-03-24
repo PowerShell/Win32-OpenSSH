@@ -28,11 +28,7 @@
 
 #include <string.h>
 
-#ifdef WIN32_FIXME
-#include <Winbase.h>
-#else
 #include <dlfcn.h>
-#endif /*WIN32_FIXME*/
 
 #include "openbsd-compat/sys-queue.h"
 
@@ -114,11 +110,7 @@ pkcs11_provider_finalize(struct pkcs11_provider *p)
 	p->valid = 0;
 	p->function_list = NULL;
 	
-  #ifdef WIN32_FIXME
-    FreeLibrary(p -> handle);
-  #else
 	dlclose(p->handle);
-  #endif /*WIN32_FIXME*/
 }
 
 /*
@@ -589,28 +581,6 @@ pkcs11_add_provider(char *provider_id, char *pin, struct sshkey ***keyp)
 		goto fail;
 	}
 	/* open shared pkcs11-libarary */
-#ifdef WIN32_FIXME
-
-    handle = LoadLibrary(provider_id);
-
-    if (handle == NULL)
-    {
-      error("Cannot load OpenSC library. Error code is: %u.\n"
-                "Please ensure that path to these libraries is properly "
-                    "set in your PATH variable.\n", GetLastError());
-      goto fail;
-    }
-
-    getfunctionlist = (CK_RV(*)(CK_FUNCTION_LIST **))GetProcAddress(handle, "C_GetFunctionList");
-
-    if (getfunctionlist == NULL)
-    {
-      error("Cannot load OpenSC library. Error code is: %u.\n", GetLastError());
-
-      goto fail;
-    }
-
-#else
 	if ((handle = dlopen(provider_id, RTLD_NOW)) == NULL) {
 		error("dlopen %s failed: %s", provider_id, dlerror());
 		goto fail;
@@ -619,8 +589,7 @@ pkcs11_add_provider(char *provider_id, char *pin, struct sshkey ***keyp)
 		error("dlsym(C_GetFunctionList) failed: %s", dlerror());
 		goto fail;
 	}
-#endif /*WIN32_FIXME*/
-  
+	
 	p = xcalloc(1, sizeof(*p));
 	p->name = xstrdup(provider_id);
 	p->handle = handle;
@@ -705,13 +674,9 @@ fail:
 		free(p->slotinfo);
 		free(p);
 	}
-  #ifdef WIN32_FIXME
-	if (handle)
-		FreeLibrary(handle);
-  #else
+
 	if (handle)
 		dlclose(handle);
-  #endif/*WIN32_FIXME*/
 	
 	return (-1);
 }

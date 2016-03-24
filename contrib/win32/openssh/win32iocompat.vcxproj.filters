@@ -50,6 +50,9 @@
     <ClInclude Include="..\win32compat\inc\syslog.h">
       <Filter>inc</Filter>
     </ClInclude>
+    <ClInclude Include="..\win32compat\inc\dlfcn.h">
+      <Filter>inc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">
