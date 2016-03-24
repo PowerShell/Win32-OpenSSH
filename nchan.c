@@ -75,12 +75,6 @@
  * ACTIONS: should never update the channel states
  */
 
-#ifdef WIN32_FIXME      
-
-  //void StopSocketThreads();
-
-#endif
-
 static void	chan_send_ieof1(Channel *);
 static void	chan_send_oclose1(Channel *);
 static void	chan_send_close2(Channel *);
@@ -121,24 +115,6 @@ static void
 chan_rcvd_oclose1(Channel *c)
 {
 	debug2("channel %d: rcvd oclose", c->self);
-
-  /*
-   * FIXME. This function forces stopping all socket threads 
-   * at next select. This workaround nivelate problem with
-   * infinite hangs up in below scenario:
-   * 
-   * a) read select start.
-   * b) write select start.
-   * c) read select ends: SSH2_MSG_CHANNEL_CLOSE received.
-   * d) close input channel.
-   * e) now write select may never ends.
-   */
-
-  #ifdef WIN32_FIXME
-
-    //StopSocketThreads();
-
-  #endif
 
 	switch (c->istate) {
 	case CHAN_INPUT_WAIT_OCLOSE:
@@ -188,7 +164,7 @@ chan_ibuf_empty(Channel *c)
 	case CHAN_INPUT_WAIT_DRAIN:
 		if (compat20) {
 			if (!(c->flags & (CHAN_CLOSE_SENT | CHAN_LOCAL))) {
-				#ifdef WIN32_FIXME
+				#ifdef WIN32_FIXME//N
 				// reset the other side if tty to be how it was before
 				if (c->isatty) {
 					char *inittermseq =

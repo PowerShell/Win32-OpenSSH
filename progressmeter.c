@@ -81,7 +81,7 @@ static const char unit[] = " KMGT";
 static int
 can_output(void)
 {
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 	return (getpgrp() == tcgetpgrp(STDOUT_FILENO));
 #else
 	return 1;
@@ -123,7 +123,7 @@ format_size(char *buf, int size, off_t bytes)
 void
 refresh_progress_meter(void)
 {
-#ifndef WIN32_FIXME
+#if(1)//ndef WIN32_FIXME
 	char buf[MAX_WINSIZE + 1];
 	time_t now;
 	off_t transferred;
@@ -248,10 +248,8 @@ update_progress_meter(int ignore)
 	if (can_output())
 		refresh_progress_meter();
 
-#ifndef WIN32_FIXME
 	signal(SIGALRM, update_progress_meter);
 	alarm(UPDATE_INTERVAL);
-#endif
 	errno = save_errno;
 }
 
@@ -271,17 +269,15 @@ start_progress_meter(const char *f, off_t filesize, off_t *ctr)
 	if (can_output())
 		refresh_progress_meter();
 
-#ifndef WIN32_FIXME
+
 	signal(SIGALRM, update_progress_meter);
 	signal(SIGWINCH, sig_winch);
 	alarm(UPDATE_INTERVAL);
-#endif
 }
 
 void
 stop_progress_meter(void)
 {
-#ifndef WIN32_FIXME
 	alarm(0);
 
 	if (!can_output())
@@ -292,7 +288,6 @@ stop_progress_meter(void)
 		refresh_progress_meter();
 
 	atomicio(vwrite, STDOUT_FILENO, "\n", 1);
-#endif
 }
 
 /*ARGSUSED*/
@@ -305,7 +300,7 @@ sig_winch(int sig)
 static void
 setscreensize(void)
 {
-	#ifndef WIN32_FIXME
+	#ifndef WIN32_FIXME//N
 	struct winsize winsize;
 
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) != -1 &&

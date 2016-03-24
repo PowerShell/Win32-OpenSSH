@@ -47,8 +47,9 @@
 #define W32_SIGTERM		8
 #define W32_SIGTTIN		9
 #define W32_SIGTTOU		10
+#define W32_SIGWINCH		11
 
-#define W32_SIGMAX		11
+#define W32_SIGMAX		12
 
 /* signal action codes*/
 #define W32_SIG_ERR		-1

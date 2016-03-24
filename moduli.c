@@ -458,7 +458,7 @@ write_checkpoint(char *cpfile, u_int32_t lineno)
 		logit("write_checkpoint: temp pathname too long");
 		return;
 	}
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//N
 //PRAGMA:TODO	
 	if ((r = mkstemp(tmp)) == -1) {
 		logit("mkstemp(%s): %s", tmp, strerror(errno));

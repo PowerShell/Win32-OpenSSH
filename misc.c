@@ -81,15 +81,6 @@ chop(char *s)
 int
 set_nonblock(int fd)
 {
-#if(0)//def WIN32_FIXME
-  
-  int on = 1;
-  
-  ioctlsocket(fd, FIONBIO, &on);
-  
-  return 0;
-
-#else
 	int val;
 
 	val = fcntl(fd, F_GETFL, 0);
@@ -109,21 +100,11 @@ set_nonblock(int fd)
 		return (-1);
 	}
 	return (0);
-#endif /* else WIN32_FIXME */
 }
 
 int
 unset_nonblock(int fd)
 {
-#if(0)//def WIN32_FIXME
-  
-  int on = 0;
-  
-  ioctlsocket(fd, FIONBIO, &on);
-  
-  return 0;
-  
-#else
 	int val;
 
 	val = fcntl(fd, F_GETFL, 0);
@@ -143,7 +124,6 @@ unset_nonblock(int fd)
 		return (-1);
 	}
 	return (0);
-#endif
 }
 
 const char *
@@ -243,7 +223,7 @@ pwcopy(struct passwd *pw)
 	copy->pw_class = xstrdup(pw->pw_class);
 #endif
 
-#ifdef WIN32_FIXME
+#ifdef WIN32_FIXME//N
   copy -> pw_dir = (char*)_wcsdup((wchar_t*)pw->pw_dir);
 #else
 	copy->pw_dir = xstrdup(pw->pw_dir);

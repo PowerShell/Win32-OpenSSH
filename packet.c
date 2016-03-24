@@ -415,7 +415,7 @@ ssh_packet_connection_af(struct ssh *ssh)
 	if (getsockname(ssh->state->connection_out, (struct sockaddr *)&to,
 	    &tolen) < 0)
 		return 0;
-#ifdef WIN32_FIXME
+#ifdef WIN32_FIXME//N
 	if (to.ss_family == AF_INET)
 		return 1;
 #endif	
@@ -1314,15 +1314,10 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	struct timeval timeout, start, *timeoutp = NULL;
 
 	DBG(debug("packet_read()"));
-#if(1)//ndef WIN32_FIXME
 	int d = howmany(state->connection_in + 1, NFDBITS);
 	 d = sizeof(fd_mask);
 	setp = calloc(howmany(state->connection_in + 1,
 	    NFDBITS), sizeof(fd_mask));
-#else
-	setp = xmalloc(sizeof(fd_set));
-	FD_ZERO(setp);
-#endif
 
 	if (setp == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -1354,12 +1349,8 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		 * Otherwise, wait for some data to arrive, add it to the
 		 * buffer, and try again.
 		 */
-#if(1)//ndef WIN32_FIXME
 		memset(setp, 0, howmany(state->connection_in + 1,
 		    NFDBITS) * sizeof(fd_mask));
-#else
-		FD_ZERO(setp);
-#endif
 		
 		FD_SET(state->connection_in, setp);
 
@@ -2094,24 +2085,16 @@ ssh_packet_write_wait(struct ssh *ssh)
 	int ret, r, ms_remain = 0;
 	struct timeval start, timeout, *timeoutp = NULL;
 	struct session_state *state = ssh->state;
-#if(1)//ndef WIN32_FIXME
+
 	setp = calloc(howmany(state->connection_out + 1,
 	    NFDBITS), sizeof(fd_mask));
-#else
-	setp = (fd_set *)xmalloc(sizeof(fd_set));
-	FD_ZERO(setp);
-#endif
-	
+
 	if (setp == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	ssh_packet_write_poll(ssh);
 	while (ssh_packet_have_data_to_write(ssh)) {
-#if(1)//ndef WIN32_FIXME
 		memset(setp, 0, howmany(state->connection_out + 1,
 		    NFDBITS) * sizeof(fd_mask));
-#else
-		FD_ZERO(setp);
-#endif
 		
 		FD_SET(state->connection_out, setp);
 
