@@ -701,43 +701,10 @@ do_exec_no_pty(Session *s, const char *command)
    * token using CreateUserToken for non-password auth mechanisms.
    */
   
-  /*
-   * Try LSA token first.
-   */
-    
-  if (s -> authctxt -> hTokenLsa_)
-  {
-    debug("Using token from lsa...");
-      
-    hToken = s -> authctxt -> hTokenLsa_;
-      
-    ModifyRightsToDesktop(hToken, 1);
-  }
-    
-  /*
-   * Next try pass-auth token.
-   */
   
-  else
-  {
-    debug("Using token from LogonUser()...");
-    
     hToken = s -> authctxt -> methoddata;
 
-    /*
-     * Clear this value out because we're going to release
-     * the token in this function
-     */
-    
-    s -> authctxt -> methoddata = INVALID_HANDLE_VALUE;
 
-    ModifyRightsToDesktop(hToken, 1);
-  }
-
-  /*
-   * Set display if needed
-   */
-  
   if (s -> display)
   {
     SetEnvironmentVariable("DISPLAY", s -> display);
@@ -749,23 +716,7 @@ do_exec_no_pty(Session *s, const char *command)
   
   if (1) // (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
   {
-    /*
-     * If there is homedir from LSA use it.
-     */
-
-    //if (HomeDirLsaW[0] != '\0')
-    //{
-      //s -> pw -> pw_dir = HomeDirLsaW;
-    //}
-    
-    /*
-     * If not get homedir from token.
-     */
-    
-    //else
-    //{
       s -> pw -> pw_dir = GetHomeDirFromToken(s -> pw -> pw_name, hToken);
-    //}
   }
 
   /*
@@ -895,10 +846,6 @@ do_exec_no_pty(Session *s, const char *command)
    * to clean up DACL of Winsta0.
    */
   
-  //CloseHandle(hToken);
-  
-  s -> authctxt -> currentToken_ = hToken; 
-
   /*
    * Log the process handle (fake it as the pid) for termination lookups 
    */
@@ -2964,7 +2911,6 @@ session_pty_cleanup2(Session *s)
     
     CloseHandle(s -> pid);
     
-    ModifyRightsToDesktop(s -> authctxt -> currentToken_, 0);
   }
  
   #endif
@@ -3391,15 +3337,6 @@ do_cleanup(Authctxt *authctxt)
 	static int called = 0;
 
 	debug("do_cleanup");
-  #ifdef WIN32_FIXME
-
-    if (authctxt)
-    {
-      ModifyRightsToDesktop(authctxt -> currentToken_, 0);
-    }  
-  
-  #endif
-
 
 	/* no cleanup if we're in the child for login shell */
 	if (is_child)

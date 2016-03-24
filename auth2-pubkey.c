@@ -209,7 +209,6 @@ userauth_pubkey(Authctxt *authctxt)
 
     #ifdef WIN32_FIXME
 
-    authctxt -> hTokenLsa_ = NULL;
     authctxt -> methoddata = NULL;
  
     /*
@@ -232,7 +231,7 @@ userauth_pubkey(Authctxt *authctxt)
     }
     else
     {
-      loginStat = LsaLogon(&authctxt -> hTokenLsa_, HomeDirLsaW,
+      loginStat = LsaLogon(&authctxt->methoddata, HomeDirLsaW,
                                authctxt -> user, pkblob, blen, sig, slen,
                                  buffer_ptr(&b), buffer_len(&b), datafellows);
 
@@ -246,7 +245,7 @@ userauth_pubkey(Authctxt *authctxt)
          * And user authorized OK.
          */
     
-        if (authctxt -> hTokenLsa_)
+        if (authctxt->methoddata)
         {
           doOpenSSHVerify = 0;
           

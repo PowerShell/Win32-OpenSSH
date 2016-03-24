@@ -87,12 +87,6 @@ struct Authctxt {
 
 	struct sshkey	**prev_userkeys;
 	u_int		 nprev_userkeys;
-  #ifdef WIN32_FIXME
-
-    HANDLE hTokenLsa_;
-    HANDLE currentToken_;
-
-  #endif
 };
 /*
  * Every authentication method has to handle authentication requests for
