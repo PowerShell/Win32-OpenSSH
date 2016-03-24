@@ -313,4 +313,5 @@ setscreensize(void)
 		win_size = DEFAULT_WINSIZE;
 	win_size += 1;					/* trailing \0 */
 #endif
+	win_size = DEFAULT_WINSIZE + 1;
 }
