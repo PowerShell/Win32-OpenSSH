@@ -1581,7 +1581,6 @@
 #define _CRT_SECURE_NO_DEPRECATE 1
 #define _CRT_NONSTDC_NO_DEPRECATE 1
 #define WIN32_FIXME 1
-#undef USE_NTCREATETOKEN
 
 /* Define if you must implement a startup_needs function for your platform */
 #define HAVE_STARTUP_NEEDS 1

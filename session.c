@@ -714,21 +714,6 @@ do_exec_no_pty(Session *s, const char *command)
     ModifyRightsToDesktop(hToken, 1);
   }
     
-  #ifdef USE_NTCREATETOKEN
-    
-  /*
-   * Next try to get an NtCreateToken token if enabled.
-   */
-    
-  else
-  {
-    debug("Using token from NtCreateToken()...");
-      
-    hToken = (HANDLE) PwdCreateUserToken(s -> authctxt -> user, NULL, "sshd");
-  }
-    
-  #endif
-    
   /*
    * Next try pass-auth token.
    */

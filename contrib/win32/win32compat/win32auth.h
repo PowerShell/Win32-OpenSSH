@@ -76,21 +76,6 @@ typedef OBJECT_ATTRIBUTES *POBJECT_ATTRIBUTES;
 #define NTSYSAPI DECLSPEC_IMPORT
 #endif
 
-//
-// Prototype for undocumented NtCreateToken() function from 'ntdll.dll'
-//
-#ifdef USE_NTCREATETOKEN
-typedef NTSYSAPI NTSTATUS
-    (NTAPI *NtCreateTokenPtr) (PHANDLE, ACCESS_MASK,
-                                   POBJECT_ATTRIBUTES,
-                                       TOKEN_TYPE, PLUID, PLARGE_INTEGER, 
-                                           PTOKEN_USER, PTOKEN_GROUPS, 
-                                               PTOKEN_PRIVILEGES, PTOKEN_OWNER,
-                                                   PTOKEN_PRIMARY_GROUP, 
-                                                       PTOKEN_DEFAULT_DACL,
-                                                           PTOKEN_SOURCE);
-#endif /* USE_NTCREATETOKEN */
-
 HANDLE CreateUserToken(const char *pUserName,
                            const char *pDomainName, const char *pSourceName);
 

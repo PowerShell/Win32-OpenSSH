@@ -104,12 +104,8 @@ userauth_pubkey(Authctxt *authctxt)
   
   int targetIsCurrent = 0;
 
-  # ifdef USE_NTCREATETOKEN
-  int doOpenSSHVerify = 1;
-  # else
   int doOpenSSHVerify = 0;
-  # endif
-
+  
   #endif
   
 	Buffer b;

@@ -120,86 +120,9 @@ wchar_t *gethomedir_w(char *pUserName, char *pDomainName)
    * and get homedir using this token.
    */
   
-  #ifdef USE_NTCREATETOKEN
-  
-  token = CreateUserTokenW(pUserName_w, pDomainName_w, L"sshd");
-  
-  if (token == NULL)
-  {
-    debug("gethomedir: create token failed");
 
-    return NULL;
-  }
-
-  debug2("setting up profile info...");
-  
-  /*
-   * Become the user
-   */
-  
-  memset(&profileInfo, 0, sizeof(profileInfo));
-
-  profileInfo.dwSize = sizeof(profileInfo);
-  profileInfo.lpUserName = pUserName_w;
-  profileInfo.lpServerName = pDomainName_w;
-
-  debug2("LoadUserProfile()...");
-  
-  if (!LoadUserProfile(token, &profileInfo))
-  {
-    DWORD dwLast = GetLastError();
-  
-    debug("gethomedir: load profile failed [%d]", dwLast);
-    
-    return NULL;
-  }
-
-  /*
-   * Get user's home directory
-   */
-  
-  //if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA, token, 0, szPath)))
-  
-  debug2("SGGetFolderPath()...");
-  
-  if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PROFILE, token, 0, szPathW)))
-  {
-    debug("gethomedir: get folder failed");
-
-    /*
-     * Become self again.
-     */
-
-    UnloadUserProfile(token, profileInfo.hProfile);
-
-    RevertToSelf();
-
-    CloseHandle(token);
-
-    return NULL;
-  }
-
-  debug3("gethomedir: szPathW [%ls]", szPathW);
-
-  /*
-   * Become self again.
-   */
-  
-  UnloadUserProfile(token, profileInfo.hProfile);
-
-  RevertToSelf();
-  
-  CloseHandle(token);
-
-  debug2("<- gethomedir()...");
-  
-  return _wcsdup(szPathW);
-  
-  #else
-  
   return NULL;
   
-  #endif
 }
 
 /*

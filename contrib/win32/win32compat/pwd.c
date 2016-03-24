@@ -444,21 +444,6 @@ user_from_uid(uid_t uid, int nouser)
 	return (cp->name);
 }
 
-#ifdef USE_NTCREATETOKEN
-
-/*
- * Simple helper to avoid having to include win32auth.h.
- */
-
-PWD_USER_TOKEN PwdCreateUserToken(const char *pUserName, 
-                                      const char *pDomainName, 
-                                          const char *pSourceName)
-{
-  return (PWD_USER_TOKEN) CreateUserToken(pUserName, pDomainName, pSourceName);
-}
-
-#endif
-
 /* TODO - this is moved from realpath.c in openbsdcompat. Review and finalize its position*/
 
 #include <Shlwapi.h>
