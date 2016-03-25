@@ -25,15 +25,6 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
-
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -179,7 +170,7 @@ allowed_user(struct passwd * pw)
 			free(shell);
 			return 0;
 		}
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 		if (S_ISREG(st.st_mode) == 0 ||
 		    (st.st_mode & (S_IXOTH|S_IXUSR|S_IXGRP)) == 0) {
 			logit("User %.100s not allowed because shell %.100s "
