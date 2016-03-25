@@ -123,7 +123,6 @@ format_size(char *buf, int size, off_t bytes)
 void
 refresh_progress_meter(void)
 {
-#if(1)//ndef WIN32_FIXME
 	char buf[MAX_WINSIZE + 1];
 	time_t now;
 	off_t transferred;
@@ -230,7 +229,6 @@ refresh_progress_meter(void)
 
 	atomicio(vwrite, STDOUT_FILENO, buf, win_size - 1);
 	last_update = now;
-#endif
 }
 
 /*ARGSUSED*/

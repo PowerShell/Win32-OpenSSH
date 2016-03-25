@@ -74,13 +74,7 @@ typedef void EditLine;
 #define DEFAULT_NUM_REQUESTS	64	/* # concurrent outstanding requests */
 
 #ifdef WIN32_FIXME
-  
-//  #define mkdir(a, b) _mkdir(a)
-
   #define FAIL(X) if (X) goto fail
-
-  //extern int sfd_start;
-  
 #endif
 
 #ifdef WIN32_VS
@@ -346,10 +340,6 @@ local_do_shell(const char *args)
 static void
 local_do_ls(const char *args)
 {
-#ifdef WIN32_FIXME
-#undef _PATH_LS
-#define _PATH_LS			"dir"
-#endif
 	if (!args || !*args)
 		local_do_shell(_PATH_LS);
 	else {
@@ -2197,173 +2187,6 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 static void
 connect_to_server(char *path, char **args, int *in, int *out)
 {
-#ifdef WIN32_FIXME
-  
-    /*
-     * Win32 code.
-     */
-  
-    int exitCode = -1;
-    
-    int sockin[2]  = {-1, -1};
-    int sockout[2] = {-1, -1};
-    
-    HANDLE childInput  = NULL;
-    HANDLE childOutput = NULL;
-
-    int i = 0, tmp;
-  
-    char fullCmd[MAX_PATH] = {0};
-
-    char ioArg[1024] = {0};
-    
-    PROCESS_INFORMATION pi = {0};
-  
-    STARTUPINFO si = {0};
-
-    /*
-     * Create socket pairs to communicate with child ssh process.
-     */
-
-    debug3("Creating socket pairs for child ssh process...");
-
-    pipe(sockin);
-    pipe(sockout);
-
-    
-    debug3("sockin[0]: %d sockin[1]: %d", sockin[0], sockin[1]);
-    debug3("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
-    
-    /*
-     * Forbid inheritance of parent's side sockets.
-     */
-
-    debug3("Clearing INHERIT flag on parent side sockets...\n");
-
-    FAIL(SetHandleInformation(sfd_to_handle(sockout[1]),
-                                  HANDLE_FLAG_INHERIT, 0) == FALSE);
-
-    FAIL(SetHandleInformation(sfd_to_handle(sockin[0]),
-                                  HANDLE_FLAG_INHERIT, 0) == FALSE);
-
-    /*
-     * Duplicate sockets for child process.
-     */
-     
-    
-    debug3("Duplicating stdin sockets for child ssh process...\n");
-
-    /*
-    FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(sockout[0]),
-                             GetCurrentProcess(), &childInput, 0, 
-                                 TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
-
-    debug3("Duplicating stdout sockets for child ssh process...\n");
-    
-    FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(sockin[1]),
-                             GetCurrentProcess(), &childOutput, 0, 
-                                 TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
-    */
-
-    //FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(STDIN_FILENO),
-    //                         GetCurrentProcess(), &childInput, 0, 
-    //                             TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
-
-    //debug3("Duplicating stdout sockets for child ssh process...\n");
-    //
-    //FAIL(DuplicateHandle(GetCurrentProcess(), sfd_to_handle(STDOUT_FILENO),
-    //                         GetCurrentProcess(), &childOutput, 0,
-    //                             TRUE, DUPLICATE_SAME_ACCESS) == FALSE);
-    
-    
-    //childInput  = sfd_to_handle(STDIN_FILENO);
-    //childOutput = sfd_to_handle(STDOUT_FILENO);
-    
-    /*
-     * Create command to run ssh-client.
-     */
-     
-    debug3("Generating ssh-client command...");
-    
-    strncat(fullCmd, path, MAX_PATH);              
-    
-    
-    for (i = 1; args[i]; i++)
-    {
-      strncat(fullCmd, " ", MAX_PATH);
-      strncat(fullCmd, args[i], MAX_PATH);
-    }
-
-    /*
-     * Assign sockets to StartupInfo.
-     */
-     
-    si.cb          = sizeof(STARTUPINFO);
-    si.hStdInput   = sfd_to_handle(sockout[0]);
-    si.hStdOutput  = sfd_to_handle(sockin[1]);//GetStdHandle(STD_OUTPUT_HANDLE);//sfd_to_handle(sockin[1]);
-    si.hStdError   =  GetStdHandle(STD_ERROR_HANDLE);
-    si.wShowWindow = SW_HIDE;
-    si.dwFlags     = STARTF_USESTDHANDLES;
-    si.lpDesktop   = NULL;
-
-    /*               
-     * Create child ssh process with given stdout/stdin.
-     */
-    
-    debug("Executing ssh client: \"%.500s\"...\n", fullCmd);
-
-    FAIL(CreateProcess(NULL, fullCmd, NULL, NULL, TRUE,
-                           NORMAL_PRIORITY_CLASS, NULL, 
-                               NULL, &si, &pi) == FALSE);
-
-    /*
-     * Return parent side of socket.
-     */
-     
-    *out = sockout[1];
-    *in  = sockin[0];
-     
-    //write(*out, "dupa", 4);
-    
-    /*
-     * Clean up.
-     */
-     
-    exitCode = 0;
-    
-    fail:
-  
-    if (exitCode)
-    {
-      error("ERROR. Cannot create ssh client process."
-                " Error code is: %u.\n", GetLastError());
-    
-      /*
-       * Clean parent's side resources on error.
-       */
-      
-      close(sockin[0]);
-      close(sockout[1]);
-      
-      CloseHandle(pi.hProcess);      
-    }
-    
-    /*
-     * Close child's side resources.
-     */
-     
-    close(sockout[0]);
-    close(sockin[1]);
-
-    //CloseHandle(childInput);
-    //CloseHandle(childOutput);
-
-    CloseHandle(pi.hThread);
-    
-    return;
-      
-  #else
-  
   /*
    * Original OpenSSH code.
    */
@@ -2387,7 +2210,55 @@ connect_to_server(char *path, char **args, int *in, int *out)
 	c_in = c_out = inout[1];
 #endif /* USE_PIPES */
 
+#ifdef WIN32_FIXME
+	{
+		int i;
+		char fullCmd[MAX_PATH] = { 0 };
+		char ioArg[1024] = { 0 };
+		PROCESS_INFORMATION pi = { 0 };
+		STARTUPINFO si = { 0 };
+
+		debug3("Generating ssh-client command...");
+		strncat(fullCmd, path, MAX_PATH);
+		for (i = 1; args[i]; i++)
+		{
+			strncat(fullCmd, " ", MAX_PATH);
+			strncat(fullCmd, args[i], MAX_PATH);
+		}
+
+		/*
+		* Assign sockets to StartupInfo.
+		*/
+
+		si.cb = sizeof(STARTUPINFO);
+		si.hStdInput = sfd_to_handle(c_in);
+		si.hStdOutput = sfd_to_handle(c_out);
+		si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+		si.wShowWindow = SW_HIDE;
+		si.dwFlags = STARTF_USESTDHANDLES;
+		si.lpDesktop = NULL;
+
+		/*
+		* Create child ssh process with given stdout/stdin.
+		*/
+
+		debug("Executing ssh client: \"%.500s\"...\n", fullCmd);
+
+		if (CreateProcessA(NULL, fullCmd, NULL, NULL, TRUE,
+			NORMAL_PRIORITY_CLASS, NULL,
+			NULL, &si, &pi) == TRUE) {
+			sshpid = pi.dwProcessId;
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+		}
+		else
+			errno = GetLastError();
+	}
+
+	if (sshpid == -1)
+#else
 	if ((sshpid = fork()) == -1)
+#endif
 		fatal("fork: %s", strerror(errno));
 	else if (sshpid == 0) {
 		if ((dup2(c_in, STDIN_FILENO) == -1) ||
@@ -2419,7 +2290,6 @@ connect_to_server(char *path, char **args, int *in, int *out)
 	signal(SIGHUP, killchild);
 	close(c_in);
 	close(c_out);
-#endif
 }
 
 static void
