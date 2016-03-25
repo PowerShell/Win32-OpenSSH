@@ -17,19 +17,6 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-
-#define true 1
-#define false 0
-
-#endif
-
 #include <sys/param.h>	/* MIN */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -232,9 +219,7 @@ errno_to_portable(int unixerrno)
 	case ENOENT:
 	case ENOTDIR:
 	case EBADF:
-#ifndef WIN32_FIXME
 	case ELOOP:
-#endif
 		ret = SSH2_FX_NO_SUCH_FILE;
 		break;
 	case EPERM:
@@ -726,12 +711,8 @@ process_open(u_int32_t id)
 	char *name;
 	int r, handle, fd, flags, mode, status = SSH2_FX_FAILURE;
 	
-//	#ifdef WIN32_FIXME
-//	name = buffer_get_string_local8_from_utf8(&iqueue, NULL);
-//#else
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0 )
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-//#endif /* WIN32_FIXME */
 
 	if ((r = sshbuf_get_u32(iqueue, &pflags)) != 0 || /* portable flags */
 	    (r = decode_attrib(iqueue, &a)) != 0)
@@ -740,14 +721,14 @@ process_open(u_int32_t id)
 	debug3("request %u: open flags %d", id, pflags);
 	flags = flags_from_portable(pflags);
 	mode = (a.flags & SSH2_FILEXFER_ATTR_PERMISSIONS) ? a.perm : 0666;
-	#ifdef WIN32_FIXME
+#ifdef WIN32_FIXME
 	char resolvedname[MAXPATHLEN];
 	if (realpathWin32i(name, resolvedname))
 	{
 		free(name);
 		name = strdup(resolvedname);
 	}
-	#endif
+#endif
 
 	logit("open \"%s\" flags %s mode 0%o",
 	    name, string_from_portable(pflags), mode);
@@ -882,27 +863,26 @@ process_do_stat(u_int32_t id, int do_lstat)
 	char *name;
 	int r, status = SSH2_FX_FAILURE;
 	
-	  #ifdef WIN32_FIXME
-  char resolvedname[MAXPATHLEN];
-  #endif
+#ifdef WIN32_FIXME
+	char resolvedname[MAXPATHLEN];
+#endif
   
   
-  #ifdef WIN32_FIXME
+#ifdef WIN32_FIXME
   
-  if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0)
+	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
   
-  if (realpathWin32i(name, resolvedname))
-  {
-    free(name);  
-    name = strdup(resolvedname);
-  }  
+	if (realpathWin32i(name, resolvedname)) {
+		free(name);
+		name = strdup(resolvedname);
+	}
 
-  debug3("request %u: %sstat", id, do_lstat ? "l" : "");
-  verbose("%sstat name \"%s\"", do_lstat ? "l" : "", name);
-  r = stat(name, &st);
+	debug3("request %u: %sstat", id, do_lstat ? "l" : "");
+	verbose("%sstat name \"%s\"", do_lstat ? "l" : "", name);
+	r = stat(name, &st);
   
-  #else
+#else
 
 
 
@@ -1957,21 +1937,6 @@ sftp_server_usage(void)
 	exit(1);
 }
 
-#ifdef WIN32_FIXME
-DWORD select_in_handle( HANDLE in_handle)
-{
-	//DWORD rc = WaitForSingleObject (in_handle, 0);
-	//if (rc == WAIT_OBJECT_0)
-	//	return 1;
-	//else
-	//	return 0;
-
-	DWORD bytesavail = 0 ;
-	PeekNamedPipe(in_handle, NULL,0, NULL, &bytesavail, NULL );
-	return bytesavail;
-}
-#endif
-
 int
 sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 {
@@ -2113,14 +2078,10 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((oqueue = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-#if(0)//def WIN32_FIXME
-  //rset = (fd_set *)xmalloc(sizeof(fd_set));
-  //wset = (fd_set *)xmalloc(sizeof(fd_set));
-#else
+
 	set_size = howmany(max + 1, NFDBITS) * sizeof(fd_mask);
 	rset = xmalloc(set_size);
 	wset = xmalloc(set_size);
-#endif
 
 
 	if (homedir != NULL) {

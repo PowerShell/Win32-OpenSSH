@@ -2226,6 +2226,9 @@ connect_to_server(char *path, char **args, int *in, int *out)
 			strncat(fullCmd, args[i], MAX_PATH);
 		}
 
+		fcntl(pout[1], F_SETFD, FD_CLOEXEC);
+		fcntl(pin[0], F_SETFD, FD_CLOEXEC);
+
 		/*
 		* Assign sockets to StartupInfo.
 		*/

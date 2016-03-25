@@ -26,10 +26,6 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
-
 #ifdef WIN32_FIXME
 void strmode(mode_t mode, char *p);
 void strmode_from_attrib(unsigned attrib, char *p);
