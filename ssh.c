@@ -1072,27 +1072,6 @@ main(int ac, char **av)
 		ac--, av++;
 	}
   #ifdef WIN32_FIXME
-  
-    /*
-     * Redirect stdin/stdout for password read. This trick allow
-     * use of all auth procedures from ssh client in sftp without
-     * additional code in parent.
-     */
-     
-    if (options.passInputHandle_)
-    {
-      debug3("Redirecting pass input to %d...\n", options.passInputHandle_);
-      abort();
-      //PassInputFd = _open_osfhandle(options.passInputHandle_, O_RDONLY);
-    }
-
-    if (options.passOutputHandle_)
-    { 
-      debug3("Redirecting pass prompt output to %d...\n", options.passOutputHandle_);
-      abort();
-      //PassOutputFd = _open_osfhandle(options.passOutputHandle_, O_WRONLY);
-    }
-
  	// create various Windows user home directory based file names
     sprintf(dotsshdir,"%s\\%s", pw->pw_dir, _PATH_SSH_USER_DIR );
     _mkdir(dotsshdir); //this base directory for the user is needed

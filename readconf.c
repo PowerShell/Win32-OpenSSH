@@ -1533,29 +1533,7 @@ parse_keytypes:
 
 	case oPubkeyAcceptedKeyTypes:
 		charptr = &options->pubkey_key_types;
-		goto parse_keytypes;
-		
-#ifdef WIN32_FIXME
-    
-    case oPassInputHandle:
-    {
-      arg = strdelim(&s);
-      
-      options -> passInputHandle_ = atoi(arg);
-    
-      break;
-    }
-
-    case oPassOutputHandle:
-    {
-      arg = strdelim(&s);
-      
-      options -> passOutputHandle_ = atoi(arg);      
-      
-      break;
-    }
-    
-#endif
+		goto parse_keytypes;		
 
 	case oDeprecated:
 		debug("%s line %d: Deprecated option \"%s\"",
@@ -1740,13 +1718,6 @@ initialize_options(Options * options)
 	options->update_hostkeys = -1;
 	options->hostbased_key_types = NULL;
 	options->pubkey_key_types = NULL;
-	
-  #ifdef WIN32_FIXME
-
-  options -> passInputHandle_  = NULL;
-  options -> passOutputHandle_ = NULL;
-  
-  #endif
 }
 
 /*

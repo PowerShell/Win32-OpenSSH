@@ -35,20 +35,6 @@
  * should be world-readable.
  */
  
-#ifdef WIN32_FIXME
-# define _PATH_SERVER_CONFIG_FILE  "sshd_config"
-# define _PATH_HOST_CONFIG_FILE    "ssh_config"
-# define _PATH_HOST_KEY_FILE       "ssh_host_key"
-# define _PATH_HOST_DSA_KEY_FILE   "ssh_host_dsa_key"
-# define _PATH_HOST_ECDSA_KEY_FILE "ssh_host_ecdsa_key"
-# define _PATH_HOST_ED25519_KEY_FILE	"ssh_host_ed25519_key"
-# define _PATH_HOST_RSA_KEY_FILE   "ssh_host_rsa_key"
-# define _PATH_DH_MODULI           "moduli"
-# define _PATH_DH_PRIMES           "primes"
-# define _PATH_SSH_PROGRAM         "ssh.exe"
-
-#else
-	
 #define _PATH_SERVER_CONFIG_FILE	SSHDIR "/sshd_config"
 #define _PATH_HOST_CONFIG_FILE		SSHDIR "/ssh_config"
 #define _PATH_HOST_KEY_FILE		SSHDIR "/ssh_host_key"
@@ -63,17 +49,12 @@
 #ifndef _PATH_SSH_PROGRAM
 #define _PATH_SSH_PROGRAM		"/usr/bin/ssh"
 #endif
-#endif
 
 /*
  * The process id of the daemon listening for connections is saved here to
  * make it easier to kill the correct daemon when necessary.
  */
-#ifndef WIN32_FIXME
 #define _PATH_SSH_DAEMON_PID_FILE	_PATH_SSH_PIDDIR "/sshd.pid"
-#else
-#define _PATH_SSH_DAEMON_PID_FILE "sshd.pid"
-#endif
 
 /*
  * The directory in user's home directory in which the files reside. The
@@ -156,11 +137,7 @@
 
 /* xauth for X11 forwarding */
 #ifndef _PATH_XAUTH
-#ifdef WIN32_FIXME
-#define _PATH_XAUTH			"./auth.exe"
-#else
 #define _PATH_XAUTH			"/usr/X11R6/bin/xauth"
-#endif
 #endif
 
 
@@ -176,15 +153,9 @@
 #endif
 
 /* for sftp */
-#ifdef WIN32_FIXME
-  #ifndef _PATH_SFTP_SERVER
-  #define _PATH_SFTP_SERVER "./sftp-server.exe"
-  #endif
-#else
 #ifndef _PATH_SFTP_SERVER
 #define _PATH_SFTP_SERVER		"/usr/libexec/sftp-server"
 #endif
-#endif /* else WIN32_FIXME */
 
 /* chroot directory for unprivileged user when UsePrivilegeSeparation=yes */
 #ifndef _PATH_PRIVSEP_CHROOT_DIR

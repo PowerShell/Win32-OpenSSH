@@ -157,12 +157,6 @@ typedef struct {
 	char   *pubkey_key_types;
 
 	char	*ignored_unknown; /* Pattern list of unknown tokens to ignore */
-#ifdef WIN32_FIXME
-
-  HANDLE passInputHandle_;
-  HANDLE passOutputHandle_;
-  
-#endif
 }       Options;
 
 #define SSH_CANONICALISE_NO	0

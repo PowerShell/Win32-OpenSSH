@@ -1564,7 +1564,7 @@
 #define _PATH_PASSWD_PROG "/usr/bin/passwd"
 
 /* Specify location of ssh.pid */
-#define _PATH_SSH_PIDDIR "/var/run"
+#define _PATH_SSH_PIDDIR "."
 
 /* Define if we don't have struct __res_state in resolv.h */
 #define __res_state state
@@ -1725,3 +1725,7 @@ typedef long ssize_t;
 
 
 #define HAVE_MBLEN 1
+
+#define SSHDIR "."
+#define _PATH_SFTP_SERVER "./sftp-server.exe"
+#define _PATH_SSH_PROGRAM "./ssh.exe"
