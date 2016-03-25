@@ -73,9 +73,6 @@ Key *previous_host_key = NULL;
 static int matching_host_key_dns = 0;
 
 #ifdef WIN32_FIXME
-
-  #define ECONNABORTED WSAECONNABORTED
-  #define ECONNREFUSED WSAECONNREFUSED
   #define FAIL(X) if (X) goto fail
 
   HANDLE proxy_command_handle = NULL;
@@ -117,11 +114,7 @@ static int
 ssh_proxy_fdpass_connect(const char *host, u_short port,
     const char *proxy_command)
 {
-#ifdef WIN32_FIXME
-//PRAGMA:TODO
-	return 0;
-#else
-	
+#ifndef WIN32_FIXME//R
 	char *command_string;
 	int sp[2], sock;
 	pid_t pid;
@@ -192,6 +185,9 @@ ssh_proxy_fdpass_connect(const char *host, u_short port,
 	packet_set_connection(sock, sock);
 
 	return 0;
+#else
+	fatal("proxy fdpass connect is not supported in Windows");
+	return 0;
 #endif
 }
 
@@ -201,120 +197,8 @@ ssh_proxy_fdpass_connect(const char *host, u_short port,
 static int
 ssh_proxy_connect(const char *host, u_short port, const char *proxy_command)
 {
-  /*
-   * Win32 code.
-   */
+#ifndef WIN32_FIXME//R
 
-  #ifdef WIN32_FIXME
-  
-    PROCESS_INFORMATION pi = {0};
-  
-    STARTUPINFO si = {0};
-    
-    char *fullCmd = NULL;
-
-    char strport[NI_MAXSERV] = {0};
-    
-    int sockin[2]  = {-1, -1};
-    int sockout[2] = {-1, -1};
-    
-    int exitCode = -1;
-  
-    /*
-     * Create command to execute as proxy.
-     */
-
-    debug("Creating proxy command...");
-    
-    snprintf(strport, sizeof strport, "%hu", port);
-    
-    fullCmd = percent_expand(proxy_command, "h", host, 
-                                 "p", strport, (char *) NULL);
-                                 
-    FAIL(fullCmd == NULL);                             
-
-    /*
-     * Create socket pairs for stdin and stdout.
-     */
-
-    debug("Creating socket pairs for proxy process...");
-
-    pipe(sockin);
-    pipe(sockout);
-    
-    debug("sockin[0]: %d sockin[1]: %d", sockin[0], sockin[1]);
-    debug("sockout[0]: %d sockout[1]: %d", sockout[0], sockout[1]);
-
-    permanently_drop_suid(original_real_uid);
-    
-    /*
-     * Assign sockets to StartupInfo
-     */
-
-    si.cb          = sizeof(STARTUPINFO);
-    si.hStdInput   = (HANDLE) sfd_to_handle(sockin[0]);
-    si.hStdOutput  = (HANDLE) sfd_to_handle(sockout[0]);
-    si.hStdError   = GetStdHandle(STD_ERROR_HANDLE);
-    si.wShowWindow = SW_HIDE;
-    si.dwFlags     = STARTF_USESTDHANDLES;
-    si.lpDesktop   = NULL;
-
-    /*               
-     * Create proxy process with given stdout/stdin.
-     */
-    
-    debug("Executing proxy command: \"%.500s\"...\n", fullCmd);
-
-    FAIL(CreateProcess(NULL, fullCmd, NULL, NULL, TRUE, 
-                           CREATE_NEW_PROCESS_GROUP, NULL, 
-                               NULL, &si, &pi) == FALSE);
-
-    proxy_command_handle = pi.hProcess;
-    proxy_command_pid    = pi.dwProcessId;
-    
-    /*
-     * Redirect network in/out to proxy sockets.
-     */
-    
-    packet_set_connection(sockout[1], sockin[1]);
-
-    
-    exitCode = 0;
-   
-    fail:
-  
-    /*
-     / Clean up.
-     */
-
-    close(sockout[0]);
-    close(sockin[0]);
-
-    CloseHandle(pi.hThread);
-    
-    free(fullCmd);
-    
-    /*
-     * Error handler.
-     */
-    
-    if (exitCode)
-    {
-      debug("Error cannot create proxy process (%u).\n", (unsigned int) GetLastError());
-      
-      close(sockout[1]);
-      close(sockin[1]);
-      
-      CloseHandle(pi.hProcess);
-    }
- 
-    return exitCode;
-
-  #else
-
-  /*
-   * Original OpenSSH code.
-   */
 	char *command_string;
 	int pin[2], pout[2];
 	pid_t pid;
@@ -384,20 +268,21 @@ ssh_proxy_connect(const char *host, u_short port, const char *proxy_command)
 
 	/* Indicate OK return */
 	return 0;
-#endif /* else WIN32_FIXME */
+#else
+	fatal("proxy connect is not supported in Windows");
+	return 0;
+#endif
 }
 
 void
 ssh_kill_proxy_command(void)
 {
-#ifndef WIN32_FIXME
 	/*
 	 * Send SIGHUP to proxy command if used. We don't wait() in
 	 * case it hangs and instead rely on init to reap the child
 	 */
 	if (proxy_command_pid > 1)
 		kill(proxy_command_pid, SIGHUP);
-#endif
 }
 
 /*
@@ -490,14 +375,8 @@ timeout_connect(int sockfd, const struct sockaddr *serv_addr,
 		goto done;
 	}
 	
-#if(1)//ndef WIN32_FIXME
 	fdset = xcalloc(howmany(sockfd + 1, NFDBITS),
 	    sizeof(fd_mask));
-#else
-	fdset = xmalloc(sizeof(fd_set));
-	FD_ZERO(fdset);
-#endif
-
 
 	FD_SET(sockfd, fdset);
 	ms_to_timeval(&tv, *timeoutp);
@@ -573,12 +452,7 @@ ssh_connect_direct(const char *host, struct addrinfo *aitop,
 	char ntop[NI_MAXHOST], strport[NI_MAXSERV];
 	struct addrinfo *ai;
 
-  #ifdef WIN32_FIXME
-
-  DWORD error_win32 = 0;
-
-  #endif
-	debug2("ssh_connect: needpriv %d", needpriv);
+  	debug2("ssh_connect: needpriv %d", needpriv);
 
 	for (attempt = 0; attempt < connection_attempts; attempt++) {
 		if (attempt > 0) {
@@ -617,9 +491,6 @@ ssh_connect_direct(const char *host, struct addrinfo *aitop,
 			} else {
 				debug("connect to address %s port %s: %s",
 				    ntop, strport, strerror(errno));
-#ifdef WIN32_FIXME
-                                error_win32 = WSAGetLastError();
-#endif
 				close(sock);
 				sock = -1;
 			}
@@ -630,9 +501,6 @@ ssh_connect_direct(const char *host, struct addrinfo *aitop,
 
 	/* Return failure if we didn't get a successful connection. */
 	if (sock == -1) {
-#ifdef WIN32_FIXME
-                WSASetLastError(error_win32);
-#endif
 		error("ssh: connect to host %s port %s: %s",
 		    host, strport, strerror(errno));
 		return (-1);
@@ -1649,13 +1517,8 @@ ssh_local_cmd(const char *args)
 		return (1);
 
 	return (WEXITSTATUS(status));
-#else
-  
-  /*
-   * Not implemented on Win32.
-   */
-   
-  return -1;  
-
-#endif /* else !WIN32_FIXME */
+#else  
+	fatal("executing local command is not supported in Windows");
+	return 0;
+#endif 
 }

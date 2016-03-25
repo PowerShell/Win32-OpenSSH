@@ -642,28 +642,6 @@ userauth_gssapi(Authctxt *authctxt)
 	OM_uint32 min;
 	int ok = 0;
 	
-
-#ifdef WIN32_FIXME
-  /*
-   * Try native SSPI/Kerberos on windows first.
-   */
-   
-  if (userauth_sspi_kerberos(authctxt) == 1)
-  {
-    return 1;
-  }
-  
-  /*
-   * If SSPI failed check is MIT KfW libraries availible.
-   * Don't go on if not.
-   */
-   
-  if (InitMitKerberos() != 0)
-  {
-    return 0;
-  }
-#endif /* WIN32_FIXME */
-
 	/* Try one GSSAPI method at a time, rather than sending them all at
 	 * once. */
 
@@ -1611,13 +1589,8 @@ ssh_keysign(struct sshkey *key, u_char **sigp, size_t *lenp,
 
 	return 0;
 #else
-
-  /*
-   * Not implemented on Win32.
-   */
-   
-  return -1;
-
+	fatal("keysign is not supported in Windows");
+	return -1;
 #endif
 }
 
