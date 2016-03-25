@@ -65,22 +65,6 @@
 
 #ifdef WIN32_FIXME
   
-  //#include <sys/socket.h>
-  
-  //#define mkdir(a, b) _mkdir(a)
-
-  //#define lstat(PATH, BUF) _stat(PATH, BUF)
-  
-  /*
-   * Don't use fstat() function redefined
-   * in socket.h ported header. It is wrong
-   * in this context.
-   */
-
-  //#ifdef fstat
-  //#undef fstat
-  //#endif
-
   int glob(const char *pattern, int flags, int (*errfunc)(const char *epath, int eerrno),
                glob_t *pglob)
   {
@@ -124,39 +108,26 @@
       //free(pglob);
     }
   }
-  
-  pid_t waitpid(pid_t pid, int *stat_loc, int options)
-  {
-    return 0;
-  }
-  
-  /*
-   * Write array of buffers to file descriptor.
-   *
-   * fd      - file descriptor to write (IN).
-   * iovec   - array of iovec with buffers to send (IN).
-   * iovecnt - number of buffers in iovec (IN).
-   *
-   * RETURNS: Number of bytes written or -1 if error.
-   */
- 
+
+  /** TODO - Move this to POSIX wrapper**/
+  /* ??? What if fd is nonblocking ???*/
   int writev(int fd, struct iovec *iov, int iovcnt)
   {
-    int written = 0;
+	  int written = 0;
 
-    int i = 0;
-    
-    for (i = 0; i < iovcnt; i++)
-    {
-      int ret = write(fd, iov[i].iov_base, iov[i].iov_len);
+	  int i = 0;
 
-      if (ret > 0)
-      {
-        written += ret;
-      }
-    }  
-    
-    return written;
+	  for (i = 0; i < iovcnt; i++)
+	  {
+		  int ret = write(fd, iov[i].iov_base, iov[i].iov_len);
+
+		  if (ret > 0)
+		  {
+			  written += ret;
+		  }
+	  }
+
+	  return written;
   }
 
 #endif
@@ -1315,16 +1286,9 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 		return(-1);
 	}
 
- #if(0)//def WIN32_FIXME
+	local_fd = open(local_path,
+	    O_WRONLY | O_CREAT | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
 
-  local_fd = _open(local_path, 
-		O_WRONLY | O_CREAT | O_BINARY | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
-
-  #else
-	  local_fd = open(local_path,
-	    O_WRONLY | O_CREAT | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR); // PRAGMA:TODO
-
-  #endif
 	
 	if (local_fd == -1) {
 		error("Couldn't open local file \"%s\" for writing: %s",
@@ -1433,15 +1397,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 				fatal("Received more data than asked for "
 				    "%zu > %zu", len, req->len);
 			if ((lseek(local_fd, req->offset, SEEK_SET) == -1 ||
-			         #if(0)//def WIN32_FIXME
-
-      atomicio(_write, local_fd, data, len) != len) &&
-
-      #else
-
 			    atomicio(vwrite, local_fd, data, len) != len) &&
-
-      #endif
 
 			    !write_error) {
 				write_errno = errno;
@@ -1556,15 +1512,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 		}
 #endif
 	}
-	  #if(0)//def WIN32_FIXME
-  
-  _close(local_fd);
-  
-  #else
-
 	close(local_fd);
-  
-  #endif
 	sshbuf_free(msg);
 	free(handle);
 
@@ -1730,15 +1678,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	}
 	if (!S_ISREG(sb.st_mode)) {
 		error("%s is not a regular file", local_path);
-		    #if(0)//def WIN32_FIXME
-    
-    _close(local_fd);
-    
-    #else
-    
 		close(local_fd);
-
-    #endif
 		return(-1);
 	}
 	stat_to_attrib(&sb, &a);
@@ -1789,16 +1729,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	handle = get_handle(conn, id, &handle_len,
 	    "remote open(\"%s\")", remote_path);
 	if (handle == NULL) {
-		   #if(0)//def WIN32_FIXME
-
-    _close(local_fd);
-    
-    #else
-    
 		close(local_fd);
-
-    #endif
-    
 		sshbuf_free(msg);
 		return -1;
 	}
@@ -1824,15 +1755,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 		if (interrupted || status != SSH2_FX_OK)
 			len = 0;
 		else do
-			    #if(0)//def WIN32_FIXME
-      
-      len = _read(local_fd, data, conn->transfer_buflen);
-      
-      #else
-
 			len = read(local_fd, data, conn->transfer_buflen);
-
-      #endif
 
 		while ((len == -1) &&
 		    (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK));
@@ -1916,16 +1839,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 		status = SSH2_FX_FAILURE;
 	}
 
-	 #if(0)//def WIN32_FIXME
-
-  if (_close(local_fd) == -1) 
-  {
-
-  #else
-
 	if (close(local_fd) == -1) {
-
-  #endif
 		error("Couldn't close local file \"%s\": %s", local_path,
 		    strerror(errno));
 		status = SSH2_FX_FAILURE;

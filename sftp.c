@@ -2337,55 +2337,8 @@ main(int argc, char **argv)
 
 	w32posix_initialize();
      
-   /* WSHELPinitialize();
-    
-    allocate_standard_descriptor(STDIN_FILENO);
-    allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);
-    
-    LoadLibrary("libwindbg.dll");*/
-
 	setvbuf(stdout, NULL, _IONBF, 0);
 
-    
-    //sfd_start = 3;
-    
-    /*
-     *  FIXME. Test.
-     */
-    
-    /*
-    
-    memset(&args, '\0', sizeof(args));
-    
-    args.list = NULL;
-    
-    addargs(&args, "%s", ssh_program);
-
-    addargs(&args, "-i test_rsa -s dzik@10.0.0.6 sftp");
-
-    connect_to_server(ssh_program, args.list, &in, &out);    
-    
-    conn = do_init(in, out, 32768, 64, 0);
-
-    if (conn == NULL)
-    {
-      fatal("Couldn't initialise connection to server");
-    }  
-
-    //err = interactive_loop(conn, NULL, NULL);
-    //do_download(conn, "/home/dzik/unity_run", "c:/tmp/unity_run", NULL, 0);
-    
-    do_ls_dir(conn, "/home/dzik", "", 0);
-    
-    exit(0);
-    
-    */
-    
-    /*
-     *  End of test.
-     */    
-    
   #endif
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();

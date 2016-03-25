@@ -31,9 +31,6 @@
  */
 
 #ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-
 void strmode(mode_t mode, char *p);
 void strmode_from_attrib(unsigned attrib, char *p);
 #endif
