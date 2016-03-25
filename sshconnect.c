@@ -74,13 +74,9 @@ static int matching_host_key_dns = 0;
 
 #ifdef WIN32_FIXME
   #define FAIL(X) if (X) goto fail
-
-  HANDLE proxy_command_handle = NULL;
-  DWORD proxy_command_pid = 0;
-  
-#else
-static pid_t proxy_command_pid = 0;
 #endif
+
+static pid_t proxy_command_pid = 0;
 
 /* import */
 extern Options options;

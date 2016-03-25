@@ -118,9 +118,6 @@
 
   #include <sys/stat.h>
 
-  extern HANDLE proxy_command_handle;
-  extern DWORD proxy_command_pid;
-
   char dotsshdir[MAX_PATH];
 
 #endif /* WIN32_FIXME */
@@ -250,49 +247,6 @@ tilde_expand_paths(char **paths, u_int num_paths)
 #ifdef WIN32_FIXME
 
 /*
- * This function send CTRL_BREAK_EVENT (equivalent of SIGINT) to
- * child proxy process.
- *
- * If process still alive terminates it.
- */
-
-static void CleanUpProxyProcess()
-{
-  if (proxy_command_handle)
-  {
-    if (GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, proxy_command_pid) == FALSE)
-    {
-      debug("ERROR. Cannot send exit signal to childs (%u).", 
-                (unsigned int) GetLastError());
-    }
-
-    /*
-     * Try wait up to 100 ms until proxy process finished.
-     */
-
-    if (WaitForSingleObject(proxy_command_handle, 100) == WAIT_TIMEOUT)
-    {
-      /*
-       * If still not closed, kill proxy process.
-       */
-    
-      if (TerminateProcess(proxy_command_handle, 1) == TRUE)
-      {
-        debug("Process %u terminated.", (unsigned int) proxy_command_pid);
-      }
-      else
-      {
-        debug("ERROR. Cannot terminate proxy process (pid = %u).", 
-                  (unsigned int) proxy_command_pid);
-      }
-    }
-
-    CloseHandle(proxy_command_handle);
-  }
-}
-
-extern Buffer stdin_buffer;	/* Buffer for stdin data. */
-/*
  * This function handles exit signal.
  */
 
@@ -325,10 +279,6 @@ BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
   
   debug("Exit signal received...");
 
-  CleanUpProxyProcess();
-  
-  UninitMitKerberos();
-  
   cleanup_exit(0);
   
   return TRUE;
@@ -1473,10 +1423,8 @@ main(int ac, char **av)
 	    options.num_system_hostfiles);
 	tilde_expand_paths(options.user_hostfiles, options.num_user_hostfiles);
 	
-#ifndef WIN32_FIXME
 	signal(SIGPIPE, SIG_IGN); /* ignore SIGPIPE early */
 	signal(SIGCHLD, main_sigchld_handler);
-#endif
 
 	/* Log into the remote system.  Never returns if the login fails. */
 	ssh_login(&sensitive_data, host, (struct sockaddr *)&hostaddr,
@@ -1533,20 +1481,14 @@ main(int ac, char **av)
    * Windows specific Cleanup.
    */
    
-  #ifdef WIN32_FIXME
+#ifdef WIN32_FIXME
   
 	if (tty_flag)
 		ConUnInitWithRestore(); // restore terminal to previous settings if it was a tty session
-
-    CleanUpProxyProcess();
-
-    UninitMitKerberos();
-
-  #else
+#endif
 
 	/* Kill ProxyCommand if it is running. */
 	ssh_kill_proxy_command();
-#endif
 
 	return exit_status;
 }
@@ -1554,7 +1496,7 @@ main(int ac, char **av)
 static void
 control_persist_detach(void)
 {
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 	pid_t pid;
 	int devnull;
 
@@ -1595,6 +1537,8 @@ control_persist_detach(void)
 	}
 	daemon(1, 1);
 	setproctitle("%s [mux]", options.control_path);
+#else
+	fatal("not supported in Windows");
 #endif
 }
 
@@ -2037,13 +1981,6 @@ ssh_session2_open(void)
 		window >>= 1;
 		packetmax >>= 1;
 	}
-	#ifdef WIN32_FIXME
-	else {
-		// make stdio duplicated ports of above binary mode so no CRLF xlate
-		//_setmode(sfd_to_fd(in), O_BINARY);
-		//_setmode(sfd_to_fd(out), O_BINARY);
-	}
-	#endif
 	
 	c = channel_new(
 	    "session", SSH_CHANNEL_OPENING, in, out, err,
@@ -2250,7 +2187,6 @@ load_public_identity_files(void)
 	free(pwdir);
 }
 
-#ifndef WIN32_FIXME
 static void
 main_sigchld_handler(int sig)
 {
@@ -2265,6 +2201,6 @@ main_sigchld_handler(int sig)
 	signal(sig, main_sigchld_handler);
 	errno = save_errno;
 }
-#endif
+
 
 
