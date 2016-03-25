@@ -38,13 +38,6 @@
  * We support only client side kerberos on Windows.
  */
 
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-  #define WIN32_USER_AUTH 1
-  //#define WIN32_PRAGMA_REMCON
-#endif
-
 #include <sys/types.h>
 #include <sys/param.h>
 #ifdef HAVE_SYS_STAT_H

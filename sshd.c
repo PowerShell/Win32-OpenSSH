@@ -44,15 +44,6 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
-
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -183,18 +174,6 @@ int log_stderr = 0;
 char **saved_argv;
 int saved_argc;
 
-/* Arguments to used for fake forked child processes of sshd.exe */
-#ifdef WIN32_FIXME
-/*
-FIXME: GFPZR: Function stat() may be undeclared.
-*/
-#include <sys/stat.h>
-#include <tlhelp32.h>
-
-char *fake_fork_args;
-
-#endif
-
 /* re-exec */
 int rexeced_flag = 0;
 int rexec_flag = 1;
@@ -308,22 +287,17 @@ static void do_ssh2_kex(void);
     
     #ifdef WIN32_FIXME
       
-      if (GetModuleFileName(NULL, path, pathSize))
-      {
+      if (GetModuleFileName(NULL, path, pathSize)){
         int i;
-
         int lastSlashPos = 0;
                 
-        for (i = 0; path[i]; i++)
-        {
-          if (path[i] == '/' || path[i] == '\\')
-          {
-            lastSlashPos = i;
-          }
-        }
+	for (i = 0; path[i]; i++) {
+		if (path[i] == '/' || path[i] == '\\') {
+			lastSlashPos = i;
+		}
+	}
         
         path[lastSlashPos] = 0;
-        
         exitCode = 0;
       }  
     
@@ -358,7 +332,6 @@ static void do_ssh2_kex(void);
   }  
 
 #ifdef WIN32_FIXME
-
   /*
    * Win32 only.
    */
@@ -423,26 +396,9 @@ static void do_ssh2_kex(void);
         debug("SERVICE_CONTROL_STOP signal received...");
     
         ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 500);
-   
-        /*
-         * Send exit signal to child 'sshd.exe' processes.
-         */
-/*
-  FIXME: Group childs in job to isolate childs from parent.
-         Reason: childs should be killed by sending SIGBRK, but
-                 parent (this service) should NOT.
 
-        debug("Sending exit signal to child 'sshd.exe' processes...");
-        
-        if (!GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0))
-        {
-          debug("ERROR: Cannot send exit signal to childs (%u).\n", GetLastError());
-        }
-*/    
-        /*
-         * Signal the service to stop.
-         */
-     
+	raise(SIGINT);
+	/*TODO -  wait for main thread to unwind */
         ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 
         return;
@@ -464,96 +420,6 @@ static void do_ssh2_kex(void);
     }  
 
     ReportSvcStatus(gSvcStatus.dwCurrentState, NO_ERROR, 0);
-  }
-
-  static VOID SvcUninstall()
-  {
-    SC_HANDLE schSCManager;
-    SC_HANDLE schService;
-
-    /*
-     * Get a handle to the SCM database.
-     */
-    
-    schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
- 
-    if (NULL == schSCManager) 
-    {
-      printf("OpenSCManager failed (%d)\n", GetLastError());
-      
-      return;
-    }
-
-    schService = OpenService(schSCManager, SVCNAME, DELETE);
-    
-    if (NULL == schService)
-    {
-      printf("OpenService failed (%d)\n", GetLastError());
-      
-      return;
-    }
-
-    if (!DeleteService(schService))
-    {
-      printf("DeleteService failed (%d)\n", GetLastError());
-      
-      return;
-    }
-
-    printf("Service (%s) deleted.", SVCNAME);
-  }
-
-  static VOID SvcInstall()
-  {
-    SC_HANDLE schSCManager;
-    SC_HANDLE schService;
-    
-    TCHAR szPath[MAX_PATH];
-
-    if(GetModuleFileName(NULL, szPath, MAX_PATH) == FALSE)
-    {
-      printf("Cannot install service (%d)\n", GetLastError());
-      
-      return;
-    }
-
-    /*
-     * Get a handle to the SCM database.
-     */
-
-    schSCManager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
-
-    if (NULL == schSCManager) 
-    {
-      printf("OpenSCManager failed (%d)\n", GetLastError());
-      
-      return;
-    }
-
-    /*
-     * Create the service
-     */
-     
-    schService = CreateService(schSCManager, SVCNAME, SVCNAME, SERVICE_ALL_ACCESS,
-                                   SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START,
-                                       SERVICE_ERROR_NORMAL, szPath, NULL, NULL,
-                                           NULL, NULL, NULL);
- 
-    if (schService == NULL) 
-    {
-      printf("CreateService failed (%d)\n", GetLastError()); 
-      
-      CloseServiceHandle(schSCManager);
-      
-      return;
-    }
-    else
-    {
-      printf("Service installed successfully\n");
-    }  
-
-    CloseServiceHandle(schService); 
-    CloseServiceHandle(schSCManager);
   }
 
 #endif /* WIN32_FIXME */
@@ -594,13 +460,11 @@ close_startup_pipes(void)
 static void
 sighup_handler(int sig)
 {
-#ifndef WIN32_FIXME
 	int save_errno = errno;
 
 	received_sighup = 1;
 	signal(SIGHUP, sighup_handler);
 	errno = save_errno;
-#endif
 }
 
 /*
@@ -610,7 +474,6 @@ sighup_handler(int sig)
 static void
 sighup_restart(void)
 {
-#ifndef WIN32_FIXME
 	logit("Received SIGHUP; restarting.");
 	platform_pre_restart();
 	close_listen_socks();
@@ -621,7 +484,6 @@ sighup_restart(void)
 	logit("RESTART FAILED: av[0]='%.100s', error: %.100s.", saved_argv[0],
 	    strerror(errno));
 	exit(1);
-#endif
 }
 
 /*
@@ -642,7 +504,6 @@ sigterm_handler(int sig)
 static void
 main_sigchld_handler(int sig)
 {
-#ifndef WIN32_FIXME
 	int save_errno = errno;
 	pid_t pid;
 	int status;
@@ -653,7 +514,6 @@ main_sigchld_handler(int sig)
 
 	signal(SIGCHLD, main_sigchld_handler);
 	errno = save_errno;
-#endif
 }
 
 /*
@@ -663,7 +523,6 @@ main_sigchld_handler(int sig)
 static void
 grace_alarm_handler(int sig)
 {
-#ifndef WIN32_FIXME
 	if (use_privsep && pmonitor != NULL && pmonitor->m_pid > 0)
 		kill(pmonitor->m_pid, SIGALRM);
 
@@ -678,7 +537,6 @@ grace_alarm_handler(int sig)
 
 	/* Log error and exit. */
 	sigdie("Timeout before authentication for %s", get_remote_ipaddr());
-#endif
 }
 
 /*
@@ -1528,13 +1386,8 @@ server_listen(void)
     /*
      * Forbid inheriting of listen socket.
      */
-     
-    if (SetHandleInformation(sfd_to_handle(listen_sock), 
-                                 HANDLE_FLAG_INHERIT, 0) == FALSE)
-    {
-      debug("ERROR: Cannot clear inherit flag from listen socket [%d]. "
-                "Error code : %u.", listen_sock, GetLastError());
-    }  
+		fcntl(listen_sock, F_SETFD, FD_CLOEXEC);
+    
   
     #endif
 
@@ -1598,14 +1451,9 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			sighup_restart();
 		if (fdset != NULL)
 			free(fdset);
-#if(1)//ndef WIN32_FIXME
+
 		fdset = xcalloc(howmany(maxfd + 1, NFDBITS),
 		    sizeof(fd_mask));
-#else
-		fdset = (fd_set *) xmalloc(sizeof(fd_set));
-		FD_ZERO(fdset);
-#endif
-		
 
 		for (i = 0; i < num_listen_socks; i++)
 			FD_SET(listen_socks[i], fdset);
@@ -1671,7 +1519,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				close(*newsock);
 				continue;
 			}
-#ifndef WIN32_FIXME
+
 			if (pipe(startup_p) == -1) {
 				close(*newsock);
 				continue;
@@ -1686,7 +1534,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				close(startup_p[1]);
 				continue;
 			}
-#endif
+
 			for (j = 0; j < options.max_startups; j++)
 				if (startup_pipes[j] == -1) {
 					startup_pipes[j] = startup_p[0];
@@ -1786,11 +1634,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
         }
 
       #else
-        
-        /* 
-         * Original OpenSSH code.
-         */
-
 
 			/*
 			 * Normal production daemon.  Fork, and have

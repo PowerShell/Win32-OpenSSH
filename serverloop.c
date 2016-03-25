@@ -37,15 +37,6 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
-
 #include <sys/param.h>	/* MIN MAX */
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -89,10 +80,6 @@
 #include "serverloop.h"
 #include "roaming.h"
 #include "ssherr.h"
-
-#ifdef WIN32_FIXME
-//#define isatty(a) WSHELPisatty(a)
-#endif
 
 extern ServerOptions options;
 
@@ -583,7 +570,6 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	int type;
 
 	debug("Entering interactive session.");
-#ifndef WIN32_FIXME
 	/* Initialize the SIGCHLD kludge. */
 	child_terminated = 0;
 	mysignal(SIGCHLD, sigchld_handler);
@@ -593,7 +579,6 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		signal(SIGINT, sigterm_handler);
 		signal(SIGQUIT, sigterm_handler);
 	}
-#endif
 
 	/* Initialize our global variables. */
 	fdin = fdin_arg;
@@ -767,7 +752,6 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	fdin = -1;
 
 	channel_free_all();
-#ifndef WIN32_FIXME
 
 	/* We no longer want our SIGCHLD handler to be called. */
 	mysignal(SIGCHLD, SIG_DFL);
@@ -778,13 +762,6 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	if (wait_pid != pid)
 		error("Strange, wait returned pid %ld, expected %ld",
 		    (long)wait_pid, (long)pid);
-#else
-	if (WaitForSingleObject(pid, 0) == 0) {
-		wait_status = 0;
-	} else {
-		packet_disconnect("wait: %d", GetLastError());
-	}
-#endif
 
 	/* Check if it exited normally. */
 	if (WIFEXITED(wait_status)) {
@@ -820,19 +797,9 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	/* NOTREACHED */
 }
 
-#ifdef WIN32_FIXME
-Session * session_get(int *);
-#endif
-
 static void
 collect_children(void)
 {
-#ifndef WIN32_FIXME
-
-  /*
-   * Original OpenSSH code.
-   */
-   
 	pid_t pid;
 	sigset_t oset, nset;
 	int status;
@@ -850,43 +817,6 @@ collect_children(void)
 		child_terminated = 0;
 	}
 	sigprocmask(SIG_SETMASK, &oset, NULL);
-#else
-
-  /*
-   * Win32 code.
-   */
-   
-  HANDLE process;
-  
-  int status = 0;
-
-  int i = 0;
-  
-  Session *s;
-  
-  do
-  {
-    s = session_get(&i);
-    
-    if ((s != NULL) && (s->pid != 0))
-    {
-      if (WaitForSingleObject(s -> pid, 0) == 0) 
-      {
-        debug("Received SIGCHLD.");
-        
-        process = s->pid;
-        
-        session_close_by_pid(s->pid, status);
-        
-        sw_remove_child(process);
-
-      }
-    }
-  } while (i > 0);
-  
-  child_terminated = 0;
-
-#endif
 }
 
 void
