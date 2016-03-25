@@ -2285,14 +2285,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
      
     debug3("Generating ssh-client command...");
     
-    strncat(fullCmd, path, MAX_PATH);
-    
-    //sprintf(ioArg, " -oPassInputHandle=%d -oPassOutputHandle=%d", 
-    //            childInput, childOutput);
-                
-//                sfd_to_handle(sockout[0]), sfd_to_handle(sockin[1]));
-                
-    //strncat(fullCmd, ioArg, MAX_PATH);                
+    strncat(fullCmd, path, MAX_PATH);              
     
     
     for (i = 1; args[i]; i++)

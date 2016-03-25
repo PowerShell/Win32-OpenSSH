@@ -245,9 +245,7 @@ wait_for_roaming_reconnect(void)
 	/* TODO Perhaps we should read from tty here */
 	while ((c = fgetc(stdin)) != EOF) {
 		if (c == 'Z' - 64) {
-#ifndef WIN32_FIXME
 			kill(getpid(), SIGTSTP);
-#endif
 			continue;
 		}
 		if (c != '\n' && c != '\r')

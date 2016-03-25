@@ -50,6 +50,10 @@ size_t strncasecmp(const char *left, const char *right, size_t n);
 #endif
 
 int gettimeofday(struct timeval *tv, void *tz);
+
+#define popen _popen
+#define pclose _pclose
+
 /* End of prototypes in the wrong file */
 
 #endif

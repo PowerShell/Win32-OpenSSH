@@ -116,10 +116,6 @@
 #include "hostfile.h"
 
 #ifdef WIN32_FIXME
-#include <sys/stat.h>
-
-//#define isatty(a) WSHELPisatty(a)
-
 // Windows Console screen size change related
 extern int ScreenX;
 extern int ScrollBottom;
@@ -168,10 +164,7 @@ static int escape_pending1;	/* Last character was an escape (proto1 only) */
 static int last_was_cr;		/* Last character was a newline. */
 static int exit_status;		/* Used to store the command exit status. */
 static int stdin_eof;		/* EOF has been encountered on stderr. */
-#ifndef WIN32_FIXME
-static
-#endif
-Buffer stdin_buffer;	/* Buffer for stdin data. */
+static Buffer stdin_buffer;	/* Buffer for stdin data. */
 static Buffer stdout_buffer;	/* Buffer for stdout data. */
 static Buffer stderr_buffer;	/* Buffer for stderr data. */
 static u_int buffer_high;	/* Soft max buffer size. */
@@ -241,9 +234,7 @@ static void
 window_change_handler(int sig)
 {
 	received_window_change_signal = 1;
-#ifndef WIN32_FIXME
 	signal(SIGWINCH, window_change_handler);
-#endif
 }
 
 /*
@@ -360,7 +351,6 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 			display = xdisplay;
 		}
 		if (trusted == 0) {
-#ifndef WIN32_FIXME
 			xauthdir = xmalloc(PATH_MAX);
 			xauthfile = xmalloc(PATH_MAX);
 			mktemp_proto(xauthdir, PATH_MAX);
@@ -395,7 +385,6 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 				if (system(cmd) == 0)
 					generated = 1;
 			}
-#endif /* !WIN32_FIXME */
 		}
 
 		/*
@@ -404,7 +393,6 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 		 * above.
 		 */
 		if (trusted || generated) {
-#ifndef WIN32_FIXME
 			snprintf(cmd, sizeof(cmd),
 			    "%s %s%s list %s 2>" _PATH_DEVNULL,
 			    xauth_path,
@@ -418,7 +406,6 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 				got_data = 1;
 			if (f)
 				pclose(f);
-#endif /* !WIN32_FIXME */
 		} else
 			error("Warning: untrusted X11 forwarding setup failed: "
 			    "xauth key data not generated");
@@ -937,9 +924,7 @@ process_cmdline(void)
 	memset(&fwd, 0, sizeof(fwd));
 
 	leave_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
-#ifndef WIN32_FIXME
 	handler = signal(SIGINT, SIG_IGN);
-#endif
 
 	cmd = s = read_passphrase("\r\nssh> ", RP_ECHO);
 	if (s == NULL)
@@ -1245,7 +1230,7 @@ process_escapes(Channel *c, Buffer *bin, Buffer *bout, Buffer *berr,
 				buffer_append(berr, string, strlen(string));
 				continue;
 
-#ifndef WIN32_FIXME
+#ifndef WIN32_FIXME//R
 			case '&':
 				if (c && c->ctl_chan != -1)
 					goto noescape;
@@ -1605,7 +1590,6 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 	 * but don't overwrite SIG_IGN, matches behaviour from rsh(1)
 	 */
 	 
-#ifndef WIN32_FIXME
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
 		signal(SIGHUP, signal_handler);
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
@@ -1615,7 +1599,6 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 	if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
 		signal(SIGTERM, signal_handler);
 	signal(SIGWINCH, window_change_handler);
-#endif
 
 	if (have_pty)
 		enter_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
@@ -1752,9 +1735,7 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 	/* Terminate the session. */
 
 	/* Stop watching for window change. */
-#ifndef WIN32_FIXME
 	signal(SIGWINCH, SIG_DFL);
-#endif
 
 	if (compat20) {
 		packet_start(SSH2_MSG_DISCONNECT);

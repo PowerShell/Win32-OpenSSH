@@ -17,15 +17,6 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
@@ -43,13 +34,6 @@
 #include "buffer.h"
 #include "roaming.h"
 #include "digest.h"
-
-#ifdef WIN32_FIXME
-
-  #define ECONNABORTED WSAECONNABORTED
-  #define ECONNREFUSED WSAECONNREFUSED
-  
-#endif
 
 static size_t out_buf_size = 0;
 static char *out_buf = NULL;

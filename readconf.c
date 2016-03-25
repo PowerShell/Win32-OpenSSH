@@ -159,12 +159,6 @@ typedef enum {
 	oFingerprintHash, oUpdateHostkeys, oHostbasedKeyTypes,
 	oPubkeyAcceptedKeyTypes,
 	oIgnoredUnknownOption, 
-#ifdef WIN32_FIXME
-  
-  oPassInputHandle,
-  oPassOutputHandle,
-  
-#endif
 	oDeprecated, oUnsupported
 } OpCodes;
 
@@ -285,12 +279,6 @@ static struct {
 	{ "hostbasedkeytypes", oHostbasedKeyTypes },
 	{ "pubkeyacceptedkeytypes", oPubkeyAcceptedKeyTypes },
 	{ "ignoreunknown", oIgnoreUnknown },
-#ifdef WIN32_FIXME
-
-  {"passinputhandle", oPassInputHandle},
-  {"passoutputhandle", oPassOutputHandle},
-  
-#endif
 	{ NULL, oBadOption }
 };
 

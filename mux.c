@@ -1834,9 +1834,7 @@ mux_client_request_session(int fd)
 		return -1;
 	}
 
-#ifndef WIN32_FIXME
 	signal(SIGPIPE, SIG_IGN);
-#endif
 
 	if (stdin_null_flag) {
 		if ((devnull = open(_PATH_DEVNULL, O_RDONLY)) == -1)
@@ -1918,12 +1916,10 @@ mux_client_request_session(int fd)
 	}
 	muxclient_request_id++;
 
-#ifndef WIN32_FIXME
 	signal(SIGHUP, control_client_sighandler);
 	signal(SIGINT, control_client_sighandler);
 	signal(SIGTERM, control_client_sighandler);
 	signal(SIGWINCH, control_client_sigrelay);
-#endif
 
 	rawmode = tty_flag;
 	if (tty_flag)
@@ -2001,9 +1997,7 @@ mux_client_request_stdio_fwd(int fd)
 		return -1;
 	}
 
-#ifndef WIN32_FIXME
 	signal(SIGPIPE, SIG_IGN);
-#endif
 
 	if (stdin_null_flag) {
 		if ((devnull = open(_PATH_DEVNULL, O_RDONLY)) == -1)
@@ -2066,12 +2060,10 @@ mux_client_request_stdio_fwd(int fd)
 	}
 	muxclient_request_id++;
 
-#ifndef WIN32_FIXME
 	signal(SIGHUP, control_client_sighandler);
 	signal(SIGINT, control_client_sighandler);
 	signal(SIGTERM, control_client_sighandler);
 	signal(SIGWINCH, control_client_sigrelay);
-#endif
 
 	/*
 	 * Stick around until the controlee closes the client_fd.

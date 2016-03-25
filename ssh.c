@@ -117,14 +117,9 @@
 #ifdef WIN32_FIXME
 
   #include <sys/stat.h>
-  //#define isatty(a) WSHELPisatty(a)
-  #define mkdir(a, b) _mkdir(a)
 
   extern HANDLE proxy_command_handle;
   extern DWORD proxy_command_pid;
-  
-  //extern int PassInputFd;
-  //extern int PassOutputFd;
 
   char dotsshdir[MAX_PATH];
 
