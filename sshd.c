@@ -1569,79 +1569,64 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				}
 				break;
 			}
-      #ifdef WIN32_FIXME
-  
-        /*
-         *  Win32 code.
-         */
-
-         {
-           PROCESS_INFORMATION pi;
-           
-           STARTUPINFO si;
-           
-           BOOL b;
-
-
-           /*
-            * Assign sockets to StartupInfo.
-            */
-           
-           memset(&si, 0 , sizeof(STARTUPINFO));
-           
-           char remotesoc[64];
-           snprintf ( remotesoc, sizeof(remotesoc), "%d", sfd_to_handle(*newsock));
-           SetEnvironmentVariable("SSHD_REMSOC", remotesoc);
-
-           si.cb = sizeof(STARTUPINFO);
-           si.hStdInput = GetStdHandle(STD_INPUT_HANDLE); //(HANDLE) sfd_to_handle(*newsock);
-           si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-           si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-           si.wShowWindow = SW_HIDE;
-           si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-
-           /*
-            * Create the child process 
-            */
-            
-           b = CreateProcess(NULL, fake_fork_args, NULL, NULL, TRUE,
-                                 CREATE_NEW_PROCESS_GROUP, NULL, NULL,
-                                     &si, &pi);
-          if (!b)
-          {
-            debug("CreateProcess failure: %d", GetLastError());
-            
-            exit(1);
-          }
-
-          /*
-           * Close child thread and process handles so it can go away 
-           */
-
-          CloseHandle(pi.hThread);
-          CloseHandle(pi.hProcess);
-          
-          close(*newsock);
-
-          /*
-           * FIXME pipes are not used so instead of  
-           * cleaning we can disable creation.
-           */
-          
-          close(startup_pipes[i]);
-          startup_pipes[i] = -1;
-          startups--;
-        }
-
-      #else
 
 			/*
-			 * Normal production daemon.  Fork, and have
-			 * the child process the connection. The
-			 * parent continues listening.
-			 */
+			* Normal production daemon.  Fork, and have
+			* the child process the connection. The
+			* parent continues listening.
+			*/
 			platform_pre_fork();
+      #ifdef WIN32_FIXME
+			{
+				PROCESS_INFORMATION pi;
+				STARTUPINFO si;
+				BOOL b;
+				char path[MAX_PATH];
+
+				memset(&si, 0, sizeof(STARTUPINFO));
+
+				char remotesoc[64];
+				snprintf(remotesoc, sizeof(remotesoc), "%d", sfd_to_handle(*newsock));
+				SetEnvironmentVariable("SSHD_REMSOC", remotesoc);
+
+				si.cb = sizeof(STARTUPINFO);
+				si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+				si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+				si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+				si.wShowWindow = SW_HIDE;
+				si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+
+				/*
+				 * Create the child process
+				 */
+				strncpy(path, GetCommandLineA(), MAX_PATH);
+				if (CreateProcess(NULL, path, NULL, NULL, TRUE,
+					CREATE_NEW_PROCESS_GROUP, NULL, NULL,
+					&si, &pi) == FALSE) {
+					debug("CreateProcess failure: %d", GetLastError());
+					exit(1);
+				}
+
+				/*
+				 * Close child thread and process handles so it can go away
+				 */
+
+				CloseHandle(pi.hThread);
+				CloseHandle(pi.hProcess);
+
+				close(*newsock);
+				close(startup_pipes[i]);
+				startup_pipes[i] = -1;
+				startups--;
+
+				pid = pi.dwProcessId;
+			}
+			
+			if (pid == 0) {
+#else
+
 			if ((pid = fork()) == 0) {
+#endif /* else WIN32_FIXME */
 				/*
 				 * Child.  Close the listening and
 				 * max_startup sockets.  Start using
@@ -1704,7 +1689,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			RAND_seed(rnd, sizeof(rnd));
 #endif
 			explicit_bzero(rnd, sizeof(rnd));
-#endif /* else WIN32_FIXME */
 		}
 
 		/* child process check (or debug mode) */
@@ -1719,21 +1703,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
    * Win32 only.
    */
    
-  char *create_fake_fork_args(int ac, char **av)
-  {
-    char *orig_cmd_line = GetCommandLine();
-    
-    char fake_fork_param[] = " -~";
-    
-    int orig_cmd_line_len = strlen(orig_cmd_line);
-    
-    char *new_cmd_line = xmalloc (orig_cmd_line_len + 1 + sizeof(fake_fork_param));
-
-    strcpy(new_cmd_line, orig_cmd_line);
-    strcpy(new_cmd_line + orig_cmd_line_len, fake_fork_param);
-
-    return new_cmd_line;
-  }
 
   /*
    * This function handles exit signal from parent process.
@@ -1826,16 +1795,7 @@ main(int ac, char **av)
 		saved_argv[i] = xstrdup(av[i]);
 	saved_argv[i] = NULL;
 	
- #ifdef WIN32_FIXME
-  
-    /*
-     * Create arguments for starting fake forked sshd.exe instances.
-     */
-
-    fake_fork_args = create_fake_fork_args(ac, av);
-
-  #endif /* WIN32_FIXME */
-
+ 
 #ifndef HAVE_SETPROCTITLE
 	/* Prepare for later setproctitle emulation */
 	compat_init_setproctitle(ac, av);
@@ -1852,35 +1812,11 @@ main(int ac, char **av)
 
 	/* Initialize configuration options to their default values. */
 	initialize_server_options(&options);
-	
-
-  #ifdef WIN32_FIXME
-
-    //debug_flag = 1;
-
-    #define FAKE_FORK_ARG "~"
-  
-  #else
-    
-    #define FAKE_FORK_ARG
-    
-  #endif
 
 	/* Parse command-line arguments. */
 	while ((opt = getopt(ac, av,
-	    "C:E:b:c:f:g:h:k:o:p:u:46DQRTdeiqrt" FAKE_FORK_ARG)) != -1) {
+	    "C:E:b:c:f:g:h:k:o:p:u:46DQRTdeiqrt")) != -1) {
 		switch (opt) {
-			
-#ifdef WIN32_FIXME
-    case '~':
-    {
-      debug("fake fork child");
-      
-      options.i_am_a_fake_fork = 1;
-      
-      break;
-    }  
-#endif
 
 		case '4':
 			options.address_family = AF_INET;
@@ -2000,37 +1936,7 @@ main(int ac, char **av)
 	}
 	
   #ifdef WIN32_FIXME
-    
-    /*
-     * Win32 only.
-     */
-
-    /* 
-     * Handle install and uninstall service options 
-     */
-    
-    if (ac > 1 && strcmp("install", av[1]) == 0)
-    {
-      /*
-       * Install the service 
-       */
-      
-      SvcInstall();
-      
-      return 0;
-    }
-    else if (ac > 1 && strcmp("uninstall", av[1]) == 0)
-    {
-      /*
-       * Remove the service 
-       */
-      
-      SvcUninstall();
-      
-      return 0;
-    }
-
-    if (!options.i_am_a_fake_fork)
+    if (getenv("SSHD_REMSOC") == NULL)
     {
       if (!ranServiceMain)
       {
@@ -2575,7 +2481,7 @@ main(int ac, char **av)
 	} else {
 		platform_pre_listen();
 #ifdef WIN32_FIXME
-    if (!options.i_am_a_fake_fork)
+    if (getenv("SSHD_REMSOC") == NULL)
 #endif
 		server_listen();
 
@@ -2604,7 +2510,7 @@ main(int ac, char **av)
 		}
     #ifdef WIN32_FIXME
       
-      if (!options.i_am_a_fake_fork)
+      if (getenv("SSHD_REMSOC") == NULL)
       {
         /* 
          * Accept a connection and return in a forked child 
@@ -2613,23 +2519,11 @@ main(int ac, char **av)
         server_accept_loop(&sock_in, &sock_out, &newsock, config_s);
       }
       else
-      {
-        //STARTUPINFO si;
-
-        //memset(&si, 0 , sizeof(STARTUPINFO));
-        
-        //si.cb = sizeof(STARTUPINFO);
-
-        /* 
-         * Get the stdin handle from process info to use for client 
-         */
-        
-        //GetStartupInfo(&si);
-        
+      {        
         int remotesochandle ;
         remotesochandle = atoi( getenv("SSHD_REMSOC") );
 
-        sock_in = sock_out = newsock = w32_allocate_fd_for_handle(remotesochandle, TRUE) ; //si.hStdInput);
+        sock_in = sock_out = newsock = w32_allocate_fd_for_handle(remotesochandle, TRUE) ; 
 		
 		// we have the socket handle, delete it for child processes we create like shell 
 		SetEnvironmentVariable("SSHD_REMSOC", NULL);
@@ -3249,7 +3143,7 @@ cleanup_exit(int i)
 		audit_event(SSH_CONNECTION_ABANDON);
 #endif
 #ifdef WIN32_FIXME
-   if (!iAmAService || options.i_am_a_fake_fork)
+   if (!iAmAService || (getenv("SSHD_REMSOC")))
 #endif
 	_exit(i);
 }

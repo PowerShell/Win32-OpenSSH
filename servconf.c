@@ -182,9 +182,6 @@ initialize_server_options(ServerOptions *options)
 	options->ip_qos_bulk = -1;
 	options->version_addendum = NULL;
 	options->fingerprint_hash = -1;
-#ifdef WIN32_FIXME
-	options->i_am_a_fake_fork = 0;
-#endif
 }
 
 /* Returns 1 if a string option is unset or set to "none" or 0 otherwise. */

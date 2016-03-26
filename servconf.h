@@ -198,12 +198,7 @@ typedef struct {
 	u_int	num_auth_methods;
 	char   *auth_methods[MAX_AUTH_METHODS];
 
-	int	fingerprint_hash;
-#ifdef WIN32_FIXME
-  int i_am_a_fake_fork;
-	char *pamLibrary_;
-#endif
-  
+	int	fingerprint_hash;  
   
 }       ServerOptions;
 
