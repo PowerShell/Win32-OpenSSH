@@ -70,17 +70,19 @@ sw_init_signal_handler_table() {
 #define MAX_CHILDREN 50
 struct _children {
 	HANDLE handles[MAX_CHILDREN];
-	//DWORD process_id[MAX_CHILDREN];
+	DWORD process_id[MAX_CHILDREN];
 	DWORD num_children;
 } children;
 
 int
-sw_add_child(HANDLE child) {
+sw_add_child(HANDLE child, DWORD pid) {
 	if (children.num_children == MAX_CHILDREN) {
 		errno = ENOTSUP;
 		return -1;
 	}
-	children.handles[children.num_children++] = child;
+	children.handles[children.num_children] = child;
+	children.process_id[children.num_children] = pid;
+	children.num_children++;
 	return 0;
 }
 
@@ -100,7 +102,6 @@ sw_remove_child_at_index(DWORD index) {
 	return 0;
 }
 
-
 int
 sw_remove_child(HANDLE child) {
 	HANDLE* handles = children.handles;
@@ -115,6 +116,90 @@ sw_remove_child(HANDLE child) {
 
 	errno = EINVAL;
 	return -1;
+}
+
+int waitpid(int pid, int *status, int options) {
+	DWORD index, ret, ret_id, exit_code, timeout = 0;
+	HANDLE process = NULL;
+
+	if (options & (~WNOHANG)) {
+		errno = ENOTSUP;
+		DebugBreak();
+		return -1;
+	}
+
+	if ((pid < -1) || (pid == 0)) {
+		errno = ENOTSUP;
+		DebugBreak();
+		return -1;
+	}
+
+	if (children.num_children == 0) {
+		errno = ECHILD;
+		return -1;
+	}
+
+	if (pid > 0) {
+		if (options != 0) {
+			errno = ENOTSUP;
+			DebugBreak();
+			return -1;
+		}
+		/* find entry in table */
+		for (index = 0; index < children.num_children; index++)
+			if (children.process_id[index] == pid)				
+				break;
+		
+		if (index == children.num_children) {
+			errno = ECHILD;
+			return -1;
+		}
+
+		process = children.handles[index];
+		ret = WaitForSingleObject(process, INFINITE);
+		if (ret != WAIT_OBJECT_0)
+			DebugBreak();//fatal
+
+		ret_id = children.process_id[index];
+		GetExitCodeProcess(process, &exit_code);
+		CloseHandle(process);
+		sw_remove_child_at_index(index);
+		if (status)
+			*status = exit_code;
+		return ret_id;
+	}
+
+	/* pid = -1*/
+	timeout = INFINITE;
+	if (options & WNOHANG)
+		timeout = 0;
+	ret = WaitForMultipleObjects(children.num_children, children.handles, FALSE, timeout);
+	if ((ret >= WAIT_OBJECT_0) && (ret < (WAIT_OBJECT_0 + children.num_children))) {
+		index = ret - WAIT_OBJECT_0;
+		process = children.handles[index];
+		ret_id = children.process_id[index];
+		GetExitCodeProcess(process, &exit_code);
+		CloseHandle(process);
+		sw_remove_child_at_index(index);
+		if (status)
+			*status = exit_code;
+		return ret_id;
+	}
+	else if (ret == WAIT_TIMEOUT) {
+		/* assert that WNOHANG  was specified*/
+		return 0;
+	}
+
+	DebugBreak();//fatal
+	return -1;
+}
+
+static void
+sw_cleanup_child_zombies() {
+	int pid = 1;
+	while (pid > 0) {
+		pid = waitpid(-1, NULL, WNOHANG);
+	}
 }
 
 struct {
@@ -223,7 +308,7 @@ sw_raise(int sig) {
 	/* execute any default handlers */
 	switch (sig) {
 	case W32_SIGCHLD:
-		/*TODO - execute sigchild default handler */
+		sw_cleanup_child_zombies();
 		break;
 	case W32_SIGINT:
 		/* TODO - execute sigint default handler */
@@ -274,9 +359,6 @@ sw_process_pending_signals() {
 				sw_raise(exp[i]);
 				sig_int = TRUE;
 			}
-			else {/* disposition is W32_SIG_IGN */
-				/* TODO for SIG_CHLD - do clean up of Zombies */
-			}
 
 			sigdelset(&pending_tmp, exp[i]);
 		}
@@ -313,7 +395,9 @@ int
 wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 {
 	HANDLE all_events[MAXIMUM_WAIT_OBJECTS];
-	DWORD num_all_events = num_events + children.num_children;
+	DWORD num_all_events;
+
+	num_all_events = num_events + children.num_children;
 
 	if (num_all_events > MAXIMUM_WAIT_OBJECTS) {
 		errno = ENOTSUP;
@@ -335,11 +419,9 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 			//woken up by event signalled
 			/* is this due to a child process going down*/
 			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
-				/* TODO - enable this once all direct closes are removed in core code*/
-				//sigaddset(&pending_signals, W32_SIGCHLD);
-				//sw_remove_child(ret - WAIT_OBJECT_0);
-				errno = EINTR;
-				return -1;
+				sigaddset(&pending_signals, W32_SIGCHLD);
+				//errno = EINTR;
+				//return -1;
 			}
 		}
 		else if (ret == WAIT_IO_COMPLETION) {

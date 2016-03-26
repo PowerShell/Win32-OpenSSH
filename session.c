@@ -843,9 +843,8 @@ do_exec_no_pty(Session *s, const char *command)
    * Log the process handle (fake it as the pid) for termination lookups 
    */
    
-  s -> pid = pi.hProcess;
-  s -> processId = pi.dwProcessId;
-  sw_add_child(pi.hProcess);
+  s -> pid = pi.dwProcessId;
+  sw_add_child(pi.hProcess, pi.dwProcessId);
   
   // Add the child process created to select mux so that during our select data call we know if the process has exited
   /* TODO - fix thi s*/
@@ -2877,10 +2876,12 @@ session_pty_cleanup2(Session *s)
 
     debug("Sending exit signal to child process [pid = %u]...", s -> pid);
 
-    if (!GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, s -> processId))
-    {
-      debug("ERROR. Cannot send signal to process.");
-    }
+    //if (!GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, s -> processId))
+    //{
+    //  debug("ERROR. Cannot send signal to process.");
+    //}
+
+    kill(s->pid, SIGTERM);
   
     /*
      * Try wait 100 ms until child finished.
@@ -2991,11 +2992,11 @@ session_close_single_x11(int id, void *arg)
     {
       debug("Sending exit signal to child process [pid = %u]...", s -> pid);
 
-      if (!GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, s -> processId))
-      {
-        debug("ERROR. Cannot send signal to process.");
-      }  
-  
+      //if (!GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, s -> processId))
+      //{
+      //  debug("ERROR. Cannot send signal to process.");
+      //}  
+      kill(s->pid, SIGTERM);
       /*
        * Try wait 100 ms until child finished.
        */

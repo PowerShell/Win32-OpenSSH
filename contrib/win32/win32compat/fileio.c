@@ -373,8 +373,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 		}
 
 		/* pick up APC if IO has completed */
-		if (-1 == wait_for_any_event(NULL, 0, 0))
-			return -1;
+		SleepEx(0, TRUE);
 
 		if (w32_io_is_blocking(pio)) {
 			while (fileio_is_io_available(pio, TRUE) == FALSE) {
@@ -519,12 +518,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max) {
 		}
 	}
 	/* execute APC to give a chance for write to complete */
-	else if (wait_for_any_event(NULL, 0, 0) == -1) {
-		/* if interrupted but write has completed, we are good*/
-		if ((errno != EINTR) || (pio->write_details.pending))
-			return -1;
-		errno = 0;
-	}
+	SleepEx(0, TRUE);
 
 	/* if write has completed, pick up any error reported*/
 	if (!pio->write_details.pending && pio->write_details.error) {

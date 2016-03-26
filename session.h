@@ -35,10 +35,6 @@ struct Session {
 	struct passwd *pw;
 	Authctxt *authctxt;
 	pid_t	pid;
-	
-  #ifdef WIN32_FIXME
-  DWORD processId;
-  #endif
 
 	/* tty */
 	char	*term;

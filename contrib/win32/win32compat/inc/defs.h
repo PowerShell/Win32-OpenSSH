@@ -70,4 +70,7 @@ typedef int sigset_t;
 
 typedef unsigned short _mode_t;
 typedef _mode_t mode_t;
-typedef unsigned long pid_t;
+typedef int pid_t;
+
+/* wait pid options */
+#define WNOHANG 1

@@ -1605,20 +1605,16 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					&si, &pi) == FALSE) {
 					debug("CreateProcess failure: %d", GetLastError());
 					exit(1);
-				}
-
-				/*
-				 * Close child thread and process handles so it can go away
-				 */
-
-				CloseHandle(pi.hThread);
-				CloseHandle(pi.hProcess);
+				}				
 
 				close(*newsock);
 				close(startup_pipes[i]);
 				startup_pipes[i] = -1;
 				startups--;
 
+				sw_add_child(pi.hProcess, pi.dwProcessId);
+				CloseHandle(pi.hThread);
+				CloseHandle(pi.hProcess);
 				pid = pi.dwProcessId;
 			}
 			

@@ -123,7 +123,7 @@ int termio_close(struct w32_io* pio);
 
 /* signal related APIs*/
 int sw_initialize();
-int sw_add_child(HANDLE child);
+int sw_add_child(HANDLE child, DWORD pid);
 int sw_remove_child(HANDLE child);
 unsigned int sw_alarm(unsigned int seconds);
 sighandler_t sw_signal(int signum, sighandler_t handler);

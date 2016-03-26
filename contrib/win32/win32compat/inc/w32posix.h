@@ -107,7 +107,7 @@ int w32_temp_DelChildToWatch(HANDLE processtowatch);
 int w32_temp_AddChildToWatch(HANDLE processtowatch);
 HANDLE w32_fd_to_handle(int fd);
 int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock);
-int sw_add_child(HANDLE child);
+int sw_add_child(HANDLE child, DWORD pid);
 
 /* temporary definitions to aid in transition */
 #define WSHELPDelChildToWatch(a) w32_temp_DelChildToWatch((a))
