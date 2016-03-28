@@ -43,15 +43,46 @@ static VOID CALLBACK
 sigint_APCProc(
 	_In_ ULONG_PTR dwParam
 	) {
+	debug3("SIGINT APCProc()");
 	sigaddset(&pending_signals, W32_SIGINT);
 }
 
-static void 
-native_sig_handler(int signal)
+static VOID CALLBACK
+sigterm_APCProc(
+	_In_ ULONG_PTR dwParam
+	) {
+	debug3("SIGTERM APCProc()");
+	sigaddset(&pending_signals, W32_SIGTERM);
+}
+
+static VOID CALLBACK
+sigtstp_APCProc(
+	_In_ ULONG_PTR dwParam
+	) {
+	debug3("SIGTSTP APCProc()");
+	sigaddset(&pending_signals, W32_SIGTSTP);
+}
+
+static BOOL WINAPI
+native_sig_handler(DWORD dwCtrlType)
 {
-	if (signal == SIGINT) {
-		/* Queue signint APC */
+	debug("Native Ctrl+C handler, CtrlType %d", dwCtrlType);
+	switch (dwCtrlType) {
+	case CTRL_C_EVENT:
 		QueueUserAPC(sigint_APCProc, main_thread, (ULONG_PTR)NULL);
+		return TRUE;
+	case CTRL_BREAK_EVENT:
+		QueueUserAPC(sigtstp_APCProc, main_thread, (ULONG_PTR)NULL);
+		return TRUE;
+	case CTRL_CLOSE_EVENT:
+	case CTRL_LOGOFF_EVENT:
+	case CTRL_SHUTDOWN_EVENT:
+		QueueUserAPC(sigterm_APCProc, main_thread, (ULONG_PTR)NULL);
+		/* wait for main thread to terminate */
+		WaitForSingleObject(main_thread, INFINITE);
+		return TRUE;
+	default:
+		return FALSE;
 	}
 }
 
@@ -59,8 +90,7 @@ void
 sw_init_signal_handler_table() {
 	int i;
 
-	/* TODO SetConsoleCtrlHandler */
-	//signal(SIGINT, native_sig_handler);
+	SetConsoleCtrlHandler(native_sig_handler, TRUE);
 	sigemptyset(&pending_signals);
 	/* this automatically sets all to SIG_DFL (0)*/
 	memset(sig_handlers, 0, sizeof(sig_handlers));
@@ -71,34 +101,93 @@ sw_init_signal_handler_table() {
 struct _children {
 	HANDLE handles[MAX_CHILDREN];
 	DWORD process_id[MAX_CHILDREN];
+	/* total children */
 	DWORD num_children;
+	/* #zombies */
+	/* (num_chileren - zombies) are live children */
+	DWORD num_zombies;
 } children;
 
 int
 sw_add_child(HANDLE child, DWORD pid) {
+	DWORD first_zombie_index;
+
+	debug("Register child %p pid %d, %d zombies of %d", child, pid, 
+	    children.num_zombies, children.num_children);
 	if (children.num_children == MAX_CHILDREN) {
-		errno = ENOTSUP;
+		errno = ENOMEM;
 		return -1;
 	}
-	children.handles[children.num_children] = child;
-	children.process_id[children.num_children] = pid;
+	if (children.num_zombies) {
+		first_zombie_index = children.num_children - children.num_zombies;
+		children.handles[children.num_children] = children.handles[first_zombie_index];
+		children.process_id[children.num_children] = children.handles[first_zombie_index];
+		
+		children.handles[first_zombie_index] = child;
+		children.process_id[first_zombie_index] = pid;
+	}
+	else {
+		children.handles[children.num_children] = child;
+		children.process_id[children.num_children] = pid;
+	}
+
+
 	children.num_children++;
 	return 0;
 }
 
 int
 sw_remove_child_at_index(DWORD index) {
-	if (index >= children.num_children) {
+	DWORD last_non_zombie;
+
+	debug("Unregister child at index %d, %d zombies of %d", index,
+		children.num_zombies, children.num_children);
+
+	if ((index >= children.num_children)
+	    || (children.num_children == 0) ){
 		errno = EINVAL;
 		return -1;
 	}
 	
 	CloseHandle(children.handles[index]);
-	if ((children.num_children > 1) && (index != (children.num_children - 1))) {
+	if (children.num_zombies == 0) {
 		children.handles[index] = children.handles[children.num_children - 1];
+		children.process_id[index] = children.process_id[children.num_children - 1];
+	}
+	else {
+		/* if its a zombie */
+		if (index >= (children.num_children - children.num_zombies)) {
+			children.handles[index] = children.handles[children.num_children - 1];
+			children.process_id[index] = children.handles[children.num_children - 1];
+			children.num_zombies--;
+		}
+		else {
+			last_non_zombie = children.num_children - children.num_zombies - 1;
+			children.handles[index] = children.handles[last_non_zombie];
+			children.process_id[index] = children.process_id[last_non_zombie];
+
+			children.handles[last_non_zombie] = children.handles[children.num_children - 1];
+			children.process_id[last_non_zombie] = children.handles[children.num_children - 1];
+		}
 	}
 
 	children.num_children--;
+	return 0;
+}
+
+int
+sw_child_to_zombie(DWORD index) {
+	DWORD last_non_zombie;
+
+	debug("zombie'ing child at index %d, %d zombies of %d", index,
+		children.num_zombies, children.num_children);
+
+	if (index >= children.num_children) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* TODO - turn child to zombie*/
 	return 0;
 }
 
