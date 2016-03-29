@@ -31,7 +31,7 @@
 #include "w32fd.h"
 #include <errno.h>
 #include <signal.h>
-#include "inc\defs.h"
+#include "signal_internal.h"
 
 /* pending signals to be processed */
 sigset_t pending_signals;
@@ -96,261 +96,7 @@ sw_init_signal_handler_table() {
 	memset(sig_handlers, 0, sizeof(sig_handlers));
 }
 
-/* child processes */
-#define MAX_CHILDREN 50
-struct _children {
-	HANDLE handles[MAX_CHILDREN];
-	DWORD process_id[MAX_CHILDREN];
-	/* total children */
-	DWORD num_children;
-	/* #zombies */
-	/* (num_chileren - zombies) are live children */
-	DWORD num_zombies;
-} children;
-
-int
-sw_add_child(HANDLE child, DWORD pid) {
-	DWORD first_zombie_index;
-
-	debug("Register child %p pid %d, %d zombies of %d", child, pid, 
-	    children.num_zombies, children.num_children);
-	if (children.num_children == MAX_CHILDREN) {
-		errno = ENOMEM;
-		return -1;
-	}
-	if (children.num_zombies) {
-		first_zombie_index = children.num_children - children.num_zombies;
-		children.handles[children.num_children] = children.handles[first_zombie_index];
-		children.process_id[children.num_children] = children.handles[first_zombie_index];
-		
-		children.handles[first_zombie_index] = child;
-		children.process_id[first_zombie_index] = pid;
-	}
-	else {
-		children.handles[children.num_children] = child;
-		children.process_id[children.num_children] = pid;
-	}
-
-
-	children.num_children++;
-	return 0;
-}
-
-int
-sw_remove_child_at_index(DWORD index) {
-	DWORD last_non_zombie;
-
-	debug("Unregister child at index %d, %d zombies of %d", index,
-		children.num_zombies, children.num_children);
-
-	if ((index >= children.num_children)
-	    || (children.num_children == 0) ){
-		errno = EINVAL;
-		return -1;
-	}
-	
-	CloseHandle(children.handles[index]);
-	if (children.num_zombies == 0) {
-		children.handles[index] = children.handles[children.num_children - 1];
-		children.process_id[index] = children.process_id[children.num_children - 1];
-	}
-	else {
-		/* if its a zombie */
-		if (index >= (children.num_children - children.num_zombies)) {
-			children.handles[index] = children.handles[children.num_children - 1];
-			children.process_id[index] = children.handles[children.num_children - 1];
-			children.num_zombies--;
-		}
-		else {
-			last_non_zombie = children.num_children - children.num_zombies - 1;
-			children.handles[index] = children.handles[last_non_zombie];
-			children.process_id[index] = children.process_id[last_non_zombie];
-
-			children.handles[last_non_zombie] = children.handles[children.num_children - 1];
-			children.process_id[last_non_zombie] = children.handles[children.num_children - 1];
-		}
-	}
-
-	children.num_children--;
-	return 0;
-}
-
-int
-sw_child_to_zombie(DWORD index) {
-	DWORD last_non_zombie;
-
-	debug("zombie'ing child at index %d, %d zombies of %d", index,
-		children.num_zombies, children.num_children);
-
-	if (index >= children.num_children) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	/* TODO - turn child to zombie*/
-	return 0;
-}
-
-int
-sw_remove_child(HANDLE child) {
-	HANDLE* handles = children.handles;
-	DWORD num_children = children.num_children;
-
-	while (num_children) {
-		if (*handles == child)
-			return sw_remove_child_at_index(children.num_children - num_children);
-		handles++;
-		num_children--;
-	}
-
-	errno = EINVAL;
-	return -1;
-}
-
-int waitpid(int pid, int *status, int options) {
-	DWORD index, ret, ret_id, exit_code, timeout = 0;
-	HANDLE process = NULL;
-
-	if (options & (~WNOHANG)) {
-		errno = ENOTSUP;
-		DebugBreak();
-		return -1;
-	}
-
-	if ((pid < -1) || (pid == 0)) {
-		errno = ENOTSUP;
-		DebugBreak();
-		return -1;
-	}
-
-	if (children.num_children == 0) {
-		errno = ECHILD;
-		return -1;
-	}
-
-	if (pid > 0) {
-		if (options != 0) {
-			errno = ENOTSUP;
-			DebugBreak();
-			return -1;
-		}
-		/* find entry in table */
-		for (index = 0; index < children.num_children; index++)
-			if (children.process_id[index] == pid)				
-				break;
-		
-		if (index == children.num_children) {
-			errno = ECHILD;
-			return -1;
-		}
-
-		process = children.handles[index];
-		ret = WaitForSingleObject(process, INFINITE);
-		if (ret != WAIT_OBJECT_0)
-			DebugBreak();//fatal
-
-		ret_id = children.process_id[index];
-		GetExitCodeProcess(process, &exit_code);
-		CloseHandle(process);
-		sw_remove_child_at_index(index);
-		if (status)
-			*status = exit_code;
-		return ret_id;
-	}
-
-	/* pid = -1*/
-	timeout = INFINITE;
-	if (options & WNOHANG)
-		timeout = 0;
-	ret = WaitForMultipleObjects(children.num_children, children.handles, FALSE, timeout);
-	if ((ret >= WAIT_OBJECT_0) && (ret < (WAIT_OBJECT_0 + children.num_children))) {
-		index = ret - WAIT_OBJECT_0;
-		process = children.handles[index];
-		ret_id = children.process_id[index];
-		GetExitCodeProcess(process, &exit_code);
-		CloseHandle(process);
-		sw_remove_child_at_index(index);
-		if (status)
-			*status = exit_code;
-		return ret_id;
-	}
-	else if (ret == WAIT_TIMEOUT) {
-		/* assert that WNOHANG  was specified*/
-		return 0;
-	}
-
-	DebugBreak();//fatal
-	return -1;
-}
-
-static void
-sw_cleanup_child_zombies() {
-	int pid = 1;
-	while (pid > 0) {
-		pid = waitpid(-1, NULL, WNOHANG);
-	}
-}
-
-struct {
-	HANDLE timer;
-	ULONGLONG ticks_at_start; /* 0 if timer is not live */
-	__int64 run_time_sec; /* time in seconds, timer is set to go off from ticks_at_start */
-} timer_info;
-
-
-VOID CALLBACK 
-sigalrm_APC(
-	_In_opt_ LPVOID lpArgToCompletionRoutine,
-	_In_     DWORD  dwTimerLowValue,
-	_In_     DWORD  dwTimerHighValue
-	) {
-	sigaddset(&pending_signals, W32_SIGALRM);
-}
-
-unsigned int 
-sw_alarm(unsigned int sec) {
-	LARGE_INTEGER due;
-	ULONGLONG sec_passed;
-	int ret = 0;
-
-	errno = 0;
-	/* cancel any live timer if seconds is 0*/
-	if (sec == 0) {
-		CancelWaitableTimer(timer_info.timer);
-		timer_info.ticks_at_start = 0;
-		timer_info.run_time_sec = 0;
-		return 0;
-	}
-
-	due.QuadPart = -10000000LL; //1 sec in 100 nanosec intervals
-	due.QuadPart *= sec;
-	/* this call resets the timer if it is already active */
-	if (!SetWaitableTimer(timer_info.timer, &due, 0, sigalrm_APC, NULL, FALSE)) {
-		debug("alram() - ERROR SetWaitableTimer() %d", GetLastError());
-		return 0;;
-	}
-
-	/* if timer was already ative, return when it was due */
-	if (timer_info.ticks_at_start) {
-		sec_passed = (GetTickCount64() - timer_info.ticks_at_start) / 1000;
-		if (sec_passed < timer_info.run_time_sec)
-			ret = timer_info.run_time_sec - sec_passed;
-	}
-	timer_info.ticks_at_start = GetTickCount64();
-	timer_info.run_time_sec = sec;
-	return ret;
-}
-
-static int
-sw_init_timer() {
-	memset(&timer_info, 0, sizeof(timer_info));
-	timer_info.timer = CreateWaitableTimer(NULL, TRUE, NULL);
-	if (timer_info.timer == NULL) {
-		errno = ENOMEM;
-		return -1;
-	}
-	return 0;
-}
+extern struct _children children;
 
 sighandler_t 
 sw_signal(int signum, sighandler_t handler) {
@@ -377,7 +123,7 @@ sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
 int 
 sw_raise(int sig) {
 	if (sig == W32_SIGSEGV)
-		raise(SIGSEGV); /* raise native exception handler*/
+		return raise(SIGSEGV); /* raise native exception handler*/
 
 	if (sig >= W32_SIGMAX) {
 		errno = EINVAL;
@@ -432,7 +178,7 @@ sw_process_pending_signals() {
 	/* check for expected signals*/
 	for (i = 0; i < (sizeof(exp) / sizeof(exp[0])); i++)
 		sigdelset(&pending_tmp, exp[i]);
-	if (pending_tmp) {
+	if (pending_tmp) { 
 		/* unexpected signals queued up */
 		errno = ENOTSUP;
 		DebugBreak();
@@ -447,6 +193,11 @@ sw_process_pending_signals() {
 			if (sig_handlers[exp[i]] != W32_SIG_IGN) {
 				sw_raise(exp[i]);
 				sig_int = TRUE;
+			}
+			else { /* W32_SIG_IGN */
+				/* for SIGCHLD process zombies */
+				if (exp[i] == W32_SIGCHLD)
+					sw_cleanup_child_zombies();
 			}
 
 			sigdelset(&pending_tmp, exp[i]);
@@ -485,8 +236,9 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 {
 	HANDLE all_events[MAXIMUM_WAIT_OBJECTS];
 	DWORD num_all_events;
+	DWORD live_children = children.num_children - children.num_zombies;
 
-	num_all_events = num_events + children.num_children;
+	num_all_events = num_events + live_children;
 
 	if (num_all_events > MAXIMUM_WAIT_OBJECTS) {
 		errno = ENOTSUP;
@@ -497,8 +249,8 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	if (pending_signals)
 		DebugBreak();
 
-	memcpy(all_events, children.handles, children.num_children * sizeof(HANDLE));
-	memcpy(all_events + children.num_children, events, num_events * sizeof(HANDLE));
+	memcpy(all_events, children.handles, live_children * sizeof(HANDLE));
+	memcpy(all_events + live_children, events, num_events * sizeof(HANDLE));
 
 	/* TODO - implement signal catching and handling */
 	if (num_all_events) {
@@ -507,11 +259,8 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_all_events - 1)) {
 			//woken up by event signalled
 			/* is this due to a child process going down*/
-			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
+			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children))
 				sigaddset(&pending_signals, W32_SIGCHLD);
-				//errno = EINTR;
-				//return -1;
-			}
 		}
 		else if (ret == WAIT_IO_COMPLETION) {
 			/* APC processed due to IO or signal*/
