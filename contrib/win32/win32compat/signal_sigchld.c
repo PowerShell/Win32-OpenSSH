@@ -127,26 +127,11 @@ sw_child_to_zombie(DWORD index) {
 	return 0;
 }
 
-int
-sw_remove_child(HANDLE child) {
-	HANDLE* handles = children.handles;
-	DWORD num_children = children.num_children;
-
-	while (num_children) {
-		if (*handles == child)
-			return sw_remove_child_at_index(children.num_children - num_children);
-		handles++;
-		num_children--;
-	}
-
-	errno = EINVAL;
-	return -1;
-}
-
 int waitpid(int pid, int *status, int options) {
 	DWORD index, ret, ret_id, exit_code, timeout = 0;
 	HANDLE process = NULL;
 
+	debug3("waitpid - pid:%d, options:%d", pid, options);
 	if (options & (~WNOHANG)) {
 		errno = ENOTSUP;
 		DebugBreak();

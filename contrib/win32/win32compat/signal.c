@@ -101,6 +101,8 @@ extern struct _children children;
 sighandler_t 
 sw_signal(int signum, sighandler_t handler) {
 	sighandler_t prev;
+
+	debug2("signal() sig:%d, handler:%p", signum, handler);
 	if (signum >= W32_SIGMAX) {
 		errno = EINVAL;
 		return W32_SIG_ERR;
@@ -115,6 +117,7 @@ int
 sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
 	/* this is only used by sshd to block SIGCHLD while doing waitpid() */
 	/* our implementation of waidpid() is never interrupted, so no need to implement this for now*/
+	debug3("sigprocmask() how:%d");
 	return 0;
 }
 
@@ -122,6 +125,7 @@ sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
 
 int 
 sw_raise(int sig) {
+	debug("raise sig:%d", sig);
 	if (sig == W32_SIGSEGV)
 		return raise(SIGSEGV); /* raise native exception handler*/
 
@@ -145,11 +149,8 @@ sw_raise(int sig) {
 	case W32_SIGCHLD:
 		sw_cleanup_child_zombies();
 		break;
-	case W32_SIGINT:
-		/* TODO - execute sigint default handler */
-		break;
 	default:
-		break;
+		ExitThread(1);
 	}
 
 	return 0;
@@ -173,6 +174,7 @@ sw_process_pending_signals() {
 	sigset_t pending_tmp = pending_signals;
 	BOOL sig_int = FALSE; /* has any signal actually interrupted */
 
+	debug3("process_signals()");
 	int i, exp[] = { W32_SIGCHLD , W32_SIGINT , W32_SIGALRM };
 
 	/* check for expected signals*/
@@ -180,6 +182,7 @@ sw_process_pending_signals() {
 		sigdelset(&pending_tmp, exp[i]);
 	if (pending_tmp) { 
 		/* unexpected signals queued up */
+		debug("process_signals() - ERROR unexpected signals in queue: %d", pending_tmp);
 		errno = ENOTSUP;
 		DebugBreak();
 		return -1;
@@ -192,12 +195,10 @@ sw_process_pending_signals() {
 		if (sigismember(&pending_tmp, exp[i])) {
 			if (sig_handlers[exp[i]] != W32_SIG_IGN) {
 				sw_raise(exp[i]);
-				sig_int = TRUE;
-			}
-			else { /* W32_SIG_IGN */
-				/* for SIGCHLD process zombies */
-				if (exp[i] == W32_SIGCHLD)
-					sw_cleanup_child_zombies();
+				/* dont error EINTR for SIG_ALRM, */
+				/* sftp client is not expecting it */
+				if (exp[i] != W32_SIGALRM)
+					sig_int = TRUE;
 			}
 
 			sigdelset(&pending_tmp, exp[i]);
@@ -210,11 +211,9 @@ sw_process_pending_signals() {
 		DebugBreak();
 
 	if (sig_int) {
-		/* processed a signal that was set not to be ignored */
 		debug("process_queued_signals: WARNING - A signal has interrupted and was processed");
-		/* there are parts of code that do not tolerate EINT during IO, so returning 0 here*/
-		//errno = EINTR;
-		//return -1;
+		errno = EINTR;
+		return -1;
 	}
 
 	return 0;
@@ -241,6 +240,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	num_all_events = num_events + live_children;
 
 	if (num_all_events > MAXIMUM_WAIT_OBJECTS) {
+		debug("wait() - ERROR max events reached");
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -252,6 +252,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	memcpy(all_events, children.handles, live_children * sizeof(HANDLE));
 	memcpy(all_events + live_children, events, num_events * sizeof(HANDLE));
 
+	debug3("wait() on %d events and %d childres", num_events, live_children);
 	/* TODO - implement signal catching and handling */
 	if (num_all_events) {
 		DWORD ret = WaitForMultipleObjectsEx(num_all_events, all_events, FALSE,
@@ -259,8 +260,10 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_all_events - 1)) {
 			//woken up by event signalled
 			/* is this due to a child process going down*/
-			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children))
+			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
 				sigaddset(&pending_signals, W32_SIGCHLD);
+				sw_child_to_zombie(ret - WAIT_OBJECT_0);
+			}
 		}
 		else if (ret == WAIT_IO_COMPLETION) {
 			/* APC processed due to IO or signal*/

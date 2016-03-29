@@ -48,6 +48,7 @@ sw_alarm(unsigned int sec) {
 	ULONGLONG sec_passed;
 	int ret = 0;
 
+	debug3("alarm() %d secs", sec);
 	errno = 0;
 	/* cancel any live timer if seconds is 0*/
 	if (sec == 0) {
