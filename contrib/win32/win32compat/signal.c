@@ -158,12 +158,21 @@ sw_raise(int sig) {
 
 int 
 sw_kill(int pid, int sig) {
-
+	int child_index, i;
 	if (pid == GetCurrentProcessId())
 		return sw_raise(sig);
 
 	/*  for child processes - only SIGTERM supported*/
 	/* TODO implement kill(SIGTERM) for child processes */
+	child_index = -1;
+	for (i = 0; i < children.num_children; i++)
+		if (children.process_id[i] == pid) {
+			child_index = i;
+			break;
+		}
+
+	if (child_index != -1)
+		TerminateProcess(children.handles[child_index], 0);
 	return 0;
 }
 
