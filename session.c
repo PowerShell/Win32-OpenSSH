@@ -2882,28 +2882,6 @@ session_pty_cleanup2(Session *s)
     //}
 
     kill(s->pid, SIGTERM);
-  
-    /*
-     * Try wait 100 ms until child finished.
-     */
-
-    if (WaitForSingleObject(s -> pid, 100) == WAIT_TIMEOUT)
-    {
-      /*
-       * If still not closed, kill 'cmd.exe' process.
-       */
-    
-      if (TerminateProcess(s -> pid, 1) == TRUE)
-      {
-        debug("Process %u terminated.", s -> pid);
-      }
-      else
-      {
-        debug("ERROR. Cannot terminate %u process.", s -> pid);
-      }
-    }
-    
-    CloseHandle(s -> pid);
     
   }
  
