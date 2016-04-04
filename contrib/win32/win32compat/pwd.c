@@ -130,6 +130,7 @@ char *GetHomeDirFromToken(char *userName, HANDLE token)
 {
   UCHAR domain[200];
   wchar_t pw_buf[MAX_PATH] = { L'\0' };
+  PWSTR tmp;
   
   debug("-> GetHomeDirFromToken()...");
   
@@ -152,49 +153,34 @@ char *GetHomeDirFromToken(char *userName, HANDLE token)
   profileInfo.hProfile = NULL;
   profileInfo.dwSize = sizeof(profileInfo);
 
-
-  
-  if (LoadUserProfile(token, &profileInfo) == FALSE)
-  {
-    debug("<- GetHomeDirFromToken()...");
-    debug("LoadUserProfile failure: %d", GetLastError());
-    
-    return NULL;
-  }
-
   /*
    * And retrieve homedir from profile.
    */
-        
-  if (!SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PROFILE, token, 0, pw_homedir)))
-  {
-    debug("<- GetHomeDirFromToken()...");
-    debug("SHGetFolderPath failed");
-    
-    return NULL;
-  }
 
-  // update APPDATA user's env variable
-  if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA, token, 0, pw_buf)))
+  if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_Documents, 0, token, &tmp)))
   {
-	  SetEnvironmentVariableW(L"APPDATA", pw_buf);
+	  wcscpy_s(pw_homedir, MAX_PATH, tmp);
+	  CoTaskMemFree(tmp);
+  } else
+  {
+	    debug("SHGetKnownFolderPath on FOLDERID_Documents failed"); 
+	    GetWindowsDirectoryW(pw_homedir, MAX_PATH);
+  }
+  
+  // update APPDATA user's env variable  
+  if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, 0, token, &tmp)))
+  {
+	  SetEnvironmentVariableW(L"APPDATA", tmp);
+	  CoTaskMemFree(tmp);
   }
 
   // update LOCALAPPDATA user's env variable
-  if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, token, 0, pw_buf)))
+  if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, token, &tmp)))
   {
-	  SetEnvironmentVariableW(L"LOCALAPPDATA", pw_buf);
+	  SetEnvironmentVariableW(L"LOCALAPPDATA", tmp);
+	  CoTaskMemFree(tmp);
   }
 
-  /*
-   * Unload user profile.
-   */
-       
-  if (UnloadUserProfile(token, profileInfo.hProfile) == FALSE)
-  {
-    debug("WARNING. Cannot unload user profile (%u).", GetLastError());
-  }
-  
   debug("<- GetHomeDirFromToken()...");
   
   return pw_homedir;
