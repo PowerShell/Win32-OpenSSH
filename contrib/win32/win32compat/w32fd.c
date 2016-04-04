@@ -517,7 +517,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	memset(&write_ready_fds, 0, sizeof(w32_fd_set));
 
 	if (timeout)
-		timeout_ms = timeout->tv_sec * 100 + timeout->tv_usec / 1000;
+		timeout_ms = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
 
 	if (fds > MAX_FDS) {
 		errno = EINVAL;
@@ -531,12 +531,13 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		return -1;
 	}
 
-	if (exceptfds) {
-		errno = EOPNOTSUPP;
-		debug("select - ERROR: exceptfds not supported");
-		DebugBreak();
-		return -1;
-	}
+	/* TODO - see if this needs to be supported */
+	//if (exceptfds) {
+	//	errno = EOPNOTSUPP;
+	//	debug("select - ERROR: exceptfds not supported");
+	//	DebugBreak();
+	//	return -1;
+	//}
 
 	if (readfds) {
 		for (i = 0; i < fds; i++)
