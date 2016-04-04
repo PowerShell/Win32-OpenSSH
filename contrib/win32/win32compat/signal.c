@@ -254,10 +254,6 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		return -1;
 	}
 
-	/* TODO assert that there are no pending signals - signals are only caught during waits*/
-	if (pending_signals)
-		DebugBreak();
-
 	memcpy(all_events, children.handles, live_children * sizeof(HANDLE));
 	memcpy(all_events + live_children, events, num_events * sizeof(HANDLE));
 
