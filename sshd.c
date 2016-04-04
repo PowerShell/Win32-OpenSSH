@@ -380,7 +380,6 @@ static void do_ssh2_kex(void);
     
     SetServiceStatus( gSvcStatusHandle, &gSvcStatus );
   }
-
   static VOID WINAPI SSHDHandlerEx(DWORD dwControl)
   {
     debug("Request received (%u)", dwControl);
@@ -397,8 +396,7 @@ static void do_ssh2_kex(void);
     
         ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 500);
 
-	raise(SIGINT);
-	/*TODO -  wait for main thread to unwind */
+        GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0);
         ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 
         return;
@@ -1614,7 +1612,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 
 				sw_add_child(pi.hProcess, pi.dwProcessId);
 				CloseHandle(pi.hThread);
-				CloseHandle(pi.hProcess);
 				pid = pi.dwProcessId;
 			}
 			

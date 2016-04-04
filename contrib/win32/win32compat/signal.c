@@ -184,7 +184,7 @@ sw_process_pending_signals() {
 	BOOL sig_int = FALSE; /* has any signal actually interrupted */
 
 	debug3("process_signals()");
-	int i, exp[] = { W32_SIGCHLD , W32_SIGINT , W32_SIGALRM };
+	int i, exp[] = { W32_SIGCHLD , W32_SIGINT , W32_SIGALRM, W32_SIGTERM, W32_SIGTSTP };
 
 	/* check for expected signals*/
 	for (i = 0; i < (sizeof(exp) / sizeof(exp[0])); i++)
