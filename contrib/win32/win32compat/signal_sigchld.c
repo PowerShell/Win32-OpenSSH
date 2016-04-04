@@ -127,6 +127,26 @@ sw_child_to_zombie(DWORD index) {
 	return 0;
 }
 
+int
+sw_kill(int pid, int sig) {
+	int child_index, i;
+	if (pid == GetCurrentProcessId())
+		return sw_raise(sig);
+
+	/*  for child processes - only SIGTERM supported*/
+	child_index = -1;
+	for (i = 0; i < children.num_children; i++)
+		if (children.process_id[i] == pid) {
+			child_index = i;
+			break;
+		}
+
+	if (child_index != -1)
+		TerminateProcess(children.handles[child_index], 0);
+	return 0;
+}
+
+
 int waitpid(int pid, int *status, int options) {
 	DWORD index, ret, ret_id, exit_code, timeout = 0;
 	HANDLE process = NULL;
@@ -189,7 +209,7 @@ int waitpid(int pid, int *status, int options) {
 		process = children.handles[index];
 		ret_id = children.process_id[index];
 		GetExitCodeProcess(process, &exit_code);
-		CloseHandle(process);
+		/* process handle will be closed when its removed from list */
 		sw_remove_child_at_index(index);
 		if (status)
 			*status = exit_code;
