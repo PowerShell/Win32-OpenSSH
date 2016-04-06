@@ -187,8 +187,11 @@ int wmain(int ac, wchar_t **av) {
 			if ((buf[i] == '\r') || (buf[i] == '\n')) {
 
 				/* TODO - do a much accurate mapping */
-				buf[i] = '\n';
 				GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
+				if ((buf[i] == '\r') && ((i == rd -1) || (buf[i+1] != '\n'))) {
+					buf[i] = '\n';
+					GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
+				}
 				in_cmd[in_cmd_len] = buf[i];
 				in_cmd_len++;
 				GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
