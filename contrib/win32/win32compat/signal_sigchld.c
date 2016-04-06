@@ -192,7 +192,7 @@ int waitpid(int pid, int *status, int options) {
 
 		ret_id = children.process_id[index];
 		GetExitCodeProcess(process, &exit_code);
-		CloseHandle(process);
+		/* process handle will be closed when its removed from list */
 		sw_remove_child_at_index(index);
 		if (status)
 			*status = exit_code;

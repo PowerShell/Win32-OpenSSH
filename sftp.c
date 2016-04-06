@@ -2251,8 +2251,8 @@ connect_to_server(char *path, char **args, int *in, int *out)
 			NORMAL_PRIORITY_CLASS, NULL,
 			NULL, &si, &pi) == TRUE) {
 			sshpid = pi.dwProcessId;
-			CloseHandle(pi.hProcess);
 			CloseHandle(pi.hThread);
+			sw_add_child(pi.hProcess, pi.dwProcessId);
 		}
 		else
 			errno = GetLastError();
