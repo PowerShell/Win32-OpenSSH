@@ -20,6 +20,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\ssh-agent-main.cpp" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\ssh-agent.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

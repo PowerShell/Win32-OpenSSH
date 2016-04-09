@@ -30,7 +30,7 @@
  */
 #include <Windows.h>
 
-int main()
-{
-	return 0;
+int start_agent() {
+	Sleep(INFINITE);
+	return 1;
 }
