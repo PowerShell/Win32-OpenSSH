@@ -3,10 +3,7 @@
 
 
 int agent_start();
-
-void agent_listen();
 void agent_shutdown();
-void agent_cleanup_connection(struct agent_connection*);
 
 struct agent_connection {
 	enum {
@@ -19,5 +16,5 @@ struct agent_connection {
 	struct agent_con* next;
 };
 
-void agent_connection_on_io(struct agent_connection*);
+void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);
 void agent_connection_disconnect(struct agent_connection*);

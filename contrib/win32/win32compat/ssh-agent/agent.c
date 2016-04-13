@@ -77,12 +77,13 @@ void agent_sm_process_action_queue() {
 				0,                        // client time-out 
 				NULL);
 
-			/* remove action from queue before the assigining iocp port*/
+			/* remove action from queue before assigning iocp port*/
+			con->next = list;
+			list = con;
 			actions_remaining = InterlockedAnd(&action_queue, ~ACTION_LISTEN);
 			CreateIoCompletionPort(h, ioc_port, con, 0);
 
-			con->next = list;
-			list = con;
+
 		}
 		else {
 			/* cleanup up a done connection*/
@@ -131,48 +132,33 @@ void agent_sm_raise(enum agent_sm_event event) {
 
 }
 
+HANDLE  iocp_workers[4];
+
+DWORD WINAPI iocp_work(LPVOID lpParam) {
+	DWORD bytes;
+	struct agent_connection* con;
+	OVERLAPPED *p_ol;
+	while (1) {
+		GetQueuedCompletionStatus(ioc_port, &bytes, &con, &p_ol, INFINITE);
+		agent_connection_on_io(con, bytes, p_ol);
+	}
+}
+
 int agent_start() {
+	int i;
 	action_queue = 0;
 	list = NULL;
 	ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
+
+	for (i = 0; i < 4; i++) 
+		iocp_workers[i] = CreateThread(NULL, 0, iocp_work, NULL, 0, NULL);
+	
 	action_queue = ACTION_LISTEN;
 	agent_sm_process_action_queue();
 }
 
-void agent_listen();
-void agent_shutdown();
-void agent_cleanup_connection(struct agent_connection*);
-
-int agent_listen() {
-
-	ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
-
-	
-	BOOL ret;
-	HANDLE temp;
-	DWORD err, bytes;
-	ULONG_PTR ptr;
-	HANDLE h = CreateNamedPipe(
-		pipe_name,		  // pipe name 
-		PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
-		PIPE_TYPE_MESSAGE |       // message type pipe 
-		PIPE_READMODE_MESSAGE |   // message-read mode 
-		PIPE_WAIT,                // blocking mode 
-		PIPE_UNLIMITED_INSTANCES, // max. instances  
-		BUFSIZE,                  // output buffer size 
-		BUFSIZE,                  // input buffer size 
-		0,                        // client time-out 
-		NULL);
-
-	temp = CreateIoCompletionPort(h, ioc_port, NULL, 0);
-
-	OVERLAPPED ol, *pol;
-	ZeroMemory(&ol, sizeof(ol));
-	ret = ConnectNamedPipe(h, &ol);
-	err = GetLastError();
-
-	GetQueuedCompletionStatus(ioc_port, &bytes, &ptr, &pol, INFINITE);
-
-	//Sleep(INFINITE);
-	return 1;
+void agent_shutdown() {
+	agent_sm_raise(SHUTDOWN);
+	while (list != NULL)
+		Sleep(100);
 }

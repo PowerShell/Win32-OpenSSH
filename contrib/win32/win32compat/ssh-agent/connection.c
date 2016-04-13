@@ -31,25 +31,20 @@
 #include "agent.h"
 #define BUFSIZE 5 * 1024
 
-static HANDLE ioc_port;
-
-
-
-ssh_agent_connection::ssh_agent_connection(HANDLE h) { 
-	connection = h; 
-	state = LISTENING;
+void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPED* ol) {
+	switch (con->state) {
+	case LISTENING:
+		break;
+	case READING:
+		break;
+	case WRITING:
+		break;
+	default:
+		DebugBreak();
+	}
 }
 
-ssh_agent_connection::~ssh_agent_connection() {
-	CloseHandle(connection);
+void agent_connection_disconnect(struct agent_connection* con) {
+	CancelIoEx(con->connection, NULL);
+	DisconnectNamedPipe(con->connection);
 }
-
-void ssh_agent_connection::process_iocp(DWORD bytes_transferred, OVERLAPPED* pol) {
-
-}
-
-void ssh_agent_connection::disconnect() {
-	DisconnectNamedPipe(connection);
-	CancelIoEx(connection, NULL);
-}
-
