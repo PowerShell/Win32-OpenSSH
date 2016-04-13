@@ -28,9 +28,28 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <Windows.h>
+#include "agent.h"
+#define BUFSIZE 5 * 1024
 
-int start_agent() {
-	Sleep(INFINITE);
-	return 1;
+static HANDLE ioc_port;
+
+
+
+ssh_agent_connection::ssh_agent_connection(HANDLE h) { 
+	connection = h; 
+	state = LISTENING;
 }
+
+ssh_agent_connection::~ssh_agent_connection() {
+	CloseHandle(connection);
+}
+
+void ssh_agent_connection::process_iocp(DWORD bytes_transferred, OVERLAPPED* pol) {
+
+}
+
+void ssh_agent_connection::disconnect() {
+	DisconnectNamedPipe(connection);
+	CancelIoEx(connection, NULL);
+}
+

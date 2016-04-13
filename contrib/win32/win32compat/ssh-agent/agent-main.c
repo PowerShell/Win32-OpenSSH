@@ -28,11 +28,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <Windows.h>
-#include <stdio.h>
+#include "agent.h"
 
 int scm_start_servie(DWORD, LPWSTR*);
-int start_agent();
 
 SERVICE_TABLE_ENTRY diapatch_table[] =
 {
