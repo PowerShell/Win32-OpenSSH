@@ -123,6 +123,7 @@ void agent_shutdown() {
 		agent_sm_process_action_queue();
 	while (list != NULL)
 		Sleep(100);
+	CloseHandle(ioc_port);
 }
 
 HANDLE  iocp_workers[4];
@@ -132,8 +133,10 @@ DWORD WINAPI iocp_work(LPVOID lpParam) {
 	struct agent_connection* con;
 	OVERLAPPED *p_ol;
 	while (1) {
-		GetQueuedCompletionStatus(ioc_port, &bytes, &(ULONG_PTR)con, &p_ol, INFINITE);
+		if (GetQueuedCompletionStatus(ioc_port, &bytes, &(ULONG_PTR)con, &p_ol, INFINITE) == FALSE)
+			return 0;
 		agent_connection_on_io(con, bytes, p_ol);
+
 	}
 }
 
