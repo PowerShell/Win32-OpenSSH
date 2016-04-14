@@ -42,21 +42,17 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 	if (con->state == DONE)
 		DebugBreak();
 
-	while (1) {
-		switch (con->state) {
+	//while (1) 
+	{
+		switch (con->state) {		
+		case LISTENING:
+			agent_listen();
 		case WRITING:
 			/* Writing is done, read next request */
-		case LISTENING:
 			con->state = READING_HEADER;
-			if (con->state == LISTENING)
-				agent_listen();
 			ZeroMemory(&con->request, sizeof(con->request));
-			if (ReadFile(con->connection, con->request.buf,
-				HEADER_SIZE,  NULL, &con->ol)) {
-				bytes = HEADER_SIZE;
-				continue;
-			}
-			if (GetLastError() != ERROR_IO_PENDING) {
+			if (!ReadFile(con->connection, con->request.buf,
+				HEADER_SIZE,  NULL, &con->ol) && (GetLastError() != ERROR_IO_PENDING)) {
 				con->state = DONE;
 				agent_cleanup_connection(con);
 				return;
@@ -66,25 +62,18 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 			con->request.read += bytes;
 			if (con->request.read == HEADER_SIZE) {
 				con->request.size = *((DWORD*)con->request.buf);
+				con->request.read = 0;
 				con->state = READING;
-				if (ReadFile(con->connection, con->request.buf,
-					con->request.size, NULL, &con->ol)) {
-					bytes = con->request.size;
-					continue;
-				}
-				if (GetLastError() != ERROR_IO_PENDING) {
+				if (!ReadFile(con->connection, con->request.buf,
+					con->request.size, NULL, &con->ol)&&(GetLastError() != ERROR_IO_PENDING)) {
 					con->state = DONE;
 					agent_cleanup_connection(con);
 					return;
 				}
 			}
 			else {
-				if (ReadFile(con->connection, con->request.buf + con->request.read,
-					HEADER_SIZE - con->request.read, NULL, &con->ol)) {
-					bytes = HEADER_SIZE - con->request.read;
-					continue;
-				}
-				if (GetLastError() != ERROR_IO_PENDING) {
+				if (!ReadFile(con->connection, con->request.buf + con->request.read,
+					HEADER_SIZE - con->request.read, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) {
 					con->state = DONE;
 					agent_cleanup_connection(con);
 					return;
@@ -96,24 +85,16 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 			if (con->request.read == con->request.size) {
 				/* process request and get response */
 				con->state = WRITING;
-				if (WriteFile(con->connection, con->request.buf,
-					con->request.size, NULL, &con->ol)) {
-					bytes = con->request.size;
-					continue;
-				}
-				if (GetLastError() != ERROR_IO_PENDING) {
+				if (!WriteFile(con->connection, con->request.buf,
+					con->request.size, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING) ){
 					con->state = DONE;
 					agent_cleanup_connection(con);
 					return;
 				}
 			}
 			else {
-				if (ReadFile(con->connection, con->request.buf + con->request.read,
-					con->request.size - con->request.read, NULL, &con->ol)) {
-					bytes = con->request.size - con->request.read;
-					continue;
-				}
-				if (GetLastError() != ERROR_IO_PENDING) {
+				if (!ReadFile(con->connection, con->request.buf + con->request.read,
+					con->request.size - con->request.read, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) {
 					con->state = DONE;
 					agent_cleanup_connection(con);
 					return;

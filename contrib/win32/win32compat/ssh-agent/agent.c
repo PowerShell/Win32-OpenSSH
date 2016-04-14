@@ -56,7 +56,7 @@ void agent_sm_process_action_queue() {
 				break;
 		}
 		else if (action_queue & ACTION_LISTEN) {
-			HANDLE h, temp;
+			HANDLE h;
 			long prev_queue;
 			struct agent_connection* con = 
 				(struct agent_connection*)malloc(sizeof(struct agent_connection));
@@ -64,8 +64,8 @@ void agent_sm_process_action_queue() {
 			h = CreateNamedPipe(
 				AGENT_PIPE_ID,		  // pipe name 
 				PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
-				PIPE_TYPE_MESSAGE |       // message type pipe 
-				PIPE_READMODE_MESSAGE |   // message-read mode 
+				PIPE_TYPE_BYTE |       // message type pipe 
+				PIPE_READMODE_BYTE |   // message-read mode 
 				PIPE_WAIT,                // blocking mode 
 				PIPE_UNLIMITED_INSTANCES, // max. instances  
 				BUFSIZE,                  // output buffer size 
@@ -78,7 +78,8 @@ void agent_sm_process_action_queue() {
 			con->next = list;
 			list = con;
 			prev_queue = InterlockedAnd(&action_queue, ~ACTION_LISTEN);
-			temp = CreateIoCompletionPort(h, ioc_port, (ULONG_PTR)con, 0);
+			CreateIoCompletionPort(h, ioc_port, (ULONG_PTR)con, 0);
+			ConnectNamedPipe(h, &con->ol);
 			if (prev_queue == ACTION_LISTEN)
 				break;
 		}
