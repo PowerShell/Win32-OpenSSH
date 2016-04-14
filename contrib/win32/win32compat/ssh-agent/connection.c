@@ -29,18 +29,100 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "agent.h"
-#define BUFSIZE 5 * 1024
 
 void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPED* ol) {
-	switch (con->state) {
-	case LISTENING:
-		break;
-	case READING:
-		break;
-	case WRITING:
-		break;
-	default:
+	
+	/* process error */
+	if ( (bytes == 0) && (GetOverlappedResult(con->connection, ol, &bytes, FALSE) == FALSE)) {
+		con->state = DONE;
+		agent_cleanup_connection(con);
+		return;
+	}
+
+	if (con->state == DONE)
 		DebugBreak();
+
+	while (1) {
+		switch (con->state) {
+		case WRITING:
+			/* Writing is done, read next request */
+		case LISTENING:
+			con->state = READING_HEADER;
+			if (con->state == LISTENING)
+				agent_listen();
+			ZeroMemory(&con->request, sizeof(con->request));
+			if (ReadFile(con->connection, con->request.buf,
+				HEADER_SIZE,  NULL, &con->ol)) {
+				bytes = HEADER_SIZE;
+				continue;
+			}
+			if (GetLastError() != ERROR_IO_PENDING) {
+				con->state = DONE;
+				agent_cleanup_connection(con);
+				return;
+			}
+			break;
+		case READING_HEADER:
+			con->request.read += bytes;
+			if (con->request.read == HEADER_SIZE) {
+				con->request.size = *((DWORD*)con->request.buf);
+				con->state = READING;
+				if (ReadFile(con->connection, con->request.buf,
+					con->request.size, NULL, &con->ol)) {
+					bytes = con->request.size;
+					continue;
+				}
+				if (GetLastError() != ERROR_IO_PENDING) {
+					con->state = DONE;
+					agent_cleanup_connection(con);
+					return;
+				}
+			}
+			else {
+				if (ReadFile(con->connection, con->request.buf + con->request.read,
+					HEADER_SIZE - con->request.read, NULL, &con->ol)) {
+					bytes = HEADER_SIZE - con->request.read;
+					continue;
+				}
+				if (GetLastError() != ERROR_IO_PENDING) {
+					con->state = DONE;
+					agent_cleanup_connection(con);
+					return;
+				}
+			}
+			break;
+		case READING:
+			con->request.read += bytes;
+			if (con->request.read == con->request.size) {
+				/* process request and get response */
+				con->state = WRITING;
+				if (WriteFile(con->connection, con->request.buf,
+					con->request.size, NULL, &con->ol)) {
+					bytes = con->request.size;
+					continue;
+				}
+				if (GetLastError() != ERROR_IO_PENDING) {
+					con->state = DONE;
+					agent_cleanup_connection(con);
+					return;
+				}
+			}
+			else {
+				if (ReadFile(con->connection, con->request.buf + con->request.read,
+					con->request.size - con->request.read, NULL, &con->ol)) {
+					bytes = con->request.size - con->request.read;
+					continue;
+				}
+				if (GetLastError() != ERROR_IO_PENDING) {
+					con->state = DONE;
+					agent_cleanup_connection(con);
+					return;
+				}
+			}
+			break;
+		default:
+			DebugBreak();
+		}		
 	}
 }
 

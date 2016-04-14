@@ -66,7 +66,7 @@ static VOID WINAPI service_handler(DWORD dwControl)
 	{
 	case SERVICE_CONTROL_STOP: {
 		ReportSvcStatus(SERVICE_STOP_PENDING, NO_ERROR, 500);
-		GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, 0);
+		agent_shutdown();
 		ReportSvcStatus(SERVICE_STOPPED, NO_ERROR, 0);
 		return;
 	}
@@ -79,11 +79,20 @@ static VOID WINAPI service_handler(DWORD dwControl)
 	ReportSvcStatus(service_status.dwCurrentState, NO_ERROR, 0);
 }
 
+BOOL WINAPI ctrl_c_handler(
+	_In_ DWORD dwCtrlType
+	) {
+	/* for any Ctrl type, shutdown agent*/
+	agent_shutdown();
+	return TRUE;
+}
+
 int main() {
 	if (!StartServiceCtrlDispatcher(diapatch_table))  {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
 			//console app
-			start_agent();
+			SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
+			return agent_start();
 		}
 		else
 			return -1;
@@ -97,6 +106,6 @@ int scm_start_servie(DWORD num, LPWSTR* args) {
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
-	return start_agent();
+	return agent_start();
 }
 

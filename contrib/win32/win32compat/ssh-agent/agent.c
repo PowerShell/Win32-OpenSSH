@@ -36,17 +36,11 @@ static HANDLE ioc_port;
 static volatile long action_queue;
 static struct agent_connection* list;
 
-enum agent_sm_event {
-	NEW_CLIENT_CONNECTION = 1,
-	CONNECTION_DONE = 2,
-	SHUTDOWN = 3
-};
-
 #define ACTION_LISTEN	0x80000000
 #define ACTION_SHUTDOWN 0x40000000
 
 void agent_sm_process_action_queue() {
-	long actions_remaining = 0;
+
 	do {
 		if (action_queue & ACTION_SHUTDOWN) {
 			/* go through the list and disconect each connection */
@@ -58,10 +52,12 @@ void agent_sm_process_action_queue() {
 
 			/* remove unwanted queued actions */
 			InterlockedAnd(&action_queue, ~ACTION_LISTEN);
-			actions_remaining = InterlockedAnd(&action_queue, ~ACTION_SHUTDOWN);
+			if (InterlockedAnd(&action_queue, ~ACTION_SHUTDOWN) == ACTION_SHUTDOWN)
+				break;
 		}
 		else if (action_queue & ACTION_LISTEN) {
-			HANDLE h;
+			HANDLE h, temp;
+			long prev_queue;
 			struct agent_connection* con = 
 				(struct agent_connection*)malloc(sizeof(struct agent_connection));
 			memset(con, 0, sizeof(struct agent_connection));
@@ -78,12 +74,13 @@ void agent_sm_process_action_queue() {
 				NULL);
 
 			/* remove action from queue before assigning iocp port*/
+			con->connection = h;
 			con->next = list;
 			list = con;
-			actions_remaining = InterlockedAnd(&action_queue, ~ACTION_LISTEN);
-			CreateIoCompletionPort(h, ioc_port, con, 0);
-
-
+			prev_queue = InterlockedAnd(&action_queue, ~ACTION_LISTEN);
+			temp = CreateIoCompletionPort(h, ioc_port, (ULONG_PTR)con, 0);
+			if (prev_queue == ACTION_LISTEN)
+				break;
 		}
 		else {
 			/* cleanup up a done connection*/
@@ -101,35 +98,30 @@ void agent_sm_process_action_queue() {
 				prev = tmp;
 				tmp = tmp->next;
 			}
-			actions_remaining = InterlockedDecrement(&action_queue);
+			if (InterlockedDecrement(&action_queue) == 0)
+				break;
 		}
-	} while (actions_remaining);
+	} while (1);
 }
 
-void agent_sm_raise(enum agent_sm_event event) {
-	long ret = 0;
-	switch (event) {
-	case NEW_CLIENT_CONNECTION:
-		ret = InterlockedOr(&action_queue, ACTION_LISTEN);
-		if (ret == 0)
-			agent_sm_process_action_queue();
-		break;
-	case SHUTDOWN:
-		ret = InterlockedOr(&action_queue, ACTION_SHUTDOWN);
-		if (ret == 0)
-			agent_sm_process_action_queue();
-		break;
-	case CONNECTION_DONE:
-		ret = InterlockedIncrement(&action_queue);
-		if (ret == 1)
-			agent_sm_process_action_queue();
-		break;
-	default:
-		DebugBreak();
-	}
+void 
+agent_cleanup_connection(struct agent_connection* con) {
+	if (InterlockedIncrement(&action_queue) == 1)
+		agent_sm_process_action_queue();
+}
 
-	/* is this the first action queued */
+void 
+agent_listen() {
+	if (InterlockedOr(&action_queue, ACTION_LISTEN) == 0)
+		agent_sm_process_action_queue();
+}
 
+
+void agent_shutdown() {
+	if (InterlockedOr(&action_queue, ACTION_SHUTDOWN) == 0)
+		agent_sm_process_action_queue();
+	while (list != NULL)
+		Sleep(100);
 }
 
 HANDLE  iocp_workers[4];
@@ -139,7 +131,7 @@ DWORD WINAPI iocp_work(LPVOID lpParam) {
 	struct agent_connection* con;
 	OVERLAPPED *p_ol;
 	while (1) {
-		GetQueuedCompletionStatus(ioc_port, &bytes, &con, &p_ol, INFINITE);
+		GetQueuedCompletionStatus(ioc_port, &bytes, &(ULONG_PTR)con, &p_ol, INFINITE);
 		agent_connection_on_io(con, bytes, p_ol);
 	}
 }
@@ -148,17 +140,13 @@ int agent_start() {
 	int i;
 	action_queue = 0;
 	list = NULL;
-	ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
+	ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, (ULONG_PTR)NULL, 0);
 
-	for (i = 0; i < 4; i++) 
-		iocp_workers[i] = CreateThread(NULL, 0, iocp_work, NULL, 0, NULL);
+	for (i = 0; i < 3; i++)
+		QueueUserWorkItem(iocp_work, NULL, 0);
 	
-	action_queue = ACTION_LISTEN;
-	agent_sm_process_action_queue();
+	agent_listen();
+	iocp_work(NULL);
+	return 1;
 }
 
-void agent_shutdown() {
-	agent_sm_raise(SHUTDOWN);
-	while (list != NULL)
-		Sleep(100);
-}
