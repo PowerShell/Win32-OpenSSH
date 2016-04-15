@@ -30,6 +30,11 @@
  */
 #include "agent.h"
 
+void agent_connection_on_error(struct agent_connection* con, DWORD error) {
+	con->state = DONE;
+	agent_cleanup_connection(con);
+}
+
 void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPED* ol) {
 	
 	/* process error */

@@ -22,6 +22,7 @@ struct agent_connection {
 };
 
 void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);
+void agent_connection_on_error(struct agent_connection* , DWORD );
 void agent_connection_disconnect(struct agent_connection*);
 
 int agent_start();

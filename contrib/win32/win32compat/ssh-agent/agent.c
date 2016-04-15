@@ -93,6 +93,7 @@ void agent_sm_process_action_queue() {
 					else
 						prev->next = tmp->next;
 					CloseHandle(tmp->connection);
+					printf("deleting %p\n", tmp);
 					free(tmp);
 					break;
 				}
@@ -130,11 +131,19 @@ HANDLE  iocp_workers[4];
 
 DWORD WINAPI iocp_work(LPVOID lpParam) {
 	DWORD bytes;
-	struct agent_connection* con;
+	struct agent_connection* con = NULL;
 	OVERLAPPED *p_ol;
 	while (1) {
-		if (GetQueuedCompletionStatus(ioc_port, &bytes, &(ULONG_PTR)con, &p_ol, INFINITE) == FALSE)
-			return 0;
+		con = NULL;
+		p_ol = NULL;
+		if (GetQueuedCompletionStatus(ioc_port, &bytes, &(ULONG_PTR)con, &p_ol, INFINITE) == FALSE) {
+			printf("error: %d on %p \n", GetLastError(), con);
+			if (con) 
+				agent_connection_on_error(con, GetLastError());
+			else
+				return 0;
+		}
+		//printf("io on %p state %d bytes %d\n", con, con->state, bytes);
 		agent_connection_on_io(con, bytes, p_ol);
 
 	}

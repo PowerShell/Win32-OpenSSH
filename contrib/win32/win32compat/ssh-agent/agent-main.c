@@ -90,7 +90,7 @@ BOOL WINAPI ctrl_c_handler(
 int main() {
 	if (!StartServiceCtrlDispatcher(diapatch_table))  {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
-			//console app
+			/* console app */
 			SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
 			return agent_start();
 		}
