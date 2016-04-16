@@ -29,20 +29,25 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "agent.h"
+#include "agent-request.h"
+
+void process_request(struct agent_connection*);
+
+#define ABORT_CONNECTION_RETURN(c) do {	\
+	con->state = DONE;		\
+	agent_cleanup_connection(con);	\
+	return;				\
+} while (0)
 
 void agent_connection_on_error(struct agent_connection* con, DWORD error) {
-	con->state = DONE;
-	agent_cleanup_connection(con);
+	ABORT_CONNECTION_RETURN(con);
 }
 
 void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPED* ol) {
 	
 	/* process error */
-	if ( (bytes == 0) && (GetOverlappedResult(con->connection, ol, &bytes, FALSE) == FALSE)) {
-		con->state = DONE;
-		agent_cleanup_connection(con);
-		return;
-	}
+	if ((bytes == 0) && (GetOverlappedResult(con->connection, ol, &bytes, FALSE) == FALSE))
+		ABORT_CONNECTION_RETURN(c);
 
 	if (con->state == DONE)
 		DebugBreak();
@@ -54,56 +59,47 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 			agent_listen();
 		case WRITING:
 			/* Writing is done, read next request */
+			/* assert on assumption that write always completes on sending all bytes*/
+			if (bytes != con->io_buf.num_bytes)
+				DebugBreak();
 			con->state = READING_HEADER;
-			ZeroMemory(&con->request, sizeof(con->request));
-			if (!ReadFile(con->connection, con->request.buf,
-				HEADER_SIZE,  NULL, &con->ol) && (GetLastError() != ERROR_IO_PENDING)) {
-				con->state = DONE;
-				agent_cleanup_connection(con);
-				return;
-			}
+			ZeroMemory(&con->io_buf, sizeof(con->io_buf));
+			if (!ReadFile(con->connection, con->io_buf.buf,
+			    HEADER_SIZE,  NULL, &con->ol) && (GetLastError() != ERROR_IO_PENDING)) 
+				ABORT_CONNECTION_RETURN(c);
 			break;
 		case READING_HEADER:
-			con->request.read += bytes;
-			if (con->request.read == HEADER_SIZE) {
-				con->request.size = *((DWORD*)con->request.buf);
-				con->request.read = 0;
+			con->io_buf.transferred += bytes;
+			if (con->io_buf.transferred == HEADER_SIZE) {
+				con->io_buf.num_bytes = PEEK_U32(con->io_buf.buf);
+				con->io_buf.transferred = 0;
+				if (con->io_buf.num_bytes > MAX_MESSAGE_SIZE)
+					ABORT_CONNECTION_RETURN(c);
+
 				con->state = READING;
-				if (!ReadFile(con->connection, con->request.buf,
-					con->request.size, NULL, &con->ol)&&(GetLastError() != ERROR_IO_PENDING)) {
-					con->state = DONE;
-					agent_cleanup_connection(con);
-					return;
-				}
+				if (!ReadFile(con->connection, con->io_buf.buf,
+				    con->io_buf.num_bytes, NULL, &con->ol)&&(GetLastError() != ERROR_IO_PENDING)) 
+					ABORT_CONNECTION_RETURN(c);
 			}
 			else {
-				if (!ReadFile(con->connection, con->request.buf + con->request.read,
-					HEADER_SIZE - con->request.read, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) {
-					con->state = DONE;
-					agent_cleanup_connection(con);
-					return;
-				}
+				if (!ReadFile(con->connection, con->io_buf.buf + con->io_buf.num_bytes,
+				    HEADER_SIZE - con->io_buf.num_bytes, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) 
+					ABORT_CONNECTION_RETURN(c);
 			}
 			break;
 		case READING:
-			con->request.read += bytes;
-			if (con->request.read == con->request.size) {
-				/* process request and get response */
+			con->io_buf.transferred += bytes;
+			if (con->io_buf.transferred == con->io_buf.num_bytes) {
+				process_request(con);
 				con->state = WRITING;
-				if (!WriteFile(con->connection, con->request.buf,
-					con->request.size, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING) ){
-					con->state = DONE;
-					agent_cleanup_connection(con);
-					return;
-				}
+				if (!WriteFile(con->connection, con->io_buf.buf,
+				    con->io_buf.num_bytes, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING) )
+					ABORT_CONNECTION_RETURN(c);
 			}
 			else {
-				if (!ReadFile(con->connection, con->request.buf + con->request.read,
-					con->request.size - con->request.read, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) {
-					con->state = DONE;
-					agent_cleanup_connection(con);
-					return;
-				}
+				if (!ReadFile(con->connection, con->io_buf.buf + con->io_buf.transferred,
+				    con->io_buf.num_bytes - con->io_buf.transferred, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) 
+					ABORT_CONNECTION_RETURN(c);
 			}
 			break;
 		default:
@@ -115,4 +111,49 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 void agent_connection_disconnect(struct agent_connection* con) {
 	CancelIoEx(con->connection, NULL);
 	DisconnectNamedPipe(con->connection);
+}
+
+static void
+process_request(struct agent_connection* con) {
+	int r;
+	struct sshbuf *request = NULL, *response = NULL;
+	u_char type;
+	
+	request = sshbuf_from(con->io_buf.buf, con->io_buf.num_bytes);
+	response = sshbuf_new();
+	if ((request == NULL) || (response == NULL)) {
+		r = ENOMEM;
+		goto done;
+	}
+
+	if ((r = sshbuf_get_u8(request, &type)) != 0)
+		goto done;
+
+	switch (type) {
+	case SSH2_AGENTC_ADD_IDENTITY:
+		r = process_add_identity(request, response, con->client_token);
+		break;
+	default:
+		r = EINVAL;
+		goto done;
+	}
+
+done:
+	if (request)
+		sshbuf_free(request);
+
+	ZeroMemory(&con->io_buf, sizeof(con->io_buf));
+	if (r == 0) {
+		POKE_U32(con->io_buf.buf, sshbuf_len(response));
+		memcpy(con->io_buf.buf + 4, sshbuf_ptr(response), sshbuf_len(response));
+		con->io_buf.num_bytes = sshbuf_len(response) + 4;
+	}
+	else {
+		POKE_U32(con->io_buf.buf, 1);
+		*(con->io_buf.buf + 4) = SSH_AGENT_FAILURE;
+		con->io_buf.num_bytes = 5;
+	}
+
+	if (response)
+		sshbuf_free(response);
 }

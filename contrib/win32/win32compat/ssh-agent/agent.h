@@ -1,16 +1,18 @@
 #include <Windows.h>
 #include <stdio.h>
-#define BUFSIZE 5 * 1024
+#define MAX_MESSAGE_SIZE 5 * 1024
 
 #define HEADER_SIZE 4
 struct agent_connection {
 	OVERLAPPED ol;
 	HANDLE connection;
+	HANDLE client_token;
 	struct {
-		DWORD size;
-		DWORD read;
-		char buf[BUFSIZE];
-	} request;
+		DWORD num_bytes;
+		DWORD transferred;
+		char buf[MAX_MESSAGE_SIZE];
+		DWORD buf_size;
+	} io_buf;
 	enum {
 		LISTENING = 0,
 		READING_HEADER,
