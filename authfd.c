@@ -94,6 +94,24 @@ ssh_get_authentication_socket(int *fdp)
 	if (fdp != NULL)
 		*fdp = -1;
 
+#ifdef WIN32_FIXME
+	HANDLE h = CreateFile(
+		"\\\\.\\pipe\\ssh-agent",   // pipe name 
+		GENERIC_READ |  // read and write access 
+		GENERIC_WRITE,
+		0,              // no sharing 
+		NULL,           // default security attributes
+		OPEN_EXISTING,  // opens existing pipe 
+		FILE_FLAG_OVERLAPPED,              // attributes 
+		NULL);          // no template file 
+	if (h == INVALID_HANDLE_VALUE) {
+		debug("cannot open auth socket\n");
+		return SSH_ERR_AGENT_NOT_PRESENT;
+	}
+
+	sock = w32_allocate_fd_for_handle(h, FALSE);
+
+#else
 	authsocket = getenv(SSH_AUTHSOCKET_ENV_NAME);
 	if (!authsocket)
 		return SSH_ERR_AGENT_NOT_PRESENT;
@@ -113,6 +131,7 @@ ssh_get_authentication_socket(int *fdp)
 		errno = oerrno;
 		return SSH_ERR_SYSTEM_ERROR;
 	}
+#endif
 
 	if (fdp != NULL)
 		*fdp = sock;

@@ -492,9 +492,7 @@ main(int argc, char **argv)
      * Allocate stdio inside our wrapper function.
      */
      
-    allocate_standard_descriptor(STDIN_FILENO);
-    allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);
+	w32posix_initialize();
 
   #endif
 

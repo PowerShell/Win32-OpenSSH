@@ -8,6 +8,7 @@ typedef unsigned __int64 u_int64_t;
 #include "sshbuf.h"
 #include "sshkey.h"
 #include "authfd.h"
+#include "digest.h"
 
 
 int process_add_identity(struct sshbuf*, struct sshbuf*, HANDLE);

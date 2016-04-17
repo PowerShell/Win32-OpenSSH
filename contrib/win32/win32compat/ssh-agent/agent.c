@@ -58,9 +58,13 @@ void agent_sm_process_action_queue() {
 		else if (action_queue & ACTION_LISTEN) {
 			HANDLE h;
 			long prev_queue;
+			SECURITY_ATTRIBUTES sa;
 			struct agent_connection* con = 
 				(struct agent_connection*)malloc(sizeof(struct agent_connection));
 			memset(con, 0, sizeof(struct agent_connection));
+			memset(&sa, 0, sizeof(sa));
+			sa.bInheritHandle = FALSE;
+			sa.lpSecurityDescriptor = NULL;
 			h = CreateNamedPipe(
 				AGENT_PIPE_ID,		  // pipe name 
 				PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
@@ -71,7 +75,7 @@ void agent_sm_process_action_queue() {
 				BUFSIZE,                  // output buffer size 
 				BUFSIZE,                  // input buffer size 
 				0,                        // client time-out 
-				NULL);
+				&sa);
 
 			/* remove action from queue before assigning iocp port*/
 			con->connection = h;
