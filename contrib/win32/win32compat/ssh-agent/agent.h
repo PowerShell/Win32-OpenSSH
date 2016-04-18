@@ -2,6 +2,10 @@
 #include <stdio.h>
 #define MAX_MESSAGE_SIZE 5 * 1024
 
+#define SSH_ROOT L"SYSTEM\\CurrentControlSet\\Control\\SSH"
+#define SSH_AGENT_ROOT SSH_ROOT L"\\agent"
+#define SSHD_HOST_KEYS_ROOT SSH_ROOT L"\\Host\\Keys"
+
 #define HEADER_SIZE 4
 struct agent_connection {
 	OVERLAPPED ol;

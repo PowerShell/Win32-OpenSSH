@@ -29,9 +29,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "agent.h"
 #include "agent-request.h"
 
-#define KEY_ROOT L"SYSTEM\\CurrentControlSet\\Control\\SSH\\Host\\Keys"
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
 
@@ -54,7 +54,7 @@ process_add_identity(struct sshbuf* request, struct sshbuf* response, HANDLE cli
 	if ((thumbprint = sshkey_fingerprint(key, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL)
 		goto done;
 
-	if ((r = RegOpenKeyEx(HKEY_LOCAL_MACHINE, KEY_ROOT,
+	if ((r = RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSHD_HOST_KEYS_ROOT,
 	    0, KEY_WRITE, &reg)) != 0)
 		goto done;
 
@@ -98,7 +98,7 @@ process_request_identities(struct sshbuf* request, struct sshbuf* response, HAND
 	wchar_t sub_name[MAX_KEY_LENGTH];
 	DWORD sub_name_len = MAX_KEY_LENGTH;
 
-	if ((r = RegOpenKeyEx(HKEY_LOCAL_MACHINE, KEY_ROOT,
+	if ((r = RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSHD_HOST_KEYS_ROOT,
 		0, STANDARD_RIGHTS_READ | KEY_ENUMERATE_SUB_KEYS, &root)) != 0)
 		goto done;
 

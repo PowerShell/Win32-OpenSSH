@@ -155,6 +155,8 @@ DWORD WINAPI iocp_work(LPVOID lpParam) {
 
 int agent_start() {
 	int i;
+	HKEY agent_root;
+	DWORD process_id = GetCurrentProcessId();
 	action_queue = 0;
 	list = NULL;
 	ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, (ULONG_PTR)NULL, 0);
@@ -163,6 +165,9 @@ int agent_start() {
 		QueueUserWorkItem(iocp_work, NULL, 0);
 	
 	agent_listen();
+	RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT,
+		0, KEY_SET_VALUE, &agent_root);
+	RegSetValueEx(agent_root, L"ProcessID", 0, REG_DWORD, &process_id, 4);
 	iocp_work(NULL);
 	return 1;
 }
