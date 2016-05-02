@@ -49,7 +49,7 @@ process_add_identity(struct sshbuf* request, struct sshbuf* response, HANDLE cli
 		goto done;
 	blob_len = (sshbuf_ptr(request) - blob) & 0xffffffff;
 
-	if ((r = sshkey_to_blob(key, &pubkey_blob_len, &pubkey_blob)) != 0) {
+	if ((r = sshkey_to_blob(key, &pubkey_blob, &pubkey_blob_len)) != 0) {
 		goto done;
 	}
 
@@ -199,15 +199,19 @@ process_request_identities(struct sshbuf* request, struct sshbuf* response, HAND
 	char* count_ptr = NULL;
 	wchar_t sub_name[MAX_KEY_LENGTH];
 	DWORD sub_name_len = MAX_KEY_LENGTH;
+	char *regdata = NULL;
+	DWORD regdatalen = 0, key_count = 0;
+
+	regdata = malloc(4);
+	regdatalen = 4;
 
 	if ((r = RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSHD_HOST_KEYS_ROOT,
 		0, STANDARD_RIGHTS_READ | KEY_ENUMERATE_SUB_KEYS, &root)) != 0)
 		goto done;
 
-	if ((r = sshbuf_put_u8(response, SSH2_AGENT_IDENTITIES_ANSWER)) != 0)
+	if (((r = sshbuf_put_u8(response, SSH2_AGENT_IDENTITIES_ANSWER)) != 0)
+	   || ((r = sshbuf_reserve(response, 4, &count_ptr)) != 0))
 		goto done;
-
-	count_ptr = sshbuf_ptr(response);
 
 	while (1) {
 		sub_name_len = MAX_KEY_LENGTH;
@@ -216,8 +220,51 @@ process_request_identities(struct sshbuf* request, struct sshbuf* response, HAND
 			sub = NULL;
 		}
 		if ((r = RegEnumKeyEx(root, index++, sub_name, &sub_name_len, NULL, NULL, NULL, NULL)) == 0) {
-			if ((r = RegOpenKeyEx(root, sub_name, 0, KEY_READ, &sub)) == 0) {
-				//RegQueryValueEx(sub, NULL, 0,  )
+			if ((r = RegOpenKeyEx(root, sub_name, 0, KEY_QUERY_VALUE, &sub)) == 0) {
+				if ((r = RegQueryValueEx(sub, L"pub", 0, NULL, regdata, &regdatalen)) != 0) {
+					if (r == ERROR_MORE_DATA) {
+						r = 0;
+						if (regdata)
+							free(regdata);
+						if ((regdata = malloc(regdatalen)) == NULL) {
+							r = ENOMEM;
+							goto done;
+						}
+						if ((r = RegQueryValueEx(sub, L"pub", 0, NULL, regdata, &regdatalen)) != 0)
+							goto done;
+
+					}
+					else {
+						r = EOTHER;
+						goto done;
+					}
+				}
+				
+				if ((r = sshbuf_put_string(response, regdata, regdatalen)) != 0)
+					goto done;
+				
+				if ((r = RegQueryValueEx(sub, L"comment", 0, NULL, regdata, &regdatalen)) != 0) {
+					if (r == ERROR_MORE_DATA) {
+						r = 0;
+						if (regdata)
+							free(regdata);
+						if ((regdata = malloc(regdatalen)) == NULL) {
+							r = ENOMEM;
+							goto done;
+						}
+						if ((r = RegQueryValueEx(sub, L"comment", 0, NULL, regdata, &regdatalen)) != 0)
+							goto done;
+
+					}
+					else {
+						r = EOTHER;
+						goto done;
+					}
+				}
+				if ((r = sshbuf_put_string(response, regdata, regdatalen)) != 0)
+					goto done;
+				key_count++;
+				
 			}
 			else if (r == ERROR_FILE_NOT_FOUND) {
 				r = 0;
@@ -235,6 +282,14 @@ process_request_identities(struct sshbuf* request, struct sshbuf* response, HAND
 
 	}
 
+	POKE_U32(count_ptr, key_count);
+
 done:
-	return r1;
+	if (regdata)
+		free(regdata);
+	if (root)
+		RegCloseKey(root);
+	if (sub)
+		RegCloseKey(sub);
+	return r;
 }

@@ -31,7 +31,7 @@
 #include "agent.h"
 #include "agent-request.h"
 
-void process_request(struct agent_connection*);
+int process_request(struct agent_connection*);
 
 #define ABORT_CONNECTION_RETURN(c) do {	\
 	c->state = DONE;		\
