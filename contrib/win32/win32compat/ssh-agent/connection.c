@@ -34,8 +34,8 @@
 void process_request(struct agent_connection*);
 
 #define ABORT_CONNECTION_RETURN(c) do {	\
-	con->state = DONE;		\
-	agent_cleanup_connection(con);	\
+	c->state = DONE;		\
+	agent_cleanup_connection(c);	\
 	return;				\
 } while (0)
 
@@ -47,7 +47,7 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 	
 	/* process error */
 	if ((bytes == 0) && (GetOverlappedResult(con->connection, ol, &bytes, FALSE) == FALSE))
-		ABORT_CONNECTION_RETURN(c);
+		ABORT_CONNECTION_RETURN(con);
 
 	if (con->state == DONE)
 		DebugBreak();
@@ -66,7 +66,7 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 			ZeroMemory(&con->io_buf, sizeof(con->io_buf));
 			if (!ReadFile(con->connection, con->io_buf.buf,
 			    HEADER_SIZE,  NULL, &con->ol) && (GetLastError() != ERROR_IO_PENDING)) 
-				ABORT_CONNECTION_RETURN(c);
+				ABORT_CONNECTION_RETURN(con);
 			break;
 		case READING_HEADER:
 			con->io_buf.transferred += bytes;
@@ -74,32 +74,34 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 				con->io_buf.num_bytes = PEEK_U32(con->io_buf.buf);
 				con->io_buf.transferred = 0;
 				if (con->io_buf.num_bytes > MAX_MESSAGE_SIZE)
-					ABORT_CONNECTION_RETURN(c);
+					ABORT_CONNECTION_RETURN(con);
 
 				con->state = READING;
 				if (!ReadFile(con->connection, con->io_buf.buf,
 				    con->io_buf.num_bytes, NULL, &con->ol)&&(GetLastError() != ERROR_IO_PENDING)) 
-					ABORT_CONNECTION_RETURN(c);
+					ABORT_CONNECTION_RETURN(con);
 			}
 			else {
 				if (!ReadFile(con->connection, con->io_buf.buf + con->io_buf.num_bytes,
 				    HEADER_SIZE - con->io_buf.num_bytes, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) 
-					ABORT_CONNECTION_RETURN(c);
+					ABORT_CONNECTION_RETURN(con);
 			}
 			break;
 		case READING:
 			con->io_buf.transferred += bytes;
 			if (con->io_buf.transferred == con->io_buf.num_bytes) {
-				process_request(con);
+				if (process_request(con) != 0) {
+					ABORT_CONNECTION_RETURN(con);
+				}
 				con->state = WRITING;
 				if (!WriteFile(con->connection, con->io_buf.buf,
 				    con->io_buf.num_bytes, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING) )
-					ABORT_CONNECTION_RETURN(c);
+					ABORT_CONNECTION_RETURN(con);
 			}
 			else {
 				if (!ReadFile(con->connection, con->io_buf.buf + con->io_buf.transferred,
 				    con->io_buf.num_bytes - con->io_buf.transferred, NULL, &con->ol)&& (GetLastError() != ERROR_IO_PENDING)) 
-					ABORT_CONNECTION_RETURN(c);
+					ABORT_CONNECTION_RETURN(con);
 			}
 			break;
 		default:
@@ -113,7 +115,7 @@ void agent_connection_disconnect(struct agent_connection* con) {
 	DisconnectNamedPipe(con->connection);
 }
 
-static void
+static int
 process_request(struct agent_connection* con) {
 	int r;
 	struct sshbuf *request = NULL, *response = NULL;
@@ -152,12 +154,9 @@ done:
 		memcpy(con->io_buf.buf + 4, sshbuf_ptr(response), sshbuf_len(response));
 		con->io_buf.num_bytes = sshbuf_len(response) + 4;
 	}
-	else {
-		POKE_U32(con->io_buf.buf, 1);
-		*(con->io_buf.buf + 4) = SSH_AGENT_FAILURE;
-		con->io_buf.num_bytes = 5;
-	}
-
+	
 	if (response)
 		sshbuf_free(response);
+
+	return r;
 }
