@@ -104,6 +104,9 @@ static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 	DWORD regdatalen = 0;
 	struct sshbuf* tmpbuf;
 
+	regdata = malloc(4);
+	regdatalen = 4;
+
 	*sig = NULL;
 	*siglen = 0;
 
@@ -118,7 +121,7 @@ static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 		NULL, &sub, NULL)) != 0)
 		goto done;
 
-	if ((RegQueryValueEx(sub, NULL, 0, NULL, NULL, &regdatalen)) != ERROR_MORE_DATA) {
+	if ((RegQueryValueEx(sub, NULL, 0, NULL, regdata, &regdatalen)) != ERROR_MORE_DATA) {
 		r = EOTHER;
 		goto done;
 	}

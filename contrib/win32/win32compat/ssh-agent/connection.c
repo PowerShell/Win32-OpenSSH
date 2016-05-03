@@ -139,6 +139,8 @@ process_request(struct agent_connection* con) {
 		r = process_request_identities(request, response, con->client_token);
 		break;
 	case SSH2_AGENTC_SIGN_REQUEST:
+		r = process_sign_request(request, response, con->client_token);
+		break;
 	default:
 		r = EINVAL;
 		goto done;
