@@ -31,6 +31,7 @@
 
 #include "agent.h"
 #include "agent-request.h"
+#include <sddl.h>
 
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
@@ -47,31 +48,84 @@ get_user_root(struct agent_connection* con, HKEY *root){
 	return r;
 }
 
+static int
+convert_blob(struct agent_connection* con, char *blob, DWORD blen, char **eblob, DWORD *eblen, int encrypt) {
+	int r = 0;
+	DATA_BLOB in, out;
+	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
+		return ERROR_INTERNAL_ERROR;
+
+	in.cbData = blen;
+	in.pbData = blob;
+	out.cbData = 0;
+	out.pbData = NULL;
+
+	if (encrypt) {
+		if (!CryptProtectData(&in, NULL, NULL, 0, NULL, 0, &out)) {
+			r = GetLastError();
+			goto done;
+		}
+	}
+	else {
+		if (!CryptUnprotectData(&in, NULL, NULL, 0, NULL, 0, &out)) {
+			r = GetLastError();
+			goto done;
+		}
+	}
+
+	
+
+
+	*eblob = malloc(out.cbData);
+	if (*eblob == NULL) {
+		r = ERROR_OUTOFMEMORY;
+		goto done;
+	}
+
+	memcpy(*eblob, out.pbData, out.cbData);
+	*eblen = out.cbData;
+done:
+	if (out.cbData)
+		LocalFree(out.cbData);
+	RevertToSelf();
+	return r;
+}
+
 int
 process_add_identity(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	struct sshkey* key = NULL;
-	int r = 0, r1 = 0, blob_len;
+	int r = 0, r1 = 0, blob_len, eblob_len;
 	size_t comment_len, pubkey_blob_len;
 	u_char *pubkey_blob = NULL;
 	char *thumbprint = NULL, *comment;
 	const char *blob;
+	char* eblob = NULL;
 	HKEY reg = 0, sub = 0, user_root = 0;
+	PSECURITY_DESCRIPTOR sd = NULL;
+	wchar_t* str = L"O:SYG:BAD:P(A;;GA;;;SY)";
+	SECURITY_ATTRIBUTES sa;
+	ConvertStringSecurityDescriptorToSecurityDescriptorW(str, SDDL_REVISION_1, &sd, NULL);
+	sa.nLength = sizeof(sa);
+	sa.lpSecurityDescriptor = sd;
+	sa.bInheritHandle = FALSE;
 
 	blob = sshbuf_ptr(request);
 	if ((r = sshkey_private_deserialize(request, &key)) != 0)
 		goto done;
 	blob_len = (sshbuf_ptr(request) - blob) & 0xffffffff;
 
-	if ((r = sshkey_to_blob(key, &pubkey_blob, &pubkey_blob_len)) != 0) {
+	if ((r = sshkey_to_blob(key, &pubkey_blob, &pubkey_blob_len)) != 0)
 		goto done;
-	}
+
+	if ((r = convert_blob(con, blob, blob_len, &eblob, &eblob_len, 1)) != 0)
+		goto done;
 
 	if (((r = sshbuf_peek_string_direct(request, &comment, &comment_len)) != 0) ||
 	    ((thumbprint = sshkey_fingerprint(key, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL) ||
 	    ((r = get_user_root(con, &user_root)) != 0) ||
 	    ((r = RegCreateKeyExW(user_root, SSHD_KEYS_ROOT, 0, 0, 0, KEY_WRITE, NULL, &reg, NULL)) != 0) ||
 	    ((r = RegCreateKeyExA(reg, thumbprint, 0, 0, 0, KEY_WRITE, NULL, &sub, NULL)) != 0) ||
-	    ((r = RegSetValueExW(sub, NULL, 0, REG_BINARY, blob, blob_len)) != 0) ||
+	    ((r = RegSetValueExW(sub, NULL, 0, REG_BINARY, eblob, eblob_len)) != 0) ||
 	    ((r = RegSetValueExW(sub, L"pub", 0, REG_BINARY, pubkey_blob, pubkey_blob_len)) != 0) ||
 	    ((r = RegSetValueExW(sub, L"type", 0, REG_DWORD, (BYTE*)&key->type, 4)) != 0) ||
 	    ((r = RegSetValueExW(sub, L"comment", 0, REG_BINARY, comment, comment_len)) != 0) )
@@ -83,6 +137,10 @@ done:
 
 	r1 = sshbuf_put_u8(response, (r==0) ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
 
+	if (eblob)
+		free(eblob);
+	if (sd)
+		LocalFree(sd);
 	if (key)
 		sshkey_free(key);
 	if (thumbprint)
@@ -104,8 +162,9 @@ static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 	int r = 0;
 	struct sshkey* prikey = NULL;
 	char *thumbprint = NULL, *regdata = NULL;
-	DWORD regdatalen = 0;
-	struct sshbuf* tmpbuf;
+	DWORD regdatalen = 0, keyblob_len = 0;;
+	struct sshbuf* tmpbuf = NULL;
+	char *keyblob = NULL;
 
 	regdata = malloc(4);
 	regdatalen = 4;
@@ -140,7 +199,10 @@ static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 	if ((r = RegQueryValueExW(sub, NULL, 0, NULL, regdata, &regdatalen)) != 0)
 		goto done;
 
-	if ((tmpbuf = sshbuf_from(regdata, regdatalen)) == NULL) {
+	if ((r = convert_blob(con, regdata, regdatalen, &keyblob, &keyblob_len, FALSE)) != 0)
+		goto done;
+
+	if ((tmpbuf = sshbuf_from(keyblob, keyblob_len)) == NULL) {
 		r = ENOMEM;
 		goto done;
 	}
@@ -150,6 +212,8 @@ static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 		goto done;
 
 done:
+	if (keyblob)
+		free(keyblob);
 	if (regdata)
 		free(regdata);
 	if (tmpbuf)
