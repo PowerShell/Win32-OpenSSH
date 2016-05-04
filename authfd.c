@@ -95,7 +95,7 @@ ssh_get_authentication_socket(int *fdp)
 		*fdp = -1;
 
 #ifdef WIN32_FIXME
-#define SSH_AGENT_ROOT "SYSTEM\\CurrentControlSet\\Control\\SSH\\agent"
+#define SSH_AGENT_ROOT "SOFTWARE\\SSH\\Agent"
 	HKEY agent_root = 0;
 	DWORD agent_pid = 0, tmp_size = 4, pipe_server_pid = 0xff;
 	RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, KEY_QUERY_VALUE, &agent_root);

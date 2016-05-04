@@ -133,13 +133,13 @@ process_request(struct agent_connection* con) {
 
 	switch (type) {
 	case SSH2_AGENTC_ADD_IDENTITY:
-		r = process_add_identity(request, response, con->client_token);
+		r = process_add_identity(request, response, con);
 		break;
 	case SSH2_AGENTC_REQUEST_IDENTITIES:
-		r = process_request_identities(request, response, con->client_token);
+		r = process_request_identities(request, response, con);
 		break;
 	case SSH2_AGENTC_SIGN_REQUEST:
-		r = process_sign_request(request, response, con->client_token);
+		r = process_sign_request(request, response, con);
 		break;
 	default:
 		r = EINVAL;

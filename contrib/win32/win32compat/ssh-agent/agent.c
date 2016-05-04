@@ -65,7 +65,7 @@ void agent_sm_process_action_queue() {
 			memset(&sa, 0, sizeof(sa));
 			sa.bInheritHandle = FALSE;
 			sa.lpSecurityDescriptor = NULL;
-			h = CreateNamedPipe(
+			h = CreateNamedPipeW(
 				AGENT_PIPE_ID,		  // pipe name 
 				PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
 				PIPE_TYPE_BYTE |       // message type pipe 
@@ -165,9 +165,8 @@ int agent_start() {
 		QueueUserWorkItem(iocp_work, NULL, 0);
 	
 	agent_listen();
-	RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT,
-		0, KEY_SET_VALUE, &agent_root);
-	RegSetValueEx(agent_root, L"ProcessID", 0, REG_DWORD, &process_id, 4);
+	RegCreateKeyExW(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, 0, 0, KEY_WRITE, 0, &agent_root, 0);
+	RegSetValueExW(agent_root, L"ProcessID", 0, REG_DWORD, (BYTE*)&process_id, 4);
 	iocp_work(NULL);
 	return 1;
 }

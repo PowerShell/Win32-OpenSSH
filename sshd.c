@@ -2242,7 +2242,9 @@ main(int ac, char **av)
 			error("Could not connect to agent \"%s\": %s",
 			    options.host_key_agent, ssh_err(r));
 	}
-
+#ifdef WIN32_FIXME
+	have_agent = 1;
+#endif
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if (options.host_key_files[i] == NULL)
 			continue;
