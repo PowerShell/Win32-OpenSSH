@@ -85,8 +85,8 @@ convert_blob(struct agent_connection* con, char *blob, DWORD blen, char **eblob,
 	memcpy(*eblob, out.pbData, out.cbData);
 	*eblen = out.cbData;
 done:
-	if (out.cbData)
-		LocalFree(out.cbData);
+	if (out.pbData)
+		LocalFree(out.pbData);
 	RevertToSelf();
 	return r;
 }
