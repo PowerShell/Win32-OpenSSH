@@ -66,18 +66,38 @@
     (x == SSH_COM_AGENT2_FAILURE) || \
     (x == SSH2_AGENT_FAILURE))
 
+int
+ssh_request_reply(int , struct sshbuf *, struct sshbuf *);
+
 
 int	ssh_add_pubkey(int sock, struct sshkey *key, const char *comment, const char* password) {
 	struct sshbuf *msg;
-	int r;
+	u_char *blob = NULL, *status = NULL, *description = NULL, *lang_tag = NULL;
+	size_t blen = 0;
+	int r, status_code;
 
 	if ((msg = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshkey_to_blob(key, &blob, &blen)) != 0)
+		goto out;
+	
+	if ((r = sshbuf_put_cstring(msg, PK_REQUEST_ADD)) != 0 ||
+		(r = sshbuf_put_string(msg, blob, blen)) != 0 ||
+		(r = sshbuf_put_u32(msg, 1)) != 0 ||
+		(r = sshbuf_put_cstring(msg, "comment")) != 0 ||
+		(r = sshbuf_put_cstring(msg, comment)) != 0 ||
+		(r = sshbuf_put_u8(msg, 1)) != 0)
+		goto out;
 
-	if ((r = sshbuf_put_cstring(msg, PK_REQUEST_ADD)) != 0 )
+	if ((r = ssh_request_reply(sock, msg, msg) != 0))
+		goto out;
 
 
-	return 0;
+
+out:
+	if (blob)
+		free(blob);
+	return r;
 }
 
 int	ssh_list_pubkeys(int sock, struct ssh_identitylist **idlp) {
