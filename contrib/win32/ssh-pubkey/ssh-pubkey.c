@@ -143,7 +143,7 @@ static int
 do_file(int agent_fd, int deleting, char *filename)
 {
 	struct sshkey *public;
-	char *comment = NULL;
+	char *comment = NULL, *password = NULL;
 	int r, ret = -1;
 
 	if ((r = sshkey_load_public(filename, &public, &comment)) != 0) {
@@ -161,7 +161,13 @@ do_file(int agent_fd, int deleting, char *filename)
 				filename, ssh_err(r));
 	}
 	else {
-		if ((r = ssh_add_pubkey(agent_fd, public, comment)) == 0) {
+		if ((password = read_passphrase("Enter your password: ",
+			RP_ALLOW_STDIN)) == NULL) {
+			ret = ENOMEM;
+			goto out;
+		}
+
+		if ((r = ssh_add_pubkey(agent_fd, public, comment, password)) == 0) {
 			fprintf(stderr, "Public key added: %s (%s)\n", filename, comment);
 			ret = 0;
 		}

@@ -55,6 +55,7 @@
 #include "atomicio.h"
 #include "misc.h"
 #include "ssherr.h"
+#include "pubkeyfd.h"
 
 #define MAX_AGENT_IDENTITIES	2048		/* Max keys in agent reply */
 #define MAX_AGENT_REPLY_LEN	(256 * 1024) 	/* Max bytes in agent reply */
@@ -66,7 +67,16 @@
     (x == SSH2_AGENT_FAILURE))
 
 
-int	ssh_add_pubkey(int sock, struct sshkey *key, const char *comment) {
+int	ssh_add_pubkey(int sock, struct sshkey *key, const char *comment, const char* password) {
+	struct sshbuf *msg;
+	int r;
+
+	if ((msg = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+
+	if ((r = sshbuf_put_cstring(msg, PK_REQUEST_ADD)) != 0 )
+
+
 	return 0;
 }
 
