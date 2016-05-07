@@ -153,10 +153,12 @@ DWORD WINAPI iocp_work(LPVOID lpParam) {
 	}
 }
 
-int agent_start() {
+int agent_start(BOOL dbg, BOOL child, HANDLE pipe) {
 	int i;
 	HKEY agent_root;
 	DWORD process_id = GetCurrentProcessId();
+
+	debug("agent_start pid:%d, dbg:%d, child:%d, pipe:%d", process_id, dbg, child, pipe);
 	action_queue = 0;
 	list = NULL;
 	ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, (ULONG_PTR)NULL, 0);

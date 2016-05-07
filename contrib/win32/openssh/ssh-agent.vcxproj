@@ -197,6 +197,7 @@
     <ClInclude Include="..\..\..\servconf.h" />
     <ClInclude Include="..\win32compat\ssh-agent\agent-request.h" />
     <ClInclude Include="..\win32compat\ssh-agent\agent.h" />
+    <ClInclude Include="..\win32compat\ssh-agent\config.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\auth.c" />

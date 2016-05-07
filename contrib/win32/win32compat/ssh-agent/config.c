@@ -45,11 +45,12 @@
 #include "myproposal.h"
 #include "digest.h"
 
-int use_privsep = -1;
+static int use_privsep = -1;
 Buffer cfg;
 ServerOptions options;
 struct passwd *privsep_pw = NULL;
 char *forced_command = NULL;
+static char *config_file_name = _PATH_SERVER_CONFIG_FILE;
 
 int	 auth2_methods_valid(const char * c, int i) {
 	return 1;
@@ -58,4 +59,51 @@ int	 auth2_methods_valid(const char * c, int i) {
 int
 mm_is_monitor(void) {
 	return 0;
+}
+
+int	 kexgex_server(struct ssh * sh) {
+	return -1;
+}
+
+static
+int GetCurrentModulePath(char *path, int pathSize)
+{
+	if (GetModuleFileName(NULL, path, pathSize)) {
+		int i;
+		int lastSlashPos = 0;
+
+		for (i = 0; path[i]; i++) {
+			if (path[i] == '/' || path[i] == '\\') {
+				lastSlashPos = i;
+			}
+		}
+
+		path[lastSlashPos] = 0;
+		return 0;
+	}
+	return -1;
+}
+
+int load_config() {
+	char basePath[MAX_PATH] = { 0 };
+	char path[MAX_PATH] = { 0 };
+
+	/* TODO - account for UNICODE paths*/
+	if (GetCurrentModulePath(basePath, MAX_PATH) == 0)
+	{
+		strncpy(path, basePath, MAX_PATH);
+		strncat(path, "/sshd_config", MAX_PATH);
+		config_file_name = path;
+	}
+	buffer_init(&cfg);
+	initialize_server_options(&options);
+	load_server_config(config_file_name, &cfg);
+	parse_server_config(&options, config_file_name, &cfg, NULL);
+	fill_default_server_options(&options);
+
+	return 0;
+}
+
+int config_log_level() {
+	return options.log_level;
 }
