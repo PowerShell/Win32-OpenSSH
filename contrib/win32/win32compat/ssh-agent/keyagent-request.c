@@ -381,3 +381,22 @@ done:
 		RegCloseKey(sub);
 	return r;
 }
+
+
+int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+	int r;
+	u_char type;
+
+	if ((r = sshbuf_get_u8(request, &type)) != 0)
+		return r;
+	switch (type) {
+	case SSH2_AGENTC_ADD_IDENTITY:
+		return process_add_identity(request, response, con);
+	case SSH2_AGENTC_REQUEST_IDENTITIES:
+		return process_request_identities(request, response, con);
+	case SSH2_AGENTC_SIGN_REQUEST:
+		return process_sign_request(request, response, con);
+	default:
+		return EINVAL;		
+	}
+}

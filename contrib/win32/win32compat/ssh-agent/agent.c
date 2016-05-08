@@ -28,18 +28,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "agent.h"
-#define AGENT_PIPE_ID L"\\\\.\\pipe\\ssh-agent"
+#include "agent.h"s
 #define BUFSIZE 5 * 1024
 
 static HANDLE ioc_port = NULL;
 static BOOL debug_mode = FALSE;
 
-#define NUM_LISTENERS 1
-#define KEY_AGENT_PIPE_ID L"\\\\.\\pipe\\ssh-agent"
+#define NUM_LISTENERS 3
+#define KEY_AGENT_PIPE_ID L"\\\\.\\pipe\\ssh-keyagent"
+#define PUBKEY_AGENT_PIPE_ID L"\\\\.\\pipe\\ssh-pubkeyagent"
+#define AUTH_AGENT_PIPE_ID L"\\\\.\\pipe\\ssh-authagent"
 
-static wchar_t *pipe_ids[NUM_LISTENERS] = { KEY_AGENT_PIPE_ID };
-static enum agent_type types[NUM_LISTENERS] = { KEY_AGENT };
+static wchar_t *pipe_ids[NUM_LISTENERS] = { KEY_AGENT_PIPE_ID, PUBKEY_AGENT_PIPE_ID, AUTH_AGENT_PIPE_ID };
+static enum agent_type types[NUM_LISTENERS] = { KEY_AGENT, PUBKEY_AGENT, PUBKEY_AUTH_AGENT};
 HANDLE event_stop_agent;
 
 struct listener {

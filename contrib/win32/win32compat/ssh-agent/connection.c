@@ -119,7 +119,6 @@ static int
 process_request(struct agent_connection* con) {
 	int r;
 	struct sshbuf *request = NULL, *response = NULL;
-	u_char type;
 	
 	request = sshbuf_from(con->io_buf.buf, con->io_buf.num_bytes);
 	response = sshbuf_new();
@@ -128,23 +127,14 @@ process_request(struct agent_connection* con) {
 		goto done;
 	}
 
-	if ((r = sshbuf_get_u8(request, &type)) != 0)
-		goto done;
-
-	switch (type) {
-	case SSH2_AGENTC_ADD_IDENTITY:
-		r = process_add_identity(request, response, con);
-		break;
-	case SSH2_AGENTC_REQUEST_IDENTITIES:
-		r = process_request_identities(request, response, con);
-		break;
-	case SSH2_AGENTC_SIGN_REQUEST:
-		r = process_sign_request(request, response, con);
-		break;
-	default:
+	if (con->type == KEY_AGENT)
+		r = process_keyagent_request(request, response, con);
+	else if (con->type == PUBKEY_AGENT) 
+		r = process_pubkeyagent_request(request, response, con);
+	else if (con->type == PUBKEY_AUTH_AGENT) 
+		r = process_authagent_request(request, response, con);
+	else 
 		r = EINVAL;
-		goto done;
-	}
 
 done:
 	if (request)

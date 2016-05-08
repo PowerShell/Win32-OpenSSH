@@ -105,7 +105,7 @@ ssh_get_authentication_socket(int *fdp)
 	}
 	
 	HANDLE h = CreateFile(
-		"\\\\.\\pipe\\ssh-agent",   // pipe name 
+		"\\\\.\\pipe\\ssh-keyagent",   // pipe name 
 		GENERIC_READ |  // read and write access 
 		GENERIC_WRITE,
 		0,              // no sharing 

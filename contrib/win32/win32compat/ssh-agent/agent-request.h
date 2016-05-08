@@ -11,6 +11,6 @@ typedef unsigned __int64 u_int64_t;
 #include "digest.h"
 
 
-int process_add_identity(struct sshbuf*, struct sshbuf*, struct agent_connection*);
-int process_request_identities(struct sshbuf*, struct sshbuf*, struct agent_connection*);
-int process_sign_request(struct sshbuf*, struct sshbuf*, struct agent_connection*);
+int process_keyagent_request(struct sshbuf*, struct sshbuf*, struct agent_connection*);
+int process_pubkeyagent_request(struct sshbuf*, struct sshbuf*, struct agent_connection*);
+int process_authagent_request(struct sshbuf*, struct sshbuf*, struct agent_connection*);
