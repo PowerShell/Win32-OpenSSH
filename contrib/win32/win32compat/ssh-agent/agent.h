@@ -7,6 +7,13 @@
 #define SSHD_KEYS_ROOT SSH_ROOT L"\\Keys"
 
 #define HEADER_SIZE 4
+
+enum agent_type {
+	KEY_AGENT,
+	PUBKEY_AGENT,
+	PUBKEY_AUTH_AGENT
+};
+
 struct agent_connection {
 	OVERLAPPED ol;
 	HANDLE connection;
@@ -23,14 +30,13 @@ struct agent_connection {
 		WRITING,
 		DONE
 	} state;
-	struct agent_connection* next;
+	enum agent_type type;
 };
 
 void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);
 void agent_connection_on_error(struct agent_connection* , DWORD );
 void agent_connection_disconnect(struct agent_connection*);
 
-int agent_start(BOOL debug, BOOL child, HANDLE pipe);
+int agent_start(BOOL, BOOL, HANDLE, enum agent_type);
 void agent_shutdown();
-void agent_listen();
 void agent_cleanup_connection(struct agent_connection*);

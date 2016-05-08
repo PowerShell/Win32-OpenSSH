@@ -84,6 +84,7 @@ BOOL WINAPI ctrl_c_handler(
 	_In_ DWORD dwCtrlType
 	) {
 	/* for any Ctrl type, shutdown agent*/
+	debug("Ctrl+C received");
 	agent_shutdown();
 	return TRUE;
 }
@@ -98,11 +99,11 @@ int main(int argc, char **argv) {
 				/* console app - start in debug mode*/
 				SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
 				log_init("ssh-agent", 7, 1, 1);
-				return agent_start(TRUE, FALSE, 0);
+				return agent_start(TRUE, FALSE, 0, 0);
 			}
 			else {
 				log_init("ssh-agent", config_log_level(), 1, 0);
-				return agent_start(FALSE, TRUE, (HANDLE)atoi(*argv));
+				return agent_start(FALSE, TRUE, (HANDLE)atoi(*(argv+1)), atoi(*(argv+2)));
 			}
 		}
 		else
@@ -118,6 +119,6 @@ int scm_start_servie(DWORD num, LPWSTR* args) {
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	log_init("ssh-agent", config_log_level(), 1, 0);
-	return agent_start(FALSE, FALSE, 0);
+	return agent_start(FALSE, FALSE, 0, 0);
 }
 
