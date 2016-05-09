@@ -24,6 +24,7 @@
     <ClCompile Include="..\ssh-pubkey\ssh-pubkey.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\ssh-pubkey\ssh-pubkeydefs.h" />
     <ClInclude Include="..\ssh-pubkey\pubkeyfd.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
