@@ -49,14 +49,14 @@ get_user_root(struct agent_connection* con, HKEY *root){
 }
 
 static int
-convert_blob(struct agent_connection* con, char *blob, DWORD blen, char **eblob, DWORD *eblen, int encrypt) {
+convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **eblob, DWORD *eblen, int encrypt) {
 	int r = 0;
 	DATA_BLOB in, out;
 	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
 		return ERROR_INTERNAL_ERROR;
 
 	in.cbData = blen;
-	in.pbData = blob;
+	in.pbData = (char*)blob;
 	out.cbData = 0;
 	out.pbData = NULL;
 

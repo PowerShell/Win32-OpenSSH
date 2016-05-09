@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "agent.h"s
+#include "agent.h"
 #define BUFSIZE 5 * 1024
 
 static HANDLE ioc_port = NULL;
@@ -118,7 +118,7 @@ process_connection(HANDLE pipe, int type) {
 	con->type = type;
 	CreateIoCompletionPort(pipe, ioc_port, (ULONG_PTR)con, 0);
 	agent_connection_on_io(con, 0, &con->ol);
-	iocp_work(NULL);
+	return iocp_work(NULL);
 }
 
 static void 
@@ -186,10 +186,10 @@ agent_listen_loop() {
 				/* todo - spawn a child to take care of this*/
 				wchar_t path[MAX_PATH], module_path[MAX_PATH];
 				PROCESS_INFORMATION pi;
-				STARTUPINFO si;
+				STARTUPINFOW si;
 
-				si.cb = sizeof(STARTUPINFO);
-				memset(&si, 0, sizeof(STARTUPINFO));
+				si.cb = sizeof(STARTUPINFOW);
+				memset(&si, 0, sizeof(STARTUPINFOW));
 				GetModuleFileNameW(NULL, module_path, MAX_PATH);
 				swprintf_s(path, MAX_PATH, L"%s %d %d", module_path, con, listeners[r - 1].type);
 				if (CreateProcessW(NULL, path, NULL, NULL, TRUE,

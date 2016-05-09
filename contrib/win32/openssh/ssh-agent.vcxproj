@@ -198,7 +198,6 @@
     <ClInclude Include="..\ssh-pubkey\ssh-pubkeydefs.h" />
     <ClInclude Include="..\win32compat\ssh-agent\agent-request.h" />
     <ClInclude Include="..\win32compat\ssh-agent\agent.h" />
-    <ClInclude Include="..\win32compat\ssh-agent\config.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\auth.c" />
@@ -208,7 +207,7 @@
     <ClCompile Include="..\win32compat\ssh-agent\agent-main.c" />
     <ClCompile Include="..\win32compat\ssh-agent\agent.c" />
     <ClCompile Include="..\win32compat\ssh-agent\authagent-request.c" />
-    <ClCompile Include="..\win32compat\ssh-agent\config.c" />
+    <ClCompile Include="..\win32compat\ssh-agent\agentconfig.c" />
     <ClCompile Include="..\win32compat\ssh-agent\connection.c" />
     <ClCompile Include="..\win32compat\ssh-agent\keyagent-request.c" />
     <ClCompile Include="..\win32compat\ssh-agent\pubkeyagent-request.c" />

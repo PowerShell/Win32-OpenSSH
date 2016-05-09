@@ -40,3 +40,6 @@ void agent_connection_disconnect(struct agent_connection*);
 int agent_start(BOOL, BOOL, HANDLE, enum agent_type);
 void agent_shutdown();
 void agent_cleanup_connection(struct agent_connection*);
+
+int load_config();
+int config_log_level();

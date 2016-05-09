@@ -28,14 +28,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include "agent.h"
-#include "config.h"
+
 
 int scm_start_servie(DWORD, LPWSTR*);
 
-SERVICE_TABLE_ENTRY diapatch_table[] =
+SERVICE_TABLE_ENTRYW dispatch_table[] =
 {
-	{ L"ssh-agent", (LPSERVICE_MAIN_FUNCTION)scm_start_servie },
+	{ L"ssh-agent", (LPSERVICE_MAIN_FUNCTIONW)scm_start_servie },
 	{ NULL, NULL }
 };
 static SERVICE_STATUS_HANDLE service_status_handle;
@@ -93,7 +94,7 @@ int main(int argc, char **argv) {
 	
 	w32posix_initialize();
 	load_config();
-	if (!StartServiceCtrlDispatcher(diapatch_table))  {
+	if (!StartServiceCtrlDispatcherW(dispatch_table))  {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
 			if (argc == 1) {
 				/* console app - start in debug mode*/
@@ -102,8 +103,10 @@ int main(int argc, char **argv) {
 				return agent_start(TRUE, FALSE, 0, 0);
 			}
 			else {
+				char* h = 0;
+				h += atoi(*(argv + 1));
 				log_init("ssh-agent", config_log_level(), 1, 0);
-				return agent_start(FALSE, TRUE, (HANDLE)atoi(*(argv+1)), atoi(*(argv+2)));
+				return agent_start(FALSE, TRUE, h, atoi(*(argv+2)));
 			}
 		}
 		else
@@ -113,7 +116,7 @@ int main(int argc, char **argv) {
 }
 
 int scm_start_servie(DWORD num, LPWSTR* args) {
-	service_status_handle = RegisterServiceCtrlHandler(L"ssh-agent", service_handler);
+	service_status_handle = RegisterServiceCtrlHandlerW(L"ssh-agent", service_handler);
 	ZeroMemory(&service_status, sizeof(service_status));
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);

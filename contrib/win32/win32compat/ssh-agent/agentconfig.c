@@ -44,6 +44,7 @@
 #include "auth.h"
 #include "myproposal.h"
 #include "digest.h"
+#include "agent.h"
 
 static int use_privsep = -1;
 Buffer cfg;
