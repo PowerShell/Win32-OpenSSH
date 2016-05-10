@@ -29,74 +29,143 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#define WIN32_NO_STATUS
 #include <Windows.h>
+#undef WIN32_NO_STATUS
 #include <Ntsecapi.h>
-//#include <ntstatus.h>
+#include <ntstatus.h>
 #include "agent.h"
 #include "agent-request.h"
 
+static void 
+InitLsaString(LSA_STRING *lsa_string, const char *str)
+{
+	if (str == NULL)
+		memset(lsa_string, 0, sizeof(LSA_STRING));
+	else {
+		lsa_string->Buffer = str;
+		lsa_string->Length = strlen(str);
+		lsa_string->MaximumLength = lsa_string->Length + 1;
+	}
+}
+
+static HANDLE 
+generate_user_token(wchar_t* user) {
+	HANDLE lsa_handle = 0, token = 0;;
+	LSA_OPERATIONAL_MODE mode;
+	ULONG auth_package_id;
+	NTSTATUS ret, subStatus;
+	KERB_S4U_LOGON *s4u_logon = NULL;
+	size_t logon_info_size;
+	LSA_STRING logon_process_name, auth_package_name, originName;
+	TOKEN_SOURCE sourceContext;
+	PKERB_INTERACTIVE_PROFILE pProfile = NULL;
+	LUID            logonId;
+	QUOTA_LIMITS    quotas;
+	DWORD           cbProfile;
+	
+	InitLsaString(&logon_process_name, "ssh-agent");
+	InitLsaString(&auth_package_name, MICROSOFT_KERBEROS_NAME_A);
+	//InitLsaString(&auth_package_name, "Negotiate");
+	InitLsaString(&originName, "sshd");
+	if (ret = LsaRegisterLogonProcess(&logon_process_name, &lsa_handle, &mode) != STATUS_SUCCESS)
+		goto done;
+
+	if (ret = LsaLookupAuthenticationPackage(lsa_handle, &auth_package_name, &auth_package_id) != STATUS_SUCCESS)
+		goto done;
+
+	logon_info_size = sizeof(KERB_S4U_LOGON);
+	logon_info_size += (wcslen(user) * 2 + 2);
+	s4u_logon = malloc(logon_info_size);
+	if (s4u_logon == NULL)
+		goto done;
+
+	s4u_logon->MessageType = KerbS4ULogon;
+	s4u_logon->Flags = 0;
+	s4u_logon->ClientUpn.Length = wcslen(user) * 2;
+	s4u_logon->ClientUpn.MaximumLength = s4u_logon->ClientUpn.Length;
+	s4u_logon->ClientUpn.Buffer = (WCHAR*)(s4u_logon + 1);
+	memcpy(s4u_logon->ClientUpn.Buffer, user, s4u_logon->ClientUpn.Length + 2);
+	s4u_logon->ClientRealm.Length = 0;
+	s4u_logon->ClientRealm.MaximumLength = 0;
+	s4u_logon->ClientRealm.Buffer = 0;
+
+	memcpy(sourceContext.SourceName,".Jobs   ", sizeof(sourceContext.SourceName));
+
+	if (AllocateLocallyUniqueId(&sourceContext.SourceIdentifier) != TRUE)
+		goto done;
+
+	if (ret = LsaLogonUser(lsa_handle, 
+		&originName, 
+		Network, 
+		auth_package_id, 
+		s4u_logon, 
+		logon_info_size, 
+		NULL, 
+		&sourceContext,
+		(PVOID*)&pProfile,
+		&cbProfile,
+		&logonId,
+		&token,
+		&quotas,
+		&subStatus) != STATUS_SUCCESS)
+		goto done;
+
+done:
+	if (lsa_handle)
+		LsaDeregisterLogonProcess(lsa_handle);
+	if (s4u_logon)
+		free(s4u_logon);
+	if (pProfile)
+		LsaFreeReturnBuffer(pProfile);
+
+	return token;
+}
+
+#define AUTH_REQUEST "keyauthenticate"
+#define MAX_USER_NAME_LEN 255 + 255
 
 int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
-	while (1)
-	{
-		HANDLE lsa_handle;
-		PLSA_OPERATIONAL_MODE mode;
-		ULONG auth_package_id;
-		NTSTATUS ret;
-		KERB_S4U_LOGON *s4u_logon;
-		size_t logon_info_size;
-		LSA_STRING logon_process_name, auth_package_name, originName;
-		InitLsaString(&logon_process_name, "ssh-agent");
-		//InitLsaString(&auth_package_name, MICROSOFT_KERBEROS_NAME_A);
-		InitLsaString(&auth_package_name, "Negotiate");
-		InitLsaString(&originName, "sshd");
-		if (ret = LsaRegisterLogonProcess(&logon_process_name, &lsa_handle, &mode) != STATUS_SUCCESS)
-			break;
+	int r = 0;
+	char* opn, key_blob, user, sig, blob;
+	size_t opn_len, key_blob_len, user_len, sig_len, blob_len;
+	struct sshkey *key = NULL;
+	HANDLE token = NULL, dup_token = NULL;
+	wchar_t wuser[MAX_USER_NAME_LEN];
+	PWSTR wuser_home = NULL;
 
-		if (ret = LsaLookupAuthenticationPackage(lsa_handle, &auth_package_name, &auth_package_id) != STATUS_SUCCESS)
-			break;
-#define USER_NAME L"user@domain"
-		logon_info_size = sizeof(KERB_S4U_LOGON);
-		logon_info_size += (wcslen(USER_NAME) * 2 + 2);
-		s4u_logon = malloc(logon_info_size);
-		s4u_logon->MessageType = KerbS4ULogon;
-		s4u_logon->Flags = 0;
-		s4u_logon->ClientUpn.Length = wcslen(USER_NAME) * 2;
-		s4u_logon->ClientUpn.MaximumLength = s4u_logon->ClientUpn.Length;
-		s4u_logon->ClientUpn.Buffer = (WCHAR*)(s4u_logon + 1);
-		memcpy(s4u_logon->ClientUpn.Buffer, USER_NAME, s4u_logon->ClientUpn.Length + 2);
-		s4u_logon->ClientRealm.Length = 0;
-		s4u_logon->ClientRealm.MaximumLength = 0;
-		s4u_logon->ClientRealm.Buffer = 0;
+	user = NULL;
+	if ((r = sshbuf_get_string_direct(request, &opn, &opn_len)) != 0 ||
+	    (r = sshbuf_get_string_direct(request, &key_blob, &key_blob_len)) != 0 ||
+	    (r = sshbuf_get_cstring(request, &user, &user_len)) != 0 ||
+	    (r = sshbuf_get_string_direct(request, &sig, &sig_len)) != 0 ||
+	    (r = sshbuf_get_string_direct(request, &blob, &blob_len)) != 0 ||
+	    (r = sshkey_from_blob(key_blob, key_blob_len, &key)) != 0)
+		goto done;
 
-		TOKEN_SOURCE sourceContext;
-		RtlCopyMemory(
-			sourceContext.SourceName,
-			".Jobs   ",
-			sizeof(sourceContext.SourceName)
-			);
-
-		if (AllocateLocallyUniqueId(&sourceContext.SourceIdentifier) != TRUE)
-			break;
-
-		PKERB_INTERACTIVE_PROFILE pProfile = NULL;
-		LUID            logonId;
-		QUOTA_LIMITS    quotas;
-		NTSTATUS        subStatus;
-		DWORD           cbProfile;
-		HANDLE          hToken = INVALID_HANDLE_VALUE;
-		if (ret = LsaLogonUser(lsa_handle, &originName, Network, auth_package_id, s4u_logon, logon_info_size, NULL, &sourceContext,
-			(PVOID*)&pProfile,
-			&cbProfile,
-			&logonId,
-			&hToken,
-			&quotas,
-			&subStatus) != STATUS_SUCCESS)
-			break;
-
-		CloseHandle(hToken);
-		LsaDeregisterLogonProcess(lsa_handle);
-		break;
+	if ((opn_len != strlen(AUTH_REQUEST)) || (memcmp(opn, AUTH_REQUEST, opn_len) != 0)) {
+		r = EINVAL;
+		goto done;
 	}
-	return -1;
+
+	if (0 == MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN) {
+		r = GetLastError();
+		goto done;
+	}
+
+	if ((token = generate_user_token(wuser)) == 0) {
+		r = EINVAL;
+		goto done;
+	}
+	
+done:
+	if (user)
+		free(user);
+	if (key)
+		sshkey_free(key);
+	if (token)
+		CloseHandle(token);
+	if (wuser_home)
+		CoTaskMemFree(wuser_home);
+	return r;
 }

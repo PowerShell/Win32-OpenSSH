@@ -73,9 +73,6 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 		}
 	}
 
-	
-
-
 	*eblob = malloc(out.cbData);
 	if (*eblob == NULL) {
 		r = ERROR_OUTOFMEMORY;
@@ -133,7 +130,7 @@ process_add_identity(struct sshbuf* request, struct sshbuf* response, struct age
 
 done:
 
-	/* TODO if r failed the delete reg entries*/
+	/* TODO if r failed, delete reg entries*/
 
 	r1 = sshbuf_put_u8(response, (r==0) ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
 
