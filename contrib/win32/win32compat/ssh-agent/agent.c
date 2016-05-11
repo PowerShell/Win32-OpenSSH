@@ -29,6 +29,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include "agent.h"
+#include <sddl.h>
 #define BUFSIZE 5 * 1024
 
 static HANDLE ioc_port = NULL;
@@ -40,7 +41,8 @@ static BOOL debug_mode = FALSE;
 #define AUTH_AGENT_PIPE_ID L"\\\\.\\pipe\\ssh-authagent"
 
 static wchar_t *pipe_ids[NUM_LISTENERS] = { KEY_AGENT_PIPE_ID, PUBKEY_AGENT_PIPE_ID, AUTH_AGENT_PIPE_ID };
-static enum agent_type types[NUM_LISTENERS] = { KEY_AGENT, PUBKEY_AGENT, PUBKEY_AUTH_AGENT};
+static enum agent_type pipe_types[NUM_LISTENERS] = { KEY_AGENT, PUBKEY_AGENT, PUBKEY_AUTH_AGENT};
+static wchar_t *pipe_sddls[NUM_LISTENERS] = { L"D:P(A;; GA;;; AU)", L"D:P(A;; GA;;; AU)", L"D:P(A;; GA;;; AU)" };
 HANDLE event_stop_agent;
 
 struct listener {
@@ -61,9 +63,14 @@ init_listeners() {
 			return GetLastError();
 		}
 		listeners[i].pipe_id = pipe_ids[i];
-		listeners[i].type = types[i];
+		listeners[i].type = pipe_types[i];
 		listeners[i].pipe = INVALID_HANDLE_VALUE;
 		listeners[i].sa.bInheritHandle = TRUE;
+		if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(pipe_sddls[i], SDDL_REVISION_1,
+			&listeners[i].sa.lpSecurityDescriptor, &listeners[i].sa.nLength)) {
+			debug("cannot convert sddl ERROR:%d", GetLastError());
+			return GetLastError();
+		}
 	}
 
 	return 0;
