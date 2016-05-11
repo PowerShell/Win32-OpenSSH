@@ -36,6 +36,7 @@
 #include <ntstatus.h>
 #include "agent.h"
 #include "agent-request.h"
+#include "key.h"
 
 static void 
 InitLsaString(LSA_STRING *lsa_string, const char *str)
@@ -65,8 +66,8 @@ generate_user_token(wchar_t* user) {
 	DWORD           cbProfile;
 	
 	InitLsaString(&logon_process_name, "ssh-agent");
-	InitLsaString(&auth_package_name, MICROSOFT_KERBEROS_NAME_A);
-	//InitLsaString(&auth_package_name, "Negotiate");
+	//InitLsaString(&auth_package_name, MICROSOFT_KERBEROS_NAME_A);
+	InitLsaString(&auth_package_name, "Negotiate");
 	InitLsaString(&originName, "sshd");
 	if (ret = LsaRegisterLogonProcess(&logon_process_name, &lsa_handle, &mode) != STATUS_SUCCESS)
 		goto done;
@@ -127,12 +128,13 @@ done:
 
 int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	int r = 0;
-	char* opn, key_blob, user, sig, blob;
+	char *opn, *key_blob, *user, *sig, *blob;
 	size_t opn_len, key_blob_len, user_len, sig_len, blob_len;
 	struct sshkey *key = NULL;
-	HANDLE token = NULL, dup_token = NULL;
+	HANDLE token = NULL, dup_token = NULL, client_proc = NULL;
 	wchar_t wuser[MAX_USER_NAME_LEN];
 	PWSTR wuser_home = NULL;
+	ULONG client_pid;
 
 	user = NULL;
 	if ((r = sshbuf_get_string_direct(request, &opn, &opn_len)) != 0 ||
@@ -148,12 +150,17 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 		goto done;
 	}
 
-	if (0 == MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN) {
+	if (0 == MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN)) {
 		r = GetLastError();
 		goto done;
 	}
 
-	if ((token = generate_user_token(wuser)) == 0) {
+	if (key_verify(key, sig, sig_len, blob, blob_len) != 1 ||
+	    (token = generate_user_token(wuser)) == 0 || 
+	    (FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
+	    ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
+	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
+	    (sshbuf_put_u32(response, dup_token) != 0) ) {
 		r = EINVAL;
 		goto done;
 	}
@@ -167,5 +174,7 @@ done:
 		CloseHandle(token);
 	if (wuser_home)
 		CoTaskMemFree(wuser_home);
+	if (client_proc)
+		CloseHandle(client_proc);
 	return r;
 }

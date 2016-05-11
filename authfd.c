@@ -154,7 +154,7 @@ ssh_get_authentication_socket(int *fdp)
 }
 
 /* Communicate with agent: send request and read reply */
-static int
+int
 ssh_request_reply(int sock, struct sshbuf *request, struct sshbuf *reply)
 {
 	int r;

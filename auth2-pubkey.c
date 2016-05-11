@@ -207,93 +207,74 @@ userauth_pubkey(Authctxt *authctxt)
      * On pure win32 try to logon using lsa first.
      */
 
-    #ifdef WIN32_FIXME
+#ifdef WIN32_FIXME
+		{
+#define SSH_AGENT_ROOT "SOFTWARE\\SSH\\Agent"
+			HKEY agent_root = 0;
+			DWORD agent_pid = 0, tmp_size = 4, pipe_server_pid = 0xff;
+			int sock = -1, r;
+			u_char *blob = NULL;
+			size_t blen = 0;
+			DWORD token = 0;
+			HANDLE h = INVALID_HANDLE_VALUE;
+			struct sshbuf *msg = NULL;
 
-    authctxt -> methoddata = NULL;
- 
-    /*
-     * Retrieve name of current login user (i.e. sshd process owner).
-     */
-     
-    GetUserName(currentUser, &currentUserSize);
+			while (1) {
+				RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, KEY_QUERY_VALUE, &agent_root);
+				if (agent_root)
+					RegQueryValueEx(agent_root, "ProcessId", 0, NULL, &agent_pid, &tmp_size);
+					
 
-    /*
-     * Try to get token from lsa, but only if targetUser != currentUser.
-     * Owerthise we already have targetUser's token in current thread, so
-     * we only need key verify from original OpenSSH code.
-     */
+				h = CreateFile(
+					"\\\\.\\pipe\\ssh-authagent",   // pipe name 
+					GENERIC_READ |  // read and write access 
+					GENERIC_WRITE,
+					0,              // no sharing 
+					NULL,           // default security attributes
+					OPEN_EXISTING,  // opens existing pipe 
+					FILE_FLAG_OVERLAPPED,              // attributes 
+					NULL);          // no template file 
+				if (h == INVALID_HANDLE_VALUE) 
+					break;
 
-    targetIsCurrent = (strcmp(currentUser, authctxt -> user) == 0);
-    
-    if (targetIsCurrent)
-    {
-      doOpenSSHVerify = 1;
-    }
-    else
-    {
-      loginStat = LsaLogon(&authctxt->methoddata, HomeDirLsaW,
-                               authctxt -> user, pkblob, blen, sig, slen,
-                                 buffer_ptr(&b), buffer_len(&b), datafellows);
+				if (!GetNamedPipeServerProcessId(h, &pipe_server_pid) || (agent_pid != pipe_server_pid)) 
+					break;
 
-      /*
-       * If lsa logon process success.
-       */
-  
-      if (loginStat == 0)
-      {
-        /*
-         * And user authorized OK.
-         */
-    
-        if (authctxt->methoddata)
-        {
-          doOpenSSHVerify = 0;
-          
-          /*
-           * This is part of openssh authorization needed for parsing
-           * 'options' block in key.
-           */
-      
-          authctxt -> pw -> pw_dir = GetHomeDir(authctxt -> user);
-      
-          if (PRIVSEP(user_key_allowed(authctxt -> pw, key, 1))) // PRAGMA:TODO
-          {
-            authenticated = 1;
-          }
-          else
-          {
-            authenticated = 0;
-          }
-          
-          buffer_free(&b);
+				sock = w32_allocate_fd_for_handle(h, FALSE);
+				msg = sshbuf_new();
+				if (!msg)
+					break;
+				if ((r = sshbuf_put_cstring(msg, "keyauthenticate")) != 0 ||
+					(r = sshkey_to_blob(key, &blob, &blen)) != 0 ||
+					(r = sshbuf_put_string(msg, blob, blen)) != 0 ||
+					(r = sshbuf_put_cstring(msg, authctxt->pw->pw_name)) != 0 ||
+					(r = sshbuf_put_string(msg, sig, slen)) != 0 ||
+					(r = sshbuf_put_string(msg, buffer_ptr(&b), buffer_len(&b))) != 0 ||
+					(r = ssh_request_reply(sock, msg, msg)) != 0 ||
+					(r = sshbuf_get_u32(msg, &token)) != 0 )
+					break;
 
-          free(sig);
-        }
-      }
-    }
-    
-    if (doOpenSSHVerify)
-    {
-      /*
-       * If lsa fails, test for correct signature using openssh code.
-       */
-      
-      authctxt -> pw -> pw_dir = GetHomeDir(authctxt -> user);
-  
-      if (PRIVSEP(user_key_allowed(authctxt->pw, key, 0))  //PRAGMA:TODO
-		  &&
-              PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b), buffer_len(&b))) == 1)
-    
-      {
-        authenticated = 1;
-      }
-    }
-    
-    /*
-     * Original code.
-     */
+				break;
+				
+			}
+			if (agent_root)
+				RegCloseKey(agent_root);
+			if (blob)
+				free(blob);
+			if (sock != -1)
+				close(sock);
+			if (msg)
+				sshbuf_free(msg);
 
-    #else /* #ifdef WIN32_FIXME */
+			if (token) {
+				authenticated = 1;
+				authctxt->methoddata = token;
+			}
+				
+		}
+
+
+#else /* #ifdef WIN32_FIXME */
 
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 1)) &&
 		    PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b),
