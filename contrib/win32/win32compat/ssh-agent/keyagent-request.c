@@ -254,17 +254,56 @@ done:
 	return r;
 }
 
+static int
+process_remove_key(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+	HKEY user_root = 0, root = 0;
+	char *blob, *thumbprint = NULL;
+	size_t blen;
+	int r = 0, success = 0, request_invalid = 0;
+	struct sshkey *key = NULL;
+
+	if (sshbuf_get_string_direct(request, &blob, &blen) != 0 ||
+	    sshkey_from_blob(blob, blen, &key) != 0) { 
+		request_invalid = 1;
+		goto done;
+	}
+
+	if ((thumbprint = sshkey_fingerprint(key, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL ||
+		get_user_root(con, &user_root) != 0 ||
+		RegOpenKeyExW(user_root, SSH_KEYS_ROOT, 0,
+			DELETE | KEY_ENUMERATE_SUB_KEYS | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &root) != 0 ||
+		RegDeleteTreeA(root, thumbprint) != 0)
+		goto done;
+	success = 1;
+done:
+	r = 0;
+	if (request_invalid)
+		r = -1;
+	else if (sshbuf_put_u8(response, success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE) != 0)
+		r = -1;
+
+	if (key)
+		sshkey_free(key);
+	if (user_root)
+		RegCloseKey(user_root);
+	if (root)
+		RegCloseKey(root);
+	if (thumbprint)
+		free(thumbprint);
+	return r;
+}
 static int 
 process_remove_all(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	HKEY user_root = 0, root = 0;
 	int r = 0;
 
 	if (get_user_root(con, &user_root) != 0 ||
-		RegOpenKeyExW(user_root, SSH_ROOT, 0, STANDARD_RIGHTS_READ | KEY_ENUMERATE_SUB_KEYS | KEY_WOW64_64KEY, &root) != 0) {
+	    RegOpenKeyExW(user_root, SSH_ROOT, 0, 
+		   DELETE | KEY_ENUMERATE_SUB_KEYS | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &root) != 0) {
 		goto done;
 	}
 
-	RegDeleteKeyExW(root, SSH_KEYS_KEY, KEY_WOW64_64KEY, 0);
+	RegDeleteTreeW(root, SSH_KEYS_KEY);
 done:
 	r = 0;
 	if (sshbuf_put_u8(response, SSH_AGENT_SUCCESS) != 0)
@@ -372,7 +411,7 @@ int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, st
 	case SSH2_AGENTC_SIGN_REQUEST:
 		return process_sign_request(request, response, con);
 	case SSH2_AGENTC_REMOVE_IDENTITY:
-
+		return process_remove_key(request, response, con);
 	case SSH2_AGENTC_REMOVE_ALL_IDENTITIES:
 		return process_remove_all(request, response, con);
 	default:
