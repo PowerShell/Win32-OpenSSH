@@ -4,7 +4,8 @@
 
 #define SSH_ROOT L"SOFTWARE\\SSH"
 #define SSH_AGENT_ROOT SSH_ROOT L"\\Agent"
-#define SSHD_KEYS_ROOT SSH_ROOT L"\\Keys"
+#define SSH_KEYS_KEY L"Keys"
+#define SSH_KEYS_ROOT SSH_ROOT L"\\" SSH_KEYS_KEY
 
 #define HEADER_SIZE 4
 
