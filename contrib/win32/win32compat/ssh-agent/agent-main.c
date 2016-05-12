@@ -100,13 +100,15 @@ int main(int argc, char **argv) {
 				/* console app - start in debug mode*/
 				SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
 				log_init("ssh-agent", 7, 1, 1);
-				return agent_start(TRUE, FALSE, 0, 0);
+				agent_start(TRUE, FALSE, 0, 0);
+				return 0;
 			}
 			else {
 				char* h = 0;
 				h += atoi(*(argv + 1));
 				log_init("ssh-agent", config_log_level(), 1, 0);
-				return agent_start(FALSE, TRUE, h, atoi(*(argv+2)));
+				agent_start(FALSE, TRUE, h, atoi(*(argv+2)));
+				return 0;
 			}
 		}
 		else
@@ -122,6 +124,7 @@ int scm_start_servie(DWORD num, LPWSTR* args) {
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	log_init("ssh-agent", config_log_level(), 1, 0);
-	return agent_start(FALSE, FALSE, 0, 0);
+	agent_start(FALSE, FALSE, 0, 0);
+	return 0;
 }
 

@@ -53,7 +53,6 @@ void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPE
 	if (con->state == DONE)
 		DebugBreak();
 
-	//while (1) 
 	{
 		switch (con->state) {		
 		case LISTENING:

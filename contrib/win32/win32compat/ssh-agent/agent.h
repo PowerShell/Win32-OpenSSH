@@ -1,6 +1,6 @@
 #include <Windows.h>
 #include <stdio.h>
-#define MAX_MESSAGE_SIZE 5 * 1024
+#define MAX_MESSAGE_SIZE 256 * 1024
 
 #define SSH_ROOT L"SOFTWARE\\SSH"
 #define SSH_AGENT_ROOT SSH_ROOT L"\\Agent"
@@ -37,7 +37,7 @@ void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);
 void agent_connection_on_error(struct agent_connection* , DWORD );
 void agent_connection_disconnect(struct agent_connection*);
 
-int agent_start(BOOL, BOOL, HANDLE, enum agent_type);
+void agent_start(BOOL, BOOL, HANDLE, enum agent_type);
 void agent_shutdown();
 void agent_cleanup_connection(struct agent_connection*);
 

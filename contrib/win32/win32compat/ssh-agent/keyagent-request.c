@@ -50,10 +50,10 @@ get_user_root(struct agent_connection* con, HKEY *root){
 
 static int
 convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **eblob, DWORD *eblen, int encrypt) {
-	int r = 0;
+	int success = 0;
 	DATA_BLOB in, out;
 	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
-		return ERROR_INTERNAL_ERROR;
+		return -1;
 
 	in.cbData = blen;
 	in.pbData = (char*)blob;
@@ -61,83 +61,86 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 	out.pbData = NULL;
 
 	if (encrypt) {
-		if (!CryptProtectData(&in, NULL, NULL, 0, NULL, 0, &out)) {
-			r = GetLastError();
+		if (!CryptProtectData(&in, NULL, NULL, 0, NULL, 0, &out))
 			goto done;
-		}
 	}
 	else {
-		if (!CryptUnprotectData(&in, NULL, NULL, 0, NULL, 0, &out)) {
-			r = GetLastError();
+		if (!CryptUnprotectData(&in, NULL, NULL, 0, NULL, 0, &out)) 
 			goto done;
-		}
 	}
 
 	*eblob = malloc(out.cbData);
-	if (*eblob == NULL) {
-		r = ERROR_OUTOFMEMORY;
+	if (*eblob == NULL) 
 		goto done;
-	}
 
 	memcpy(*eblob, out.pbData, out.cbData);
 	*eblen = out.cbData;
+	success = 1;
 done:
 	if (out.pbData)
 		LocalFree(out.pbData);
 	RevertToSelf();
-	return r;
+	return success? 0: -1;
 }
+
+#define REG_KEY_SDDL L"D:P(A;; GA;;; SY)(A;; GA;;; BA)"
 
 int
 process_add_identity(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	struct sshkey* key = NULL;
-	int r = 0, r1 = 0, blob_len, eblob_len;
+	int r = 0, blob_len, eblob_len, request_invalid = 0, success = 0;
 	size_t comment_len, pubkey_blob_len;
 	u_char *pubkey_blob = NULL;
 	char *thumbprint = NULL, *comment;
 	const char *blob;
 	char* eblob = NULL;
 	HKEY reg = 0, sub = 0, user_root = 0;
-	PSECURITY_DESCRIPTOR sd = NULL;
-	wchar_t* str = L"O:SYG:BAD:P(A;;GA;;;SY)";
 	SECURITY_ATTRIBUTES sa;
-	ConvertStringSecurityDescriptorToSecurityDescriptorW(str, SDDL_REVISION_1, &sd, NULL);
-	sa.nLength = sizeof(sa);
-	sa.lpSecurityDescriptor = sd;
-	sa.bInheritHandle = FALSE;
 
+	/* parse input request */
 	blob = sshbuf_ptr(request);
-	if ((r = sshkey_private_deserialize(request, &key)) != 0)
+	if (sshkey_private_deserialize(request, &key) != 0 ||
+	   (blob_len = (sshbuf_ptr(request) - blob) & 0xffffffff) == 0 ||
+	    sshbuf_peek_string_direct(request, &comment, &comment_len) != 0) {
+		debug("key add request is invalid");
+		request_invalid = 1;
 		goto done;
-	blob_len = (sshbuf_ptr(request) - blob) & 0xffffffff;
+	}
 
-	if ((r = sshkey_to_blob(key, &pubkey_blob, &pubkey_blob_len)) != 0)
-		goto done;
-
-	if ((r = convert_blob(con, blob, blob_len, &eblob, &eblob_len, 1)) != 0)
-		goto done;
-
-	if (((r = sshbuf_peek_string_direct(request, &comment, &comment_len)) != 0) ||
+	memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
+	sa.nLength = sizeof(sa);
+	if ((!ConvertStringSecurityDescriptorToSecurityDescriptorW(REG_KEY_SDDL, SDDL_REVISION_1, &sa.lpSecurityDescriptor, &sa.nLength)) ||
+	    sshkey_to_blob(key, &pubkey_blob, &pubkey_blob_len) != 0 ||
+	    convert_blob(con, blob, blob_len, &eblob, &eblob_len, 1) != 0 ||
 	    ((thumbprint = sshkey_fingerprint(key, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL) ||
-	    ((r = get_user_root(con, &user_root)) != 0) ||
-	    ((r = RegCreateKeyExW(user_root, SSHD_KEYS_ROOT, 0, 0, 0, KEY_WRITE, NULL, &reg, NULL)) != 0) ||
-	    ((r = RegCreateKeyExA(reg, thumbprint, 0, 0, 0, KEY_WRITE, NULL, &sub, NULL)) != 0) ||
-	    ((r = RegSetValueExW(sub, NULL, 0, REG_BINARY, eblob, eblob_len)) != 0) ||
-	    ((r = RegSetValueExW(sub, L"pub", 0, REG_BINARY, pubkey_blob, pubkey_blob_len)) != 0) ||
-	    ((r = RegSetValueExW(sub, L"type", 0, REG_DWORD, (BYTE*)&key->type, 4)) != 0) ||
-	    ((r = RegSetValueExW(sub, L"comment", 0, REG_BINARY, comment, comment_len)) != 0) )
+	    get_user_root(con, &user_root) != 0 ||
+	    RegCreateKeyExW(user_root, SSHD_KEYS_ROOT, 0, 0, 0, KEY_WRITE | KEY_WOW64_64KEY, &sa, &reg, NULL) != 0 ||
+	    RegCreateKeyExA(reg, thumbprint, 0, 0, 0, KEY_WRITE | KEY_WOW64_64KEY, &sa, &sub, NULL) != 0 ||
+	    RegSetValueExW(sub, NULL, 0, REG_BINARY, eblob, eblob_len) != 0 ||
+	    RegSetValueExW(sub, L"pub", 0, REG_BINARY, pubkey_blob, pubkey_blob_len) != 0 ||
+	    RegSetValueExW(sub, L"type", 0, REG_DWORD, (BYTE*)&key->type, 4) != 0 ||
+	    RegSetValueExW(sub, L"comment", 0, REG_BINARY, comment, comment_len) != 0 ) {
+		debug("failed to add key to store");
 		goto done;
+	}
 
+	debug("added key to store");
+	success = 1;
 done:
+	r = 0;
+	if (request_invalid)
+		r = -1;
+	else if (sshbuf_put_u8(response, success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE) != 0)
+		r = -1;
 
-	/* TODO if r failed, delete reg entries*/
-
-	r1 = sshbuf_put_u8(response, (r==0) ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
+	/* delete created reg key if not succeeded*/
+	if ((success == 0) && reg && thumbprint)
+		RegDeleteKeyExA(reg, thumbprint, KEY_WOW64_64KEY, 0);
 
 	if (eblob)
 		free(eblob);
-	if (sd)
-		LocalFree(sd);
+	if (sa.lpSecurityDescriptor)
+		LocalFree(sa.lpSecurityDescriptor);
 	if (key)
 		sshkey_free(key);
 	if (thumbprint)
@@ -150,63 +153,40 @@ done:
 		RegCloseKey(sub);
 	if (pubkey_blob)
 		free(pubkey_blob);
-	return r1;
+	return r;
 }
 
 static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 	const u_char *blob, size_t blen, u_int flags, struct agent_connection* con) {
 	HKEY reg = 0, sub = 0, user_root = 0;
-	int r = 0;
+	int r = 0, success = 0;
 	struct sshkey* prikey = NULL;
 	char *thumbprint = NULL, *regdata = NULL;
-	DWORD regdatalen = 0, keyblob_len = 0;;
+	DWORD regdatalen = 0, keyblob_len = 0;
 	struct sshbuf* tmpbuf = NULL;
 	char *keyblob = NULL;
-
-	regdata = malloc(4);
-	regdatalen = 4;
 
 	*sig = NULL;
 	*siglen = 0;
 
-	if ((thumbprint = sshkey_fingerprint(pubkey, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL)
-		goto done;
-	
-	if ((r = get_user_root(con, &user_root)) != 0)
-		goto done;
-
-	if ((r = RegOpenKeyExW(user_root, SSHD_KEYS_ROOT,
-		0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS, &reg)) != 0)
-		goto done;
-
-	if ((r = RegOpenKeyExA(reg, thumbprint, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS, 
-		&sub)) != 0)
-		goto done;
-
-	if ((RegQueryValueExW(sub, NULL, 0, NULL, regdata, &regdatalen)) != ERROR_MORE_DATA) {
-		r = EOTHER;
-		goto done;
-	}
-
-	if ((regdata = malloc(regdatalen)) == NULL) {
-		r = ENOMEM;
-		goto done;
-	}
-
-	if ((r = RegQueryValueExW(sub, NULL, 0, NULL, regdata, &regdatalen)) != 0)
+	if ((thumbprint = sshkey_fingerprint(pubkey, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL ||
+	    get_user_root(con, &user_root) != 0 ||
+	    RegOpenKeyExW(user_root, SSHD_KEYS_ROOT,
+			0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY | KEY_ENUMERATE_SUB_KEYS, &reg) != 0 ||
+	    RegOpenKeyExA(reg, thumbprint, 0,
+			STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_WOW64_64KEY, &sub) != 0 ||
+	    RegQueryValueExW(sub, NULL, 0, NULL, NULL, &regdatalen) != ERROR_SUCCESS ||
+	    (regdata = malloc(regdatalen)) == NULL ||
+	    RegQueryValueExW(sub, NULL, 0, NULL, regdata, &regdatalen) != ERROR_SUCCESS ||
+	    convert_blob(con, regdata, regdatalen, &keyblob, &keyblob_len, FALSE) != 0 ||
+	    (tmpbuf = sshbuf_from(keyblob, keyblob_len)) == NULL)
 		goto done;
 
-	if ((r = convert_blob(con, regdata, regdatalen, &keyblob, &keyblob_len, FALSE)) != 0)
+	if ( sshkey_private_deserialize(tmpbuf, &prikey) != 0 ||
+	     sshkey_sign(prikey, sig, siglen, blob, blen, 0) != 0)
 		goto done;
 
-	if ((tmpbuf = sshbuf_from(keyblob, keyblob_len)) == NULL) {
-		r = ENOMEM;
-		goto done;
-	}
-	
-	if ( ((r = sshkey_private_deserialize(tmpbuf, &prikey)) != 0) ||
-		((r = sshkey_sign(prikey, sig, siglen, blob, blen, 0)) != 0) )
-		goto done;
+	success = 1;
 
 done:
 	if (keyblob)
@@ -226,7 +206,7 @@ done:
 	if (sub)
 		RegCloseKey(sub);
 
-	return r;
+	return success ? 0 : -1;
 }
 
 int
@@ -234,39 +214,49 @@ process_sign_request(struct sshbuf* request, struct sshbuf* response, struct age
 	u_char *blob, *data, *signature = NULL;
 	size_t blen, dlen, slen = 0;
 	u_int flags = 0;
-	int r, r1;
-	struct sshkey *key;
+	int r, request_invalid = 0, success = 0;
+	struct sshkey *key = NULL;
 
-	if ((r = sshbuf_get_string(request, &blob, &blen)) != 0 ||
-		(r = sshbuf_get_string(request, &data, &dlen)) != 0 ||
-		(r = sshbuf_get_u32(request, &flags)) != 0)
+	if (sshbuf_get_string_direct(request, &blob, &blen) != 0 ||
+	    sshbuf_get_string_direct(request, &data, &dlen) != 0 ||
+	    sshbuf_get_u32(request, &flags) != 0 ||
+	    sshkey_from_blob(blob, blen, &key) != 0) {
+		request_invalid = 1;
 		goto done;
+	}
 
 	/* TODO - flags?*/
 
-	if (((r = sshkey_from_blob(blob, blen, &key)) != 0)
-		|| ((r = sign_blob(key, &signature, &slen,
-			data, dlen, 0, con)) != 0))
+	if (sign_blob(key, &signature, &slen, data, dlen, 0, con) != 0)
 		goto done;
 
+	success = 1;
 done:
-	if (r == 0) {
-		if ((r = sshbuf_put_u8(response, SSH2_AGENT_SIGN_RESPONSE)) != 0 ||
-			(r = sshbuf_put_string(response, signature, slen)) != 0) {
+	r = 0;
+	if (request_invalid)
+		r = -1;
+	else {
+		if (success) {
+			if (sshbuf_put_u8(response, SSH2_AGENT_SIGN_RESPONSE) != 0 ||
+			    sshbuf_put_string(response, signature, slen) != 0) {
+				r = -1;
+			}
 		}
+		else
+			if (sshbuf_put_u8(response, SSH_AGENT_FAILURE) != 0)
+				r = -1;
 	}
-	else 
-		r = sshbuf_put_u8(response, SSH_AGENT_FAILURE);
 
-	free(data);
-	free(blob);
-	free(signature);
+	if (key)
+		sshkey_free(key);
+	if (signature)
+		free(signature);
 	return r;
 }
 
 int
 process_request_identities(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
-	int r, r1, count = 0, index = 0;
+	int count = 0, index = 0, success = 0;
 	HKEY root = NULL, sub = NULL, user_root = 0;
 	char* count_ptr = NULL;
 	wchar_t sub_name[MAX_KEY_LENGTH];
@@ -275,19 +265,9 @@ process_request_identities(struct sshbuf* request, struct sshbuf* response, stru
 	DWORD regdatalen = 0, key_count = 0;
 	struct sshbuf* identities;
 
-	regdata = malloc(4);
-	regdatalen = 4;
-
-	identities = sshbuf_new();
-
-	if ((identities == NULL) || (regdata == NULL))
-		goto done;
-
-	if ((r = get_user_root(con, &user_root)) != 0)
-		goto done;
-
-	if ((r = RegOpenKeyExW(user_root, SSHD_KEYS_ROOT,
-		0, STANDARD_RIGHTS_READ | KEY_ENUMERATE_SUB_KEYS, &root)) != 0)
+	if ((identities = sshbuf_new()) == NULL ||
+	    get_user_root(con, &user_root) != 0 ||
+	    RegOpenKeyExW(user_root, SSHD_KEYS_ROOT, 0, STANDARD_RIGHTS_READ | KEY_ENUMERATE_SUB_KEYS | KEY_WOW64_64KEY, &root) != 0)
 		goto done;
 
 	while (1) {
@@ -296,9 +276,11 @@ process_request_identities(struct sshbuf* request, struct sshbuf* response, stru
 			RegCloseKey(sub);
 			sub = NULL;
 		}
-		if ((r = RegEnumKeyExW(root, index++, sub_name, &sub_name_len, NULL, NULL, NULL, NULL)) == 0) {
-			if ((r = RegOpenKeyExW(root, sub_name, 0, KEY_QUERY_VALUE, &sub)) == 0) {
-				if ((r = RegQueryValueExW(sub, L"pub", 0, NULL, regdata, &regdatalen)) != 0) {
+		if (RegEnumKeyExW(root, index++, sub_name, &sub_name_len, NULL, NULL, NULL, NULL) == 0) {
+			if (RegOpenKeyExW(root, sub_name, 0, KEY_QUERY_VALUE, &sub) == 0) {
+				if (RegQueryValueExW(sub, L"pub", 0, NULL, NULL, &regdatalen) == 0) {
+
+
 					if (r == ERROR_MORE_DATA) {
 						r = 0;
 						if (regdata)
@@ -394,6 +376,7 @@ int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, st
 	case SSH2_AGENTC_SIGN_REQUEST:
 		return process_sign_request(request, response, con);
 	default:
+		debug("unknown key agent request %d", type);
 		return EINVAL;		
 	}
 }
