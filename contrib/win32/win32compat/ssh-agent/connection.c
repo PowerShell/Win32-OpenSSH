@@ -115,16 +115,73 @@ void agent_connection_disconnect(struct agent_connection* con) {
 }
 
 static int
+get_con_client_type(HANDLE pipe) {
+	int r = -1;
+	wchar_t *sshd_act = L"NT SERVICE\\SSHD", *ref_dom = NULL;
+	PSID sshd_sid = NULL;
+	char system_sid[SECURITY_MAX_SID_SIZE];
+	char ns_sid[SECURITY_MAX_SID_SIZE];
+	DWORD sshd_sid_len = 0, reg_dom_len = 0, info_len = 0, sid_size;
+	SID_NAME_USE nuse;
+	HANDLE token;
+	TOKEN_USER* info = NULL;
+
+	if (ImpersonateNamedPipeClient(pipe) == FALSE)
+		return -1;
+
+	if (LookupAccountNameW(NULL, sshd_act, NULL, &sshd_sid_len, NULL, &reg_dom_len, &nuse) == TRUE ||
+		(sshd_sid = malloc(sshd_sid_len)) == NULL ||
+		(ref_dom = (wchar_t*)malloc(reg_dom_len * 2)) == NULL ||
+		LookupAccountNameW(NULL, sshd_act, sshd_sid, &sshd_sid_len, ref_dom, &reg_dom_len, &nuse) == FALSE ||
+		OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, FALSE, &token) == FALSE ||
+		GetTokenInformation(token, TokenUser, NULL, 0, &info_len) == TRUE ||
+		(info = (TOKEN_USER*)malloc(info_len)) == NULL ||
+		GetTokenInformation(token, TokenUser, info, info_len, &info_len) == FALSE)
+		goto done;
+
+	sid_size = SECURITY_MAX_SID_SIZE;
+	if (CreateWellKnownSid(WinLocalSystemSid, NULL, system_sid, &sid_size) == FALSE)
+		goto done;
+	sid_size = SECURITY_MAX_SID_SIZE;
+	if (CreateWellKnownSid(WinNetworkServiceSid, NULL, ns_sid, &sid_size) == FALSE)
+		goto done;
+
+	if (EqualSid(info->User.Sid, system_sid))
+		r = LOCAL_SYSTEM;
+	else if (EqualSid(info->User.Sid, sshd_sid))
+		r = SSHD;
+	else if (EqualSid(info->User.Sid, ns_sid))
+		r = NETWORK_SERVICE;
+	else
+		r = OTHER;
+
+	debug("client type: %d", r);
+done:
+	if (sshd_sid)
+		free(sshd_sid);
+	if (ref_dom)
+		free(ref_dom);
+	if (info)
+		free(info);
+	RevertToSelf();
+	return r;
+}
+
+
+static int
 process_request(struct agent_connection* con) {
-	int r;
+	int r = -1;
 	struct sshbuf *request = NULL, *response = NULL;
+
+	if (con->client_type == UNKNOWN)
+		if ((con->client_type = get_con_client_type(con->connection)) == -1)
+			goto done;
+
 	
 	request = sshbuf_from(con->io_buf.buf, con->io_buf.num_bytes);
 	response = sshbuf_new();
-	if ((request == NULL) || (response == NULL)) {
-		r = ENOMEM;
+	if ((request == NULL) || (response == NULL))
 		goto done;
-	}
 
 	if (con->type == KEY_AGENT)
 		r = process_keyagent_request(request, response, con);
@@ -132,8 +189,6 @@ process_request(struct agent_connection* con) {
 		r = process_pubkeyagent_request(request, response, con);
 	else if (con->type == PUBKEY_AUTH_AGENT) 
 		r = process_authagent_request(request, response, con);
-	else 
-		r = EINVAL;
 
 done:
 	if (request)

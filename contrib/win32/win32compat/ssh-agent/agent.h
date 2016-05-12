@@ -31,6 +31,13 @@ struct agent_connection {
 		WRITING,
 		DONE
 	} state;
+	enum {
+		UNKNOWN = 0,
+		OTHER,
+		LOCAL_SYSTEM,
+		SSHD,
+		NETWORK_SERVICE
+	} client_type;
 	enum agent_type type;
 };
 

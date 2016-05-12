@@ -40,9 +40,12 @@ static int
 get_user_root(struct agent_connection* con, HKEY *root){
 	int r = 0;
 	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
-		return ERROR_INTERNAL_ERROR;
+		return -1;
 	
-	r = RegOpenCurrentUser(KEY_ALL_ACCESS, root);
+	if (con->client_type > OTHER)
+		*root = HKEY_LOCAL_MACHINE;
+	else if (RegOpenCurrentUser(KEY_ALL_ACCESS, root) != ERROR_SUCCESS)
+		r = -1;
 
 	RevertToSelf();
 	return r;
@@ -52,8 +55,10 @@ static int
 convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **eblob, DWORD *eblen, int encrypt) {
 	int success = 0;
 	DATA_BLOB in, out;
-	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
-		return -1;
+
+	if (con->client_type == OTHER)
+		if (ImpersonateNamedPipeClient(con->connection) == FALSE)
+			return -1;
 
 	in.cbData = blen;
 	in.pbData = (char*)blob;
@@ -61,12 +66,16 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 	out.pbData = NULL;
 
 	if (encrypt) {
-		if (!CryptProtectData(&in, NULL, NULL, 0, NULL, 0, &out))
+		if (!CryptProtectData(&in, NULL, NULL, 0, NULL, 0, &out)) {
+			debug("cannot encrypt data");
 			goto done;
+		}
 	}
 	else {
-		if (!CryptUnprotectData(&in, NULL, NULL, 0, NULL, 0, &out)) 
+		if (!CryptUnprotectData(&in, NULL, NULL, 0, NULL, 0, &out)) {
+			debug("cannot decrypt data");
 			goto done;
+		}
 	}
 
 	*eblob = malloc(out.cbData);
@@ -79,7 +88,8 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 done:
 	if (out.pbData)
 		LocalFree(out.pbData);
-	RevertToSelf();
+	if (con->client_type == OTHER)
+		RevertToSelf();
 	return success? 0: -1;
 }
 
@@ -182,9 +192,11 @@ static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 	    (tmpbuf = sshbuf_from(keyblob, keyblob_len)) == NULL)
 		goto done;
 
-	if ( sshkey_private_deserialize(tmpbuf, &prikey) != 0 ||
-	     sshkey_sign(prikey, sig, siglen, blob, blen, 0) != 0)
+	if (sshkey_private_deserialize(tmpbuf, &prikey) != 0 ||
+	    sshkey_sign(prikey, sig, siglen, blob, blen, 0) != 0) {
+		debug("cannot sign using retrieved key");
 		goto done;
+	}
 
 	success = 1;
 
@@ -221,6 +233,7 @@ process_sign_request(struct sshbuf* request, struct sshbuf* response, struct age
 	    sshbuf_get_string_direct(request, &data, &dlen) != 0 ||
 	    sshbuf_get_u32(request, &flags) != 0 ||
 	    sshkey_from_blob(blob, blen, &key) != 0) {
+		debug("sign request is invalid");
 		request_invalid = 1;
 		goto done;
 	}
@@ -403,6 +416,8 @@ int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, st
 
 	if ((r = sshbuf_get_u8(request, &type)) != 0)
 		return r;
+	debug2("process key agent request type %d", type);
+
 	switch (type) {
 	case SSH2_AGENTC_ADD_IDENTITY:
 		return process_add_identity(request, response, con);

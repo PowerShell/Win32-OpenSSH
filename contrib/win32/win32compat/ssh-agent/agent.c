@@ -65,7 +65,7 @@ init_listeners() {
 		listeners[i].pipe_id = pipe_ids[i];
 		listeners[i].type = pipe_types[i];
 		listeners[i].pipe = INVALID_HANDLE_VALUE;
-		listeners[i].sa.bInheritHandle = TRUE;
+		listeners[i].sa.bInheritHandle = FALSE;
 		if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(pipe_sddls[i], SDDL_REVISION_1,
 			&listeners[i].sa.lpSecurityDescriptor, &listeners[i].sa.nLength)) {
 			debug("cannot convert sddl ERROR:%d", GetLastError());
@@ -111,7 +111,6 @@ iocp_work(LPVOID lpParam) {
 	}
 }
 
-
 static void
 process_connection(HANDLE pipe, int type) {
 	struct agent_connection* con;
@@ -124,7 +123,7 @@ process_connection(HANDLE pipe, int type) {
 	con->type = type;
 	if (CreateIoCompletionPort(pipe, ioc_port, (ULONG_PTR)con, 0) != ioc_port)
 		fatal("failed to assign pipe to ioc_port");
-	
+
 	agent_connection_on_io(con, 0, &con->ol);
 	return iocp_work(NULL);
 }
@@ -185,8 +184,10 @@ agent_listen_loop() {
 		else if ((r > WAIT_OBJECT_0) && (r <= (WAIT_OBJECT_0 + NUM_LISTENERS))) {
 			/* process incoming connection */
 			HANDLE con = listeners[r - 1].pipe;
+			DWORD client_pid = 0;
 			listeners[r - 1].pipe = INVALID_HANDLE_VALUE;
-			verbose("client connected on %ls", pipe_ids[r-1]);
+			GetNamedPipeClientProcessId(con, &client_pid);
+			verbose("client pid %d connected on %ls", client_pid, pipe_ids[r-1]);
 			if (debug_mode) {
 				process_connection(con, listeners[r - 1].type);
 				agent_cleanup();
@@ -201,6 +202,7 @@ agent_listen_loop() {
 				si.cb = sizeof(STARTUPINFOW);
 				memset(&si, 0, sizeof(STARTUPINFOW));
 				GetModuleFileNameW(NULL, module_path, MAX_PATH);
+				SetHandleInformation(con, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
 				if ((swprintf_s(path, MAX_PATH, L"%s %d %d", module_path, con, listeners[r - 1].type) == -1 ) ||
 				    (CreateProcessW(NULL, path, NULL, NULL, TRUE,
 					DETACHED_PROCESS, NULL, NULL,
@@ -212,6 +214,7 @@ agent_listen_loop() {
 					CloseHandle(pi.hProcess);
 					CloseHandle(pi.hThread);
 				}
+				SetHandleInformation(con, HANDLE_FLAG_INHERIT, 0);
 				CloseHandle(con);				
 			}
 			
