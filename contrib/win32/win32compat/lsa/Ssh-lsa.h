@@ -41,14 +41,16 @@
 #include <Ntsecapi.h>
 #include <NTSecPkg.h>
 #include <ntstatus.h>
-#include "Types.h"
+#include <stdio.h>
 
+#define Unsigned  unsigned
+#define Char char
+#define Int int
+#define Long long
+#define Not(value) ((value) == 0)
 #define PKG_NAME "SSH-LSA"
-
 #define PKG_NAME_SIZE sizeof(PKG_NAME)
-                                              
 #define MAX_ACCOUNT_NAME_SIZE (256 * 2)
-
 #define VERSION "4.0.346"
 
 typedef struct _SshLsaAuth
