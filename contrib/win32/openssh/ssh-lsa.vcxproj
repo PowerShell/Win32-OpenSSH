@@ -20,15 +20,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\Base64.cpp" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\Debug.cpp" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\DeskRight.cpp" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\Key.cpp" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\KeyAuth.cpp" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\LsaString.cpp" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\PopBinary.cpp" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\Ssh-lsa.cpp" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\Utils.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{02FB3D98-6516-42C6-9762-98811A99960F}</ProjectGuid>
@@ -117,7 +110,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Userenv.lib;Ws2_32.lib;Secur32.lib;libeay32.lib;ssleay32.lib;kernel32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSL-Win32-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>ssh-lsa.def</ModuleDefinitionFile>
     </Link>
@@ -137,7 +131,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Userenv.lib;Ws2_32.lib;Secur32.lib;libeay32.lib;ssleay32.lib;kernel32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSL-x64-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>ssh-lsa.def</ModuleDefinitionFile>
     </Link>
@@ -160,7 +155,8 @@
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>Userenv.lib;Ws2_32.lib;Secur32.lib;libeay32.lib;ssleay32.lib;kernel32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSL-Win32-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>ssh-lsa.def</ModuleDefinitionFile>
     </Link>
@@ -183,7 +179,8 @@
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>Userenv.lib;Ws2_32.lib;Secur32.lib;libeay32.lib;ssleay32.lib;kernel32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSL-x64-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>ssh-lsa.def</ModuleDefinitionFile>
     </Link>
