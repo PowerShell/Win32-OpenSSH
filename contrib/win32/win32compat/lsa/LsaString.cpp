@@ -37,7 +37,6 @@
 #include <Ntsecapi.h>
 #endif
 
-
 #include "LsaString.h"
 
 #ifdef __VS_BUILD__
@@ -89,8 +88,7 @@ fail:
       
       LsaApi.FreeLsaHeap((*lsaStr));
     }
-    
-    DBG_MSG("ERROR. Cannot allocate LSA UNICODE_STRING...\n");
+
   }
   
   return ntStat;
@@ -166,10 +164,6 @@ NTSTATUS FillUnicodeString(UNICODE_STRING *lsaStr, const Char *str)
   
 fail:
 
-  if (ntStat)
-  {
-    DBG_MSG("ERROR. Cannot fill UNICODE_STRING...\n");    
-  }
   
   return ntStat;  
 }
