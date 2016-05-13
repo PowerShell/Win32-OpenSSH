@@ -34,37 +34,14 @@
 
 #undef STRING
 #undef TEST_APP
-
-#include "Win64Fix.h"
-
-
+#define UMDF_USING_NTSTATUS 
 #include <windows.h>
-
+#define SECURITY_WIN32
+#include <security.h>
+#include <Ntsecapi.h>
 #include <NTSecPkg.h>
-
-#ifndef __VS_BUILD__
-#ifdef _WIN64
 #include <ntstatus.h>
-#else
-#include <ddk/ntstatus.h>
-#endif
-#else
-#include <ntstatus.h>
-#endif
-
-#include <Userenv.h>
-#include <Shlwapi.h>
-#include <sddl.h>
-
-#include <openssl/rsa.h>
-#include <openssl/dsa.h>
-#include <openssl/ssl.h>
-
-#include "Debug.h"
-#include "KeyAuth.h"
-#include "LsaString.h"
-#include "SSLFix.h"
-#include "DeskRight.h"
+#include "Types.h"
 
 #define PKG_NAME "SSH-LSA"
 
@@ -97,27 +74,14 @@ typedef VOID (WINAPI *RtlInitUnicodeStringPtr)
 						(PUNICODE_STRING, PCWSTR SourceString);
 #endif
 
+#define FAIL(CONDITION) if(CONDITION) goto fail
 
-#ifndef __VS_BUILD__
-#ifndef _WIN64
-typedef struct _LSA_TOKEN_INFORMATION_V1
-{
-  LARGE_INTEGER ExpirationTime;
-  
-  TOKEN_USER User;
-  
-  PTOKEN_GROUPS Groups;
-  
-  TOKEN_PRIMARY_GROUP PrimaryGroup;
-  
-  PTOKEN_PRIVILEGES Privileges;
-  
-  TOKEN_OWNER Owner;
+#define NTFAIL(NTFUNC) if((ntStat = (NTFUNC))) goto fail
 
-  TOKEN_DEFAULT_DACL DefaultDacl;
-} 
-LSA_TOKEN_INFORMATION_V1, *PLSA_TOKEN_INFORMATION_V1;
-#endif
-#endif
+NTSTATUS LsaAllocUnicodeString(UNICODE_STRING **lsaStr, DWORD maxLen);
+
+NTSTATUS FillUnicodeString(UNICODE_STRING *lsaStr, const Char *str);
+
+void LsaFreeUnicodeString(UNICODE_STRING *lsaStr);
 
 #endif

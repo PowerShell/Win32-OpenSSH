@@ -31,12 +31,6 @@
 
 #define WINVER 0x501
 
-#ifdef __VS_BUILD__
-#define UMDF_USING_NTSTATUS 
-
-#include <Windows.h>
-#endif
-
 #include "Ssh-lsa.h"
 
 #ifdef __cplusplus

@@ -29,15 +29,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifdef __VS_BUILD__
-#define UMDF_USING_NTSTATUS 
-
-#include <Windows.h>
-#include <LsaLookup.h>
-#include <Ntsecapi.h>
-#endif
-
-#include "LsaString.h"
+#include "ssh-lsa.h"
 
 #ifdef __VS_BUILD__
 #ifdef __cplusplus

@@ -34,28 +34,17 @@
 
 #undef STRING
 
-
-
-#include "Win64Fix.h"
-
-#include <stdio.h>
-#include <wchar.h>
-
 #include <windows.h>
+#define SECURITY_WIN32
+#include <security.h>
 #include <Ntsecapi.h>
 #include <NTSecPkg.h>
-
-#ifndef __VS_BUILD__
-#ifdef _WIN64
 #include <ntstatus.h>
-#else
-#include <ddk/ntstatus.h>
-#endif
-#else
-#include <ntstatus.h>
-#endif
+#include "Types.h"
 
-#include "Debug.h"
+#define FAIL(CONDITION) if(CONDITION) goto fail
+
+#define NTFAIL(NTFUNC) if((ntStat = (NTFUNC))) goto fail
 
 NTSTATUS LsaAllocUnicodeString(UNICODE_STRING **lsaStr, DWORD maxLen);
 
