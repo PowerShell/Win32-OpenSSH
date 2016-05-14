@@ -20,8 +20,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\LsaString.cpp" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\Ssh-lsa.cpp" />
+    <ClCompile Include="..\win32compat\lsa\Ssh-lsa.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{02FB3D98-6516-42C6-9762-98811A99960F}</ProjectGuid>

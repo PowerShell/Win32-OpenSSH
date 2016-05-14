@@ -15,10 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\LsaString.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\lsa\Ssh-lsa.cpp">
+    <ClCompile Include="..\win32compat\lsa\Ssh-lsa.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
