@@ -56,18 +56,22 @@ generate_user_token(wchar_t* user) {
 	LSA_OPERATIONAL_MODE mode;
 	ULONG auth_package_id;
 	NTSTATUS ret, subStatus;
-	KERB_S4U_LOGON *s4u_logon = NULL;
+	void * logon_info = NULL;
 	size_t logon_info_size;
 	LSA_STRING logon_process_name, auth_package_name, originName;
 	TOKEN_SOURCE sourceContext;
 	PKERB_INTERACTIVE_PROFILE pProfile = NULL;
-	LUID            logonId;
-	QUOTA_LIMITS    quotas;
-	DWORD           cbProfile;
-	
+	LUID logonId;
+	QUOTA_LIMITS quotas;
+	DWORD cbProfile;
+	BOOL domain_user = (wcschr(user, L'@') != NULL)? TRUE : FALSE;
+
 	InitLsaString(&logon_process_name, "ssh-agent");
-	//InitLsaString(&auth_package_name, MICROSOFT_KERBEROS_NAME_A);
-	InitLsaString(&auth_package_name, "Negotiate");
+	if (domain_user)
+		InitLsaString(&auth_package_name, MICROSOFT_KERBEROS_NAME_A);
+	else 
+		InitLsaString(&auth_package_name, "SSH-LSA");
+
 	InitLsaString(&originName, "sshd");
 	if (ret = LsaRegisterLogonProcess(&logon_process_name, &lsa_handle, &mode) != STATUS_SUCCESS)
 		goto done;
@@ -75,23 +79,33 @@ generate_user_token(wchar_t* user) {
 	if (ret = LsaLookupAuthenticationPackage(lsa_handle, &auth_package_name, &auth_package_id) != STATUS_SUCCESS)
 		goto done;
 
-	logon_info_size = sizeof(KERB_S4U_LOGON);
-	logon_info_size += (wcslen(user) * 2 + 2);
-	s4u_logon = malloc(logon_info_size);
-	if (s4u_logon == NULL)
-		goto done;
+	if (domain_user) {
+		KERB_S4U_LOGON *s4u_logon;
+		logon_info_size = sizeof(KERB_S4U_LOGON);
+		logon_info_size += (wcslen(user) * 2 + 2);
+		logon_info = malloc(logon_info_size);
+		if (logon_info == NULL)
+			goto done;
+		s4u_logon = (KERB_S4U_LOGON*)logon_info;
+		s4u_logon->MessageType = KerbS4ULogon;
+		s4u_logon->Flags = 0;
+		s4u_logon->ClientUpn.Length = wcslen(user) * 2;
+		s4u_logon->ClientUpn.MaximumLength = s4u_logon->ClientUpn.Length;
+		s4u_logon->ClientUpn.Buffer = (WCHAR*)(s4u_logon + 1);
+		memcpy(s4u_logon->ClientUpn.Buffer, user, s4u_logon->ClientUpn.Length + 2);
+		s4u_logon->ClientRealm.Length = 0;
+		s4u_logon->ClientRealm.MaximumLength = 0;
+		s4u_logon->ClientRealm.Buffer = 0;
+	}
+	else {
+		logon_info_size = (wcslen(user) + 1)*sizeof(wchar_t);
+		logon_info = malloc(logon_info_size);
+		if (logon_info == NULL)
+			goto done;
+		memcpy(logon_info, user, logon_info_size);
+	}
 
-	s4u_logon->MessageType = KerbS4ULogon;
-	s4u_logon->Flags = 0;
-	s4u_logon->ClientUpn.Length = wcslen(user) * 2;
-	s4u_logon->ClientUpn.MaximumLength = s4u_logon->ClientUpn.Length;
-	s4u_logon->ClientUpn.Buffer = (WCHAR*)(s4u_logon + 1);
-	memcpy(s4u_logon->ClientUpn.Buffer, user, s4u_logon->ClientUpn.Length + 2);
-	s4u_logon->ClientRealm.Length = 0;
-	s4u_logon->ClientRealm.MaximumLength = 0;
-	s4u_logon->ClientRealm.Buffer = 0;
-
-	memcpy(sourceContext.SourceName,".Jobs   ", sizeof(sourceContext.SourceName));
+	memcpy(sourceContext.SourceName,"sshagent", sizeof(sourceContext.SourceName));
 
 	if (AllocateLocallyUniqueId(&sourceContext.SourceIdentifier) != TRUE)
 		goto done;
@@ -100,7 +114,7 @@ generate_user_token(wchar_t* user) {
 		&originName, 
 		Network, 
 		auth_package_id, 
-		s4u_logon, 
+		logon_info,
 		logon_info_size, 
 		NULL, 
 		&sourceContext,
@@ -115,8 +129,8 @@ generate_user_token(wchar_t* user) {
 done:
 	if (lsa_handle)
 		LsaDeregisterLogonProcess(lsa_handle);
-	if (s4u_logon)
-		free(s4u_logon);
+	if (logon_info)
+		free(logon_info);
 	if (pProfile)
 		LsaFreeReturnBuffer(pProfile);
 

@@ -54,36 +54,36 @@ extern "C" {
 
 NTSTATUS LsaAllocUnicodeString(PUNICODE_STRING *lsaStr, DWORD maxLen)
 {
-  NTSTATUS ntStat = STATUS_NO_MEMORY; 
-  
-  FAIL(lsaStr == NULL);
+	NTSTATUS ntStat = STATUS_NO_MEMORY;
 
-  *lsaStr = (PUNICODE_STRING) LsaApi.AllocateLsaHeap(sizeof(UNICODE_STRING));
-  
-  FAIL((*lsaStr) == NULL);
-  
-  (*lsaStr) -> Buffer = (WCHAR *) LsaApi.AllocateLsaHeap(sizeof(maxLen));
-  (*lsaStr) -> Length = 0;
-  (*lsaStr) -> MaximumLength = maxLen;
-  
-  FAIL((*lsaStr) -> Buffer == NULL);
-  
-  ntStat = 0;
-  
+	FAIL(lsaStr == NULL);
+
+	*lsaStr = (PUNICODE_STRING)LsaApi.AllocateLsaHeap(sizeof(UNICODE_STRING));
+
+	FAIL((*lsaStr) == NULL);
+
+	(*lsaStr)->Buffer = (WCHAR *)LsaApi.AllocateLsaHeap(sizeof(maxLen));
+	(*lsaStr)->Length = 0;
+	(*lsaStr)->MaximumLength = maxLen;
+
+	FAIL((*lsaStr)->Buffer == NULL);
+
+	ntStat = 0;
+
 fail:
 
-  if (ntStat)
-  {
-    if (lsaStr && (*lsaStr))
-    {
-      LsaApi.FreeLsaHeap((*lsaStr) -> Buffer);
-      
-      LsaApi.FreeLsaHeap((*lsaStr));
-    }
+	if (ntStat)
+	{
+		if (lsaStr && (*lsaStr))
+		{
+			LsaApi.FreeLsaHeap((*lsaStr)->Buffer);
 
-  }
-  
-  return ntStat;
+			LsaApi.FreeLsaHeap((*lsaStr));
+		}
+
+	}
+
+	return ntStat;
 }
 
 //
@@ -94,15 +94,15 @@ fail:
 
 void LsaFreeUnicodeString(PUNICODE_STRING lsaStr)
 {
-  if (lsaStr)
-  {
-    if (lsaStr -> Buffer)
-    {
-      LsaApi.FreeLsaHeap(lsaStr -> Buffer);
-    }
+	if (lsaStr)
+	{
+		if (lsaStr->Buffer)
+		{
+			LsaApi.FreeLsaHeap(lsaStr->Buffer);
+		}
 
-    LsaApi.FreeLsaHeap(lsaStr);
-  }
+		LsaApi.FreeLsaHeap(lsaStr);
+	}
 }
 
 //
@@ -116,46 +116,46 @@ void LsaFreeUnicodeString(PUNICODE_STRING lsaStr)
 
 NTSTATUS FillUnicodeString(UNICODE_STRING *lsaStr, const Char *str)
 {
-  NTSTATUS ntStat = STATUS_NO_MEMORY;
-  
-  DWORD cbSize = 0;
-  
-  //
-  // Is arguments ok?
-  //
-  
-  FAIL(lsaStr == NULL);
- 
-  FAIL(lsaStr -> Buffer == NULL);
+	NTSTATUS ntStat = STATUS_NO_MEMORY;
 
-  FAIL(str == NULL);
-   
-  //
-  // Is string buffer too small?
-  //
-  
-  cbSize = strlen(str);
-  
-  FAIL(cbSize >= lsaStr -> MaximumLength);
-  
-  //
-  // Fill string buffer.
-  //
-  
+	DWORD cbSize = 0;
+
+	//
+	// Is arguments ok?
+	//
+
+	FAIL(lsaStr == NULL);
+
+	FAIL(lsaStr->Buffer == NULL);
+
+	FAIL(str == NULL);
+
+	//
+	// Is string buffer too small?
+	//
+
+	cbSize = strlen(str);
+
+	FAIL(cbSize >= lsaStr->MaximumLength);
+
+	//
+	// Fill string buffer.
+	//
+
 #ifdef __VS_BUILD__
-  _swprintf(lsaStr -> Buffer, L"%hs", str);
+	_swprintf(lsaStr->Buffer, L"%hs", str);
 #else
-  swprintf(lsaStr->Buffer, L"%hs", str);
+	swprintf(lsaStr->Buffer, L"%hs", str);
 #endif
-  
-  lsaStr -> Length = cbSize * 2;
-  
-  lsaStr -> Buffer[cbSize * 2] = 0x0000;
-  
-  ntStat = STATUS_SUCCESS;
-  
+
+	lsaStr->Length = cbSize * 2;
+
+	lsaStr->Buffer[cbSize * 2] = 0x0000;
+
+	ntStat = STATUS_SUCCESS;
+
 fail:
 
-  
-  return ntStat;  
+
+	return ntStat;
 }
