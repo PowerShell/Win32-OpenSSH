@@ -39,6 +39,7 @@
 static int
 get_user_root(struct agent_connection* con, HKEY *root){
 	int r = 0;
+	*root = NULL;
 	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
 		return -1;
 	
@@ -47,6 +48,8 @@ get_user_root(struct agent_connection* con, HKEY *root){
 	else if (RegOpenCurrentUser(KEY_ALL_ACCESS, root) != ERROR_SUCCESS)
 		r = -1;
 
+	if (*root == NULL)
+		debug("cannot connect to user's registry root");
 	RevertToSelf();
 	return r;
 }
@@ -411,11 +414,10 @@ done:
 
 
 int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
-	int r;
 	u_char type;
 
-	if ((r = sshbuf_get_u8(request, &type)) != 0)
-		return r;
+	if (sshbuf_get_u8(request, &type) != 0)
+		return -1;
 	debug2("process key agent request type %d", type);
 
 	switch (type) {
@@ -431,6 +433,6 @@ int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, st
 		return process_remove_all(request, response, con);
 	default:
 		debug("unknown key agent request %d", type);
-		return EINVAL;		
+		return -1;		
 	}
 }

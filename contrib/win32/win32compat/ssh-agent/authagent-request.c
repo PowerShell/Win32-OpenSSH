@@ -138,10 +138,10 @@ done:
 }
 
 #define AUTH_REQUEST "keyauthenticate"
-#define MAX_USER_NAME_LEN 255 + 255
+#define MAX_USER_NAME_LEN 256
 
 int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
-	int r = 0;
+	int r = -1;
 	char *opn, *key_blob, *user, *sig, *blob;
 	size_t opn_len, key_blob_len, user_len, sig_len, blob_len;
 	struct sshkey *key = NULL;
@@ -151,36 +151,44 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 	ULONG client_pid;
 
 	user = NULL;
-	if ((r = sshbuf_get_string_direct(request, &opn, &opn_len)) != 0 ||
-	    (r = sshbuf_get_string_direct(request, &key_blob, &key_blob_len)) != 0 ||
-	    (r = sshbuf_get_cstring(request, &user, &user_len)) != 0 ||
-	    (r = sshbuf_get_string_direct(request, &sig, &sig_len)) != 0 ||
-	    (r = sshbuf_get_string_direct(request, &blob, &blob_len)) != 0 ||
-	    (r = sshkey_from_blob(key_blob, key_blob_len, &key)) != 0)
-		goto done;
-
-	if ((opn_len != strlen(AUTH_REQUEST)) || (memcmp(opn, AUTH_REQUEST, opn_len) != 0)) {
-		r = EINVAL;
-		goto done;
-	}
-
-	if (0 == MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN)) {
-		r = GetLastError();
+	if (sshbuf_get_string_direct(request, &opn, &opn_len) != 0 ||
+	    sshbuf_get_string_direct(request, &key_blob, &key_blob_len) != 0 ||
+	    sshbuf_get_cstring(request, &user, &user_len) != 0 ||
+	    sshbuf_get_string_direct(request, &sig, &sig_len) != 0 ||
+	    sshbuf_get_string_direct(request, &blob, &blob_len) != 0 ||
+	    sshkey_from_blob(key_blob, key_blob_len, &key) != 0 ||
+	    opn_len != strlen(AUTH_REQUEST) ||
+	    memcmp(opn, AUTH_REQUEST, opn_len) != 0) {
+		debug("auth agent invalid request");
 		goto done;
 	}
 
-	if (key_verify(key, sig, sig_len, blob, blob_len) != 1 ||
-	    (token = generate_user_token(wuser)) == 0 ||
-	    SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
-	    pubkey_allowed(key, wuser, wuser_home) != 1 ||
-	    (FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
-	    ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
-	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
-	    (sshbuf_put_u32(response, dup_token) != 0) ) {
-		r = EINVAL;
+	if (MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN) == 0 ||
+	    (token = generate_user_token(wuser)) == 0) {
+		debug("unable to generate user token");
+		goto done;
+	}
+
+	if (SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
+		pubkey_allowed(key, wuser, wuser_home) != 1) {
+		debug("given public key is not mapped to user %ls", wuser);
+		goto done;
+	}
+
+	if (key_verify(key, sig, sig_len, blob, blob_len) != 1) {
+		debug("signature verification failed");
 		goto done;
 	}
 	
+	if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
+	    ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
+	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
+	    (sshbuf_put_u32(response, dup_token) != 0) ) {
+		debug("failed to authorize user");
+		goto done;
+	}
+	
+	r = 0;
 done:
 	if (user)
 		free(user);

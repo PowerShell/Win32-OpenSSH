@@ -125,7 +125,7 @@ process_connection(HANDLE pipe, int type) {
 		fatal("failed to assign pipe to ioc_port");
 
 	agent_connection_on_io(con, 0, &con->ol);
-	return iocp_work(NULL);
+	iocp_work(NULL);
 }
 
 static void 
@@ -194,7 +194,7 @@ agent_listen_loop() {
 				return;
 			}
 			else {
-				/* todo - spawn a child to take care of this*/
+				/* spawn a child to take care of this*/
 				wchar_t path[MAX_PATH], module_path[MAX_PATH];
 				PROCESS_INFORMATION pi;
 				STARTUPINFOW si;
@@ -239,9 +239,11 @@ void agent_shutdown() {
 	SetEvent(event_stop_agent);
 }
 
+#define REG_AGENT_SDDL L"D:P(A;; GR;;; AU)(A;; GA;;; SY)(A;; GA;;; BA)"
+
 void
 agent_start(BOOL dbg_mode, BOOL child, HANDLE pipe, enum agent_type type) {
-	int i, r;
+	int r;
 	HKEY agent_root = NULL;
 	DWORD process_id = GetCurrentProcessId();
 
@@ -251,8 +253,14 @@ agent_start(BOOL dbg_mode, BOOL child, HANDLE pipe, enum agent_type type) {
 	if ((ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, (ULONG_PTR)NULL, 0)) == NULL)
 		fatal("cannot create ioc port ERROR:%d", GetLastError());
 
+
 	if (child == FALSE) {
-		if ((r = RegCreateKeyExW(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, 0, 0, KEY_WRITE, 0, &agent_root, 0)) != ERROR_SUCCESS)
+		SECURITY_ATTRIBUTES sa;
+		memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
+		sa.nLength = sizeof(sa);
+		if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(REG_AGENT_SDDL, SDDL_REVISION_1, &sa.lpSecurityDescriptor, &sa.nLength))
+			fatal("ConvertStringSecurityDescriptorToSecurityDescriptorW failed");
+		if ((r = RegCreateKeyExW(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, 0, 0, KEY_WRITE, &sa, &agent_root, 0)) != ERROR_SUCCESS)
 			fatal("cannot create agent root reg key, ERROR:%d", r);
 		if ((r = RegSetValueExW(agent_root, L"ProcessID", 0, REG_DWORD, (BYTE*)&process_id, 4)) != ERROR_SUCCESS)
 			fatal("cannot publish agent master process id ERROR:%d", r);
@@ -266,6 +274,5 @@ agent_start(BOOL dbg_mode, BOOL child, HANDLE pipe, enum agent_type type) {
 		process_connection(pipe, type);
 	}
 	
-	return 0;
 }
 
