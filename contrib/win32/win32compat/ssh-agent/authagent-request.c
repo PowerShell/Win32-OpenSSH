@@ -29,11 +29,11 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#define WIN32_NO_STATUS
+#define UMDF_USING_NTSTATUS 
 #include <Windows.h>
-#undef WIN32_NO_STATUS
 #include <Ntsecapi.h>
 #include <ntstatus.h>
+#include <Shlobj.h>
 #include "agent.h"
 #include "agent-request.h"
 #include "key.h"
@@ -170,7 +170,9 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 	}
 
 	if (key_verify(key, sig, sig_len, blob, blob_len) != 1 ||
-	    (token = generate_user_token(wuser)) == 0 || 
+	    (token = generate_user_token(wuser)) == 0 ||
+	    SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
+	    pubkey_allowed(key, wuser, wuser_home) != 1 ||
 	    (FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
 	    ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
 	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||

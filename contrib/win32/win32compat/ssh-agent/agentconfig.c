@@ -50,7 +50,6 @@ static int use_privsep = -1;
 Buffer cfg;
 ServerOptions options;
 struct passwd *privsep_pw = NULL;
-char *forced_command = NULL;
 static char *config_file_name = _PATH_SERVER_CONFIG_FILE;
 
 int	 auth2_methods_valid(const char * c, int i) {
@@ -107,4 +106,18 @@ int load_config() {
 
 int config_log_level() {
 	return options.log_level;
+}
+
+int pubkey_allowed(struct sshkey* pubkey, wchar_t* wuser, wchar_t* wuser_home) {
+	struct passwd pw;
+	char user[256], user_home[MAX_PATH];
+	memset(&pw, 0, sizeof(pw));
+
+	if (WideCharToMultiByte(CP_UTF8, 0, wuser, -1, user, 256, NULL, NULL) == 0)
+		return 0;
+	/* BUG - pw structure is assumed to be filled with unicode strings by expand_authorized_keys()*/
+	//WideCharToMultiByte(CP_UTF8, 0, wuser_home, -1, user_home, MAX_PATH, NULL, NULL);
+	pw.pw_dir = wuser_home;
+	pw.pw_name = user;
+	return user_key_allowed(&pw, pubkey, 1);
 }
