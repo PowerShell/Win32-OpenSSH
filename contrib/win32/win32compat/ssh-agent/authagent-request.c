@@ -50,9 +50,10 @@ InitLsaString(LSA_STRING *lsa_string, const char *str)
 	}
 }
 
+#define MAX_USER_LEN 256
 static HANDLE 
 generate_user_token(wchar_t* user) {
-	HANDLE lsa_handle = 0, token = 0;;
+	HANDLE lsa_handle = 0, token = 0;
 	LSA_OPERATIONAL_MODE mode;
 	ULONG auth_package_id;
 	NTSTATUS ret, subStatus;
@@ -64,7 +65,33 @@ generate_user_token(wchar_t* user) {
 	LUID logonId;
 	QUOTA_LIMITS quotas;
 	DWORD cbProfile;
-	BOOL domain_user = (wcschr(user, L'@') != NULL)? TRUE : FALSE;
+	BOOL domain_user;
+	
+	/* prep user name - TODO: implment an accurate check if user is domain account*/
+	if (wcsnlen(user, MAX_USER_LEN) == MAX_USER_LEN) {
+		debug("user length is not supported");
+		goto done;
+	}
+
+	if (wcschr(user, L'\\') != NULL) {
+		wchar_t *un = NULL, *dn = NULL;
+		DWORD un_len = 0, dn_len = 0;
+		dn = user;
+		dn_len = wcschr(user, L'\\') - user;
+		un = wcschr(user, L'\\') + 1;
+		un_len = wcsnlen(user, MAX_USER_LEN) - dn_len - 1;
+		if (dn_len == 0 || un_len == 0) {
+			debug("cannot get user token - bad user name");
+			goto done;
+		}
+		memcpy(user_copy, un, un_len * sizeof(wchar_t));
+		user_copy[un_len] = L'@';
+		memcpy(user_copy + un_len + 1, dn, dn_len * sizeof(wchar_t));
+		user_copy[dn_len + 1 + un_len] = L'\0';
+		user = user_copy;
+	}
+	
+	domain_user = (wcschr(user, L'@') != NULL) ? TRUE : FALSE;
 
 	InitLsaString(&logon_process_name, "ssh-agent");
 	if (domain_user)
