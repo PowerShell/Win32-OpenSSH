@@ -66,6 +66,7 @@ generate_user_token(wchar_t* user) {
 	QUOTA_LIMITS quotas;
 	DWORD cbProfile;
 	BOOL domain_user;
+	wchar_t user_copy[MAX_USER_LEN];
 	
 	/* prep user name - TODO: implment an accurate check if user is domain account*/
 	if (wcsnlen(user, MAX_USER_LEN) == MAX_USER_LEN) {
