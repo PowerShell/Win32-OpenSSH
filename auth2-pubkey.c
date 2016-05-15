@@ -93,21 +93,7 @@ extern u_int session_id2_len;
 
 static int
 userauth_pubkey(Authctxt *authctxt)
-{
-  #ifdef WIN32_FIXME
-  
-  int loginStat = 1;
-
-  char currentUser[MAX_PATH] = {0};
-  
-  DWORD currentUserSize = sizeof(currentUser);
-  
-  int targetIsCurrent = 0;
-
-  int doOpenSSHVerify = 0;
-  
-  #endif
-  
+{  
 	Buffer b;
 	Key *key = NULL;
 	char *pkalg, *userstyle;
@@ -203,9 +189,6 @@ userauth_pubkey(Authctxt *authctxt)
 
 		/* test for correct signature */
 		authenticated = 0;
-   /*
-     * On pure win32 try to logon using lsa first.
-     */
 
 #ifdef WIN32_FIXME
 		{
@@ -234,13 +217,18 @@ userauth_pubkey(Authctxt *authctxt)
 					OPEN_EXISTING,  // opens existing pipe 
 					FILE_FLAG_OVERLAPPED,              // attributes 
 					NULL);          // no template file 
-				if (h == INVALID_HANDLE_VALUE) 
+				if (h == INVALID_HANDLE_VALUE) {
+					debug("cannot connect to auth agent");
 					break;
+				}
 
-				if (!GetNamedPipeServerProcessId(h, &pipe_server_pid) || (agent_pid != pipe_server_pid)) 
+				if (!GetNamedPipeServerProcessId(h, &pipe_server_pid) || (agent_pid != pipe_server_pid)) {
+					debug("auth agent pid mismatch");
 					break;
+				}
 
-				sock = w32_allocate_fd_for_handle(h, FALSE);
+				if ((sock = w32_allocate_fd_for_handle(h, FALSE)) < 0)
+					break;
 				msg = sshbuf_new();
 				if (!msg)
 					break;
@@ -251,8 +239,10 @@ userauth_pubkey(Authctxt *authctxt)
 					(r = sshbuf_put_string(msg, sig, slen)) != 0 ||
 					(r = sshbuf_put_string(msg, buffer_ptr(&b), buffer_len(&b))) != 0 ||
 					(r = ssh_request_reply(sock, msg, msg)) != 0 ||
-					(r = sshbuf_get_u32(msg, &token)) != 0 )
+					(r = sshbuf_get_u32(msg, &token)) != 0) {
+					debug("auth agent did not authorize client %s", authctxt->pw->pw_name);
 					break;
+				}
 
 				break;
 				

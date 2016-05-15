@@ -42,21 +42,7 @@ process_add_request(struct sshbuf* request, struct sshbuf* response, struct agen
 
 
 int process_pubkeyagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
-	int r = 0;
-	const u_char *op;
-	size_t op_len;
-	
-	if ((r = sshbuf_get_string_direct(request, &op, &op_len)) != 0)
-		goto done;
-
-	if (op_len > 10) {
-		r = EINVAL;
-		goto done;
-	}
-
-	if ((op_len == 3) && (strncmp(op, PK_REQUEST_ADD, 3) == 0))
-		r = 0;
-	
+	int r = -1;
 
 done:
 	return r;
