@@ -4,7 +4,7 @@ $scriptdir = Split-Path $scriptpath
 $sshdpath = Join-Path $scriptdir "sshd.exe"
 $sshagentpath = Join-Path $scriptdir "ssh-agent.exe"
 
-$ntrights = Join-Path $scriptdir "ntrights.exe -u `"NT SERVICE\SSHD`" +r SeAssignPrimaryTokenPrivilege"
+$ntrights = "ntrights.exe -u `"NT SERVICE\SSHD`" +r SeAssignPrimaryTokenPrivilege"
 
 if (-not (Test-Path $sshdpath)) {
     throw "sshd.exe is not present in script path"
@@ -27,6 +27,10 @@ cmd.exe /c 'sc.exe sdset ssh-agent D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPW
 
 New-Service -Name sshd -BinaryPathName $sshdpath -Description "SSH Deamon" -StartupType Manual -DependsOn ssh-agent | Out-Null
 sc.exe config sshd obj= "NT SERVICE\SSHD"
+
+Push-Location
+cd $scriptdir
 cmd.exe /c $ntrights
+Pop-Location
 Write-Host -ForegroundColor Green "sshd and ssh-agent services successfully installed"
 
