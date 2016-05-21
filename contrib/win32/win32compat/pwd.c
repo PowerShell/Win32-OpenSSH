@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <shlobj.h>
 #include <Userenv.h>
+#include <sddl.h>
 
 #include "win32auth.h"
 #include "homedirhelp.h"
@@ -128,87 +129,46 @@ int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
 
 char *GetHomeDirFromToken(char *userName, HANDLE token)
 {
-  UCHAR domain[200];
-  wchar_t pw_buf[MAX_PATH] = { L'\0' };
-  PWSTR tmp;
+	UCHAR InfoBuffer[1000];
+	PTOKEN_USER pTokenUser = (PTOKEN_USER)InfoBuffer;
+	DWORD dwInfoBufferSize, tmp_len;
+	LPWSTR sid_str = NULL;
+	wchar_t reg_path[MAX_PATH];
+	HKEY reg_key = 0;
+
+	/* set home dir to Windows if any of below fair*/
+	GetWindowsDirectoryW(pw_homedir, MAX_PATH);
+
+	tmp_len = MAX_PATH;
+	if (GetTokenInformation(token, TokenUser, InfoBuffer,
+		1000, &dwInfoBufferSize) == FALSE ||
+	    ConvertSidToStringSidW(pTokenUser->User.Sid, &sid_str) == FALSE ||
+	    swprintf(reg_path, MAX_PATH, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", sid_str) == MAX_PATH ||
+	    RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
+	    RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, pw_homedir, &tmp_len) != 0 ){
+		/* one of the above failed */
+		debug("cannot retirve profile path - perhaps user profile is not created yet");
+	}
+
+	if (sid_str)
+		LocalFree(sid_str);
+	
+	if (reg_key)
+		RegCloseKey(reg_key);
+
+	/* TODO - populate APPDATA, LOCALADPPDATA, TEMP, etc */
+	SetEnvironmentVariableW(L"LOCALAPPDATA", L"");
+	SetEnvironmentVariableW(L"APPDATA", L"");
+	SetEnvironmentVariableW(L"TEMP", L"");
+	SetEnvironmentVariableW(L"TMP", L"");
+	SetEnvironmentVariableW(L"USERDNSDOMAIN", L"");
+	SetEnvironmentVariableW(L"USERDOMAIN", L"");
+	SetEnvironmentVariableW(L"USERDOMAIN_ROAMINGPROFILE", L"");
+	SetEnvironmentVariableW(L"USERPROFILE", L"");
   
-  debug("-> GetHomeDirFromToken()...");
+	debug("<- GetHomeDirFromToken()...");
   
-  PROFILEINFO profileInfo;
-
-  // find the server name of the domain controller which created this token
-  GetDomainFromToken ( &token, domain, sizeof(domain));
-  //if (MultiByteToWideChar(CP_UTF8, 0, domain, -1, domainW, sizeof(domainW)) == 0)
-  //{
-    //debug("DomainServerName encoding conversion failure");
-    //return NULL;
-  //}
-
-  profileInfo.dwFlags = PI_NOUI;
-  profileInfo.lpProfilePath = NULL;
-  profileInfo.lpUserName = userName;
-  profileInfo.lpDefaultPath = NULL;
-  profileInfo.lpServerName = domain;
-  profileInfo.lpPolicyPath = NULL;
-  profileInfo.hProfile = NULL;
-  profileInfo.dwSize = sizeof(profileInfo);
-
-  /*
-   * And retrieve homedir from profile.
-   */
-
-  if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_Documents, 0, token, &tmp)))
-  {
-	  wcscpy_s(pw_homedir, MAX_PATH, tmp);
-	  CoTaskMemFree(tmp);
-  } else
-  {
-	    debug("SHGetKnownFolderPath on FOLDERID_Documents failed"); 
-	    GetWindowsDirectoryW(pw_homedir, MAX_PATH);
-  }
-  
-  // update APPDATA user's env variable  
-  if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, 0, token, &tmp)))
-  {
-	  SetEnvironmentVariableW(L"APPDATA", tmp);
-	  CoTaskMemFree(tmp);
-  }
-
-  // update LOCALAPPDATA user's env variable
-  if (SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, token, &tmp)))
-  {
-	  SetEnvironmentVariableW(L"LOCALAPPDATA", tmp);
-	  CoTaskMemFree(tmp);
-  }
-
-  debug("<- GetHomeDirFromToken()...");
-  
-  return pw_homedir;
-}
-
-
-wchar_t *GetHomeDir(char *userName)
-{
-  /*
-   * Get home directory path (if this fails, the user is invalid, bail)
-   */
-
-  wchar_t *homeDir = NULL;
-  
-  homeDir = gethomedir_w(userName, NULL);
-  
-  if (homeDir == NULL || homeDir[0] == L'\0')
-  {
-    return NULL;
-  }
-  
-  debug3("GetHomeDir: homedir [%ls]", homeDir);
-  
-  wcsncpy(pw_homedir, homeDir, sizeof(pw_homedir));
-
-  free(homeDir);
-  
-  return pw_homedir;
+	return pw_homedir;
 }
 
 /*
