@@ -1664,9 +1664,6 @@
 
 #define BROKEN_SYS_TERMIO_H
 
-#define strerror strerror_win32
-
-#define strerror strerror_win32
 
 // PRAGMA SYS PORT
 #define WITH_OPENSSL 1

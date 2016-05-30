@@ -223,8 +223,8 @@ createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 		if (c_s_flags & O_EXCL)
 			cf_flags->dwCreationDisposition = CREATE_NEW;
 		else
-			cf_flags->dwCreationDisposition = OPEN_ALWAYS;
-	}
+			cf_flags->dwCreationDisposition = CREATE_ALWAYS;
+	} 
 
 	if (c_s_flags & O_APPEND)
 		cf_flags->dwDesiredAccess = FILE_APPEND_DATA;
@@ -301,7 +301,7 @@ VOID CALLBACK ReadCompletionRoutine(
 /* initiate an async read */
 /* TODO:  make this a void func, store error in context */
 int
-fileio_ReadFileEx(struct w32_io* pio) {
+fileio_ReadFileEx(struct w32_io* pio, unsigned int bytes_requested) {
 	debug2("ReadFileEx io:%p", pio);
 
 	if (pio->read_details.buf == NULL) {
@@ -311,8 +311,12 @@ fileio_ReadFileEx(struct w32_io* pio) {
 			debug2("ReadFileEx - ERROR: %d, io:%p", errno, pio);
 			return -1;
 		}
-		pio->read_details.buf_size = READ_BUFFER_SIZE;
 	}
+
+	if (FILETYPE(pio) == FILE_TYPE_DISK)
+		pio->read_details.buf_size = min(bytes_requested, READ_BUFFER_SIZE);
+	else
+		pio->read_details.buf_size = READ_BUFFER_SIZE;
 
 	if (ReadFileEx(WINHANDLE(pio), pio->read_details.buf, pio->read_details.buf_size,
 		&pio->read_overlapped, &ReadCompletionRoutine))
@@ -353,7 +357,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max) {
 				return -1;
 		}
 		else {
-			if (-1 == fileio_ReadFileEx(pio)) {
+			if (-1 == fileio_ReadFileEx(pio, max)) {
 				if ((FILETYPE(pio) == FILE_TYPE_PIPE)
 					&& (errno == ERROR_BROKEN_PIPE)) {
 					/* write end of the pipe closed */
@@ -560,8 +564,8 @@ fileio_lseek(struct w32_io* pio, long offset, int origin) {
 		return -1;
 	}
 
-	//NO-OP as we automatically move file pointer in async io callbacks for files
-	//assert current postion in overlapped struct
+	pio->read_overlapped.Offset = offset;
+	pio->write_overlapped.Offset = offset;
 	return 0;
 }
 
@@ -625,7 +629,7 @@ fileio_on_select(struct w32_io* pio, BOOL rd) {
 			}
 		}
 		else {
-			if (fileio_ReadFileEx(pio) != 0) {
+			if (fileio_ReadFileEx(pio, INT_MAX) != 0) {
 				pio->read_details.error = errno;
 				errno = 0;
 				return;

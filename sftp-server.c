@@ -1320,7 +1320,7 @@ process_rmdir(u_int32_t id)
 static void
 process_realpath(u_int32_t id)
 {
-	char resolvedname[PATH_MAX];
+	char resolvedname[PATH_MAX+ 1];
 	char *path;
 	int r;
 //#ifdef WIN32_FIXME
