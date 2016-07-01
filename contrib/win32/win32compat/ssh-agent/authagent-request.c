@@ -138,21 +138,23 @@ generate_user_token(wchar_t* user) {
 	if (AllocateLocallyUniqueId(&sourceContext.SourceIdentifier) != TRUE)
 		goto done;
 
-	if (ret = LsaLogonUser(lsa_handle, 
-		&originName, 
-		Network, 
-		auth_package_id, 
-		logon_info,
-		logon_info_size, 
-		NULL, 
-		&sourceContext,
-		(PVOID*)&pProfile,
-		&cbProfile,
-		&logonId,
-		&token,
-		&quotas,
-		&subStatus) != STATUS_SUCCESS)
+	if (ret = LsaLogonUser(lsa_handle,
+	    &originName,
+	    Network,
+	    auth_package_id,
+	    logon_info,
+	    logon_info_size,
+	    NULL,
+	    &sourceContext,
+	    (PVOID*)&pProfile,
+	    &cbProfile,
+	    &logonId,
+	    &token,
+	    &quotas,
+	    &subStatus) != STATUS_SUCCESS) {
+	    debug("LsaRegisterLogonProcess failed");
 		goto done;
+	}
 
 done:
 	if (lsa_handle)
@@ -193,13 +195,13 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 
 	if (MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN) == 0 ||
 	    (token = generate_user_token(wuser)) == 0) {
-		debug("unable to generate user token");
+		debug("unable to generate token for user %ls", wuser);
 		goto done;
 	}
 
 	if (SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
 		pubkey_allowed(key, wuser, wuser_home) != 1) {
-		debug("given public key is not mapped to user %ls", wuser);
+		debug("given public key is not mapped to user %ls (profile:%ls)", wuser, wuser_home);
 		goto done;
 	}
 
