@@ -214,6 +214,9 @@
     <ClCompile Include="..\..\..\auth-options.c" />
     <ClCompile Include="..\..\..\auth2-pubkey.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

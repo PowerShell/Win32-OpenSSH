@@ -24,6 +24,9 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sftp-server-main.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sftp-server.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6657614F-7821-4D55-96EF-7C3C4B551880}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>

@@ -249,6 +249,9 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sshlogin.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshpty.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

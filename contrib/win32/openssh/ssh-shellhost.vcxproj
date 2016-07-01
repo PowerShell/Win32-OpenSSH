@@ -22,6 +22,9 @@
   <ItemGroup>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\shell-host.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>

@@ -22,6 +22,12 @@
   <ItemGroup>
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-add.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{029797FF-C986-43DE-95CD-2E771E86AEBC}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
