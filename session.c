@@ -758,6 +758,9 @@ do_exec_no_pty(Session *s, const char *command)
   
   SetEnvironmentVariable("SSH_CONNECTION", buf);
 
+  if (original_command)
+	  SetEnvironmentVariable("SSH_ORIGINAL_COMMAND", original_command);
+
   // set better prompt for Windows cmd shell
   if (!s -> is_subsystem) {
 	  snprintf(buf,sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
