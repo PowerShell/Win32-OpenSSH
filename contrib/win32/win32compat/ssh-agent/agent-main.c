@@ -96,18 +96,42 @@ int main(int argc, char **argv) {
 	load_config();
 	if (!StartServiceCtrlDispatcherW(dispatch_table))  {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
-			if (argc == 1) {
-				/* console app - start in debug mode*/
+			/*todo - support debug mode*/
+			/*
+			if (debugmode) {
 				SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
 				log_init("ssh-agent", 7, 1, 1);
 				agent_start(TRUE, FALSE, 0, 0);
 				return 0;
 			}
-			else {
+			*/
+			if (argc == 2) {
+				/*agent process is likely a spawned child*/
 				char* h = 0;
 				h += atoi(*(argv + 1));
-				log_init("ssh-agent", config_log_level(), 1, 0);
-				agent_start(FALSE, TRUE, h, atoi(*(argv+2)));
+				if (h != 0) {
+					log_init("ssh-agent", config_log_level(), 1, 0);
+					agent_start(FALSE, TRUE, h, atoi(*(argv + 2)));
+					return 0;
+				}
+			}
+			/* to support linux compat scenarios where ssh-agent.exe is typically launched per session*/
+			/* - just start ssh-agent service if needed */
+			{
+				SC_HANDLE sc_handle, svc_handle;
+				DWORD err;
+								
+				if ((sc_handle = OpenSCManagerW(NULL, NULL, SERVICE_START)) == NULL ||
+				    (svc_handle = OpenServiceW(sc_handle, L"ssh-agent", SERVICE_START)) == NULL){
+					fatal("unable to open service handle");
+					return -1;
+				}
+				
+				if (StartService(svc_handle, 0, NULL) == FALSE && GetLastError() != ERROR_SERVICE_ALREADY_RUNNING) {
+					fatal("unable to start ssh-agent service, error :%d", GetLastError());
+					return -1;
+				}
+
 				return 0;
 			}
 		}
