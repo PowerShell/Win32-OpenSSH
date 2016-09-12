@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
 				return 0;
 			}
 			*/
-			if (argc == 2) {
+			if (argc == 3) {
 				/*agent process is likely a spawned child*/
 				char* h = 0;
 				h += atoi(*(argv + 1));
