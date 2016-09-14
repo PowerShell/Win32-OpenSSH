@@ -708,6 +708,59 @@ do_local_cmd(arglist *a)
 	#endif
 }
 
+static int pipe_counter = 1;
+/* create overlapped supported pipe */
+BOOL CreateOverlappedPipe(PHANDLE hReadPipe, PHANDLE hWritePipe, LPSECURITY_ATTRIBUTES sa, DWORD size) {
+	HANDLE read_handle = INVALID_HANDLE_VALUE, write_handle = INVALID_HANDLE_VALUE;
+	char pipe_name[MAX_PATH];
+
+	/* create name for named pipe */
+	if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\W32SCPPipe.%08x.%08x",
+		GetCurrentProcessId(), pipe_counter++)) {
+		debug("pipe - ERROR sprintf_s %d", errno);
+		goto error;
+	}
+
+	read_handle = CreateNamedPipeA(pipe_name,
+		PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+		PIPE_TYPE_BYTE | PIPE_WAIT,
+		1,
+		4096,
+		4096,
+		0,
+		sa);
+	if (read_handle == INVALID_HANDLE_VALUE) {
+		debug("pipe - CreateNamedPipe() ERROR:%d", errno);
+		goto error;
+	}
+
+	/* connect to named pipe */
+	write_handle = CreateFileA(pipe_name,
+		GENERIC_WRITE,
+		0,
+		sa,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+		NULL);
+	if (write_handle == INVALID_HANDLE_VALUE) {
+		debug("pipe - ERROR CreateFile() :%d", errno);
+		goto error;
+	}
+
+	*hReadPipe = read_handle;
+	*hWritePipe = write_handle;
+	return TRUE;
+
+error:
+	if (read_handle)
+		CloseHandle(read_handle);
+	if (write_handle)
+		CloseHandle(write_handle);
+
+	return FALSE;
+
+}
+
 /*
  * This function executes the given command as the specified user on the
  * given host.  This returns < 0 if execution fails, and >= 0 otherwise. This
@@ -814,7 +867,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 		sa.lpSecurityDescriptor = NULL;
 		/* command processor output redirected to a nameless pipe */
 
-		rc = CreatePipe ( &hstdout[0], &hstdout[1], &sa, 0 ) ;
+		rc = CreateOverlappedPipe( &hstdout[0], &hstdout[1], &sa, 0 ) ;
 		/* read from this fd to get data from ssh.exe*/
 
 		// make scp's pipe read handle not inheritable by ssh
@@ -830,7 +883,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 		*fdin = _open_osfhandle((intptr_t)hstdout[0],0);
 		_setmode (*fdin, O_BINARY); // set this file handle for binary I/O
 
-		rc = CreatePipe ( &hstdin[0], &hstdin[1], &sa, 0 ) ;
+		rc = CreateOverlappedPipe( &hstdin[0], &hstdin[1], &sa, 0 ) ;
 		/* write to this fd to get data into ssh.exe*/
 
 		// make scp's pipe write handle not inheritable by ssh
@@ -1033,11 +1086,7 @@ int pflag, iamremote, iamrecursive, targetshouldbedirectory;
 char cmd[CMDNEEDS];		/* must hold "rcp -r -p -d\0" */
 
 int response(void);
-#ifdef WIN32_FIXME
-void rsource(char *, struct _stati64 *);
-#else
 void rsource(char *, struct stat *);
-#endif
 
 void sink(int, char *[]);
 void source(int, char *[]);
@@ -1439,7 +1488,7 @@ tolocal(int argc, char **argv)
 void
 source(int argc, char *argv[])
 {
-	struct _stati64 stb;
+	struct stat stb;
 	static BUF buffer;
 	BUF *bp;
 	off_t i;
@@ -1520,7 +1569,7 @@ source(int argc, char *argv[])
 
 		if (_sopen_s(&fd, name, O_RDONLY | O_BINARY, _SH_DENYNO, 0) != 0) {
 			// in NT, we have to check if it is a directory
-			if (_stati64(name, &stb) >= 0) {
+			if (stat(name, &stb) >= 0) {
 				goto switchpoint;
 			}
 			else
@@ -1692,7 +1741,7 @@ next:			if (fd != -1) (void)_close(fd);
 			free(filenames[ii]);
 }
 
-void rsource(char *name, struct _stati64 *statp)
+void rsource(char *name, struct stat *statp)
 {
 	SCPDIR *dirp;
 	struct scp_dirent *dp;
@@ -1754,7 +1803,7 @@ void sink(int argc, char *argv[])
 {
 //	DWORD dwread;
 	static BUF buffer;
-	struct _stati64 stb;
+	struct stat stb;
 	enum { YES, NO, DISPLAYED } wrerr;
 	BUF *bp;
 	size_t i, j, size;
@@ -1812,7 +1861,7 @@ void sink(int argc, char *argv[])
         
 	(void)_write(remout, "", 1);
 
-	if (_stati64(targ, &stb) == 0 && S_ISDIR(stb.st_mode))
+	if (stat(targ, &stb) == 0 && S_ISDIR(stb.st_mode))
 		targisdir = 1;
 
 	for (first = 1;; first = 0) {
@@ -1912,7 +1961,7 @@ keepgoing:
 			np = namebuf;
 		} else
 			np = targ;
-		exists = _stati64(np, &stb) == 0;
+		exists = stat(np, &stb) == 0;
 		if (buf[0] == 'D') {
 			int mod_flag = pflag;
 			if (exists) {
@@ -2807,9 +2856,9 @@ char *win32colon(char *cp)
 
 void verifydir(char *cp)
 {
-	struct _stati64 stb;
+	struct stat stb;
 
-	if (!_stati64(cp, &stb)) {
+	if (!stat(cp, &stb)) {
 		if (S_ISDIR(stb.st_mode))
 			return;
 		errno = ENOTDIR;
