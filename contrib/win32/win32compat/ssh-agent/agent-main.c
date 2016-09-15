@@ -98,20 +98,20 @@ int main(int argc, char **argv) {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
 			/*todo - support debug mode*/
 			/*
-			if (debugmode) {
+			if (debugMode) {
 				SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
 				log_init("ssh-agent", 7, 1, 1);
-				agent_start(TRUE, FALSE, 0, 0);
+				agent_start(TRUE, FALSE, 0);
 				return 0;
 			}
 			*/
-			if (argc == 3) {
+			if (argc == 2) {
 				/*agent process is likely a spawned child*/
 				char* h = 0;
 				h += atoi(*(argv + 1));
 				if (h != 0) {
 					log_init("ssh-agent", config_log_level(), 1, 0);
-					agent_start(FALSE, TRUE, h, atoi(*(argv + 2)));
+					agent_start(FALSE, TRUE, h);
 					return 0;
 				}
 			}
@@ -148,7 +148,7 @@ int scm_start_servie(DWORD num, LPWSTR* args) {
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	log_init("ssh-agent", config_log_level(), 1, 0);
-	agent_start(FALSE, FALSE, 0, 0);
+	agent_start(FALSE, FALSE, 0);
 	return 0;
 }
 

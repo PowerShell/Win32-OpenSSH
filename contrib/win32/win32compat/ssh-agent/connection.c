@@ -183,12 +183,31 @@ process_request(struct agent_connection* con) {
 	if ((request == NULL) || (response == NULL))
 		goto done;
 
-	if (con->type == KEY_AGENT)
-		r = process_keyagent_request(request, response, con);
-	else if (con->type == PUBKEY_AGENT) 
-		r = process_pubkeyagent_request(request, response, con);
-	else if (con->type == PUBKEY_AUTH_AGENT) 
-		r = process_authagent_request(request, response, con);
+	{
+		u_char type;
+
+		if (sshbuf_get_u8(request, &type) != 0)
+			return -1;
+		debug2("process key agent request type %d", type);
+
+		switch (type) {
+		case SSH2_AGENTC_ADD_IDENTITY:
+			return process_add_identity(request, response, con);
+		case SSH2_AGENTC_REQUEST_IDENTITIES:
+			return process_request_identities(request, response, con);
+		case SSH2_AGENTC_SIGN_REQUEST:
+			return process_sign_request(request, response, con);
+		case SSH2_AGENTC_REMOVE_IDENTITY:
+			return process_remove_key(request, response, con);
+		case SSH2_AGENTC_REMOVE_ALL_IDENTITIES:
+			return process_remove_all(request, response, con);
+		case 100:
+			return process_authagent_request(request, response, con);
+		default:
+			debug("unknown agent request %d", type);
+			return -1;
+		}
+	}
 
 done:
 	if (request)

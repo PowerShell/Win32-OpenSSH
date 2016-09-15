@@ -98,7 +98,7 @@ done:
 
 #define REG_KEY_SDDL L"D:P(A;; GA;;; SY)(A;; GA;;; BA)"
 
-static int
+int
 process_add_identity(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	struct sshkey* key = NULL;
 	int r = 0, blob_len, eblob_len, request_invalid = 0, success = 0;
@@ -224,7 +224,7 @@ done:
 	return success ? 0 : -1;
 }
 
-static int
+int
 process_sign_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	u_char *blob, *data, *signature = NULL;
 	size_t blen, dlen, slen = 0;
@@ -270,7 +270,7 @@ done:
 	return r;
 }
 
-static int
+int
 process_remove_key(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	HKEY user_root = 0, root = 0;
 	char *blob, *thumbprint = NULL;
@@ -308,7 +308,7 @@ done:
 		free(thumbprint);
 	return r;
 }
-static int 
+int 
 process_remove_all(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	HKEY user_root = 0, root = 0;
 	int r = 0;
@@ -332,7 +332,7 @@ done:
 	return r;
 }
 
-static int
+int
 process_request_identities(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	int count = 0, index = 0, success = 0, r = 0;
 	HKEY root = NULL, sub = NULL, user_root = 0;
