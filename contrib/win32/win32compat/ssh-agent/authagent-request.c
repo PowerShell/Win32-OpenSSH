@@ -31,6 +31,7 @@
 
 #define UMDF_USING_NTSTATUS 
 #include <Windows.h>
+#include <UserEnv.h>
 #include <Ntsecapi.h>
 #include <ntstatus.h>
 #include <Shlobj.h>
@@ -48,6 +49,53 @@ InitLsaString(LSA_STRING *lsa_string, const char *str)
 		lsa_string->Length = strlen(str);
 		lsa_string->MaximumLength = lsa_string->Length + 1;
 	}
+}
+
+static void
+EnablePrivilege(const char *privName, int enabled)
+{
+	TOKEN_PRIVILEGES tp;
+	HANDLE hProcToken = NULL;
+	LUID luid;
+
+	int exitCode = 1;
+
+	if (LookupPrivilegeValueA(NULL, privName, &luid) == FALSE ||
+		OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hProcToken) == FALSE)
+		goto done;
+
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = luid;
+	tp.Privileges[0].Attributes = enabled ? SE_PRIVILEGE_ENABLED : 0;
+
+	AdjustTokenPrivileges(hProcToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), NULL, NULL);
+
+done:
+	if (hProcToken)
+		CloseHandle(hProcToken);
+	
+	return;
+}
+
+
+void
+LoadProfile(HANDLE token, char* user, char* domain) {
+	PROFILEINFOA profileInfo;
+	profileInfo.dwFlags = PI_NOUI;
+	profileInfo.lpProfilePath = NULL;
+	profileInfo.lpUserName = user;
+	profileInfo.lpDefaultPath = NULL;
+	profileInfo.lpServerName = domain;
+	profileInfo.lpPolicyPath = NULL;
+	profileInfo.hProfile = NULL;
+	profileInfo.dwSize = sizeof(profileInfo);
+	EnablePrivilege("SeBackupPrivilege", 1);
+	EnablePrivilege("SeRestorePrivilege", 1);
+	if (LoadUserProfileA(token, &profileInfo) == FALSE)
+		debug("Loading user profile failed ERROR: %d", GetLastError());
+	EnablePrivilege("SeBackupPrivilege", 0);
+	EnablePrivilege("SeRestorePrivilege", 0);
+
 }
 
 #define MAX_USER_LEN 256
@@ -167,8 +215,66 @@ done:
 	return token;
 }
 
-#define AUTH_REQUEST "pubkey"
+#define PUBKEY_AUTH_REQUEST "pubkey"
+#define PASSWD_AUTH_REQUEST "password"
 #define MAX_USER_NAME_LEN 256
+
+int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+	char *user = NULL, *pwd = NULL, *dom = NULL, *tmp;
+	//wchar_t *userW = NULL, *domW = NULL, *pwdW = NULL;
+	size_t user_len = 0, pwd_len = 0, dom_len = 0;
+	int r = -1;
+	HANDLE token = 0, dup_token, client_proc = 0;
+	ULONG client_pid;
+
+	if (sshbuf_get_cstring(request, &user, &user_len) != 0 ||
+		sshbuf_get_cstring(request, &pwd, &pwd_len) != 0 ||
+		user_len == 0 ||
+		pwd_len == 0 ){
+		debug("bad password auth request");
+		goto done;
+	}
+
+	/*TODO - support Unicode*/
+	
+	if ((tmp = strchr(user, '\\')) != NULL) {
+		dom = user;
+		user = tmp + 1;
+		*tmp = '\0';
+
+	}
+	else if ((tmp = strchr(user, '@')) != NULL) {
+		dom = tmp + 1;
+		*tmp = '\0';
+	}
+
+	if (LogonUser(user, dom, pwd, LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, &token) == FALSE ||
+		(FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
+		((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
+		(FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
+		(sshbuf_put_u32(response, dup_token) != 0)) {
+		debug("failed to authenticate user");
+		goto done;
+	}
+
+	LoadProfile(token, user, dom);
+	r = 0;
+done:
+	/* TODO Fix this hacky protocol*/
+	if ((r == -1) && (sshbuf_put_u8(response, SSH_AGENT_FAILURE) == 0))
+		r = 0;
+	
+	if (user)
+		free(user);
+	if (pwd)
+		free(pwd);
+	if (token)
+		CloseHandle(token);
+	if (client_proc)
+		CloseHandle(client_proc);
+
+	return r;
+}
 
 int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	int r = -1;
@@ -214,7 +320,22 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 		debug("failed to authorize user");
 		goto done;
 	}
-	
+	{
+		/*TODO - support Unicode*/
+		char *tmp, *u = user, *d = NULL;
+		if ((tmp = strchr(user, '\\')) != NULL) {
+			d = user;
+			u = tmp + 1;
+			*tmp = '\0';
+
+		}
+		else if ((tmp = strchr(user, '@')) != NULL) {
+			d = tmp + 1;
+			*tmp = '\0';
+		}
+		LoadProfile(token, u, d);
+	}
+
 	r = 0;
 done:
 	if (user)
@@ -238,8 +359,10 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 		return -1;
 	}
 
-	if (opn_len == strlen(AUTH_REQUEST) && memcmp(opn, AUTH_REQUEST, opn_len) == 0)
+	if (opn_len == strlen(PUBKEY_AUTH_REQUEST) && memcmp(opn, PUBKEY_AUTH_REQUEST, opn_len) == 0)
 		return process_pubkeyauth_request(request, response, con);
+	else if (opn_len == strlen(PASSWD_AUTH_REQUEST) && memcmp(opn, PASSWD_AUTH_REQUEST, opn_len) == 0)
+		return process_passwordauth_request(request, response, con);
 	else {
 		debug("unknown auth request: %s", opn);
 		return -1;
