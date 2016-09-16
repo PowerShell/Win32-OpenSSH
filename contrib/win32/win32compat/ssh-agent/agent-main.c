@@ -32,11 +32,11 @@
 #include "agent.h"
 
 
-int scm_start_servie(DWORD, LPWSTR*);
+int scm_start_service(DWORD, LPWSTR*);
 
 SERVICE_TABLE_ENTRYW dispatch_table[] =
 {
-	{ L"ssh-agent", (LPSERVICE_MAIN_FUNCTIONW)scm_start_servie },
+	{ L"ssh-agent", (LPSERVICE_MAIN_FUNCTIONW)scm_start_service },
 	{ NULL, NULL }
 };
 static SERVICE_STATUS_HANDLE service_status_handle;
@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
-int scm_start_servie(DWORD num, LPWSTR* args) {
+int scm_start_service(DWORD num, LPWSTR* args) {
 	service_status_handle = RegisterServiceCtrlHandlerW(L"ssh-agent", service_handler);
 	ZeroMemory(&service_status, sizeof(service_status));
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;

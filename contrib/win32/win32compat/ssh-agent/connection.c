@@ -46,7 +46,7 @@ void agent_connection_on_error(struct agent_connection* con, DWORD error) {
 void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPED* ol) {
 	
 	/* process error */
-	debug("connection io %p #bytes:%d state:%d", con, bytes, con->state);
+	debug3("connection io %p #bytes:%d state:%d", con, bytes, con->state);
 	if ((bytes == 0) && (GetOverlappedResult(con->connection, ol, &bytes, FALSE) == FALSE))
 		ABORT_CONNECTION_RETURN(con);
 
@@ -155,7 +155,7 @@ get_con_client_type(HANDLE pipe) {
 	else
 		r = OTHER;
 
-	debug("client type: %d", r);
+	debug2("client type: %d", r);
 done:
 	if (sshd_sid)
 		free(sshd_sid);
@@ -167,6 +167,7 @@ done:
 	return r;
 }
 
+#define SSH_AGENT_AUTHENTICATE			100
 
 static int
 process_request(struct agent_connection* con) {
@@ -188,24 +189,31 @@ process_request(struct agent_connection* con) {
 
 		if (sshbuf_get_u8(request, &type) != 0)
 			return -1;
-		debug2("process key agent request type %d", type);
+		debug("process agent request type %d", type);
 
 		switch (type) {
 		case SSH2_AGENTC_ADD_IDENTITY:
-			return process_add_identity(request, response, con);
+			r =  process_add_identity(request, response, con);
+			break;
 		case SSH2_AGENTC_REQUEST_IDENTITIES:
-			return process_request_identities(request, response, con);
+			r = process_request_identities(request, response, con);
+			break;
 		case SSH2_AGENTC_SIGN_REQUEST:
-			return process_sign_request(request, response, con);
+			r = process_sign_request(request, response, con);
+			break;
 		case SSH2_AGENTC_REMOVE_IDENTITY:
-			return process_remove_key(request, response, con);
+			r = process_remove_key(request, response, con);
+			break;
 		case SSH2_AGENTC_REMOVE_ALL_IDENTITIES:
-			return process_remove_all(request, response, con);
-		case 100:
-			return process_authagent_request(request, response, con);
+			r = process_remove_all(request, response, con);
+			break;
+		case SSH_AGENT_AUTHENTICATE:
+			r = process_authagent_request(request, response, con);
+			break;
 		default:
 			debug("unknown agent request %d", type);
-			return -1;
+			r = -1;
+			break;
 		}
 	}
 

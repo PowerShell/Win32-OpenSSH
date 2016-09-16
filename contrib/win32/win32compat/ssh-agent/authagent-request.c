@@ -167,13 +167,13 @@ done:
 	return token;
 }
 
-#define AUTH_REQUEST "keyauthenticate"
+#define AUTH_REQUEST "pubkey"
 #define MAX_USER_NAME_LEN 256
 
-int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	int r = -1;
-	char *opn, *key_blob, *user, *sig, *blob;
-	size_t opn_len, key_blob_len, user_len, sig_len, blob_len;
+	char *key_blob, *user, *sig, *blob;
+	size_t key_blob_len, user_len, sig_len, blob_len;
 	struct sshkey *key = NULL;
 	HANDLE token = NULL, dup_token = NULL, client_proc = NULL;
 	wchar_t wuser[MAX_USER_NAME_LEN];
@@ -181,15 +181,12 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 	ULONG client_pid;
 
 	user = NULL;
-	if (sshbuf_get_string_direct(request, &opn, &opn_len) != 0 ||
-	    sshbuf_get_string_direct(request, &key_blob, &key_blob_len) != 0 ||
+	if (sshbuf_get_string_direct(request, &key_blob, &key_blob_len) != 0 ||
 	    sshbuf_get_cstring(request, &user, &user_len) != 0 ||
 	    sshbuf_get_string_direct(request, &sig, &sig_len) != 0 ||
 	    sshbuf_get_string_direct(request, &blob, &blob_len) != 0 ||
-	    sshkey_from_blob(key_blob, key_blob_len, &key) != 0 ||
-	    opn_len != strlen(AUTH_REQUEST) ||
-	    memcmp(opn, AUTH_REQUEST, opn_len) != 0) {
-		debug("auth agent invalid request");
+	    sshkey_from_blob(key_blob, key_blob_len, &key) != 0) {
+		debug("invalid pubkey auth request");
 		goto done;
 	}
 
@@ -231,4 +228,21 @@ done:
 	if (client_proc)
 		CloseHandle(client_proc);
 	return r;
+}
+
+int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+	char *opn;
+	size_t opn_len;
+	if (sshbuf_get_string_direct(request, &opn, &opn_len) != 0) {
+		debug("invalid auth request");
+		return -1;
+	}
+
+	if (opn_len == strlen(AUTH_REQUEST) && memcmp(opn, AUTH_REQUEST, opn_len) == 0)
+		return process_pubkeyauth_request(request, response, con);
+	else {
+		debug("unknown auth request: %s", opn);
+		return -1;
+	}
+		
 }
