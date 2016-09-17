@@ -174,8 +174,8 @@ process_request(struct agent_connection* con) {
 	int r = -1;
 	struct sshbuf *request = NULL, *response = NULL;
 
-	if (con->client_type == UNKNOWN)
-		if ((con->client_type = get_con_client_type(con->connection)) == -1)
+	if (con->client_process == UNKNOWN)
+		if ((con->client_process = get_con_client_type(con->connection)) == -1)
 			goto done;
 
 	

@@ -212,6 +212,10 @@ agent_listen_loop() {
 void agent_cleanup_connection(struct agent_connection* con) {
 	debug("connection %p clean up", con);
 	CloseHandle(con->connection);
+        if (con->hProfile)
+                UnloadUserProfile(con->auth_token, con->hProfile);
+        if (con->auth_token)
+                CloseHandle(con->auth_token);
 	free(con);
 	CloseHandle(ioc_port);
 	ioc_port = NULL;

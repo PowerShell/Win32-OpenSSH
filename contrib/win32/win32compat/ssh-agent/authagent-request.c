@@ -79,8 +79,8 @@ done:
 
 
 void
-LoadProfile(HANDLE token, char* user, char* domain) {
-	PROFILEINFOA profileInfo;
+LoadProfile(struct agent_connection* con, wchar_t* user, wchar_t* domain) {
+	PROFILEINFOW profileInfo;
 	profileInfo.dwFlags = PI_NOUI;
 	profileInfo.lpProfilePath = NULL;
 	profileInfo.lpUserName = user;
@@ -91,11 +91,12 @@ LoadProfile(HANDLE token, char* user, char* domain) {
 	profileInfo.dwSize = sizeof(profileInfo);
 	EnablePrivilege("SeBackupPrivilege", 1);
 	EnablePrivilege("SeRestorePrivilege", 1);
-	if (LoadUserProfileA(token, &profileInfo) == FALSE)
-		debug("Loading user profile failed ERROR: %d", GetLastError());
+        if (LoadUserProfileW(con->auth_token, &profileInfo) == FALSE)
+                debug("Loading user (%ls,%ls) profile failed ERROR: %d", user, domain, GetLastError());
+        else
+                con->hProfile = profileInfo.hProfile;
 	EnablePrivilege("SeBackupPrivilege", 0);
 	EnablePrivilege("SeRestorePrivilege", 0);
-
 }
 
 #define MAX_USER_LEN 256
@@ -200,7 +201,7 @@ generate_user_token(wchar_t* user) {
 	    &token,
 	    &quotas,
 	    &subStatus) != STATUS_SUCCESS) {
-	    debug("LsaRegisterLogonProcess failed");
+	    debug("LsaLogonUser failed");
 		goto done;
 	}
 
@@ -218,10 +219,12 @@ done:
 #define PUBKEY_AUTH_REQUEST "pubkey"
 #define PASSWD_AUTH_REQUEST "password"
 #define MAX_USER_NAME_LEN 256
+#define MAX_PW_LEN 128
 
 int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
-	char *user = NULL, *pwd = NULL, *dom = NULL, *tmp;
-	//wchar_t *userW = NULL, *domW = NULL, *pwdW = NULL;
+        char *user = NULL, *pwd = NULL;
+        wchar_t userW_buf[MAX_USER_NAME_LEN], pwdW_buf[MAX_PW_LEN];
+	wchar_t *userW = userW_buf, *domW = NULL, *pwdW = pwdW_buf, *tmp;
 	size_t user_len = 0, pwd_len = 0, dom_len = 0;
 	int r = -1;
 	HANDLE token = 0, dup_token, client_proc = 0;
@@ -235,20 +238,25 @@ int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response
 		goto done;
 	}
 
-	/*TODO - support Unicode*/
+	userW[0] = L'\0';
+        if (MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, userW, MAX_USER_NAME_LEN) == 0 ||
+                MultiByteToWideChar(CP_UTF8, 0, pwd, pwd_len + 1, pwdW, MAX_PW_LEN) == 0) {
+                debug("unable to convert user (%s) or password to UTF-16", user);
+                goto done;
+        }
 	
-	if ((tmp = strchr(user, '\\')) != NULL) {
-		dom = user;
-		user = tmp + 1;
-		*tmp = '\0';
+        if ((tmp = wcschr(userW, L'\\')) != NULL) {
+		domW = userW;
+		userW = tmp + 1;
+		*tmp = L'\0';
 
 	}
-	else if ((tmp = strchr(user, '@')) != NULL) {
-		dom = tmp + 1;
-		*tmp = '\0';
+	else if ((tmp = wcschr(userW, L'@')) != NULL) {
+		domW = tmp + 1;
+		*tmp = L'\0';
 	}
 
-	if (LogonUser(user, dom, pwd, LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, &token) == FALSE ||
+	if (LogonUserW(userW, domW, pwdW, LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, &token) == FALSE ||
 		(FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
 		((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
 		(FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
@@ -257,7 +265,8 @@ int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response
 		goto done;
 	}
 
-	LoadProfile(token, user, dom);
+        con->auth_token = token;
+        LoadProfile(con, userW, domW);
 	r = 0;
 done:
 	/* TODO Fix this hacky protocol*/
@@ -268,8 +277,6 @@ done:
 		free(user);
 	if (pwd)
 		free(pwd);
-	if (token)
-		CloseHandle(token);
 	if (client_proc)
 		CloseHandle(client_proc);
 
@@ -296,11 +303,14 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 		goto done;
 	}
 
+        wuser[0] = L'\0';
 	if (MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN) == 0 ||
 	    (token = generate_user_token(wuser)) == 0) {
 		debug("unable to generate token for user %ls", wuser);
 		goto done;
 	}
+
+        con->auth_token = token;
 
 	if (SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
 		pubkey_allowed(key, wuser, wuser_home) != 1) {
@@ -320,30 +330,33 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 		debug("failed to authorize user");
 		goto done;
 	}
-	{
-		/*TODO - support Unicode*/
-		char *tmp, *u = user, *d = NULL;
-		if ((tmp = strchr(user, '\\')) != NULL) {
-			d = user;
-			u = tmp + 1;
-			*tmp = '\0';
+	
+        {
+                wchar_t *tmp, *userW, *domW;
+                userW = wuser;
+                if ((tmp = wcschr(userW, L'\\')) != NULL) {
+                        domW = userW;
+                        userW = tmp + 1;
+                        *tmp = L'\0';
 
-		}
-		else if ((tmp = strchr(user, '@')) != NULL) {
-			d = tmp + 1;
-			*tmp = '\0';
-		}
-		LoadProfile(token, u, d);
+                }
+                else if ((tmp = wcschr(userW, L'@')) != NULL) {
+                        domW = tmp + 1;
+                        *tmp = L'\0';
+                }
+		LoadProfile(con, userW, domW);
 	}
 
 	r = 0;
 done:
+        /* TODO Fix this hacky protocol*/
+        if ((r == -1) && (sshbuf_put_u8(response, SSH_AGENT_FAILURE) == 0))
+                r = 0;
+
 	if (user)
 		free(user);
 	if (key)
 		sshkey_free(key);
-	if (token)
-		CloseHandle(token);
 	if (wuser_home)
 		CoTaskMemFree(wuser_home);
 	if (client_proc)

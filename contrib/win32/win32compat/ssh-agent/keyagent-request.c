@@ -43,7 +43,7 @@ get_user_root(struct agent_connection* con, HKEY *root){
 	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
 		return -1;
 	
-	if (con->client_type > OTHER)
+	if (con->client_process > OTHER)
 		*root = HKEY_LOCAL_MACHINE;
 	else if (RegOpenCurrentUser(KEY_ALL_ACCESS, root) != ERROR_SUCCESS)
 		r = -1;
@@ -59,7 +59,7 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 	int success = 0;
 	DATA_BLOB in, out;
 
-	if (con->client_type == OTHER)
+	if (con->client_process == OTHER)
 		if (ImpersonateNamedPipeClient(con->connection) == FALSE)
 			return -1;
 
@@ -91,7 +91,7 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 done:
 	if (out.pbData)
 		LocalFree(out.pbData);
-	if (con->client_type == OTHER)
+	if (con->client_process == OTHER)
 		RevertToSelf();
 	return success? 0: -1;
 }

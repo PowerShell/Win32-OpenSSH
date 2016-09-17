@@ -31,7 +31,9 @@ struct agent_connection {
 		LOCAL_SYSTEM,
 		SSHD,
 		NETWORK_SERVICE
-	} client_type;
+	} client_process;
+        HANDLE auth_token;
+        HANDLE hProfile;
 };
 
 void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);
