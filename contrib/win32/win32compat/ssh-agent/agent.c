@@ -30,6 +30,7 @@
  */
 #include "agent.h"
 #include <sddl.h>
+#include <UserEnv.h>
 #define BUFSIZE 5 * 1024
 
 static HANDLE ioc_port = NULL;
