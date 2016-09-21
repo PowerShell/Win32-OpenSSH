@@ -201,7 +201,7 @@ generate_user_token(wchar_t* user) {
 	    &token,
 	    &quotas,
 	    &subStatus) != STATUS_SUCCESS) {
-	    debug("LsaLogonUser failed");
+	    debug("LsaLogonUser failed %d", ret);
 		goto done;
 	}
 
@@ -256,12 +256,16 @@ int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response
 		*tmp = L'\0';
 	}
 
-	if (LogonUserW(userW, domW, pwdW, LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, &token) == FALSE ||
-		(FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
-		((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
-		(FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
-		(sshbuf_put_u32(response, dup_token) != 0)) {
-		debug("failed to authenticate user");
+        if (LogonUserW(userW, domW, pwdW, LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, &token) == FALSE) {
+                debug("failed to logon user");
+                goto done;
+        }
+                
+	if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
+	    ((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
+	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
+	    (sshbuf_put_u32(response, dup_token) != 0)) {
+	        debug("failed to duplicate user token");
 		goto done;
 	}
 

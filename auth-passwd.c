@@ -155,23 +155,23 @@ warn_expiry(Authctxt *authctxt, auth_session_t *as)
 #ifdef HAVE_LOGIN_CAP
 	if (authctxt->valid) {
 		pwwarntime = login_getcaptime(lc, "password-warn", TWO_WEEKS,
-			TWO_WEEKS);
+		    TWO_WEEKS);
 		acwarntime = login_getcaptime(lc, "expire-warn", TWO_WEEKS,
-			TWO_WEEKS);
+		    TWO_WEEKS);
 	}
 #endif
 	if (pwtimeleft != 0 && pwtimeleft < pwwarntime) {
 		daysleft = pwtimeleft / DAY + 1;
 		snprintf(buf, sizeof(buf),
-			"Your password will expire in %lld day%s.\n",
-			daysleft, daysleft == 1 ? "" : "s");
+		    "Your password will expire in %lld day%s.\n",
+		    daysleft, daysleft == 1 ? "" : "s");
 		buffer_append(&loginmsg, buf, strlen(buf));
 	}
 	if (actimeleft != 0 && actimeleft < acwarntime) {
 		daysleft = actimeleft / DAY + 1;
 		snprintf(buf, sizeof(buf),
-			"Your account will expire in %lld day%s.\n",
-			daysleft, daysleft == 1 ? "" : "s");
+		    "Your account will expire in %lld day%s.\n",
+		    daysleft, daysleft == 1 ? "" : "s");
 		buffer_append(&loginmsg, buf, strlen(buf));
 	}
 }
@@ -184,7 +184,7 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 	static int expire_checked = 0;
 
 	as = auth_usercheck(pw->pw_name, authctxt->style, "auth-ssh",
-		(char *)password);
+	    (char *)password);
 	if (as == NULL)
 		return (0);
 	if (auth_getstate(as) & AUTH_PWEXPIRED) {
@@ -192,8 +192,7 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 		disable_forwarding();
 		authctxt->force_pwchange = 1;
 		return (1);
-	}
-	else {
+	} else {
 		if (!expire_checked) {
 			expire_checked = 1;
 			warn_expiry(authctxt, as);
@@ -258,13 +257,13 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 
 	/* Encrypt the candidate password using the proper salt. */
 	encrypted_password = xcrypt(password,
-		(pw_password[0] && pw_password[1]) ? pw_password : "xx");
+	    (pw_password[0] && pw_password[1]) ? pw_password : "xx");
 
 	/*
 	 * Authentication is accepted if the encrypted passwords
 	 * are identical.
 	 */
 	return encrypted_password != NULL &&
-		strcmp(encrypted_password, pw_password) == 0;
+	    strcmp(encrypted_password, pw_password) == 0;
 }
 #endif

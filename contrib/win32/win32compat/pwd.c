@@ -165,7 +165,7 @@ char *GetHomeDirFromToken(char *userName, HANDLE token)
 		RegCloseKey(reg_key);
 
         { /* retrieve and set env variables. */
-                /* TODO - Get away with fixed limits and dynamically allocated required memory*/
+                /* TODO - Get away with fixed limits and dynamically allocate required memory, cleanup this logic*/
 #define MAX_VALUE_LEN  1000
 #define MAX_DATA_LEN   2000
 #define MAX_EXPANDED_DATA_LEN 5000
@@ -176,7 +176,8 @@ char *GetHomeDirFromToken(char *userName, HANDLE token)
                 int i;
                 LONG ret;
                 
-                ImpersonateLoggedOnUser(token);
+                if (ImpersonateLoggedOnUser(token) == FALSE)
+                        debug("Failed to impersonate user token, %d", GetLastError());
                 SET_USER_ENV(FOLDERID_LocalAppData, L"LOCALAPPDATA");
                 SET_USER_ENV(FOLDERID_Profile, L"USERPROFILE");
                 SET_USER_ENV(FOLDERID_RoamingAppData, L"APPDATA");

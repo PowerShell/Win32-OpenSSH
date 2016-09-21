@@ -167,6 +167,7 @@ done:
 	return r;
 }
 
+/* TODO - move this to common header*/
 #define SSH_AGENT_AUTHENTICATE			100
 
 static int
