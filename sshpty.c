@@ -240,9 +240,6 @@ pty_change_window_size(int ptyfd, u_int row, u_int col,
 	(void) ioctl(ptyfd, TIOCSWINSZ, &w);
 #else
 	extern HANDLE hOutputConsole ;
-    if (ptyfd != 0) {
-        hOutputConsole = (HANDLE)ptyfd;
-    }
 	#ifndef WIN32_PRAGMA_REMCON
     if (hOutputConsole != NULL) {
         ConSetScreenSize(col, row);

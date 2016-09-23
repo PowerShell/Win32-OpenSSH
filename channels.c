@@ -1722,85 +1722,91 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
 	int len;
 
 	/* Send buffered output data to the socket. */
-	if (c->wfd != -1 &&
-	    FD_ISSET(c->wfd, writeset) &&
-	    buffer_len(&c->output) > 0) {
-		olen = buffer_len(&c->output);
-		if (c->output_filter != NULL) {
-			if ((buf = c->output_filter(c, &data, &dlen)) == NULL) {
-				debug2("channel %d: filter stops", c->self);
-				if (c->type != SSH_CHANNEL_OPEN)
-					chan_mark_dead(c);
-				else
-					chan_write_failed(c);
-				return -1;
-			}
-		} else if (c->datagram) {
-			buf = data = buffer_get_string(&c->output, &dlen);
-		} else {
-			buf = data = buffer_ptr(&c->output);
-			dlen = buffer_len(&c->output);
-		}
+        if (c->wfd != -1 &&
+                FD_ISSET(c->wfd, writeset) &&
+                buffer_len(&c->output) > 0) {
+                olen = buffer_len(&c->output);
+                if (c->output_filter != NULL) {
+                        if ((buf = c->output_filter(c, &data, &dlen)) == NULL) {
+                                debug2("channel %d: filter stops", c->self);
+                                if (c->type != SSH_CHANNEL_OPEN)
+                                        chan_mark_dead(c);
+                                else
+                                        chan_write_failed(c);
+                                return -1;
+                        }
+                } else if (c->datagram) {
+                        buf = data = buffer_get_string(&c->output, &dlen);
+                } else {
+                        buf = data = buffer_ptr(&c->output);
+                        dlen = buffer_len(&c->output);
+                }
 
-		if (c->datagram) {
-			/* ignore truncated writes, datagrams might get lost */
-			len = write(c->wfd, buf, dlen);
-			free(data);
-			if (len < 0 && (errno == EINTR || errno == EAGAIN ||
-			    errno == EWOULDBLOCK))
-				return 1;
-			if (len <= 0) {
-				if (c->type != SSH_CHANNEL_OPEN)
-					chan_mark_dead(c);
-				else
-					chan_write_failed(c);
-				return -1;
-			}
-			goto out;
-		}
+                if (c->datagram) {
+                        /* ignore truncated writes, datagrams might get lost */
+                        len = write(c->wfd, buf, dlen);
+                        free(data);
+                        if (len < 0 && (errno == EINTR || errno == EAGAIN ||
+                                errno == EWOULDBLOCK))
+                                return 1;
+                        if (len <= 0) {
+                                if (c->type != SSH_CHANNEL_OPEN)
+                                        chan_mark_dead(c);
+                                else
+                                        chan_write_failed(c);
+                                return -1;
+                        }
+                        goto out;
+                }
 #ifdef _AIX
-		/* XXX: Later AIX versions can't push as much data to tty */
-		if (compat20 && c->wfd_isatty)
-			dlen = MIN(dlen, 8*1024);
+                /* XXX: Later AIX versions can't push as much data to tty */
+                if (compat20 && c->wfd_isatty)
+                        dlen = MIN(dlen, 8 * 1024);
+#endif
+#ifdef WIN32_FIXME /* TODO - Fix this - on windows we somehow end up with dlen = 0*/
+                if (dlen > 0) {
 #endif
 
-		len = write(c->wfd, buf, dlen);
-		if (len < 0 &&
-		    (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
-			return 1;
-		if (len <= 0) {
-			if (c->type != SSH_CHANNEL_OPEN) {
-				debug2("channel %d: not open", c->self);
-				chan_mark_dead(c);
-				return -1;
-			} else if (compat13) {
-				buffer_clear(&c->output);
-				debug2("channel %d: input draining.", c->self);
-				c->type = SSH_CHANNEL_INPUT_DRAINING;
-			} else {
-				chan_write_failed(c);
-			}
-			return -1;
-		}
+                        len = write(c->wfd, buf, dlen);
+                        if (len < 0 &&
+                                (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK))
+                                return 1;
+                        if (len <= 0) {
+                                if (c->type != SSH_CHANNEL_OPEN) {
+                                        debug2("channel %d: not open", c->self);
+                                        chan_mark_dead(c);
+                                        return -1;
+                                } else if (compat13) {
+                                        buffer_clear(&c->output);
+                                        debug2("channel %d: input draining.", c->self);
+                                        c->type = SSH_CHANNEL_INPUT_DRAINING;
+                                } else {
+                                        chan_write_failed(c);
+                                }
+                                return -1;
+                        }
 #ifndef WIN32_FIXME//R
 #ifndef BROKEN_TCGETATTR_ICANON
-		if (compat20 && c->isatty && dlen >= 1 && buf[0] != '\r') {
-			if (tcgetattr(c->wfd, &tio) == 0 &&
-			    !(tio.c_lflag & ECHO) && (tio.c_lflag & ICANON)) {
-				/*
-				 * Simulate echo to reduce the impact of
-				 * traffic analysis. We need to match the
-				 * size of a SSH2_MSG_CHANNEL_DATA message
-				 * (4 byte channel id + buf)
-				 */
-				packet_send_ignore(4 + len);
-				packet_send();
-			}
-		}
+                        if (compat20 && c->isatty && dlen >= 1 && buf[0] != '\r') {
+                                if (tcgetattr(c->wfd, &tio) == 0 &&
+                                        !(tio.c_lflag & ECHO) && (tio.c_lflag & ICANON)) {
+                                        /*
+                                         * Simulate echo to reduce the impact of
+                                         * traffic analysis. We need to match the
+                                         * size of a SSH2_MSG_CHANNEL_DATA message
+                                         * (4 byte channel id + buf)
+                                         */
+                                        packet_send_ignore(4 + len);
+                                        packet_send();
+                                }
+                        }
 #endif
 #endif
-		buffer_consume(&c->output, len);
-	}
+                        buffer_consume(&c->output, len);
+                }
+#ifdef WIN32_FIXME /* for if (dlen > 0) */
+        }
+#endif
  out:
 	if (compat20 && olen > 0)
 		c->local_consumed += olen - buffer_len(&c->output);

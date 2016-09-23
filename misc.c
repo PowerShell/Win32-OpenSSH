@@ -661,6 +661,7 @@ wchar_t    *percent_expand_w(const wchar_t *string, ...)
                 const wchar_t *repl;
         } keys[EXPAND_MAX_KEYS];
         wchar_t buf[4096];
+        wchar_t *aptr = NULL;
         va_list ap;
 
         /* Gather keys */
@@ -694,9 +695,9 @@ wchar_t    *percent_expand_w(const wchar_t *string, ...)
                         goto append;
                 for (j = 0; j < num_keys; j++) {
                         if (wcschr(keys[j].key, *string) != NULL) {
-                                i = wcsncat(buf, keys[j].repl, sizeof(buf));
+                                aptr = wcsncat(buf, keys[j].repl, sizeof(buf));
                                 buf[sizeof(buf)-1] = 0;
-                                if (i >= sizeof(buf))
+                                if (aptr == NULL)
                                         fatal("%s: string too long", __func__);
                                 break;
                         }

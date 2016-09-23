@@ -20,13 +20,13 @@ enum w32_io_type {
 enum w32_io_sock_state {
 	SOCK_INITIALIZED = 0,		
 	SOCK_LISTENING = 1,	/*listen called on socket*/
-	SOCK_ACCEPTED = 2,	/*socket retruned from accept()*/
+	SOCK_ACCEPTED = 2,	/*socket returned from accept()*/
 	SOCK_CONNECTING = 3,	/*connect called on socket, connect is in progress*/
 	SOCK_CONNECTED = 4	/*connect completed on socket*/
 };
 
 /*
-* This sturcture encapsulates the state info needed to map a File Descriptor 
+* This structure encapsulates the state info needed to map a File Descriptor 
 * to Win32 Handle
 */
 struct w32_io {

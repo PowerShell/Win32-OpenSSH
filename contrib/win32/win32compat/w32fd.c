@@ -31,6 +31,7 @@
 */
 #include "inc\w32posix.h"
 #include "w32fd.h"
+#include "signal_internal.h"
 #include <stdarg.h>
 #include <errno.h>
 #include <time.h>
@@ -303,8 +304,8 @@ w32_shutdown(int fd, int how) {
 }
 
 int
-w32_socketpair(int domain, int type, int sv[2]) {
-	errno = ENOTSUP;
+w32_socketpair(int domain, int type, int protocol, int sv[2]) {
+        errno = ENOTSUP;
 	debug("socketpair - ERROR not supported");
 	return -1;
 }
@@ -362,8 +363,8 @@ w32_open(const char *pathname, int flags, ...) {
 }
 
 int
-w32_read(int fd, void *dst, unsigned int max) {
-	CHECK_FD(fd);
+w32_read(int fd, void *dst, size_t max) {
+        CHECK_FD(fd);
 
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
 		return socketio_recv(fd_table.w32_ios[fd], dst, max, 0);
@@ -645,7 +646,6 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 			for (int i = 0; i < fds; i++) {
 
 				if (readfds && FD_ISSET(i, readfds)) {
-					in_set_fds++;
 					if (w32_io_is_io_available(fd_table.w32_ios[i], TRUE)) {
 						FD_SET(i, &read_ready_fds);
 						out_ready_fds++;
@@ -653,7 +653,6 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 				}
 
 				if (writefds && FD_ISSET(i, writefds)) {
-					in_set_fds++;
 					if (w32_io_is_io_available(fd_table.w32_ios[i], FALSE)) {
 						FD_SET(i, &write_ready_fds);
 						out_ready_fds++;

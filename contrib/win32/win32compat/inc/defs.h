@@ -70,6 +70,8 @@ typedef int sigset_t;
 
 typedef unsigned short _mode_t;
 typedef _mode_t mode_t;
+/* TODO - investigate if it makes sense to make pid_t a DWORD_PTR. 
+ * Double check usage of pid_t as int */
 typedef int pid_t;
 
 /* wait pid options */

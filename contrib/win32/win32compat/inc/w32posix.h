@@ -32,16 +32,17 @@ int w32_connect(int fd, const struct sockaddr* name, int namelen);
 int w32_recv(int fd, void *buf, size_t len, int flags);
 int w32_send(int fd, const void *buf, size_t len, int flags);
 int w32_shutdown(int fd, int how);
-int w32_socketpair(int domain, int type, int sv[2]);
+int w32_socketpair(int domain, int type, int protocol, int sv[2]);
 
 /*non-network (file) i/o*/
+#undef fdopen
 #define fdopen(a,b)	w32_fdopen((a), (b))
 #define fstat(a,b)	w32_fstat((a), (b))
 
 struct w32_stat;
 int w32_pipe(int *pfds);
 int w32_open(const char *pathname, int flags, ...);
-int w32_read(int fd, void *dst, unsigned int max);
+int w32_read(int fd, void *dst, size_t max);
 int w32_write(int fd, const void *buf, unsigned int max);
 int w32_fstat(int fd, struct w32_stat *buf);
 int w32_stat(const char *path, struct w32_stat *buf);
