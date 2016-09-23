@@ -52,9 +52,10 @@
 TelParams Parameters;
 
 extern int ScreenX;
-extern  int ScreenY;
+extern int ScreenY;
 extern int ScrollTop;
 extern int ScrollBottom;
+
 // end of imports from outside module 
 
 bool	gbVTAppMode		= false;
@@ -80,7 +81,8 @@ int	bCS0 = 0;
 int bCS1 = 0;
 int	bBkMode = 0;
 int	bCharMode = 0;
-
+int ReportedX = 0;
+int ReportedY = 0;
 
 BOOL	fShiftOut = FALSE;
 BOOL	InPrintMode = FALSE;
@@ -544,6 +546,8 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 				if (bMode & MODE_BRK)
 				{
 					// Cursor left
+                    if (iParam[0] == 0)
+                        iParam[0] = 1;
 					ConMoveCursorPosition(-iParam[0], 0);
 				}
 				else if (bMode == 0)
@@ -570,15 +574,27 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 				break;
 
 			case 'h':
+                if (bMode & MODE_EXT)
+                {
+                    if (iParam[0] == 4 && iParam[1] == 7) {
+                        ConSaveScreen();
+                    }
+                }
 			case 'l': // ^[?25h
 				if (bMode & MODE_EXT)
 				{
-					if (iParam[0] == 4) {
-						VTMode |= MODE_IRM_INSERT;
-					}
-					int i;
-					for ( i = 0; i < iCurrentParam; i++ )
-						ConSetExtendedMode(iParam[i], *pszCurrent=='h' ? 1 : 0); 
+                    if (iParam[0] == 4 && iParam[1] == 7) {
+                        ConRestoreScreen();
+                    }
+                    else
+                    {
+                        if (iParam[0] == 4) {
+                            VTMode |= MODE_IRM_INSERT;
+                        }
+                        int i;
+                        for (i = 0; i < iCurrentParam; i++)
+                            ConSetExtendedMode(iParam[i], *pszCurrent == 'h' ? 1 : 0);
+                    }
 				}
 				else if (bMode & MODE_BRK)
 				{
@@ -618,12 +634,14 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 				ConSetAttribute(iParam, iCurrentParam);
 				fcompletion = 1;
 				break;
-
 			case 'r':
 				fcompletion = 1;
 				break;
-
-			case 'H':
+            case 'R':
+                ReportedX = iParam[1];
+                ReportedY = iParam[0];
+                break;
+            case 'H':
 			case 'f':
 				if (bMode & MODE_BRK)
 				{

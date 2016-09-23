@@ -172,6 +172,7 @@
 #define NEXT_KEY                    "\x1b[6~"
 #define SHIFT_TAB_KEY               "\x1b[~"
 #define ESCAPE_KEY		            "\x1b"
+#define BACKSPACE_KEY               "\b"
 
 #define TERMINAL_ID                 "\x1b[?1;2c"
 #define STATUS_REPORT               "\x1b[2;5R"
