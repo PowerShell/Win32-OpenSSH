@@ -39,6 +39,14 @@
 #define WM_APPEXIT WM_USER+1
 #define MAX_EXPECTED_BUFFER_SIZE 1024
 
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING  0x4
+#endif
+
+#ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
+#define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
+#endif
+
 typedef struct consoleEvent {
     DWORD event;
     HWND  hwnd;
@@ -56,6 +64,7 @@ BOOL istty = FALSE;
 BOOL bRet = FALSE;
 BOOL bNoScrollRegion = FALSE;
 BOOL bStartup = TRUE;
+BOOL bAnsi = FALSE;
 
 HANDLE child_out = INVALID_HANDLE_VALUE;
 HANDLE child_in = INVALID_HANDLE_VALUE;
@@ -173,18 +182,11 @@ void SendSetCursor(HANDLE hInput, int X, int Y) {
     DWORD wr = 0;
     DWORD out = 0;
 
-    static int sLastX = 0;
-    static int sLastY = 0;
-
     char formatted_output[255];
 
     out = _snprintf_s(formatted_output, sizeof(formatted_output), _TRUNCATE, "\033[%d;%dH", Y, X);
-    //if (X != sLastX || Y != sLastY)
-        if (bUseAnsiEmulation)
-            WriteFile(hInput, formatted_output, out, &wr, NULL);
-
-    sLastX = X;
-    sLastY = Y;
+    if (bUseAnsiEmulation)
+        WriteFile(hInput, formatted_output, out, &wr, NULL);
 }
 
 void SendVerticalScroll(HANDLE hInput, int lines) {
@@ -224,6 +226,8 @@ void SendCharacter(HANDLE hInput, WORD attributes, char character) {
     DWORD current = 0;
 
     char formatted_output[2048];
+
+    static USHORT pColor = 0;
 
     USHORT Color = 0;
 	ULONG Status = 0;
@@ -301,14 +305,10 @@ void SendCharacter(HANDLE hInput, WORD attributes, char character) {
 
 	StringCbPrintfExA(Next, SizeLeft, &Next, &SizeLeft, 0, "m", Color);
 
-    if (bUseAnsiEmulation)
+    if (bUseAnsiEmulation && Color != pColor)
         WriteFile(hInput, formatted_output, (Next - formatted_output), &wr, NULL);
 
     WriteFile(hInput, &character, 1, &wr, NULL);
-
-    // Reset
-    if (bUseAnsiEmulation)
-        WriteFile(hInput, "\033[0m", 4, &wr, NULL);
 }
 
 void SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize) {
@@ -357,24 +357,7 @@ void SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize) {
 
 void CalculateAndSetCursor(HANDLE hInput, UINT aboveTopLine, UINT viewPortHeight, UINT x, UINT y) {
 
-    if (aboveTopLine > 0) {
-        if (y == viewPortHeight + aboveTopLine - 1) {
-            if (ViewPortY == lastViewPortY && lastViewPortY > 0) {
-                SendSetCursor(pipe_out, x + 1, y + 1);
-            }
-            else {
-                SendSetCursor(pipe_out, x + 1, y + 1);
-            }
-            consoleInfo = nextConsoleInfo;
-        }
-        else {
-            SendSetCursor(pipe_out, x + 1, y + 1);
-        }
-    }
-    else {
-        SendSetCursor(pipe_out, x + 1, y + 1);
-    }
-
+    SendSetCursor(pipe_out, x + 1, y + 1);
     currentLine = y;
 }
 
@@ -436,71 +419,6 @@ void SizeWindow(HANDLE hInput) {
     }
 
     bSuccess = GetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
-}
-
-void RepaintWindow(HANDLE hInput) {
-
-    SMALL_RECT readRect;
-    DWORD bufferSize = 0;
-
-    CONSOLE_SCREEN_BUFFER_INFOEX  consoleInfo;
-    CHAR_INFO *pBuffer = NULL;
-
-    SendHideCursor(hInput);
-
-    ZeroMemory(&consoleInfo, sizeof(consoleInfo));
-    consoleInfo.cbSize = sizeof(consoleInfo);
-
-    if (GetConsoleScreenBufferInfoEx(child_out, &consoleInfo)) {
-
-        // Compute buffer size for the full window
-        bufferSize = (consoleInfo.srWindow.Bottom - consoleInfo.srWindow.Top + 1) * 
-            (consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1);
-
-        // Create the screen scrape buffer
-        pBuffer = (PCHAR_INFO)malloc(sizeof(CHAR_INFO) * bufferSize);
-
-        if (!pBuffer) {
-           goto final_processing;
-        }
-
-        // Figure out the buffer size
-        COORD coordBufSize;
-        coordBufSize.Y = (consoleInfo.srWindow.Bottom - consoleInfo.srWindow.Top + 1);
-        coordBufSize.X = (consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1);
-
-        if (coordBufSize.X < 0 || coordBufSize.X > MAX_CONSOLE_COLUMNS ||
-            coordBufSize.Y < 0 || coordBufSize.Y > MAX_CONSOLE_ROWS)
-        {
-            goto final_processing;
-        }
-
-        // The top left destination cell of the temporary buffer is row 0, col 0.
-        COORD coordBufCoord;
-        coordBufCoord.X = 0;
-        coordBufCoord.Y = 0;
-
-        // Copy the block from the screen buffer to the temporary buffer.
-        if (!ReadConsoleOutput(child_out, pBuffer, coordBufSize, coordBufCoord, &consoleInfo.srWindow))
-        {
-            goto final_processing;
-        }
-
-        // Set cursor location based on the reported location from the message.
-        CalculateAndSetCursor(pipe_out, 0, 0, 0, 0);
-
-        // Send the entire block.
-        SendBuffer(pipe_out, pBuffer, bufferSize);
-
-        free(pBuffer);
-        pBuffer = NULL;
-    }
-
-final_processing:
-    if (pBuffer)
-        free(pBuffer);
-
-    SendShowCursor(hInput);
 }
 
 // End of VT output routines
@@ -709,13 +627,6 @@ DWORD ProcessEvent(void *p) {
             ViewPortY += vn;
         }
 
-        //SendVerticalScroll(pipe_out, vd);
-
-        //SendHorizontalScroll(pipe_out, hd);
-
-        if(vd < 0)
-            SendCRLF(pipe_out);
-
         break;
     }
     case EVENT_CONSOLE_LAYOUT:
@@ -759,7 +670,7 @@ DWORD ProcessEvent(void *p) {
     return ERROR_SUCCESS;
 }
 
-DWORD ProcessEventQueue(void *p) {
+DWORD WINAPI ProcessEventQueue(LPVOID p) {
 
     while (1) {
 
@@ -791,8 +702,23 @@ DWORD ProcessEventQueue(void *p) {
             }
         }
 
-        if (child_out != INVALID_HANDLE_VALUE && child_out != NULL)
+        if (child_in  != INVALID_HANDLE_VALUE && child_in  != NULL &&
+            child_out != INVALID_HANDLE_VALUE && child_out != NULL)
         {
+            DWORD dwInputMode;
+            DWORD dwOutputMode;
+
+            if (GetConsoleMode(child_in, &dwInputMode) && GetConsoleMode(child_out, &dwOutputMode)) {
+                if (((dwOutputMode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == ENABLE_VIRTUAL_TERMINAL_PROCESSING) &&
+                    ((dwInputMode & ENABLE_VIRTUAL_TERMINAL_INPUT) == ENABLE_VIRTUAL_TERMINAL_INPUT))
+                {
+                    bAnsi = TRUE;
+                }
+                else {
+                    bAnsi = FALSE;
+                }
+            }
+
             ZeroMemory(&consoleInfo, sizeof(consoleInfo));
             consoleInfo.cbSize = sizeof(consoleInfo);
 
@@ -860,7 +786,7 @@ void QueueEvent(
     return;
 }
 
-DWORD ProcessPipes(void *p) {
+DWORD WINAPI ProcessPipes(LPVOID p) {
 
     BOOL ret;
     DWORD dwStatus;
@@ -869,8 +795,8 @@ DWORD ProcessPipes(void *p) {
     while (1) {
         char buf[128];
         DWORD rd = 0, wr = 0, i = 0;
-        GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, 128, &rd, NULL));
 
+        GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, 128, &rd, NULL));
         if (!istty) { /* no tty, just send it accross */
             GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, buf, rd, &wr, NULL));
             continue;
@@ -882,95 +808,7 @@ DWORD ProcessPipes(void *p) {
 
             INPUT_RECORD ir;
 
-            if (buf[i] == '\r')
-            {
-                SendKeyStroke(child_in, VK_RETURN, buf[0]);
-            }
-            else if (buf[i] == '\b')
-            {
-                SendKeyStroke(child_in, VK_BACK, buf[0]);
-            }
-            else if (buf[i] == '\t')
-            {
-                SendKeyStroke(child_in, VK_TAB, buf[0]);
-            }
-            else if (buf[i] == '\x1b') 
-            {                
-                // These are incoming ANSI keystrokes.
-                switch (rd) {
-                case 1:
-                    SendKeyStroke(child_in, VK_ESCAPE, buf[0]);
-                    break;
-                case 3:
-                    switch (buf[i + 1])
-                    {
-                    case '[':
-                        switch (buf[i + 2])
-                        {
-                        case 'A':
-                            SendKeyStroke(child_in, VK_UP, 0);
-                            i = i + 2;
-                            break;
-                        case 'B':
-                            SendKeyStroke(child_in, VK_DOWN, 0);
-                            i = i + 2;
-                            break;
-                        case 'C':
-                            SendKeyStroke(child_in, VK_RIGHT, 0);
-                            i = i + 2;
-                            break;
-                        case 'D':
-                            SendKeyStroke(child_in, VK_LEFT, 0);
-                            i = i + 2;
-                            break;
-                        default:
-                            break;
-                        }
-                    default:
-                        break;
-                    }
-                case 4:
-                    switch (buf[i + 1]) {
-                    case '[':
-                    {
-                        switch (buf[i + 2]) {
-                        case '2':
-                            switch (buf[i + 3]) {
-                            case '~':
-                            {
-                                SendKeyStroke(child_in, VK_INSERT, 0);
-                                i = i + 3;
-                                break;
-                            }
-                            default:
-                                break;
-                            }
-                        case '3':
-                            switch (buf[i + 3]) {
-                            case '~':
-                            {
-                                SendKeyStroke(child_in, VK_DELETE, 0);
-                                i = i + 3;
-                                break;
-                            }
-                            default:
-                                break;
-                            }
-                        default:
-                            break;
-                        }
-                    }
-                    default:
-                        break;
-                    }
-                default:
-                    // Write the string to the console
-                    WriteConsole(child_in, buf, rd, &wr, NULL);
-                    break;
-                }
-            }
-            else
-            {
+            if (bAnsi) {
                 ir.EventType = KEY_EVENT;
                 ir.Event.KeyEvent.bKeyDown = TRUE;
                 ir.Event.KeyEvent.wRepeatCount = 1;
@@ -982,6 +820,121 @@ DWORD ProcessPipes(void *p) {
 
                 ir.Event.KeyEvent.bKeyDown = FALSE;
                 WriteConsoleInputA(child_in, &ir, 1, &wr);
+            }
+            else
+            {
+                if (buf[i] == '\r')
+                {
+                    SendKeyStroke(child_in, VK_RETURN, buf[0]);
+                }
+                else if (buf[i] == '\b')
+                {
+                    SendKeyStroke(child_in, VK_BACK, buf[0]);
+                }
+                else if (buf[i] == '\t')
+                {
+                    SendKeyStroke(child_in, VK_TAB, buf[0]);
+                }
+                else if (buf[i] == '\x1b')
+                {
+                    switch (rd) {
+                    case 1:
+                        SendKeyStroke(child_in, VK_ESCAPE, buf[0]);
+                        break;
+                    case 3:
+                        switch (buf[i + 1])
+                        {
+                        case '[':
+                            switch (buf[i + 2])
+                            {
+                            case 'A':
+                                SendKeyStroke(child_in, VK_UP, 0);
+                                i = i + 2;
+                                break;
+                            case 'B':
+                                SendKeyStroke(child_in, VK_DOWN, 0);
+                                i = i + 2;
+                                break;
+                            case 'C':
+                                SendKeyStroke(child_in, VK_RIGHT, 0);
+                                i = i + 2;
+                                break;
+                            case 'D':
+                                SendKeyStroke(child_in, VK_LEFT, 0);
+                                i = i + 2;
+                                break;
+                            default:
+                                break;
+                            }
+                        default:
+                            break;
+                        }
+                        break;
+                    case 4:
+                        switch (buf[i + 1]) {
+                        case '[':
+                        {
+                            switch (buf[i + 2]) {
+                            case '2':
+                                switch (buf[i + 3]) {
+                                case '~':
+                                {
+                                    SendKeyStroke(child_in, VK_INSERT, 0);
+                                    i = i + 3;
+                                    break;
+                                }
+                                default:
+                                    break;
+                                }
+                                break;
+                            case '3':
+                                switch (buf[i + 3]) {
+                                case '~':
+                                {
+                                    SendKeyStroke(child_in, VK_DELETE, 0);
+                                    i = i + 3;
+                                    break;
+                                }
+                                default:
+                                    break;
+                                }
+                                break;
+                            default:
+                                break;
+                            }
+                        }
+                        default:
+                            break;
+                        }
+                    default:
+                        ir.EventType = KEY_EVENT;
+                        ir.Event.KeyEvent.bKeyDown = TRUE;
+                        ir.Event.KeyEvent.wRepeatCount = 1;
+                        ir.Event.KeyEvent.wVirtualKeyCode = 0;
+                        ir.Event.KeyEvent.wVirtualScanCode = 0;
+                        ir.Event.KeyEvent.uChar.AsciiChar = buf[i];
+                        ir.Event.KeyEvent.dwControlKeyState = 0;
+                        WriteConsoleInputA(child_in, &ir, 1, &wr);
+
+                        ir.Event.KeyEvent.bKeyDown = FALSE;
+                        WriteConsoleInputA(child_in, &ir, 1, &wr);
+
+                        break;
+                    }
+                }
+                else {
+                    ir.EventType = KEY_EVENT;
+                    ir.Event.KeyEvent.bKeyDown = TRUE;
+                    ir.Event.KeyEvent.wRepeatCount = 1;
+                    ir.Event.KeyEvent.wVirtualKeyCode = 0;
+                    ir.Event.KeyEvent.wVirtualScanCode = 0;
+                    ir.Event.KeyEvent.uChar.AsciiChar = buf[i];
+                    ir.Event.KeyEvent.dwControlKeyState = 0;
+                    WriteConsoleInputA(child_in, &ir, 1, &wr);
+
+                    ir.Event.KeyEvent.bKeyDown = FALSE;
+                    WriteConsoleInputA(child_in, &ir, 1, &wr);
+                }
             }
 
             i++;
