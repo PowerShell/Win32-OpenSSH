@@ -650,9 +650,11 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                                     NetWriteString2(pParams->Socket, (char *)BACKSPACE_KEY, 1, 0);
                                     break;
                                 case VK_TAB:
-                                    if (dwControlKeyState == SHIFT_PRESSED)
-                                        NetWriteString2(pParams->Socket, (char *)SHIFT_TAB_KEY, 3, 0);
-                                    break;
+                                        if (dwControlKeyState == SHIFT_PRESSED)
+                                                NetWriteString2(pParams->Socket, (char *)SHIFT_TAB_KEY, 3, 0);
+                                        else
+                                                NetWriteString2(pParams->Socket, (char *)octets, n, 0);
+                                        break;
                                 case VK_ESCAPE:
                                     NetWriteString2(pParams->Socket, (char *)ESCAPE_KEY, 1, 0);
                                     break;
