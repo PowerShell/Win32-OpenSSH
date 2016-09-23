@@ -130,6 +130,7 @@ void SendKeyStroke(HANDLE hInput, int keyStroke, char character)
     ir.Event.KeyEvent.wVirtualKeyCode = keyStroke;
     ir.Event.KeyEvent.wVirtualScanCode = 0;
     ir.Event.KeyEvent.dwControlKeyState = 0;
+    ir.Event.KeyEvent.uChar.UnicodeChar = 0;
     if(character != 0)
         ir.Event.KeyEvent.uChar.AsciiChar = character;
 
@@ -674,6 +675,9 @@ DWORD ProcessEvent(void *p) {
 
 DWORD WINAPI ProcessEventQueue(LPVOID p) {
 
+    static SHORT lastX = 0;
+    static SHORT lastY = 0;
+
     while (1) {
 
         while (head) {
@@ -728,8 +732,15 @@ DWORD WINAPI ProcessEventQueue(LPVOID p) {
             GetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
 
             // Set the cursor to the last known good location according to the live buffer.
-            SendSetCursor(pipe_out, consoleInfo.dwCursorPosition.X + 1, 
-                consoleInfo.dwCursorPosition.Y + 1);
+            if (lastX != consoleInfo.dwCursorPosition.X ||
+                lastY != consoleInfo.dwCursorPosition.Y) {
+
+                SendSetCursor(pipe_out, consoleInfo.dwCursorPosition.X + 1,
+                    consoleInfo.dwCursorPosition.Y + 1);
+            }
+
+            lastX = consoleInfo.dwCursorPosition.X;
+            lastY = consoleInfo.dwCursorPosition.Y;
         }
 
         Sleep(100);
