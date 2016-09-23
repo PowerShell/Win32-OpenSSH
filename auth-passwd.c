@@ -41,13 +41,13 @@
 #include "xmalloc.h"
 #endif
 
-/*
- * We support only client side kerberos on Windows.
- */
+ /*
+  * We support only client side kerberos on Windows.
+  */
 
 #ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
+#undef GSSAPI
+#undef KRB5
 #endif
 
 #include <sys/types.h>
@@ -202,183 +202,43 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 }
 
 #elif defined(WIN32_FIXME)
+extern int auth_sock;
 int sys_auth_passwd(Authctxt *authctxt, const char *password)
 {
-  /* 
-   * Authenticate on Windows 
-   */
-   
-  struct passwd *pw = authctxt -> pw;
+	/*
+	 * Authenticate on Windows
+	 */
 
-  HANDLE hToken = INVALID_HANDLE_VALUE;
-  
-  BOOL worked = FALSE;
-  
-  LPWSTR user_UTF16     = NULL;
-  LPWSTR password_UTF16 = NULL;
-  LPWSTR domain_UTF16   = NULL;
+	{
+		u_char *blob = NULL;
+		size_t blen = 0;
+		DWORD token = 0;
+		struct sshbuf *msg = NULL;
 
-  int buffer_size = 0;
-  
-  /*
-   * Identify domain or local login.
-   */
+		msg = sshbuf_new();
+		if (!msg)
+			return 0;
+		if (sshbuf_put_u8(msg, 100) != 0 ||
+			sshbuf_put_cstring(msg, "password") != 0 ||
+			sshbuf_put_cstring(msg, authctxt->user) != 0 ||
+			sshbuf_put_cstring(msg, password) != 0 ||
+			ssh_request_reply(auth_sock, msg, msg) != 0 ||
+			sshbuf_get_u32(msg, &token) != 0) {
+			debug("auth agent did not authorize client %s", authctxt->pw->pw_name);
+			return 0;
+		}
 
-  char *username = authctxt->user;
 
-  char *domainslash = strchr(authctxt->user, '\\');
-  if (domainslash) {
-	  // domain\username format
-	  char *domainname = authctxt->user;
-	  *domainslash = '\0';
-	  username = ++domainslash; // username is past the domain \ is the username
+		if (blob)
+			free(blob);
+		if (msg)
+			sshbuf_free(msg);
 
- 	  // Convert domainname from UTF-8 to UTF-16
-	  buffer_size = MultiByteToWideChar(CP_UTF8, 0, domainname, -1, NULL, 0);
+		authctxt->methoddata = token;
+		
+	}
 
-	  if (buffer_size > 0)
-	  {
-		  domain_UTF16 = xmalloc(4 * buffer_size);
-	  }
-	  else
-	  {
-		  return 0;
-	  }
-
-	  if (0 == MultiByteToWideChar(CP_UTF8, 0, domainname,
-		  -1, domain_UTF16, buffer_size))
-	  {
-		  free(domain_UTF16);
-
-		  return 0;
-	  }
-  }
-  else if (domainslash = strchr(authctxt->user, '@')) {
-	  // username@domain format
-	  username = authctxt->user;
-	  *domainslash = '\0';
-	  char *domainname = ++domainslash; // domainname is past the user@
-
-								// Convert domainname from UTF-8 to UTF-16
-	  buffer_size = MultiByteToWideChar(CP_UTF8, 0, domainname, -1, NULL, 0);
-
-	  if (buffer_size > 0)
-	  {
-		  domain_UTF16 = xmalloc(4 * buffer_size);
-	  }
-	  else
-	  {
-		  return 0;
-	  }
-
-	  if (0 == MultiByteToWideChar(CP_UTF8, 0, domainname,
-		  -1, domain_UTF16, buffer_size))
-	  {
-		  free(domain_UTF16);
-
-		  return 0;
-	  }
-  }
-  else {
-	  domain_UTF16 = strchr(authctxt->user, '@') ? NULL : L".";
-  }
-  
-  authctxt -> methoddata = hToken;
- 
-  if (domain_UTF16 == NULL)
-  {
-    debug3("Using domain logon...");
-  }
-  
-  /*
-   * Convert username from UTF-8 to UTF-16
-   */
- 
-  buffer_size = MultiByteToWideChar(CP_UTF8, 0, username, -1, NULL, 0);
-
-  if (buffer_size > 0)
-  {
-    user_UTF16 = xmalloc(4 * buffer_size);
-  }
-  else
-  {
-    return 0;
-  }
-  
-  if (0 == MultiByteToWideChar(CP_UTF8, 0, username,
-                                   -1, user_UTF16, buffer_size))
-  {
-    free(user_UTF16);
-
-    return 0;
-  }
-
-  /*
-   * Convert password from UTF-8 to UTF-16
-   */
-  
-  buffer_size = MultiByteToWideChar(CP_UTF8, 0, password, -1, NULL, 0);
-
-  if (buffer_size > 0)
-  {
-    password_UTF16 = xmalloc(4 * buffer_size);
-  }
-  else
-  {
-    return 0;
-  }
-  
-  if (0 == MultiByteToWideChar(CP_UTF8, 0, password, -1, 
-                                   password_UTF16 , buffer_size))
-  {
-    free(password_UTF16 );
-
-    return 0;
-  }
-  
-  worked = LogonUserW(user_UTF16, domain_UTF16, password_UTF16,
-	  LOGON32_LOGON_NETWORK,
-                             LOGON32_PROVIDER_DEFAULT, &hToken);
-                             
-  
-  free(user_UTF16);
-  free(password_UTF16);
-  if (domainslash) free(domain_UTF16);
-  
-  /*
-   * If login still fails, go out.
-   */
-   
-  if (!worked || hToken == INVALID_HANDLE_VALUE)
-  {
-    return 0;
-  }
-
-  /*
-   * Make sure this can be inherited for when 
-   * we start shells or commands.
-   */
-  
-  worked = SetHandleInformation(hToken, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-  
-  if (!worked)
-  {
-    CloseHandle(hToken);
-    
-    hToken = INVALID_HANDLE_VALUE;
-    
-    authctxt -> methoddata = hToken;
-
-    return 0;
-  }
-
-  /*
-   * Save the handle (or invalid handle) as method-specific data.
-   */
-   
-  authctxt -> methoddata = hToken;
-
-  return 1;
+	return 1;
 }
 
 #elif !defined(CUSTOM_SYS_AUTH_PASSWD)

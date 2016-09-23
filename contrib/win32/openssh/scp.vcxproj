@@ -22,6 +22,9 @@
   <ItemGroup>
     <ClCompile Include="$(OpenSSH-Src-Path)scp.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{29B98ADF-1285-49CE-BF6C-AA92C5D2FB24}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>

@@ -46,7 +46,7 @@ void agent_connection_on_error(struct agent_connection* con, DWORD error) {
 void agent_connection_on_io(struct agent_connection* con, DWORD bytes, OVERLAPPED* ol) {
 	
 	/* process error */
-	debug("connection io %p #bytes:%d state:%d", con, bytes, con->state);
+	debug3("connection io %p #bytes:%d state:%d", con, bytes, con->state);
 	if ((bytes == 0) && (GetOverlappedResult(con->connection, ol, &bytes, FALSE) == FALSE))
 		ABORT_CONNECTION_RETURN(con);
 
@@ -155,7 +155,7 @@ get_con_client_type(HANDLE pipe) {
 	else
 		r = OTHER;
 
-	debug("client type: %d", r);
+	debug2("client type: %d", r);
 done:
 	if (sshd_sid)
 		free(sshd_sid);
@@ -167,14 +167,16 @@ done:
 	return r;
 }
 
+/* TODO - move this to common header*/
+#define SSH_AGENT_AUTHENTICATE			100
 
 static int
 process_request(struct agent_connection* con) {
 	int r = -1;
 	struct sshbuf *request = NULL, *response = NULL;
 
-	if (con->client_type == UNKNOWN)
-		if ((con->client_type = get_con_client_type(con->connection)) == -1)
+	if (con->client_process == UNKNOWN)
+		if ((con->client_process = get_con_client_type(con->connection)) == -1)
 			goto done;
 
 	
@@ -183,12 +185,38 @@ process_request(struct agent_connection* con) {
 	if ((request == NULL) || (response == NULL))
 		goto done;
 
-	if (con->type == KEY_AGENT)
-		r = process_keyagent_request(request, response, con);
-	else if (con->type == PUBKEY_AGENT) 
-		r = process_pubkeyagent_request(request, response, con);
-	else if (con->type == PUBKEY_AUTH_AGENT) 
-		r = process_authagent_request(request, response, con);
+	{
+		u_char type;
+
+		if (sshbuf_get_u8(request, &type) != 0)
+			return -1;
+		debug("process agent request type %d", type);
+
+		switch (type) {
+		case SSH2_AGENTC_ADD_IDENTITY:
+			r =  process_add_identity(request, response, con);
+			break;
+		case SSH2_AGENTC_REQUEST_IDENTITIES:
+			r = process_request_identities(request, response, con);
+			break;
+		case SSH2_AGENTC_SIGN_REQUEST:
+			r = process_sign_request(request, response, con);
+			break;
+		case SSH2_AGENTC_REMOVE_IDENTITY:
+			r = process_remove_key(request, response, con);
+			break;
+		case SSH2_AGENTC_REMOVE_ALL_IDENTITIES:
+			r = process_remove_all(request, response, con);
+			break;
+		case SSH_AGENT_AUTHENTICATE:
+			r = process_authagent_request(request, response, con);
+			break;
+		default:
+			debug("unknown agent request %d", type);
+			r = -1;
+			break;
+		}
+	}
 
 done:
 	if (request)

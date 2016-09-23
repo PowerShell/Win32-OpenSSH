@@ -278,3 +278,4 @@ d2utmpa*
 configure
 contrib/win32/openssh/Win32-OpenSSH.VC.opendb
 *.opendb
+*.db

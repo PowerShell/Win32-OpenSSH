@@ -127,6 +127,14 @@ int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
  * RETURNS: pointer to static string with homedir or NULL if fails.
  */
 
+#define SET_USER_ENV(folder_id, evn_variable) do  {                \
+       if (SHGetKnownFolderPath(&folder_id,0,token,&path) == S_OK)              \
+        {                                                                       \
+                SetEnvironmentVariableW(evn_variable, path);                    \
+                CoTaskMemFree(path);                                            \
+       }                                                                        \
+} while (0)                                                                     
+
 char *GetHomeDirFromToken(char *userName, HANDLE token)
 {
 	UCHAR InfoBuffer[1000];
@@ -156,16 +164,63 @@ char *GetHomeDirFromToken(char *userName, HANDLE token)
 	if (reg_key)
 		RegCloseKey(reg_key);
 
-	/* TODO - populate APPDATA, LOCALADPPDATA, TEMP, etc */
-	SetEnvironmentVariableW(L"LOCALAPPDATA", L"");
-	SetEnvironmentVariableW(L"APPDATA", L"");
-	SetEnvironmentVariableW(L"TEMP", L"");
-	SetEnvironmentVariableW(L"TMP", L"");
-	SetEnvironmentVariableW(L"USERDNSDOMAIN", L"");
-	SetEnvironmentVariableW(L"USERDOMAIN", L"");
-	SetEnvironmentVariableW(L"USERDOMAIN_ROAMINGPROFILE", L"");
-	SetEnvironmentVariableW(L"USERPROFILE", L"");
-  
+        { /* retrieve and set env variables. */
+                /* TODO - Get away with fixed limits and dynamically allocate required memory, cleanup this logic*/
+#define MAX_VALUE_LEN  1000
+#define MAX_DATA_LEN   2000
+#define MAX_EXPANDED_DATA_LEN 5000
+                wchar_t *path;
+                wchar_t value_name[MAX_VALUE_LEN];
+                wchar_t value_data[MAX_DATA_LEN], value_data_expanded[MAX_EXPANDED_DATA_LEN], *to_apply;
+                DWORD value_type, name_len, data_len;
+                int i;
+                LONG ret;
+                
+                if (ImpersonateLoggedOnUser(token) == FALSE)
+                        debug("Failed to impersonate user token, %d", GetLastError());
+                SET_USER_ENV(FOLDERID_LocalAppData, L"LOCALAPPDATA");
+                SET_USER_ENV(FOLDERID_Profile, L"USERPROFILE");
+                SET_USER_ENV(FOLDERID_RoamingAppData, L"APPDATA");
+                reg_key = 0;
+                if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_QUERY_VALUE, &reg_key) == ERROR_SUCCESS) {
+                        i = 0;
+                        while (1) {
+                                name_len = MAX_VALUE_LEN * 2;
+                                data_len = MAX_DATA_LEN * 2;
+                                to_apply = NULL;
+                                if (RegEnumValueW(reg_key, i++, &value_name, &name_len, 0, &value_type, &value_data, &data_len) != ERROR_SUCCESS)
+                                        break;
+                                if (value_type == REG_SZ) 
+                                        to_apply = value_data;
+                                else if (value_type == REG_EXPAND_SZ) {
+                                        ExpandEnvironmentStringsW(value_data, value_data_expanded, MAX_EXPANDED_DATA_LEN);
+                                        to_apply = value_data_expanded;
+                                }          
+
+                                if (wcsicmp(value_name, L"PATH") == 0) {
+                                        DWORD size;
+                                        if ((size = GetEnvironmentVariableW(L"PATH", NULL, 0)) != ERROR_ENVVAR_NOT_FOUND) {
+                                                memcpy(value_data_expanded + size, to_apply, (wcslen(to_apply) + 1)*2);
+                                                GetEnvironmentVariableW(L"PATH", value_data_expanded, MAX_EXPANDED_DATA_LEN);
+                                                value_data_expanded[size-1] = L';';
+                                                to_apply = value_data_expanded;
+                                        }
+
+                                }
+                                if (to_apply)
+                                        SetEnvironmentVariableW(value_name, to_apply);
+
+
+                        }
+                        RegCloseKey(reg_key);
+                }
+
+
+                RevertToSelf();
+        }
+
+
+
 	debug("<- GetHomeDirFromToken()...");
   
 	return pw_homedir;

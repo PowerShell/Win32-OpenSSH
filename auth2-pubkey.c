@@ -86,6 +86,7 @@ extern u_int session_id2_len;
 #ifdef WIN32_FIXME
   
   extern char HomeDirLsaW[MAX_PATH];
+  extern int auth_sock;
 
 #endif
 
@@ -192,52 +193,24 @@ userauth_pubkey(Authctxt *authctxt)
 #ifdef WIN32_FIXME
 		{
 #define SSH_AGENT_ROOT "SOFTWARE\\SSH\\Agent"
-			HKEY agent_root = 0;
-			DWORD agent_pid = 0, tmp_size = 4, pipe_server_pid = 0xff;
-			int sock = -1, r;
+			int r;
 			u_char *blob = NULL;
 			size_t blen = 0;
 			DWORD token = 0;
-			HANDLE h = INVALID_HANDLE_VALUE;
 			struct sshbuf *msg = NULL;
 
 			while (1) {
-				RegOpenKeyEx(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, KEY_QUERY_VALUE, &agent_root);
-				if (agent_root)
-					RegQueryValueEx(agent_root, "ProcessId", 0, NULL, &agent_pid, &tmp_size);
-					
-
-				h = CreateFile(
-					"\\\\.\\pipe\\ssh-authagent",   // pipe name 
-					GENERIC_READ |  // read and write access 
-					GENERIC_WRITE,
-					0,              // no sharing 
-					NULL,           // default security attributes
-					OPEN_EXISTING,  // opens existing pipe 
-					FILE_FLAG_OVERLAPPED,              // attributes 
-					NULL);          // no template file 
-				if (h == INVALID_HANDLE_VALUE) {
-					debug("cannot connect to auth agent");
-					break;
-				}
-
-				if (!GetNamedPipeServerProcessId(h, &pipe_server_pid) || (agent_pid != pipe_server_pid)) {
-					debug("auth agent pid mismatch");
-					break;
-				}
-
-				if ((sock = w32_allocate_fd_for_handle(h, FALSE)) < 0)
-					break;
 				msg = sshbuf_new();
 				if (!msg)
 					break;
-				if ((r = sshbuf_put_cstring(msg, "keyauthenticate")) != 0 ||
+				if ((r = sshbuf_put_u8(msg, 100)) != 0 ||
+					(r = sshbuf_put_cstring(msg, "pubkey")) != 0 ||
 					(r = sshkey_to_blob(key, &blob, &blen)) != 0 ||
 					(r = sshbuf_put_string(msg, blob, blen)) != 0 ||
 					(r = sshbuf_put_cstring(msg, authctxt->pw->pw_name)) != 0 ||
 					(r = sshbuf_put_string(msg, sig, slen)) != 0 ||
 					(r = sshbuf_put_string(msg, buffer_ptr(&b), buffer_len(&b))) != 0 ||
-					(r = ssh_request_reply(sock, msg, msg)) != 0 ||
+					(r = ssh_request_reply(auth_sock, msg, msg)) != 0 ||
 					(r = sshbuf_get_u32(msg, &token)) != 0) {
 					debug("auth agent did not authorize client %s", authctxt->pw->pw_name);
 					break;
@@ -246,12 +219,8 @@ userauth_pubkey(Authctxt *authctxt)
 				break;
 				
 			}
-			if (agent_root)
-				RegCloseKey(agent_root);
 			if (blob)
 				free(blob);
-			if (sock != -1)
-				close(sock);
 			if (msg)
 				sshbuf_free(msg);
 

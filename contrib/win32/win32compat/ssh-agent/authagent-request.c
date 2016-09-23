@@ -31,6 +31,7 @@
 
 #define UMDF_USING_NTSTATUS 
 #include <Windows.h>
+#include <UserEnv.h>
 #include <Ntsecapi.h>
 #include <ntstatus.h>
 #include <Shlobj.h>
@@ -48,6 +49,54 @@ InitLsaString(LSA_STRING *lsa_string, const char *str)
 		lsa_string->Length = strlen(str);
 		lsa_string->MaximumLength = lsa_string->Length + 1;
 	}
+}
+
+static void
+EnablePrivilege(const char *privName, int enabled)
+{
+	TOKEN_PRIVILEGES tp;
+	HANDLE hProcToken = NULL;
+	LUID luid;
+
+	int exitCode = 1;
+
+	if (LookupPrivilegeValueA(NULL, privName, &luid) == FALSE ||
+		OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hProcToken) == FALSE)
+		goto done;
+
+	tp.PrivilegeCount = 1;
+	tp.Privileges[0].Luid = luid;
+	tp.Privileges[0].Attributes = enabled ? SE_PRIVILEGE_ENABLED : 0;
+
+	AdjustTokenPrivileges(hProcToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), NULL, NULL);
+
+done:
+	if (hProcToken)
+		CloseHandle(hProcToken);
+	
+	return;
+}
+
+
+void
+LoadProfile(struct agent_connection* con, wchar_t* user, wchar_t* domain) {
+	PROFILEINFOW profileInfo;
+	profileInfo.dwFlags = PI_NOUI;
+	profileInfo.lpProfilePath = NULL;
+	profileInfo.lpUserName = user;
+	profileInfo.lpDefaultPath = NULL;
+	profileInfo.lpServerName = domain;
+	profileInfo.lpPolicyPath = NULL;
+	profileInfo.hProfile = NULL;
+	profileInfo.dwSize = sizeof(profileInfo);
+	EnablePrivilege("SeBackupPrivilege", 1);
+	EnablePrivilege("SeRestorePrivilege", 1);
+        if (LoadUserProfileW(con->auth_token, &profileInfo) == FALSE)
+                debug("Loading user (%ls,%ls) profile failed ERROR: %d", user, domain, GetLastError());
+        else
+                con->hProfile = profileInfo.hProfile;
+	EnablePrivilege("SeBackupPrivilege", 0);
+	EnablePrivilege("SeRestorePrivilege", 0);
 }
 
 #define MAX_USER_LEN 256
@@ -152,7 +201,7 @@ generate_user_token(wchar_t* user) {
 	    &token,
 	    &quotas,
 	    &subStatus) != STATUS_SUCCESS) {
-	    debug("LsaRegisterLogonProcess failed");
+	    debug("LsaLogonUser failed %d", ret);
 		goto done;
 	}
 
@@ -167,13 +216,81 @@ done:
 	return token;
 }
 
-#define AUTH_REQUEST "keyauthenticate"
+#define PUBKEY_AUTH_REQUEST "pubkey"
+#define PASSWD_AUTH_REQUEST "password"
 #define MAX_USER_NAME_LEN 256
+#define MAX_PW_LEN 128
 
-int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+        char *user = NULL, *pwd = NULL;
+        wchar_t userW_buf[MAX_USER_NAME_LEN], pwdW_buf[MAX_PW_LEN];
+	wchar_t *userW = userW_buf, *domW = NULL, *pwdW = pwdW_buf, *tmp;
+	size_t user_len = 0, pwd_len = 0, dom_len = 0;
 	int r = -1;
-	char *opn, *key_blob, *user, *sig, *blob;
-	size_t opn_len, key_blob_len, user_len, sig_len, blob_len;
+	HANDLE token = 0, dup_token, client_proc = 0;
+	ULONG client_pid;
+
+	if (sshbuf_get_cstring(request, &user, &user_len) != 0 ||
+		sshbuf_get_cstring(request, &pwd, &pwd_len) != 0 ||
+		user_len == 0 ||
+		pwd_len == 0 ){
+		debug("bad password auth request");
+		goto done;
+	}
+
+	userW[0] = L'\0';
+        if (MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, userW, MAX_USER_NAME_LEN) == 0 ||
+                MultiByteToWideChar(CP_UTF8, 0, pwd, pwd_len + 1, pwdW, MAX_PW_LEN) == 0) {
+                debug("unable to convert user (%s) or password to UTF-16", user);
+                goto done;
+        }
+	
+        if ((tmp = wcschr(userW, L'\\')) != NULL) {
+		domW = userW;
+		userW = tmp + 1;
+		*tmp = L'\0';
+
+	}
+	else if ((tmp = wcschr(userW, L'@')) != NULL) {
+		domW = tmp + 1;
+		*tmp = L'\0';
+	}
+
+        if (LogonUserW(userW, domW, pwdW, LOGON32_LOGON_NETWORK, LOGON32_PROVIDER_DEFAULT, &token) == FALSE) {
+                debug("failed to logon user");
+                goto done;
+        }
+                
+	if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
+	    ((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
+	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
+	    (sshbuf_put_u32(response, dup_token) != 0)) {
+	        debug("failed to duplicate user token");
+		goto done;
+	}
+
+        con->auth_token = token;
+        LoadProfile(con, userW, domW);
+	r = 0;
+done:
+	/* TODO Fix this hacky protocol*/
+	if ((r == -1) && (sshbuf_put_u8(response, SSH_AGENT_FAILURE) == 0))
+		r = 0;
+	
+	if (user)
+		free(user);
+	if (pwd)
+		free(pwd);
+	if (client_proc)
+		CloseHandle(client_proc);
+
+	return r;
+}
+
+int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+	int r = -1;
+	char *key_blob, *user, *sig, *blob;
+	size_t key_blob_len, user_len, sig_len, blob_len;
 	struct sshkey *key = NULL;
 	HANDLE token = NULL, dup_token = NULL, client_proc = NULL;
 	wchar_t wuser[MAX_USER_NAME_LEN];
@@ -181,23 +298,23 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 	ULONG client_pid;
 
 	user = NULL;
-	if (sshbuf_get_string_direct(request, &opn, &opn_len) != 0 ||
-	    sshbuf_get_string_direct(request, &key_blob, &key_blob_len) != 0 ||
+	if (sshbuf_get_string_direct(request, &key_blob, &key_blob_len) != 0 ||
 	    sshbuf_get_cstring(request, &user, &user_len) != 0 ||
 	    sshbuf_get_string_direct(request, &sig, &sig_len) != 0 ||
 	    sshbuf_get_string_direct(request, &blob, &blob_len) != 0 ||
-	    sshkey_from_blob(key_blob, key_blob_len, &key) != 0 ||
-	    opn_len != strlen(AUTH_REQUEST) ||
-	    memcmp(opn, AUTH_REQUEST, opn_len) != 0) {
-		debug("auth agent invalid request");
+	    sshkey_from_blob(key_blob, key_blob_len, &key) != 0) {
+		debug("invalid pubkey auth request");
 		goto done;
 	}
 
+        wuser[0] = L'\0';
 	if (MultiByteToWideChar(CP_UTF8, 0, user, user_len + 1, wuser, MAX_USER_NAME_LEN) == 0 ||
 	    (token = generate_user_token(wuser)) == 0) {
 		debug("unable to generate token for user %ls", wuser);
 		goto done;
 	}
+
+        con->auth_token = token;
 
 	if (SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
 		pubkey_allowed(key, wuser, wuser_home) != 1) {
@@ -218,17 +335,54 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 		goto done;
 	}
 	
+        {
+                wchar_t *tmp, *userW, *domW;
+                userW = wuser;
+                if ((tmp = wcschr(userW, L'\\')) != NULL) {
+                        domW = userW;
+                        userW = tmp + 1;
+                        *tmp = L'\0';
+
+                }
+                else if ((tmp = wcschr(userW, L'@')) != NULL) {
+                        domW = tmp + 1;
+                        *tmp = L'\0';
+                }
+		LoadProfile(con, userW, domW);
+	}
+
 	r = 0;
 done:
+        /* TODO Fix this hacky protocol*/
+        if ((r == -1) && (sshbuf_put_u8(response, SSH_AGENT_FAILURE) == 0))
+                r = 0;
+
 	if (user)
 		free(user);
 	if (key)
 		sshkey_free(key);
-	if (token)
-		CloseHandle(token);
 	if (wuser_home)
 		CoTaskMemFree(wuser_home);
 	if (client_proc)
 		CloseHandle(client_proc);
 	return r;
+}
+
+int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+	char *opn;
+	size_t opn_len;
+	if (sshbuf_get_string_direct(request, &opn, &opn_len) != 0) {
+		debug("invalid auth request");
+		return -1;
+	}
+
+	if (opn_len == strlen(PUBKEY_AUTH_REQUEST) && memcmp(opn, PUBKEY_AUTH_REQUEST, opn_len) == 0)
+		return process_pubkeyauth_request(request, response, con);
+	else if (opn_len == strlen(PASSWD_AUTH_REQUEST) && memcmp(opn, PASSWD_AUTH_REQUEST, opn_len) == 0)
+		return process_passwordauth_request(request, response, con);
+	else {
+		debug("unknown auth request: %s", opn);
+		return -1;
+	}
+		
 }
