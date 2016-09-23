@@ -19,4 +19,4 @@
 #define recv(a,b,c,d)		w32_recv((a), (b), (c), (d))
 #define send(a,b,c,d)		w32_send((a), (b), (c), (d))
 #define shutdown(a,b)		w32_shutdown((a), (b))
-#define socketpair(a,b,c)	w32_socketpair((a), (b), (c))
+#define socketpair(a,b,c,d)	w32_socketpair((a), (b), (c), (d))

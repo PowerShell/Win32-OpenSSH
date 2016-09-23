@@ -45,8 +45,8 @@ InitLsaString(LSA_STRING *lsa_string, const char *str)
 	if (str == NULL)
 		memset(lsa_string, 0, sizeof(LSA_STRING));
 	else {
-		lsa_string->Buffer = str;
-		lsa_string->Length = strlen(str);
+                lsa_string->Buffer = (char *)str;
+                lsa_string->Length = strlen(str);
 		lsa_string->MaximumLength = lsa_string->Length + 1;
 	}
 }

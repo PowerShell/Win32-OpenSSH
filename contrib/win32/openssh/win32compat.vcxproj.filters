@@ -57,12 +57,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\kerberos.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsalogon.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\lsastring.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\pwd.c">
       <Filter>Source Files</Filter>
     </ClCompile>

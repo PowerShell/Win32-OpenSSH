@@ -38,7 +38,6 @@
 /* Compatibility header to avoid lots of #ifdefs in includes.h on Win32 */
 
 #include <conio.h>
-#include <direct.h>
 
 /* We can't put these in string.h since we can't easily override that header, so here they are */
 #if !defined(HAVE_STRCASECMP) && !defined(__MINGW32__)
