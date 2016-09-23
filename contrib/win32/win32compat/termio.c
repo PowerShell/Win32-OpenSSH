@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include "w32fd.h"
+#include "tncon.h"
 #include "inc/defs.h"
 
 #define TERM_IO_BUF_SIZE 2048
@@ -48,6 +49,33 @@ static DWORD WINAPI ReadThread(
 	return 0;
 }
 
+static DWORD WINAPI ReadConsoleThread(
+    _In_ LPVOID lpParameter
+) {
+    int nBytesReturned = 0;
+
+    struct w32_io* pio = (struct w32_io*)lpParameter;
+
+    debug3("TermRead thread, io:%p", pio);
+    memset(&read_status, 0, sizeof(read_status));
+   
+    while (nBytesReturned == 0) {
+        nBytesReturned = ReadConsoleForTermEmul(WINHANDLE(pio),
+            pio->read_details.buf, pio->read_details.buf_size);
+    }
+
+    read_status.transferred = nBytesReturned;
+
+    if (0 == QueueUserAPC(ReadAPCProc, main_thread, (ULONG_PTR)pio)) {
+        debug("TermRead thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
+        pio->read_details.pending = FALSE;
+        pio->read_details.error = GetLastError();
+        DebugBreak();
+    }
+
+    return 0;
+}
+
 int
 termio_initiate_read(struct w32_io* pio) {
 	HANDLE read_thread;
@@ -63,7 +91,7 @@ termio_initiate_read(struct w32_io* pio) {
 		pio->read_details.buf_size = TERM_IO_BUF_SIZE;
 	}
 
-	read_thread = CreateThread(NULL, 0, ReadThread, pio, 0, NULL);
+    read_thread = CreateThread(NULL, 0, ReadConsoleThread, pio, 0, NULL);
 	if (read_thread == NULL) {
 		errno = errno_from_Win32Error(GetLastError());
 		debug("TermRead initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
@@ -136,9 +164,9 @@ int termio_close(struct w32_io* pio) {
 	HANDLE h;
 
 	CancelIoEx(WINHANDLE(pio), NULL);
-	/* If io is pending, let worker threads exit*/
-	if (pio->read_details.pending)
-		WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);
+	/* If io is pending, let write worker threads exit. The read thread is blocked so terminate it.*/
+    if (pio->read_details.pending)
+        TerminateThread(pio->read_overlapped.hEvent, 0);
 	if (pio->write_details.pending)
 		WaitForSingleObject(pio->write_overlapped.hEvent, INFINITE);
 	/* drain queued APCs */

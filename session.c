@@ -97,6 +97,9 @@
 #include "kex.h"
 #include "monitor_wrap.h"
 #include "sftp.h"
+#ifdef WIN32_FIXME
+#include "console.h"
+#endif
 
 #ifdef WIN32_FIXME
 
@@ -581,7 +584,6 @@ do_exec_no_pty(Session *s, const char *command)
    * Create three socket pairs for stdin, stdout and stderr 
    */
   pipe(pipein);
-
   pipe(pipeout);
   pipe(pipeerr);
 
@@ -590,8 +592,10 @@ do_exec_no_pty(Session *s, const char *command)
   {
 	prot_scr_width = s->col;
 	prot_scr_height = s->row;
-	extern HANDLE hConsole ;
-	hConsole = GetStdHandle (STD_OUTPUT_HANDLE);
+    extern HANDLE hInputConsole;
+    extern HANDLE hOutputConsole ;
+    hInputConsole = GetConsoleInputHandle();
+    hOutputConsole = GetConsoleOutputHandle();
 	ConSetScreenSize( s->col, s->row );
 	s->ptyfd = pipein[1]; // hConsole; // the pty is the Windows console output handle in our Win32 port
   }
@@ -616,24 +620,20 @@ do_exec_no_pty(Session *s, const char *command)
   si.lpTitle          = NULL; /* NULL means use exe name as title */
   si.dwX              = 0;
   si.dwY              = 0;
-  si.dwXSize          = prot_scr_width;
-  si.dwYSize          = prot_scr_height;
+  si.dwXSize          = 640;
+  si.dwYSize          = 480;
   si.dwXCountChars    = prot_scr_width;
   si.dwYCountChars    = prot_scr_height;
   si.dwFillAttribute  = 0;
-  si.dwFlags          = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS; // | STARTF_USESHOWWINDOW ;
+  si.dwFlags          = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS;
   si.wShowWindow      = 0; // FALSE ;
   si.cbReserved2      = 0;
   si.lpReserved2      = 0;
 
-	si.hStdInput = (HANDLE) sfd_to_handle(pipein[0]);
-	si.hStdOutput = (HANDLE) sfd_to_handle(pipeout[1]);
-	si.hStdError = (HANDLE) sfd_to_handle(pipeerr[1]);
-	si.lpDesktop = NULL; //L"winsta0\\default";
-
-  //si.wShowWindow = SW_HIDE;
-  //si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-
+  si.hStdInput = (HANDLE) sfd_to_handle(pipein[0]);
+  si.hStdOutput = (HANDLE) sfd_to_handle(pipeout[1]);
+  si.hStdError = (HANDLE) sfd_to_handle(pipeerr[1]);
+  si.lpDesktop = NULL; 
 
   SetEnvironmentVariable("USER", s->pw->pw_name);
   SetEnvironmentVariable("USERNAME", s->pw->pw_name);
@@ -693,7 +693,6 @@ do_exec_no_pty(Session *s, const char *command)
    * (e.g. for password auth) or we need to create a more restrictive
    * token using CreateUserToken for non-password auth mechanisms.
    */
-  
   
     hToken = s -> authctxt -> methoddata;
 
@@ -759,7 +758,8 @@ do_exec_no_pty(Session *s, const char *command)
   SetEnvironmentVariable("SSH_CONNECTION", buf);
 
   if (original_command)
-	  SetEnvironmentVariable("SSH_ORIGINAL_COMMAND", original_command);
+          SetEnvironmentVariable("SSH_ORIGINAL_COMMAND", original_command);
+
 
   // set better prompt for Windows cmd shell
   if (!s -> is_subsystem) {
@@ -778,22 +778,6 @@ do_exec_no_pty(Session *s, const char *command)
   char name[256];
   
   GetUserName(name, &size);
-
-//#ifndef WIN32_PRAGMA_REMCON
-//  if ( (!s -> is_subsystem) && (s ->ttyfd != -1)) {
-//	  // Send to the remote client ANSI/VT Sequence so that they send us CRLF in place of LF
-//	  char *inittermseq = "\033[20h\033[?7h\0" ; // LFtoCRLF AUTOWRAPON
-//	  Channel *c=channel_by_id ( s->chanid );
-//	  buffer_append(&c->input, inittermseq, strlen(inittermseq));
-//	  channel_output_poll();
-//  }
-//#endif
-
-  //if (s ->ttyfd != -1) {
-  	  // set the channel to tty interactive type
-  //	  Channel *c=channel_by_id ( s->chanid );
-  //	  c->isatty = 1;
-  //}
 
   if ( (s->term) && (s->term[0]) )
 		  SetEnvironmentVariable("TERM", s->term);
@@ -898,7 +882,7 @@ do_exec_no_pty(Session *s, const char *command)
 	if ( s->ttyfd == -1)
 		session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s -> is_subsystem, 0);
 	else
-		session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s -> is_subsystem, 1); // tty interctive session
+		session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s -> is_subsystem, 1); // tty interactive session
   } 
   else 
   {
@@ -2630,9 +2614,7 @@ session_pty_req(Session *s)
 		pty_setowner(s->pw, s->tty);
 
 	/* Set window size from the packet. */
-	#ifndef WIN32_FIXME
 	pty_change_window_size(s->ptyfd, s->row, s->col, s->xpixel, s->ypixel);
-	#endif
 
 	#ifndef WIN32_PRAGMA_REMCON
 	packet_check_eom();
@@ -2874,7 +2856,7 @@ session_pty_cleanup2(Session *s)
    * Send exit signal to child 'cmd.exe' process.
    */
   
-  if (s -> pid != NULL)
+  if (s -> pid != 0)
   {
 
     debug("Sending exit signal to child process [pid = %u]...", s -> pid);
@@ -2969,7 +2951,7 @@ session_close_single_x11(int id, void *arg)
    * Send exit signal to child 'cmd.exe' process.
    */
   
-    if (s -> pid != NULL)
+    if (s && s -> pid != 0)
     {
       debug("Sending exit signal to child process [pid = %u]...", s -> pid);
 

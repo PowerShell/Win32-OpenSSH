@@ -58,6 +58,7 @@
 #define ANSI_FOREGROUND_MAGENTA	35
 #define ANSI_FOREGROUND_CYAN	36
 #define ANSI_FOREGROUND_WHITE	37
+#define ANSI_DEFAULT_FOREGROUND 39
 #define ANSI_BACKGROUND_BLACK	40
 #define ANSI_BACKGROUND_RED		41
 #define ANSI_BACKGROUND_GREEN	42
@@ -66,6 +67,7 @@
 #define ANSI_BACKGROUND_MAGENTA	45
 #define ANSI_BACKGROUND_CYAN	46
 #define ANSI_BACKGROUND_WHITE	47
+#define ANSI_DEFAULT_BACKGROUND	49
 #define ANSI_BACKGROUND_BRIGHT	128
 
 #define TAB_LENGTH				4
@@ -81,14 +83,14 @@ typedef void *  SCREEN_HANDLE;
 int ConInit( DWORD OutputHandle, BOOL fSmartInit);
 int ConUnInitWithRestore( void );
 int ConUnInit( void );
-//void ConHideConsole(void);
+BOOL ConIsRedirected(HANDLE hInput);
+HANDLE GetConsoleOutputHandle();
+HANDLE GetConsoleInputHandle();
 BOOL ConSetScreenRect( int xSize, int ySize );
 BOOL ConSetScreenSize( int X, int Y );
 BOOL ConRestoreScreen( void );
 BOOL ConSaveScreen( void );
-DWORD ConRedrawScreen( void );
 void ConSetAttribute( int *iParam, int iParamCount );
-void ConSetScrollRegion( int Top, int Bottom );
 int	ConScreenSizeX();
 int	ConSetScreenX();
 int ConScreenSizeY();
@@ -97,7 +99,6 @@ int ConWindowSizeY();
 int ConSetScreenY();
 void ConFillToEndOfLine();
 int ConWriteString(char* pszString, int cbString);
-int ConWriteMenu(char* pszString, int cbString);
 BOOL ConWriteChar( CHAR ch );
 int ConWriteConsole( char *pData, int NumChars );
 PCHAR ConDisplayData(char* pData, int NumLines);
@@ -131,6 +132,7 @@ void ConDeleteScreenHandle( SCREEN_HANDLE hScreen );
 void ConSaveViewRect( void );
 void ConRestoreViewRect( void );
 void ConDeleteChars(int n);
+void ConSaveWindowsState(void);
 
 
 #endif

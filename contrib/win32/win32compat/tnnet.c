@@ -37,60 +37,58 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
-
-
 #include <windows.h>
 
-#include "ansiprsr.h"
-#include "tncon.h"
+#include <ansiprsr.h>
 
 #define dwBuffer 4096
- 
-int NetWriteString( char* pszString, size_t cbString)
-{
-	//return send_output_to_remote_client( sock, pszString, (int)cbString, 0 );
-	return (int)cbString ;
-}
 
-size_t telProcessNetwork ( char *buf, size_t len )
+// Server will always be returning a sequence of ANSI control characters which the client
+// protocol can either passthru directly to the console or transform based on an output terminal
+// type. We're not using termcap so we're only supporting the ANSI (vt100) sequences that
+// are hardcoded in the server and will be transformed to Windows Console commands.
+
+size_t telProcessNetwork(char *buf, size_t len, unsigned char **respbuf, size_t *resplen)
 {
 	unsigned char szBuffer[dwBuffer + 8];
-	unsigned char* pszHead = szBuffer;
-	unsigned char* pszTail = szBuffer;
-	size_t Result;
-	unsigned char* pszNewHead;
 
+	unsigned char* pszNewHead = NULL;
+
+    unsigned char* pszHead = NULL;
+    unsigned char* pszTail = NULL;
+
+    char *term = NULL;
+
+    if (len == 0)
+        return len;
+
+    term = getenv("TERM");
+
+    if (term != NULL && _stricmp(term, "passthru") == 0)
+        return len;
+
+    // Transform a single carriage return into a single linefeed before
+    // continuing.
 	if ((len == 1) && (buf[0] == 13))
 		buf[0] = 10;
 
-	if (1)
-	{
-		Result = len ;
-		pszTail = (unsigned char *)buf ;
-		pszHead = (unsigned char *)buf ;
+	pszTail = (unsigned char *)buf;
+	pszHead = (unsigned char *)buf;
 
-		pszTail += Result;
+	pszTail += len;
 
-		pszNewHead = pszHead;
+	pszNewHead = pszHead;
 
-		do 
-		{
-			pszHead = pszNewHead;
-			pszNewHead = ParseBuffer(pszHead, pszTail);
-		} while ((pszNewHead != pszHead) && (pszNewHead < pszTail));
+    // Loop through the network buffer transforming characters as necessary.
+    // The buffer will be empty after the transformation
+    // process since the buffer will contain only commands that are handled by the console API.
+	do {
+		pszHead = pszNewHead;
+		pszNewHead = ParseBuffer(pszHead, pszTail, respbuf, resplen);
 
-		if ( pszNewHead >= pszTail )
-		{
-			// Everything is okay and we will reset variables and continue
-			pszTail = pszHead = szBuffer;
-		} 
-		else 
-		{
-			MoveMemory(szBuffer, pszNewHead, pszTail - pszNewHead);
-			pszTail = szBuffer + (pszTail - pszNewHead);
-			pszHead = szBuffer;
-		}
-	}
+	} while ((pszNewHead != pszHead) && (pszNewHead < pszTail) && (resplen == NULL || (resplen != NULL && *resplen == 0)));
+
+    len = 0;
 
 	return len;
 }

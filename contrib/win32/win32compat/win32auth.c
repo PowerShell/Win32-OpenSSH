@@ -362,6 +362,8 @@ fail:
     debug("ERROR. Cannot setup TOKEN_PRIVILEGES (err=%u, ntStat=%x).",
               GetLastError(), ntStat);
   }
+
+  return exitCode;
 }
 
 

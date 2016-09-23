@@ -39,16 +39,15 @@
 #define TERM_ANSI 0
 #define TERM_VT52 1
 
-unsigned char * ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd);
+unsigned char * ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char **respbuf, size_t *resplen);
 unsigned char * GetNextChar(unsigned char * pszBuffer, unsigned char *pszBufferEnd);
-unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEnd);
-unsigned char * ParseVT52(unsigned char * pszBuffer, unsigned char * pszBufferEnd);
+unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char **respbuf, size_t *resplen);
+unsigned char * ParseVT52(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char **respbuf, size_t *resplen);
 
 #define true TRUE
 #define false FALSE
 #define bool BOOL
 
-//typedef enum _crlftype { CRLF = 0, LF, CR } CRLFType;
 #define ENUM_CRLF 0
 #define ENUM_LF 1
 #define ENUM_CR 2
@@ -60,22 +59,22 @@ typedef struct _TelParams
 
 	char *pInputFile;
 
-	char * szDebugInputFile;
-    BOOL   fDebugWait;
+	char *szDebugInputFile;
+    BOOL fDebugWait;
 
 	int timeOut;
 	int fLocalEcho;
 	int fTreatLFasCRLF;
 	int	fSendCROnly;
 	int nReceiveCRLF;
-	//_crlftype nReceiveCRLF;
-	char	sleepChar;
-	char	menuChar;
 
-	SOCKET	Socket;
+    char sleepChar;
+	char menuChar;
+
+	SOCKET Socket;
 	BOOL bVT100Mode;
 
-	char	*pAltKey;
+	char *pAltKey;
 
 } TelParams;
 

@@ -1846,7 +1846,10 @@ mux_client_request_session(int fd)
 	}
 
 	term = getenv("TERM");
-
+#ifdef WIN32_FIXME
+        if (term != NULL && _stricmp(term, "passthru") == 0)
+                term = "ansi";
+#endif
 	buffer_init(&m);
 	buffer_put_int(&m, MUX_C_NEW_SESSION);
 	buffer_put_int(&m, muxclient_request_id);

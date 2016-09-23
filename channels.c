@@ -2442,6 +2442,8 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	char *data;
 	u_int data_len, tcode;
 	Channel *c;
+        char *respbuf = NULL;
+        size_t resplen = 0;
 
 	/* Get the channel number and verify it. */
 	id = packet_get_int();
@@ -2480,8 +2482,14 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	#ifndef WIN32_FIXME//N
 	buffer_append(&c->extended, data, data_len);
 	#else
-	if ( c->client_tty )
-		telProcessNetwork ( data, data_len ); // run it by ANSI engine if it is the ssh client
+        if (c->client_tty) {
+                if (telProcessNetwork(data, data_len, &respbuf, &resplen) > 0) // run it by ANSI engine if it is the ssh client
+                        buffer_append(&c->extended, data, data_len);
+
+                if (respbuf != NULL) {
+                        sshbuf_put(&c->input, respbuf, resplen);
+                }
+        }
 	else
 		buffer_append(&c->extended, data, data_len);
 	#endif

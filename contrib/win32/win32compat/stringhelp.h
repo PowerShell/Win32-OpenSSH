@@ -32,15 +32,14 @@
 #ifndef StringHelp_H
 #define StringHelp_H 1
 
+#include <windows.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-char * strerror_win32(int);
-
-void *CovertCodePage(const char *src, DWORD srcCP, DWORD dstCP, int *retSize);
-void *CovertUtf8ToLocal8(const char *utf8, int utf8Size, int *bytesReturned);
-void *CovertLocal8ToUtf8(const char *local8, int local8Size, int *bytesReturned);
+void *ConvertCodePage(const char *src, int srcSize, DWORD srcCP, DWORD dstCP, int *retSize);
+void *ConvertUtf8ToLocal8(const char *utf8, int utf8Size, int *bytesReturned);
 
 #ifdef __cplusplus
 };

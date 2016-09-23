@@ -43,29 +43,9 @@
 
 #define SocketErrorStringSize 1024
 
-char * strerror_win32(int error)
-{
-
-  static char SocketErrorString[2 * SocketErrorStringSize] = { 0 };
-
-  DWORD error_win32 = WSAGetLastError();
-
-  if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                        NULL, error_win32, MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL),
-                            (LPTSTR) SocketErrorString, SocketErrorStringSize,
-                                NULL ) != 0)
-  {
-    return SocketErrorString;
-  }
-  else
-  {
-    return "Unknown error";
-  }
-}
-
 /*
  * Convert string encoding from one 8-bit CP to another 8-bit CP.
- * WARNING: Returned strong MUST be free by caller.
+ * WARNING: Returned string MUST be freed by caller.
  *
  * src     - source string (IN).
  * srcSize - size of src string in bytes or -1 if zero terminated (IN).
@@ -77,8 +57,7 @@ char * strerror_win32(int error)
  *          or NULL if error.
  *
  */
- 
-void *CovertCodePage(const char *src, int srcSize, 
+void *ConvertCodePage(const char *src, int srcSize, 
                          DWORD srcCP, DWORD dstCP, int *retSize)
 {
   int exitCode = -1;
@@ -188,7 +167,7 @@ void *CovertCodePage(const char *src, int srcSize,
 }
 
 /*
- * Covert string from UTF8 to CP used by current thread (Local8).
+ * Convert string from UTF8 to CP used by current thread (Local8).
  *
  * utf8          - string in UTF8 (IN).
  * utf8Size      - size of utf8 string in bytes or -1 if zero terminated (IN).
@@ -197,13 +176,13 @@ void *CovertCodePage(const char *src, int srcSize,
  * RETURNS: Pointer to new allocated Local8 string or NULL if error.
  */
  
-void *CovertUtf8ToLocal8(const char *utf8, int utf8Size, int *bytesReturned)
+void *ConvertUtf8ToLocal8(const char *utf8, int utf8Size, int *bytesReturned)
 {
-  return CovertCodePage(utf8, utf8Size, CP_UTF8, GetACP(), bytesReturned);
+  return ConvertCodePage(utf8, utf8Size, CP_UTF8, GetACP(), bytesReturned);
 }
 
 /*
- * Covert string from CP used by current thread (Local8) to UTF8.
+ * Convert string from CP used by current thread (Local8) to UTF8.
  *
  * local8        - string in Local8 CP (IN).
  * local8Size    - size of local8 string in bytes or -1 if zero terminated (IN).
@@ -214,6 +193,6 @@ void *CovertUtf8ToLocal8(const char *utf8, int utf8Size, int *bytesReturned)
 
 void *ConvertLocal8ToUtf8(const char *local8, int local8Size, int *bytesReturned)
 {
-  return CovertCodePage(local8, local8Size, 
+  return ConvertCodePage(local8, local8Size, 
                             GetACP(), CP_UTF8, bytesReturned);
 }

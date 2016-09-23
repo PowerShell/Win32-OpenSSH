@@ -170,7 +170,7 @@ static int
 createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 
 	/* check flags */
-	int rwflags = flags & 0xf;
+	int rwflags = flags & 0x3;
 	int c_s_flags = flags & 0xfffffff0;
 
 	/*

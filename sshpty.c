@@ -239,10 +239,14 @@ pty_change_window_size(int ptyfd, u_int row, u_int col,
 	w.ws_ypixel = ypixel;
 	(void) ioctl(ptyfd, TIOCSWINSZ, &w);
 #else
-	extern HANDLE hConsole ;
-	hConsole = ptyfd;
+	extern HANDLE hOutputConsole ;
+    if (ptyfd != 0) {
+        hOutputConsole = (HANDLE)ptyfd;
+    }
 	#ifndef WIN32_PRAGMA_REMCON
-	ConSetScreenSize( col, row );
+    if (hOutputConsole != NULL) {
+        ConSetScreenSize(col, row);
+    }
 	#else
 	if (ptyfd > 0 )
 		pty_change_window_size_oob(ptyfd, row, col, xpixel, ypixel);
