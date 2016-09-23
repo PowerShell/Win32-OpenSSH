@@ -227,7 +227,7 @@ void SendCharacter(HANDLE hInput, WORD attributes, char character) {
 
     char formatted_output[2048];
 
-    static USHORT pColor = 0;
+    static WORD pattributes = 0;
 
     USHORT Color = 0;
 	ULONG Status = 0;
@@ -305,10 +305,12 @@ void SendCharacter(HANDLE hInput, WORD attributes, char character) {
 
 	StringCbPrintfExA(Next, SizeLeft, &Next, &SizeLeft, 0, "m", Color);
 
-    if (bUseAnsiEmulation && Color != pColor)
+    if (bUseAnsiEmulation && attributes != pattributes)
         WriteFile(hInput, formatted_output, (Next - formatted_output), &wr, NULL);
 
     WriteFile(hInput, &character, 1, &wr, NULL);
+
+    pattributes = attributes;
 }
 
 void SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize) {
