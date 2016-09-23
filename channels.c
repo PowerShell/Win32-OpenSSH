@@ -1735,11 +1735,9 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
                                         chan_write_failed(c);
                                 return -1;
                         }
-                }
-                else if (c->datagram) {
+                } else if (c->datagram) {
                         buf = data = buffer_get_string(&c->output, &dlen);
-                }
-                else {
+                } else {
                         buf = data = buffer_ptr(&c->output);
                         dlen = buffer_len(&c->output);
                 }
@@ -1778,13 +1776,11 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
                                         debug2("channel %d: not open", c->self);
                                         chan_mark_dead(c);
                                         return -1;
-                                }
-                                else if (compat13) {
+                                } else if (compat13) {
                                         buffer_clear(&c->output);
                                         debug2("channel %d: input draining.", c->self);
                                         c->type = SSH_CHANNEL_INPUT_DRAINING;
-                                }
-                                else {
+                                } else {
                                         chan_write_failed(c);
                                 }
                                 return -1;
