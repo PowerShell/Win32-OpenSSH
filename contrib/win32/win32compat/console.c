@@ -104,7 +104,12 @@ int ConInit( DWORD OutputHandle, BOOL fSmartInit )
 
     if ( os.dwPlatformId == VER_PLATFORM_WIN32_NT )
     {
-        dwAttributes = (DWORD)ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;  // PERFECT in NT
+        char *term = getenv("TERM");
+        dwAttributes = (DWORD)ENABLE_PROCESSED_OUTPUT;  // PERFECT in NT
+
+        if (term != NULL && (_stricmp(term, "ansi") == 0 || _stricmp(term, "passthru")))
+            dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
         SetConsoleMode(hOutputConsole, dwAttributes); // Windows NT
     }
     else
@@ -285,11 +290,21 @@ BOOL ConSetScreenSize( int xSize, int ySize )
 /* ************************************************************ */
 void ConSetAttribute(int *iParam, int iParamCount)
 {
-    int		iAttr = 0;
+    static int	iAttr = 0;
     int		i = 0;
+    BOOL    bRet = TRUE;
 
     if (iParamCount < 1)
-        SetConsoleTextAttribute(hOutputConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+    {
+        iAttr |= FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+
+        iAttr = iAttr & ~BACKGROUND_INTENSITY;
+        iAttr = iAttr & ~FOREGROUND_INTENSITY;
+        iAttr = iAttr & ~COMMON_LVB_UNDERSCORE;
+        iAttr = iAttr & ~COMMON_LVB_REVERSE_VIDEO;
+
+        SetConsoleTextAttribute(hOutputConsole, (WORD)iAttr);
+    }
     else
     {
         for (i=0;i<iParamCount;i++)
@@ -297,7 +312,12 @@ void ConSetAttribute(int *iParam, int iParamCount)
             switch (iParam[i])
             {
                 case ANSI_ATTR_RESET:
-                    SetConsoleTextAttribute(hOutputConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+                    iAttr |= FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+
+                    iAttr = iAttr & ~BACKGROUND_INTENSITY;
+                    iAttr = iAttr & ~FOREGROUND_INTENSITY;
+                    iAttr = iAttr & ~COMMON_LVB_UNDERSCORE;
+                    iAttr = iAttr & ~COMMON_LVB_REVERSE_VIDEO;
                     break;
                 case ANSI_BRIGHT:
                     iAttr |= FOREGROUND_INTENSITY;
@@ -315,7 +335,7 @@ void ConSetAttribute(int *iParam, int iParamCount)
                 case ANSI_HIDDEN:
                     break;
                 case ANSI_NOREVERSE:
-                    iAttr |= FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+                    iAttr = iAttr & ~COMMON_LVB_REVERSE_VIDEO;
                     break;
                 case ANSI_DEFAULT_FOREGROUND:
                     // White
@@ -359,6 +379,9 @@ void ConSetAttribute(int *iParam, int iParamCount)
                     break;
                 case ANSI_DEFAULT_BACKGROUND:
                     //Black
+                    iAttr = iAttr & ~BACKGROUND_RED;
+                    iAttr = iAttr & ~BACKGROUND_BLUE;
+                    iAttr = iAttr & ~BACKGROUND_GREEN;
                     iAttr |= 0;
                     break;
                 case ANSI_BACKGROUND_BLACK:
@@ -400,11 +423,13 @@ void ConSetAttribute(int *iParam, int iParamCount)
                 case ANSI_BACKGROUND_BRIGHT:
                     iAttr |= BACKGROUND_INTENSITY;
                     break;
+                default:
+                    continue;
             }
         }
 
         if (iAttr)
-            SetConsoleTextAttribute(hOutputConsole, (WORD)iAttr);
+            bRet = SetConsoleTextAttribute(hOutputConsole, (WORD)iAttr);
     }
 } // End procedure
 

@@ -250,8 +250,8 @@ unsigned char* ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd
 		case 10:
 			pszBuffer++;
 			AutoWrap = 1;
-		    bAtEOLN = TRUE;
-		    break;
+            GoToNextLine();
+            break;
 				
 		case 12:
 		    pszBuffer++;
@@ -510,6 +510,8 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 				else if (bMode & MODE_BRK)
 				{
 					// Cursor UP
+                    if (iParam[0] == 0)
+                        iParam[0] = 1;
 					ConMoveCursorPosition(0, -iParam[0]);
 				}
 				fcompletion = 1;
@@ -523,6 +525,8 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 				else if (bMode & MODE_BRK)
 				{
 					// Cursor DOWN
+                    if (iParam[0] == 0)
+                        iParam[0] = 1;
 					ConMoveCursorPosition(0, iParam[0]);
 				}
 				fcompletion = 1;
@@ -536,6 +540,8 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 				else if (bMode & MODE_BRK)
 				{
 					// Cursor right
+                    if (iParam[0] == 0)
+                        iParam[0] = 1;
 					ConMoveCursorPosition(iParam[0], 0);
 
                 }
@@ -863,7 +869,7 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 		bCS1 = 0;
 		bBkMode = 0;
 		bCharMode = 0;
-		return pszCurrent;
+        return pszCurrent;
 	}
 	else
 		return pszBuffer;
@@ -906,9 +912,9 @@ unsigned char * ParseVT52(unsigned char * pszBuffer, unsigned char * pszBufferEn
 			break;
 
 		case 'H':  // Cursor Home
-			ConSetCursorPosition(1, 1);
+			ConSetCursorPosition(0, 0);
 			pszCurrent++;
-				bAtEOLN = FALSE;
+			bAtEOLN = FALSE;
 			break;
 		case 'I':  // Reverse Line Feed
 			pszCurrent++;
