@@ -2448,7 +2448,7 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	char *data;
 	u_int data_len, tcode;
 	Channel *c;
-#ifndef WIN32_FIXME
+#ifdef WIN32_FIXME
         char *respbuf = NULL;
         size_t resplen = 0;
 #endif
