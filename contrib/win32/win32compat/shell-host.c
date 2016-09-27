@@ -2,6 +2,9 @@
 * Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
 * Primitive shell-host to support parsing of cmd.exe input and async IO redirection
 *
+* Author: Ray Heyes <ray.hayes@microsoft.com>
+* PTY with ANSI emulation wrapper 
+*
 * Copyright (c) 2015 Microsoft Corp.
 * All rights reserved
 *
@@ -807,7 +810,7 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
     /* process data from pipe_in and route appropriately */
     while (1) {
         char buf[128];
-        DWORD rd = 0, wr = 0, i = 0;
+        DWORD rd = 0, wr = 0, i = -1;
 
         GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, 128, &rd, NULL));
         if (!istty) { /* no tty, just send it accross */
@@ -817,9 +820,14 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
 
         bStartup = FALSE;
 
-        while (i < rd) {
+        while (++i < rd) {
 
             INPUT_RECORD ir;
+
+	    if (buf[i] == 3) {/*Ctrl+C - Raise Ctrl+C*/
+		    GenerateConsoleCtrlEvent(CTRL_C_EVENT, childProcessId);
+		    continue;
+	    }
 
             if (bAnsi) {
                 ir.EventType = KEY_EVENT;
@@ -950,7 +958,6 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
                 }
             }
 
-            i++;
         }
     }
 
@@ -1115,7 +1122,9 @@ int wmain(int ac, wchar_t **av) {
 
     /*TODO - pick this up from system32*/
     cmd[0] = L'\0';
-    GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L"cmd.exe"));
+    if (ac)
+	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L"cmd.exe"));
+
     ac--;
     av++;
     if (ac)

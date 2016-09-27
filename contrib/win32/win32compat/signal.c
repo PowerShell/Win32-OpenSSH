@@ -149,14 +149,14 @@ sw_raise(int sig) {
 	case W32_SIGCHLD:
 		sw_cleanup_child_zombies();
 		break;
-	default:
-		ExitThread(1);
+	default: /* exit process */
+		exit(0);
 	}
 
 	return 0;
 }
 
-/* processes pending signals, return EINTR if any are processed*/
+/* processes pending signals, return -1 and errno=EINTR if any are processed*/
 static int 
 sw_process_pending_signals() {
 	sigset_t pending_tmp = pending_signals;
@@ -210,11 +210,11 @@ sw_process_pending_signals() {
 /*
  * Main wait routine used by all blocking calls. 
  * It wakes up on 
- * - any signals (errno = EINTR ) - TODO
+ * - any signals (errno = EINTR )
  * - any of the supplied events set 
  * - any APCs caused by IO completions 
  * - time out 
- * - Returns 0 on IO completion, timeout -1 on rest
+ * - Returns 0 on IO completion and timeout, -1 on rest
  *  if milli_seconds is 0, this function returns 0, its called with 0 
  *  to execute any scheduled APCs
 */

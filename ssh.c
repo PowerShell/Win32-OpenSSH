@@ -244,50 +244,6 @@ tilde_expand_paths(char **paths, u_int num_paths)
 	}
 }
 
-#ifdef WIN32_FIXME
-
-/*
- * This function handles exit signal.
- */
-
-BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
-{
-
-  switch( dwCtrlType ) 
-  { 
-    // Handle the CTRL-C signal. 
-    case CTRL_C_EVENT: 
-	  // send CTRL_C code to the remote app via sshd server
-      //buffer_put_char(&stdin_buffer, 0x3); // control-c is decimal 3
-      //Beep( 750, 300 ); 
-      //return( TRUE ); // we have handled it. FALSE would be go to next handler
-
-    case CTRL_BREAK_EVENT: 
- 	  // send CTRL_BREAK to the remote side ?
-	  //return TRUE;
-
-    case CTRL_CLOSE_EVENT: 
-    case CTRL_LOGOFF_EVENT: 
-    case CTRL_SHUTDOWN_EVENT: 
-	  // send SHELL_CODE_TERMINATE to the remote side
-	  //return FALSE ; // go to next handler
-
-	default:
-	   break;
-      //return FALSE;
-  }
-  
-  debug("Exit signal received...");
-
-  cleanup_exit(0);
-  
-  return TRUE;
-
-}
-
-#endif /* WIN32_FIXME */
-
-
 /*
  * Attempt to resolve a host name / port to a set of addresses and
  * optionally return any CNAMEs encountered along the way.
@@ -575,22 +531,11 @@ main(int ac, char **av)
   #ifdef WIN32_FIXME
   
     /*
-     * Setup exit signal handler for receiving signal, when 
-     * parent server is stopped.
-     */
-
-    SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
-
-    /*
      * Initialize wrapped stdio.
      */
 
     w32posix_initialize();
    
-   /* allocate_standard_descriptor(STDIN_FILENO);
-    allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);*/
-    
   #endif
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
