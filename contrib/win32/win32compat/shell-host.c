@@ -848,8 +848,9 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
                 {
                     SendKeyStroke(child_in, VK_RETURN, buf[0]);
                 }
-                else if (buf[i] == '\b')
+                else if (buf[i] == '\b' || buf[i] == 127)
                 {
+                    buf[0] = 8;			
                     SendKeyStroke(child_in, VK_BACK, buf[0]);
                 }
                 else if (buf[i] == '\t')
