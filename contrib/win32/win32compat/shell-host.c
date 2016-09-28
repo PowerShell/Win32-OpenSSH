@@ -63,7 +63,6 @@ consoleEvent* head = NULL;
 consoleEvent* tail = NULL;
 
 BOOL isRedirected = FALSE;
-BOOL istty = FALSE;
 BOOL bRet = FALSE;
 BOOL bNoScrollRegion = FALSE;
 BOOL bStartup = TRUE;
@@ -75,8 +74,6 @@ HANDLE child_err = INVALID_HANDLE_VALUE;
 HANDLE pipe_in = INVALID_HANDLE_VALUE;
 HANDLE pipe_out = INVALID_HANDLE_VALUE;
 HANDLE pipe_err = INVALID_HANDLE_VALUE;
-HANDLE child_pipe_read = INVALID_HANDLE_VALUE;
-HANDLE child_pipe_write = INVALID_HANDLE_VALUE;
 HANDLE child = INVALID_HANDLE_VALUE;
 HANDLE hConsoleBuffer = INVALID_HANDLE_VALUE;
 
@@ -813,10 +810,6 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
         DWORD rd = 0, wr = 0, i = -1;
 
         GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, 128, &rd, NULL));
-        if (!istty) { /* no tty, just send it accross */
-            GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, buf, rd, &wr, NULL));
-            continue;
-        }
 
         bStartup = FALSE;
 
@@ -1076,12 +1069,6 @@ int wmain(int ac, wchar_t **av) {
 
     memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
     sa.bInheritHandle = TRUE;
-    if (!CreatePipe(&child_pipe_read, &child_pipe_write, &sa, 128))
-        return -1;
-
-    /* A console is attached if a tty is requested */
-    if (!AllocConsole())
-        istty = TRUE;
 
     /* create job to hold all child processes */
     {
@@ -1116,9 +1103,8 @@ int wmain(int ac, wchar_t **av) {
 
     if (isRedirected)
     {
-        /* disable inheritance on child_pipe_write and pipe_in*/
+        /* disable inheritance on pipe_in*/
         GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
-        GOTO_CLEANUP_ON_FALSE(SetHandleInformation(child_pipe_write, HANDLE_FLAG_INHERIT, 0));
     }
 
     /*TODO - pick this up from system32*/
@@ -1146,10 +1132,6 @@ int wmain(int ac, wchar_t **av) {
     {
         Sleep(1000);
     }
-
-    /* close unwanted handles*/
-    CloseHandle(child_pipe_read);
-    child_pipe_read = INVALID_HANDLE_VALUE;
 
     /* monitor child exist */
     child = pi.hProcess;
