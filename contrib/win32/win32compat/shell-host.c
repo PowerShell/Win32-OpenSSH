@@ -62,7 +62,6 @@ typedef struct consoleEvent {
 consoleEvent* head = NULL;
 consoleEvent* tail = NULL;
 
-BOOL isRedirected = FALSE;
 BOOL bRet = FALSE;
 BOOL bNoScrollRegion = FALSE;
 BOOL bStartup = TRUE;
@@ -86,6 +85,7 @@ DWORD hostThreadId = 0;
 DWORD childProcessId = 0;
 DWORD dwStatus = 0;
 DWORD currentLine = 0;
+DWORD lastLineLength = 0;
 
 UINT cp = 0;
 
@@ -141,41 +141,46 @@ void SendKeyStroke(HANDLE hInput, int keyStroke, char character)
 }
 
 // VT output routines
+void SendLF(HANDLE hInput) {
+    DWORD wr = 0;
+
+    if (bUseAnsiEmulation)
+        WriteFile(hInput, "\n", 1, &wr, NULL);
+}
+
 void SendClearScreen(HANDLE hInput) {
     DWORD wr = 0;
 
-    WriteFile(hInput, "\033[2J", 4, &wr, NULL);
+    if (bUseAnsiEmulation)
+        WriteFile(hInput, "\033[2J", 4, &wr, NULL);
 }
 
 void SendClearScreenFromCursor(HANDLE hInput) {
     DWORD wr = 0;
 
-    WriteFile(hInput, "\033[1J", 4, &wr, NULL);
-}
-
-void SendCRLF(HANDLE hInput) {
-
-    DWORD wr = 0;
-
-    WriteFile(hInput, "\n", 2, &wr, NULL);
+    if (bUseAnsiEmulation)
+        WriteFile(hInput, "\033[1J", 4, &wr, NULL);
 }
 
 void SendHideCursor(HANDLE hInput) {
     DWORD wr = 0;
 
-    WriteFile(hInput, "\033[?25l", 6, &wr, NULL);
+    if (bUseAnsiEmulation)
+        WriteFile(hInput, "\033[?25l", 6, &wr, NULL);
 }
 
 void SendShowCursor(HANDLE hInput) {
     DWORD wr = 0;
 
-    WriteFile(hInput, "\033[?25h", 6, &wr, NULL);
+    if (bUseAnsiEmulation)
+        WriteFile(hInput, "\033[?25h", 6, &wr, NULL);
 }
 
 void SendCursorPositionRequest(HANDLE hInput) {
     DWORD wr = 0;
 
-    WriteFile(hInput, "\033[6n", 4, &wr, NULL);    
+    if (bUseAnsiEmulation)
+        WriteFile(hInput, "\033[6n", 4, &wr, NULL);
 }
 
 void SendSetCursor(HANDLE hInput, int X, int Y) {
@@ -428,8 +433,6 @@ void SizeWindow(HANDLE hInput) {
 
 DWORD WINAPI MonitorChild(_In_ LPVOID lpParameter) {
     WaitForSingleObject(child, INFINITE);
-    if (isRedirected)
-        CloseHandle(pipe_in);
     PostThreadMessage(hostThreadId, WM_APPEXIT, 0, 0);
     return 0;
 }
@@ -519,7 +522,7 @@ DWORD ProcessEvent(void *p) {
         readRect.Right = LOWORD(idChild);
 
         // Detect a "cls" (Windows).
-        if (!bStartup && 
+        if (!bStartup &&
             (readRect.Top == consoleInfo.srWindow.Top || readRect.Top == nextConsoleInfo.srWindow.Top))
         {
             BOOL isClearCommand = FALSE;
@@ -555,7 +558,7 @@ DWORD ProcessEvent(void *p) {
 
         if (bufferSize > MAX_EXPECTED_BUFFER_SIZE) {
 
-           if (!bStartup) {
+            if (!bStartup) {
                 SendClearScreen(pipe_out);
                 ViewPortY = 0;
                 lastViewPortY = 0;
@@ -563,7 +566,7 @@ DWORD ProcessEvent(void *p) {
 
             return ERROR_SUCCESS;
         }
-        
+
         // Create the screen scrape buffer
         CHAR_INFO *pBuffer = (PCHAR_INFO)malloc(sizeof(CHAR_INFO) * bufferSize);
 
@@ -586,6 +589,10 @@ DWORD ProcessEvent(void *p) {
             return dwError;
         }
 
+        if (readRect.Top > currentLine)
+            for(SHORT n = currentLine; n < readRect.Top; n++)
+                SendLF(pipe_out);
+
         // Set cursor location based on the reported location from the message.
         CalculateAndSetCursor(pipe_out, ViewPortY, viewPortHeight, readRect.Left, 
             readRect.Top);
@@ -594,6 +601,7 @@ DWORD ProcessEvent(void *p) {
         SendBuffer(pipe_out, pBuffer, bufferSize);
 
         lastViewPortY = ViewPortY;
+        lastLineLength = readRect.Left;
 
         free(pBuffer);
 
@@ -1062,8 +1070,6 @@ int wmain(int ac, wchar_t **av) {
 
     cp = GetConsoleCP();
 
-    isRedirected = !GetConsoleMode(pipe_in, &dwMode);
-
     ZeroMemory(&inputSi, sizeof(STARTUPINFO));
     GetStartupInfo(&inputSi);
 
@@ -1086,13 +1092,10 @@ int wmain(int ac, wchar_t **av) {
     hostThreadId = GetCurrentThreadId();
     hostProcessId = GetCurrentProcessId();
 
-    if (isRedirected)
-    {
-        InitializeCriticalSection(&criticalSection);
+    InitializeCriticalSection(&criticalSection);
 
-        hEventHook = SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
-            ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
-    }
+    hEventHook = SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
+        ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 
     memset(&si, 0, sizeof(STARTUPINFO));
     memset(&pi, 0, sizeof(PROCESS_INFORMATION));
@@ -1101,11 +1104,8 @@ int wmain(int ac, wchar_t **av) {
     si.cb = sizeof(STARTUPINFO);
     si.dwFlags = 0;
 
-    if (isRedirected)
-    {
-        /* disable inheritance on pipe_in*/
-        GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
-    }
+    /* disable inheritance on pipe_in*/
+    GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
 
     /*TODO - pick this up from system32*/
     cmd[0] = L'\0';

@@ -250,8 +250,8 @@ unsigned char* ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd
 		case 10:
 			pszBuffer++;
 			AutoWrap = 1;
-            GoToNextLine();
-		    break;
+            bAtEOLN = FALSE;
+            break;
 				
 		case 12:
 		    pszBuffer++;
@@ -264,7 +264,7 @@ unsigned char* ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd
 		case 13:
 			pszBuffer++;
 			AutoWrap = 1;
-		    bAtEOLN = FALSE;
+            GoToNextLine();
 		    break;
 
 		case 14:
