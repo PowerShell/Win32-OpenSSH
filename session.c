@@ -822,6 +822,15 @@ do_exec_no_pty(Session *s, const char *command)
 	  }
 	  if (!debug_flag)
 		  RevertToSelf();
+	  {
+		  /* TODO - check this - Create Process above is not respecting x# and y# chars, so we are doing this explicity on the 
+		   * attached console agein */
+
+		  COORD coord;
+		  coord.X = s->col;
+		  coord.Y = s->row;
+		  SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+	  }
   }
   
   /* 
