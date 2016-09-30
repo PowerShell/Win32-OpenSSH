@@ -194,7 +194,7 @@ agent_listen_loop() {
 					verbose("Failed to create child process %ls ERROR:%d", module_path, GetLastError());
 				}
 				else {
-					debug("spawned child %d ", pi.dwProcessId);
+					debug("spawned worker %d for agent client pid %d ", pi.dwProcessId, client_pid);
 					CloseHandle(pi.hProcess);
 					CloseHandle(pi.hThread);
 				}
