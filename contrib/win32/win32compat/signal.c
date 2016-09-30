@@ -86,6 +86,20 @@ native_sig_handler(DWORD dwCtrlType)
 	}
 }
 
+static VOID CALLBACK
+sigwinch_APCProc(
+	_In_ ULONG_PTR dwParam
+	) {
+	debug3("SIGTERM APCProc()");
+	sigaddset(&pending_signals, W32_SIGWINCH);
+}
+
+
+void
+queue_terminal_window_change_event() {
+	QueueUserAPC(sigwinch_APCProc, main_thread, (ULONG_PTR)NULL);
+}
+
 void 
 sw_init_signal_handler_table() {
 	int i;
@@ -163,7 +177,7 @@ sw_process_pending_signals() {
 	BOOL sig_int = FALSE; /* has any signal actually interrupted */
 
 	debug3("process_signals()");
-	int i, exp[] = { W32_SIGCHLD , W32_SIGINT , W32_SIGALRM, W32_SIGTERM, W32_SIGTSTP };
+	int i, exp[] = { W32_SIGCHLD , W32_SIGINT , W32_SIGALRM, W32_SIGTERM, W32_SIGTSTP, W32_SIGWINCH };
 
 	/* check for expected signals*/
 	for (i = 0; i < (sizeof(exp) / sizeof(exp[0])); i++)

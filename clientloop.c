@@ -537,7 +537,7 @@ client_make_packets_from_stdin_data(void)
 static void
 client_check_window_change(void)
 {
-#ifndef WIN32_FIXME
+
 	struct winsize ws;
 
 	if (! received_window_change_signal)
@@ -550,6 +550,7 @@ client_check_window_change(void)
 	if (compat20) {
 		channel_send_window_changes();
 	} else {
+#ifndef WIN32_FIXME
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) < 0)
 			return;
 		packet_start(SSH_CMSG_WINDOW_SIZE);
@@ -558,27 +559,8 @@ client_check_window_change(void)
 		packet_put_int((u_int)ws.ws_xpixel);
 		packet_put_int((u_int)ws.ws_ypixel);
 		packet_send();
+#endif
 	}
-#else
-
-	if (! win_received_window_change_signal)
-		return;
-	/** XXX race */
-	win_received_window_change_signal = 0;
-
-	debug2("client_check_window_change: changed");
-
-	if (compat20) {
-		channel_send_window_changes(ScreenX, ScrollBottom, 640, 480);
-	} else {
-		packet_start(SSH_CMSG_WINDOW_SIZE);
-		packet_put_int((u_int)ScreenX);
-		packet_put_int((u_int)ScrollBottom);
-		packet_put_int((u_int)640);
-		packet_put_int((u_int)480);
-		packet_send();
-	}
-#endif /* !WIN32_FIXME */
 }
 
 static int

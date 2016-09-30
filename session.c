@@ -497,6 +497,10 @@ do_authenticated1(Authctxt *authctxt)
 #define USE_PIPES 1
 #endif
 
+#ifdef WIN32_FIXME
+extern int debug_flag;
+#endif
+
 /*
  * This is called to fork and execute a command when we have no tty.  This
  * will call do_child from the child, and server_loop from the parent after
@@ -548,8 +552,6 @@ do_exec_no_pty(Session *s, const char *command)
   char *exec_command;
   char *laddr;
   char buf[256];
-  int prot_scr_width = 80;
-  int prot_scr_height = 25;
   #ifdef WIN32_PRAGMA_REMCON
   char exec_command_str[512];
   #endif
@@ -590,8 +592,6 @@ do_exec_no_pty(Session *s, const char *command)
   int retcode = -1;
   if ( (!s -> is_subsystem) && (s ->ttyfd != -1))
   {
-	prot_scr_width = s->col;
-	prot_scr_height = s->row;
     extern HANDLE hInputConsole;
     extern HANDLE hOutputConsole ;
     hInputConsole = GetConsoleInputHandle();
@@ -620,10 +620,10 @@ do_exec_no_pty(Session *s, const char *command)
   si.lpTitle          = NULL; /* NULL means use exe name as title */
   si.dwX              = 0;
   si.dwY              = 0;
-  si.dwXSize          = 640;
-  si.dwYSize          = 480;
-  si.dwXCountChars    = prot_scr_width;
-  si.dwYCountChars    = prot_scr_height;
+  si.dwXSize          = 5;
+  si.dwYSize          = 5;
+  si.dwXCountChars    = s->col;
+  si.dwYCountChars    = s->row;
   si.dwFillAttribute  = 0;
   si.dwFlags          = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS;
   si.wShowWindow      = 0; // FALSE ;
@@ -794,31 +794,34 @@ do_exec_no_pty(Session *s, const char *command)
   wchar_t exec_command_w[MAX_PATH];
   
   MultiByteToWideChar(CP_UTF8, 0, exec_command, -1, exec_command_w, MAX_PATH);
-  DWORD	dwStartupFlags = 0;// CREATE_SUSPENDED;  // 0
+  DWORD	dwStartupFlags = DETACHED_PROCESS;// CREATE_SUSPENDED;  // 0
  
   SetConsoleCtrlHandler(NULL, FALSE);
-  b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
+  if (debug_flag)
+	  b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
+		  /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, s->pw->pw_dir,
+		  &si, &pi);
+  else 
+	b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
                               /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, s -> pw -> pw_dir,
                                   &si, &pi);
-  /*
-   * If CreateProcessAsUser() fails we will try CreateProcess()
-   * but only if current user and login user are the same.
-   */
-
-  if ((!b) && (strcmp(name, s -> pw -> pw_name) == 0))
-  {
-    b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE, 
-                          /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, s -> pw -> pw_dir,
-                              &si, &pi);
-  }
-
   if (!b)
   {
-    debug("ERROR. Cannot create process as new user (%u).\n", GetLastError());
+    debug("ERROR. Cannot create process (%u).\n", GetLastError());
     
     CloseHandle(hToken);
     
     exit(1);
+  }
+  else {
+	  FreeConsole();
+	  if (!debug_flag)
+		ImpersonateLoggedOnUser(hToken);
+	  while (AttachConsole(pi.dwProcessId) == FALSE) {
+		  Sleep(200);
+	  }
+	  if (!debug_flag)
+		  RevertToSelf();
   }
   
   /* 

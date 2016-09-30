@@ -3895,7 +3895,6 @@ channel_connect_to_path(const char *path, char *ctype, char *rname)
 	return connect_to(path, PORT_STREAMLOCAL, ctype, rname);
 }
 
-#ifndef WIN32_FIXME//N
 void
 channel_send_window_changes(void)
 {
@@ -3907,8 +3906,21 @@ channel_send_window_changes(void)
 		if (channels[i] == NULL || !channels[i]->client_tty ||
 		    channels[i]->type != SSH_CHANNEL_OPEN)
 			continue;
+#ifndef WIN32_FIXME
 		if (ioctl(channels[i]->rfd, TIOCGWINSZ, &ws) < 0)
-			continue;
+			continue
+#else
+		{
+			CONSOLE_SCREEN_BUFFER_INFO c_info;
+			/* TODO - Fix this for multiple channels*/
+			if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &c_info))
+				continue;
+			ws.ws_col = c_info.dwSize.X;
+			ws.ws_row = c_info.dwSize.Y;
+			ws.ws_xpixel = 640;
+			ws.ws_ypixel = 480;
+		}
+#endif
 		channel_request_start(i, "window-change", 0);
 		packet_put_int((u_int)ws.ws_col);
 		packet_put_int((u_int)ws.ws_row);
@@ -3917,27 +3929,6 @@ channel_send_window_changes(void)
 		packet_send();
 	}
 }
-
-#else // WIN32_FIXME
-void
-channel_send_window_changes(int col, int row, int xpixel, int ypixel)
-{
-	u_int i;
-	struct winsize ws;
-
-	for (i = 0; i < channels_alloc; i++) {
-		if (channels[i] == NULL || !channels[i]->client_tty ||
-		    channels[i]->type != SSH_CHANNEL_OPEN)
-			continue;
-		channel_request_start(i, "window-change", 0);
-		packet_put_int((u_int)col);
-		packet_put_int((u_int)row);
-		packet_put_int((u_int)xpixel);
-		packet_put_int((u_int)ypixel);
-		packet_send();
-	}
-}
-#endif
 
 
 /* -- X11 forwarding */

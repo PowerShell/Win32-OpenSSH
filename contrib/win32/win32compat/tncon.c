@@ -116,6 +116,8 @@ BOOL DataAvailable(HANDLE h)
 	return FALSE;
 }
 
+void queue_terminal_window_change_event();
+
 int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 {
     HANDLE hHandle[] = { hInput, NULL };
@@ -148,11 +150,7 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
         switch (InputRecord.EventType)
         {
             case WINDOW_BUFFER_SIZE_EVENT:
-                memcpy(szResponse, NAWSSTR, 9);
-                szResponse[4] = ConScreenSizeX();
-                szResponse[6] = ConWindowSizeY();
-                ScreenX = ConScreenSizeX();
-                ScreenY = ConWindowSizeY();	
+		queue_terminal_window_change_event();
                 break;
 
             case FOCUS_EVENT:

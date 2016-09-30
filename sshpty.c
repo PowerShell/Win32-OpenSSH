@@ -197,32 +197,6 @@ pty_make_controlling_tty(int *ttyfd, const char *tty)
 #endif
 }
 
-#ifdef WIN32_PRAGMA_REMCON
-/* Changes the window size associated with the pty. */
-
-void pty_change_window_size_oob(int ptyfd, u_int row, u_int col, u_int xpixel, u_int ypixel)
-{
-	int rc;
-	char unsigned data[16];
-	size_t data_len;
-
-	// IAC SB NAWS <16-bit value width> <16-bit value height> IAC
-	//sprintf (data,"%c%c%c%c%c%c%c%c", 255, 250, 31, 0, col, 0, row, 255 );
-	data[0] = 255; // IAC;
-	data[1] = 250; // SB
-	data[2] = 31; // NAWS
-	data[3] = 0;
-	data[4] = (unsigned char)col;
-	data[5] = 0;
-	data[6] = (unsigned char)row;
-	data[7] = 255; // IAC
-	data[8] = 240; // iac end
-	data_len = 9; //strlen (data);
-	rc = write(ptyfd, data, (DWORD)data_len);
-	//rc = AsyncWrite(c->hInputHandle, (char *)data, (DWORD)data_len);
-}
-
-#endif
 /* Changes the window size associated with the pty. */
 
 void
@@ -239,15 +213,10 @@ pty_change_window_size(int ptyfd, u_int row, u_int col,
 	w.ws_ypixel = ypixel;
 	(void) ioctl(ptyfd, TIOCSWINSZ, &w);
 #else
-	extern HANDLE hOutputConsole ;
-	#ifndef WIN32_PRAGMA_REMCON
-    if (hOutputConsole != NULL) {
-        ConSetScreenSize(col, row);
-    }
-	#else
-	if (ptyfd > 0 )
-		pty_change_window_size_oob(ptyfd, row, col, xpixel, ypixel);
-	#endif
+	COORD coord;
+	coord.X = col;
+	coord.Y = row;
+	SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 #endif
 }
 
