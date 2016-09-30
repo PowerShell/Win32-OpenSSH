@@ -179,10 +179,6 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                         ConWriteString((char *)octets, n);
                     }
 
-                    if (dwControlKeyState == LEFT_ALT_PRESSED ||
-                        dwControlKeyState == RIGHT_ALT_PRESSED)
-                        NetWriteString2(pParams->Socket, (char *)pParams->pAltKey, 1, 0);
-
                     switch (InputRecord.Event.KeyEvent.uChar.UnicodeChar)
                     {
                         case 0xd:
