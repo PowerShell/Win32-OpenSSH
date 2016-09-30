@@ -55,6 +55,8 @@ int ScreenX;
 int ScreenY;
 int ScrollTop;
 int ScrollBottom;
+int LastCursorX;
+int LastCursorY;
 
 char *pSavedScreen = NULL;
 static COORD ZeroCoord = {0,0};
@@ -1092,7 +1094,7 @@ void ConScrollDownEntireBuffer()
 
     if (!GetConsoleScreenBufferInfo(hOutputConsole, &ConsoleInfo))
         return;
-    ConScrollDown(0,ConsoleInfo.dwSize.Y-1);
+    ConScrollDown(0, ConsoleInfo.dwSize.Y - 1);
     return;
 }
 
@@ -1102,7 +1104,7 @@ void ConScrollUpEntireBuffer()
 
     if (!GetConsoleScreenBufferInfo(hOutputConsole, &ConsoleInfo))
         return;
-    ConScrollUp(0,ConsoleInfo.dwSize.Y-1);
+    ConScrollUp(0, ConsoleInfo.dwSize.Y - 1);
     return;
 }
 
@@ -1141,7 +1143,7 @@ void ConScrollUp(int topline,int botline)
     Fill.Attributes = ConsoleInfo.wAttributes;
     Fill.Char.AsciiChar = ' ';
 
-    ScrollConsoleScreenBuffer(	hOutputConsole,
+    BOOL bRet = ScrollConsoleScreenBuffer(	hOutputConsole,
                                 &ScrollRect,
                                 &ClipRect,
                                 destination,
@@ -1149,7 +1151,7 @@ void ConScrollUp(int topline,int botline)
                                 );
 }
 
-void ConScrollDown(int	topline,int botline)
+void ConScrollDown(int topline, int botline)
 {
     SMALL_RECT	ScrollRect;
     SMALL_RECT	ClipRect;
@@ -1160,19 +1162,19 @@ void ConScrollDown(int	topline,int botline)
     if (!GetConsoleScreenBufferInfo(hOutputConsole, &ConsoleInfo))
         return;
 
-    if ((botline - topline) == ConsoleInfo.dwSize.Y-1)  // scrolling whole buffer
+    if ((botline - topline) == ConsoleInfo.dwSize.Y - 1)  // scrolling whole buffer
     {
         ScrollRect.Top = topline;
         ScrollRect.Bottom = botline;
     }
     else
     {
-        ScrollRect.Top = topline + ConsoleInfo.srWindow.Top+1;
+        ScrollRect.Top = topline + ConsoleInfo.srWindow.Top + 1;
         ScrollRect.Bottom = botline + ConsoleInfo.srWindow.Top;
     }
 
     ScrollRect.Left = 0;
-    ScrollRect.Right = ConScreenSizeX()-1;
+    ScrollRect.Right = ConScreenSizeX() - 1;
 
     ClipRect.Top = ScrollRect.Top;
     ClipRect.Bottom = ScrollRect.Bottom;
@@ -1180,12 +1182,12 @@ void ConScrollDown(int	topline,int botline)
     ClipRect.Right = ScrollRect.Right;
 
     destination.X = 0;
-    destination.Y = ScrollRect.Top-1;
+    destination.Y = ScrollRect.Top - 1;
 
     Fill.Attributes = ConsoleInfo.wAttributes;
     Fill.Char.AsciiChar = ' ';
 
-    ScrollConsoleScreenBuffer(	hOutputConsole,
+    BOOL bRet = ScrollConsoleScreenBuffer(	hOutputConsole,
                                 &ScrollRect,
                                 NULL,
                                 destination,
@@ -1224,8 +1226,20 @@ void ConSetCursorPosition(int x, int y)
     Coord.X = (short)(x); 
     Coord.Y = (short)(y); 
 
+    if ((y > ConsoleInfo.dwSize.Y - 1) && y > LastCursorY) {
+        for(int n = LastCursorY; n < y; n++)
+            GoToNextLine();
+    }
+
+    if (y >= ConsoleInfo.dwSize.Y) {
+        Coord.Y = ConsoleInfo.dwSize.Y - 1;
+    }
+
     if (!SetConsoleCursorPosition(hOutputConsole, Coord))
         rc = GetLastError();
+
+    LastCursorX = x;
+    LastCursorY = y;
 }
 
 BOOL ConChangeCursor( CONSOLE_CURSOR_INFO *pCursorInfo )
