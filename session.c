@@ -813,7 +813,7 @@ do_exec_no_pty(Session *s, const char *command)
     
     exit(1);
   }
-  else {
+  else if (s->ttyfd != -1) { /*attach to shell console */
 	  FreeConsole();
 	  if (!debug_flag)
 		ImpersonateLoggedOnUser(hToken);
