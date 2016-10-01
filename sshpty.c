@@ -215,7 +215,7 @@ pty_change_window_size(int ptyfd, u_int row, u_int col,
 #else
 	COORD coord;
 	coord.X = col;
-	coord.Y = row;
+	coord.Y = 9999;
 	SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 #endif
 }

@@ -828,7 +828,7 @@ do_exec_no_pty(Session *s, const char *command)
 
 		  COORD coord;
 		  coord.X = s->col;
-		  coord.Y = s->row;
+		  coord.Y = 9999;;
 		  SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 	  }
   }
