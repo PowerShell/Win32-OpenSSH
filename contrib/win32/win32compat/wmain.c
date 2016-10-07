@@ -32,8 +32,10 @@
 
 #include <Windows.h>
 
+int main(int, char **);
+
 char*
-utf16_to_utf8(wchar_t utf16str) {
+utf16_to_utf8(wchar_t* utf16str) {
         char* ret;
         int needed;
         if ((needed = WideCharToMultiByte(CP_UTF8, 0, utf16str, -1, NULL, 0, NULL, NULL)) == 0 ||
