@@ -242,6 +242,7 @@ struct w32_io*
 	struct w32_io* pio = NULL;
 	struct createFile_flags cf_flags;
 	HANDLE handle;
+        wchar_t wpathname[MAX_PATH];
 
 	debug2("open - pathname:%s, flags:%d, mode:%d", pathname, flags, mode);
 	/* check input params*/
@@ -251,12 +252,16 @@ struct w32_io*
 		return NULL;
 	}
 
-
+        if (MultiByteToWideChar(CP_UTF8, 0, pathname, -1, wpathname, MAX_PATH) == 0) {
+                errno = EFAULT;
+                debug("WideCharToMultiByte failed - ERROR:%d", GetLastError());
+                return NULL;
+        }
+        
 	if (createFile_flags_setup(flags, mode, &cf_flags) == -1)
 		return NULL;
 
-	/* TODO - Use unicode version.*/
-	handle = CreateFileA(pathname, cf_flags.dwDesiredAccess, cf_flags.dwShareMode,
+	handle = CreateFileW(wpathname, cf_flags.dwDesiredAccess, cf_flags.dwShareMode,
 		&cf_flags.securityAttributes, cf_flags.dwCreationDisposition,
 		cf_flags.dwFlagsAndAttributes, NULL);
 

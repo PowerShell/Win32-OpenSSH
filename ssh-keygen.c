@@ -2701,7 +2701,7 @@ main(int argc, char **argv)
 			} else if (!quiet)
 #ifdef WIN32_FIXME
       {
-        SetFileAttributesA(dotsshdir, FILE_ATTRIBUTE_HIDDEN);
+        SetFileAttributes(dotsshdir, FILE_ATTRIBUTE_HIDDEN);
         
         printf("Created directory '%s'.\n", dotsshdir);
       }

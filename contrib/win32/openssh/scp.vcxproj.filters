@@ -18,5 +18,13 @@
     <ClCompile Include="$(OpenSSH-Src-Path)scp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\win32compat\wmain.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
