@@ -35,6 +35,8 @@
 
 #define getdtablesize() MAX_FDS
 
+#define fopen w32_fopen_utf8
+
 /* Compatibility header to avoid lots of #ifdefs in includes.h on Win32 */
 
 #include <conio.h>
