@@ -103,7 +103,6 @@
 
 #ifdef WIN32_FIXME
 
-char *GetHomeDirFromToken(char *userName, HANDLE token);
 /*
 FIXME: GFPZR: Function stat() may be undeclared.
 */
@@ -703,19 +702,12 @@ do_exec_no_pty(Session *s, const char *command)
   }
 
   /*
-   * Get user homedir if needed.
-   */
-  
-  if (1) // (s -> pw -> pw_dir == NULL || s -> pw -> pw_dir[0] == '\0')
-  {
-      s -> pw -> pw_dir = GetHomeDirFromToken(s -> pw -> pw_name, hToken);
-  }
-
-  /*
    * Change to users home directory
+   * TODO - pw_dir is utf-8, convert it to utf-16 and call _wchdir
+   * also change subsequent calls to SetEnvironmentVariable
    */
 
-  _wchdir(s -> pw -> pw_dir);
+  _chdir(s->pw->pw_dir);
 
   SetEnvironmentVariableW(L"HOME", s -> pw -> pw_dir);
   wchar_t *wstr, wchr;

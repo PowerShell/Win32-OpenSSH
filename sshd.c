@@ -2213,6 +2213,7 @@ main(int ac, char **av)
   logit("[Build " __DATE__ " " __TIME__ "]");
 #endif
 
+#ifndef WINDOWS
 	/* Store privilege separation user for later use if required. */
 	if ((privsep_pw = getpwnam(SSH_PRIVSEP_USER)) == NULL) {
 		if (use_privsep || options.kerberos_authentication)
@@ -2226,6 +2227,7 @@ main(int ac, char **av)
 		privsep_pw->pw_passwd = xstrdup("*");
 	}
 	endpwent();
+#endif
 
 	/* load host keys */
 	sensitive_data.host_keys = xcalloc(options.num_host_key_files,

@@ -118,3 +118,9 @@ w32_fopen_utf8(const char *path, const char *mode) {
 
 	return f;
 }
+
+/*TODO implement Unicode host name support in Windows*/
+int 
+w32_gethostname(char *name, size_t len) {
+	return gethostname(name, len);
+}

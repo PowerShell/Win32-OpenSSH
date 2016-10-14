@@ -1564,7 +1564,7 @@ read_config_file(const char *filename, struct passwd *pw, const char *host,
 	if ((f = fopen(filename, "r")) == NULL)
 		return 0;
 
-#ifndef WIN32_FIXME
+#ifndef WINDOWS /* TODO - implement permission checks for Windows */
 	if (flags & SSHCONF_CHECKPERM) {
 		struct stat sb;
 

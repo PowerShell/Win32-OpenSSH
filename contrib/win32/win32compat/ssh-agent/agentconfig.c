@@ -116,9 +116,8 @@ int pubkey_allowed(struct sshkey* pubkey, wchar_t* wuser, wchar_t* wuser_home) {
 
 	if (WideCharToMultiByte(CP_UTF8, 0, wuser, -1, user, 256, NULL, NULL) == 0)
 		return 0;
-	/* BUG - pw structure is assumed to be filled with unicode strings by expand_authorized_keys()*/
-	//WideCharToMultiByte(CP_UTF8, 0, wuser_home, -1, user_home, MAX_PATH, NULL, NULL);
-	pw.pw_dir = wuser_home;
+	WideCharToMultiByte(CP_UTF8, 0, wuser_home, -1, user_home, MAX_PATH, NULL, NULL);
+	pw.pw_dir = user_home;
 	pw.pw_name = user;
 	return user_key_allowed(&pw, pubkey, 1);
 }

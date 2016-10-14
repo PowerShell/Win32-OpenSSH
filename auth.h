@@ -196,11 +196,7 @@ char	*get_challenge(Authctxt *);
 int	verify_response(Authctxt *, const char *);
 void	abandon_challenge_response(Authctxt *);
 
-#ifndef WIN32_FIXME
 char	*expand_authorized_keys(const char *, struct passwd *pw);
-#else
-wchar_t *expand_authorized_keys(const wchar_t *filename, struct passwd *pw);
-#endif
 
 char	*authorized_principals_file(struct passwd *);
 

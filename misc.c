@@ -222,12 +222,7 @@ pwcopy(struct passwd *pw)
 #ifdef HAVE_STRUCT_PASSWD_PW_CLASS
 	copy->pw_class = xstrdup(pw->pw_class);
 #endif
-
-#ifdef WIN32_FIXME//N
-  copy -> pw_dir = (char*)_wcsdup((wchar_t*)pw->pw_dir);
-#else
 	copy->pw_dir = xstrdup(pw->pw_dir);
-#endif
 	copy->pw_shell = xstrdup(pw->pw_shell);
 	return copy;
 }

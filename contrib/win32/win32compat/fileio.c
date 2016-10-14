@@ -557,6 +557,7 @@ fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 
 int
 fileio_stat(const char *path, struct _stat64 *buf) {
+	/* TODO - path is UTD -8, support unicode*/
 	return _stat64(path, buf);
 }
 

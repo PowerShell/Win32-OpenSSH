@@ -29,76 +29,132 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "includes.h"
-
-#include <Lmcons.h>
-#include <Lm.h>
-#include <stdlib.h>
-#include <ntsecapi.h>
-#include <errno.h>
-#include <shlobj.h>
-#include <Userenv.h>
+#include <Windows.h>
+#include <LM.h>
 #include <sddl.h>
-
-#include "win32auth.h"
-#include "homedirhelp.h"
-
-
-char *GetHomeDirFromToken(char *userName, HANDLE token);
-
-uid_t getuid(void)
-{
-  return 0;
-}
-
-gid_t getgid(void)
-{
-  return 0;
-}
-
-uid_t geteuid(void)
-{
-  return 0;
-}
-
-gid_t getegid(void)
-{
-  return 0;
-}
-
-int setuid(uid_t uid)
-{
-  return 0;
-}
-
-int setgid(gid_t gid)
-{
-  return 0;
-}
-
-int seteuid(uid_t uid)
-{
-  return 0;
-}
-
-int setegid(gid_t gid)
-{
-  return 0;
-}
-
-/*
- * Global pw variables
- */
+#define SECURITY_WIN32
+#include <security.h>
+#include "inc\pwd.h"
 
 static struct passwd pw;
+static char* pw_shellpath = "ssh-shellhost.exe";
 
-static char pw_gecos[UNLEN + 1]    = {'\0'};
-static char pw_username[UNLEN + 1] = {'\0'};
-static char pw_passwd[UNLEN + 1]   = {'\0'};
-static wchar_t pw_homedir[MAX_PATH]   = {L'\0'};
-static char pw_homedir_ascii[MAX_PATH]   = {'\0'};
-static char pw_password[MAX_PATH]  = {'\0'};
-static char pw_shellpath[MAX_PATH] = {'\0'};
+int
+initialize_pw() {
+        if (pw.pw_shell != pw_shellpath) {
+                memset(&pw, 0, sizeof(pw));
+                pw.pw_shell = pw_shellpath;
+        }
+        return 0;
+}
+
+void
+reset_pw() {
+        if (pw.pw_name)
+                free(pw.pw_name);
+        if (pw.pw_dir)
+                free(pw.pw_dir);
+}
+
+wchar_t*
+utf8_to_utf16(const char *utf8) {
+        int needed = 0;
+        wchar_t* utf16 = NULL;
+        if ((needed = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0)) == 0 ||
+                (utf16 = malloc(needed*sizeof(wchar_t))) == NULL ||
+                MultiByteToWideChar(CP_UTF8, 0, utf8, -1, utf16, needed) == 0)
+                return NULL;
+        return utf16;
+}
+
+char*
+utf16_to_utf8(const wchar_t* utf16) {
+        int needed = 0;
+        char* utf8 = NULL;
+        if ((needed = WideCharToMultiByte(CP_UTF8, 0, utf16, -1, NULL, 0, NULL, NULL)) == 0 ||
+                (utf8 = malloc(needed)) == NULL ||
+                WideCharToMultiByte(CP_UTF8, 0, utf16, -1, utf8, needed, NULL, NULL) == 0)
+                return NULL;
+        return utf8;
+}
+
+struct passwd*
+w32_getpwnam(const char *user_utf8) {
+        struct passwd *ret = NULL;
+        wchar_t *user_utf16 = NULL, *uname_utf16, *udom_utf16, *tmp;
+        char *uname_utf8 = NULL, *pw_home_utf8 = NULL;
+        LPBYTE *user_info = NULL;
+        LPWSTR user_sid = NULL;
+        wchar_t reg_path[MAX_PATH], profile_home[MAX_PATH];
+        HKEY reg_key = 0;
+        int tmp_len = MAX_PATH;
+
+        errno = 0;
+
+        if (initialize_pw() != 0)
+                goto done;
+
+        if ((user_utf16 = utf8_to_utf16(user_utf8) ) == NULL) {
+                errno = ENOMEM;
+                goto done;
+        }
+
+        /*find domain part if any*/
+        if ((tmp = wcschr(user_utf16, L'\\')) != NULL) {
+                udom_utf16 = user_utf16;
+                uname_utf16 = tmp + 1;
+                *tmp = L'\0';
+
+        }
+        else if ((tmp = wcschr(user_utf16, L'@')) != NULL) {
+                udom_utf16 = tmp + 1;
+                uname_utf16 = user_utf16;
+                *tmp = L'\0';
+        }
+        else {
+                uname_utf16 = user_utf16;
+                udom_utf16 = NULL;
+        }
+
+        if (NetUserGetInfo(udom_utf16, uname_utf16, 23, user_info) != NERR_Success ||
+                ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid) == FALSE) {
+                errno = ENOMEM; //??
+                goto done;
+        }
+
+        if (swprintf(reg_path, MAX_PATH, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", user_sid) == MAX_PATH ||
+                RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
+                RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, (LPBYTE)profile_home, &tmp_len) != 0)
+                GetWindowsDirectoryW(profile_home, MAX_PATH);
+
+        if ((uname_utf8 = utf16_to_utf8(uname_utf16)) == NULL ||
+                (pw_home_utf8 = utf16_to_utf8(profile_home)) == NULL) {
+                errno = ENOMEM;
+                goto done;
+        }
+        
+        pw.pw_name = uname_utf8;
+        uname_utf8 = NULL;
+        pw.pw_dir = pw_home_utf8;
+        pw_home_utf8 = NULL;
+        ret = &pw;
+done:
+        if (user_utf16)
+                free(user_utf16);
+        if (uname_utf8)
+                free(uname_utf8);
+        if (pw_home_utf8)
+                free(pw_home_utf8);
+        if (user_info)
+                NetApiBufferFree(user_info);
+        if (user_sid)
+                LocalFree(user_sid);
+        if (reg_key)
+                RegCloseKey(reg_key);
+        return ret;
+}
+
+
 
 /* given a access token, find the domain name of user account of the access token */
 int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
@@ -135,315 +191,39 @@ int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
        }                                                                        \
 } while (0)                                                                     
 
-char *GetHomeDirFromToken(char *userName, HANDLE token)
-{
-	UCHAR InfoBuffer[1000];
-	PTOKEN_USER pTokenUser = (PTOKEN_USER)InfoBuffer;
-	DWORD dwInfoBufferSize, tmp_len;
-	LPWSTR sid_str = NULL;
-	wchar_t reg_path[MAX_PATH];
-	HKEY reg_key = 0;
-
-	/* set home dir to Windows if any of below fair*/
-	GetWindowsDirectoryW(pw_homedir, MAX_PATH);
-
-	tmp_len = MAX_PATH;
-	if (GetTokenInformation(token, TokenUser, InfoBuffer,
-		1000, &dwInfoBufferSize) == FALSE ||
-	    ConvertSidToStringSidW(pTokenUser->User.Sid, &sid_str) == FALSE ||
-	    swprintf(reg_path, MAX_PATH, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", sid_str) == MAX_PATH ||
-	    RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
-	    RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, pw_homedir, &tmp_len) != 0 ){
-		/* one of the above failed */
-		debug("cannot retirve profile path - perhaps user profile is not created yet");
-	}
-
-	if (sid_str)
-		LocalFree(sid_str);
-	
-	if (reg_key)
-		RegCloseKey(reg_key);
-
-        { /* retrieve and set env variables. */
-                /* TODO - Get away with fixed limits and dynamically allocate required memory, cleanup this logic*/
-#define MAX_VALUE_LEN  1000
-#define MAX_DATA_LEN   2000
-#define MAX_EXPANDED_DATA_LEN 5000
-                wchar_t *path;
-                wchar_t value_name[MAX_VALUE_LEN];
-                wchar_t value_data[MAX_DATA_LEN], value_data_expanded[MAX_EXPANDED_DATA_LEN], *to_apply;
-                DWORD value_type, name_len, data_len;
-                int i;
-                LONG ret;
-                
-                if (ImpersonateLoggedOnUser(token) == FALSE)
-                        debug("Failed to impersonate user token, %d", GetLastError());
-                SET_USER_ENV(FOLDERID_LocalAppData, L"LOCALAPPDATA");
-                SET_USER_ENV(FOLDERID_Profile, L"USERPROFILE");
-                SET_USER_ENV(FOLDERID_RoamingAppData, L"APPDATA");
-                reg_key = 0;
-                if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_QUERY_VALUE, &reg_key) == ERROR_SUCCESS) {
-                        i = 0;
-                        while (1) {
-                                name_len = MAX_VALUE_LEN * 2;
-                                data_len = MAX_DATA_LEN * 2;
-                                to_apply = NULL;
-                                if (RegEnumValueW(reg_key, i++, &value_name, &name_len, 0, &value_type, &value_data, &data_len) != ERROR_SUCCESS)
-                                        break;
-                                if (value_type == REG_SZ) 
-                                        to_apply = value_data;
-                                else if (value_type == REG_EXPAND_SZ) {
-                                        ExpandEnvironmentStringsW(value_data, value_data_expanded, MAX_EXPANDED_DATA_LEN);
-                                        to_apply = value_data_expanded;
-                                }          
-
-                                if (wcsicmp(value_name, L"PATH") == 0) {
-                                        DWORD size;
-                                        if ((size = GetEnvironmentVariableW(L"PATH", NULL, 0)) != ERROR_ENVVAR_NOT_FOUND) {
-                                                memcpy(value_data_expanded + size, to_apply, (wcslen(to_apply) + 1)*2);
-                                                GetEnvironmentVariableW(L"PATH", value_data_expanded, MAX_EXPANDED_DATA_LEN);
-                                                value_data_expanded[size-1] = L';';
-                                                to_apply = value_data_expanded;
-                                        }
-
-                                }
-                                if (to_apply)
-                                        SetEnvironmentVariableW(value_name, to_apply);
-
-
-                        }
-                        RegCloseKey(reg_key);
-                }
-
-
-                RevertToSelf();
-        }
-
-
-
-	debug("<- GetHomeDirFromToken()...");
-  
-	return pw_homedir;
-}
-
 /*
- * Not thread safe, would need to use thread local
- * storage instead of a static.
+ * Temporary getpwuid implementaion of Windows. This should be replaced with getpw_currentuser
  */
 
-struct passwd *getpwuid(uid_t uid)
-{
-  static struct passwd pw;
+struct passwd*
+w32_getpwuid(uid_t uid) {
+        wchar_t* wuser = NULL;
+        char* user_utf8 = NULL;
+        ULONG needed = 0;
+        struct passwd *ret = NULL;
 
-  static char username[UNLEN + 1];
-  
-  DWORD usernamelen = UNLEN + 1;
-  
-  wchar_t *homedir_w;
+        errno = 0;
 
-  /*
-   * Clear errno.
-   */
-  
-  errno = 0;
+        if (GetUserNameExW(NameSamCompatible, NULL, &needed) != 0 ||
+                (wuser = malloc(needed*sizeof(wchar_t))) == NULL ||
+                GetUserNameExW(NameSamCompatible, wuser, &needed) == 0 ||
+                (user_utf8 = utf16_to_utf8(wuser) )== NULL ) {
+                errno = ENOMEM;
+                goto done;
+        }
 
-  /*
-   * Zero out the structure.
-   */
-  
-  memset(&pw, 0, sizeof(pw));
-  
-  memset(pw_username, 0, sizeof(pw_username));
-  memset(pw_homedir, 0, sizeof(pw_homedir));
-  memset(pw_password, 0, sizeof(pw_password));
-  memset(pw_shellpath, 0, sizeof(pw_shellpath));
+        ret = w32_getpwnam(user_utf8);
 
-  /*
-   * Point to the static string variables.
-   */
-  
-  pw.pw_name = pw_username;
-  pw.pw_passwd = pw_password;
-  pw.pw_gecos = pw_gecos;
-  pw.pw_shell = pw_shellpath;
-  pw.pw_dir = pw_homedir_ascii;
+done:
+        if (wuser)
+                free(wuser);
+        if (user_utf8)
+                free(user_utf8);
 
-  /*
-   * Get the current user's name.
-   */
-  
-  GetUserName(username, &usernamelen);
-  
-  debug3("getpwuid: username [%s]", username);
-  
-  strncpy(pw_username, username, sizeof(pw_username));
-
-  /*
-   * ssh need path to 'known_hosts' file, so we don't
-   * comment it here (see -> getpwnam() function).
-   */
-  
-  /*
-   * Get default shell path.
-   */
-  
-  //GetSystemDirectory(pw_shellpath, MAX_PATH);
-  
-  //debug3("getpwuid: system dir [%s]", pw_shellpath);
-  pw_shellpath[0] = '\0';
-  strcat(pw_shellpath, "ssh-shellhost.exe");
-  
-  //debug3("getpwuid: shell path [%s]", pw_shellpath);
-
-  /*
-   * Get home directory path (if this fails,
-   * the user is invalid, bail)
-   */
-  
-  homedir_w = gethomedir_w(username, NULL);
-  
-  if (!homedir_w || homedir_w[0] == '\0')
-  {
-    /*
-     * Bail out.
-     */
-      
-    errno = ENOENT;
-
-    return &pw;
-  }
-
-  debug3("getpwuid: homedir [%ls]", homedir_w);
-    
-  //wcsncpy(pw_homedir, homedir_w, sizeof(pw_homedir));
-  // convert to ascii from widechar(unicode)
-  int rc = WideCharToMultiByte( CP_UTF8, // UTF8/ANSI Code Page
-		0, // No special handling of unmapped chars
-		homedir_w, // wide-character string to be converted
-		-1, // Unicode src str len, -1 means calc it
-		pw_homedir_ascii, 
-		sizeof(pw_homedir_ascii),
-		NULL, NULL ); // Unrepresented char replacement - Use Default
- 
-  free(homedir_w);
-
-  if ( rc == 0 ) {
-	  debug3("Could not convert homedirectory [%ls]from unicode to utf8", homedir_w);
-  }
-  
-  /*
-   * Point to the username static variable.
-   */
-  
-  //pw.pw_name   = pw_username;
-  //pw.pw_passwd = pw_passwd;
-  //pw.pw_gecos  = pw_gecos;
-  //pw.pw_shell  = pw_shellpath;
-  //pw.pw_dir    = pw_homedir;
-
-  return &pw;
+        return ret;
 }
 
 
-struct passwd *getpwnam(const char *userin)
-{
-  char *homedir;
-
-  debug3("getpwnam: username [%s]", userin);
-
-  /*
-   * Clear errno.
-   */
-  
-  errno = 0;
-
-  /*
-   * Zero out the structure.
-   */
-  
-  memset(&pw, 0, sizeof(pw));
-  
-  memset(pw_username, 0, sizeof(pw_username));
-  memset(pw_homedir, 0, sizeof(pw_homedir));
-  memset(pw_password, 0, sizeof(pw_password));
-  memset(pw_shellpath, 0, sizeof(pw_shellpath));
-
-  /*
-   * Point to the static string variables.
-   */
-  
-  pw.pw_name   = pw_username;
-  pw.pw_passwd = pw_password;
-  pw.pw_gecos  = pw_gecos;
-  pw.pw_shell  = pw_shellpath;
-  pw.pw_dir    = pw_homedir;
-
-  /*
-   * Get default shell path.
-   */
-  
-   //GetSystemDirectory(pw_shellpath, MAX_PATH);
-
-   //debug3("getpwuid: system dir [%s]", pw_shellpath);
-
-  pw_shellpath[0] = '\0';
-  strcat(pw_shellpath, "ssh-shellhost.exe");
-
-  //debug3("getpwuid: shell path [%s]", pw_shellpath);
-
-  /*
-   * Copy user name to static structure.
-   */
-  
-  strncpy(pw_username, userin, UNLEN + 1);
-
-  /*
-   * Get a token for this user.
-   */
-  
-  return &pw;
-}
-
-void endpwent(void)
-{
-  /*
-   * This normally cleans up access to the passwd file,
-   * which we don't have, thus no cleanup.
-   */
-}
-
-#define	NCACHE	64			/* power of 2 */
-#define	MASK	(NCACHE - 1)		/* bits to store with */
-
-const char *
-user_from_uid(uid_t uid, int nouser)
-{
-	static struct ncache {
-		uid_t	uid;
-		char	*name;
-	} c_uid[NCACHE];
-	static int pwopen;
-	static char nbuf[15];		/* 32 bits == 10 digits */
-	struct passwd *pw;
-	struct ncache *cp;
-
-	cp = c_uid + (uid & MASK);
-	if (cp->uid != uid || cp->name == NULL) {
-		if (pwopen == 0) {
-			pwopen = 1;
-		}
-		if ((pw = getpwuid(uid)) == NULL) {
-			if (nouser)
-				return (NULL);
-			(void)snprintf(nbuf, sizeof(nbuf), "%u", uid);
-		}
-		cp->uid = uid;
-		if (cp->name != NULL)
-			free(cp->name);
-		cp->name = strdup(pw ? pw->pw_name : nbuf);
-	}
-	return (cp->name);
-}
 
 /* TODO - this is moved from realpath.c in openbsdcompat. Review and finalize its position*/
 
@@ -469,56 +249,43 @@ void slashconvert(char *str)
 	}
 }
 
-char *realpathWin32(const char *path, char resolved[PATH_MAX])
-{
-	char realpath[PATH_MAX];
 
-	strlcpy(resolved, path + 1, sizeof(realpath));
-	backslashconvert(resolved);
-	PathCanonicalizeA(realpath, resolved);
-	slashconvert(realpath);
-
-	/*
-	* Store terminating slash in 'X:/' on Windows.
-	*/
-
-	if (realpath[1] == ':' && realpath[2] == 0)
-	{
-		realpath[2] = '/';
-		realpath[3] = 0;
-	}
-
-	resolved[0] = *path; // will be our first slash in /x:/users/test1 format
-	strncpy(resolved + 1, realpath, sizeof(realpath));
-	return resolved;
+uid_t
+getuid(void) {
+	return 0;
 }
 
-// like realpathWin32() but takes out the first slash so that windows systems can work on the actual file or directory
-char *realpathWin32i(const char *path, char resolved[PATH_MAX])
-{
-	char realpath[PATH_MAX];
+gid_t
+getgid(void) {
+	return 0;
+}
 
-	if (path[0] != '/') {
-		// absolute form x:/abc/def given, no first slash to take out
-		strlcpy(resolved, path, sizeof(realpath));
-	}
-	else
-		strlcpy(resolved, path + 1, sizeof(realpath));
+uid_t
+geteuid(void) {
+	return 0;
+}
 
-	backslashconvert(resolved);
-	PathCanonicalizeA(realpath, resolved);
-	slashconvert(realpath);
+gid_t
+getegid(void) {
+	return 0;
+}
 
-	/*
-	* Store terminating slash in 'X:/' on Windows.
-	*/
+int
+setuid(uid_t uid) {
+	return 0;
+}
 
-	if (realpath[1] == ':' && realpath[2] == 0)
-	{
-		realpath[2] = '/';
-		realpath[3] = 0;
-	}
+int
+setgid(gid_t gid) {
+	return 0;
+}
 
-	strncpy(resolved, realpath, sizeof(realpath));
-	return resolved;
+int
+seteuid(uid_t uid) {
+	return 0;
+}
+
+int
+setegid(gid_t gid) {
+	return 0;
 }

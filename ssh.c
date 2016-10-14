@@ -560,6 +560,7 @@ main(int ac, char **av)
 	 */
 	closefrom(STDERR_FILENO + 1);
 
+#ifndef WINDOWS
 	/*
 	 * Save the original real uid.  It will be needed later (uid-swapping
 	 * may clobber the real uid).
@@ -575,6 +576,7 @@ main(int ac, char **av)
 	 * has been made, as we may need to create the port several times).
 	 */
 	PRIV_END;
+#endif
 
 #ifdef HAVE_SETRLIMIT
 	/* If we are installed setuid root be careful to not drop core. */
@@ -2081,16 +2083,8 @@ load_public_identity_files(void)
 	if ((pw = getpwuid(original_real_uid)) == NULL)
 		fatal("load_public_identity_files: getpwuid failed");
 	pwname = xstrdup(pw->pw_name);
-#ifdef WIN32_FIXME
-  pwdir = _wcsdup(pw -> pw_dir);
-  
-  if (pwdir)
-  {
-    sprintf(pwdir, "%ls", pw -> pw_dir);
-  }
-#else
 	pwdir = xstrdup(pw->pw_dir);
-#endif
+
 	if (gethostname(thishost, sizeof(thishost)) == -1)
 		fatal("load_public_identity_files: gethostname: %s",
 		    strerror(errno));
