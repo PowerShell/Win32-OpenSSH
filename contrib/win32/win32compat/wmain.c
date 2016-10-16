@@ -31,9 +31,9 @@
 */
 
 #include <Windows.h>
+#include "inc\utf.h"
 
 int main(int, char **);
-char* utf16_to_utf8(const wchar_t*);
 void w32posix_initialize();
 
 int

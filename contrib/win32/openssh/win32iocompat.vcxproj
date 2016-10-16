@@ -172,6 +172,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
     <ClInclude Include="..\win32compat\inc\pwd.h" />
     <ClInclude Include="..\win32compat\inc\sys\param.h" />
+    <ClInclude Include="..\win32compat\inc\utf.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -8,6 +8,7 @@
 #include <WS2tcpip.h>
 #include <stdio.h>
 #include "defs.h"
+#include "utf.h"
 
 
 typedef struct w32_fd_set_ {

@@ -509,6 +509,7 @@ int
 do_exec_no_pty(Session *s, const char *command)
 {
 #ifdef WIN32_FIXME
+        wchar_t* pw_dir_utf16 = utf8_to_utf16(s->pw->pw_dir);
   
   /*
    * Win32 code.
@@ -707,20 +708,22 @@ do_exec_no_pty(Session *s, const char *command)
    * also change subsequent calls to SetEnvironmentVariable
    */
 
-  _chdir(s->pw->pw_dir);
+  _wchdir(pw_dir_utf16);
 
-  SetEnvironmentVariableW(L"HOME", s -> pw -> pw_dir);
+  SetEnvironmentVariableW(L"HOME", pw_dir_utf16);
+  SetEnvironmentVariableW(L"USERPROFILE", pw_dir_utf16);
+
   wchar_t *wstr, wchr;
-  wstr = wcschr(s->pw->pw_dir, ':');
+  wstr = wcschr(pw_dir_utf16, L':');
   if (wstr) {
 	  wchr = *(wstr + 1);
 	  *(wstr + 1) = '\0';
-	  SetEnvironmentVariableW(L"HOMEDRIVE", s->pw->pw_dir);
+	  SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_utf16);
 	  *(wstr + 1) = wchr;
 	  SetEnvironmentVariableW(L"HOMEPATH", (wstr+1));
   }
 
-  SetEnvironmentVariableW(L"USERPROFILE", s -> pw -> pw_dir);
+
   
   // find the server name of the domain controller which created this token
   GetDomainFromToken ( &hToken, buf, sizeof(buf));
@@ -734,7 +737,7 @@ do_exec_no_pty(Session *s, const char *command)
   snprintf(buf, sizeof buf, "%.50s %d %d",
                get_remote_ipaddr(), get_remote_port(), get_local_port());
   
-  SetEnvironmentVariable("SSH_CLIENT", buf);
+  SetEnvironmentVariableA("SSH_CLIENT", buf);
 
   /*
    * Set SSH_CONNECTION variable.
@@ -747,16 +750,16 @@ do_exec_no_pty(Session *s, const char *command)
                
   free(laddr);
   
-  SetEnvironmentVariable("SSH_CONNECTION", buf);
+  SetEnvironmentVariableA("SSH_CONNECTION", buf);
 
   if (original_command)
-          SetEnvironmentVariable("SSH_ORIGINAL_COMMAND", original_command);
+          SetEnvironmentVariableA("SSH_ORIGINAL_COMMAND", original_command);
 
 
   // set better prompt for Windows cmd shell
   if (!s -> is_subsystem) {
 	  snprintf(buf,sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
-	  SetEnvironmentVariable("PROMPT", buf);
+	  SetEnvironmentVariableA("PROMPT", buf);
   }
 
   /*
@@ -789,14 +792,17 @@ do_exec_no_pty(Session *s, const char *command)
   DWORD	dwStartupFlags = DETACHED_PROCESS;// CREATE_SUSPENDED;  // 0
  
   SetConsoleCtrlHandler(NULL, FALSE);
-  if (debug_flag)
-	  b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
-		  /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, s->pw->pw_dir,
-		  &si, &pi);
-  else 
-	b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
-                              /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, s -> pw -> pw_dir,
-                                  &si, &pi);
+  
+        wchar_t* p_dir = utf8_to_utf16(s->pw->pw_dir);
+        if (debug_flag)
+                b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
+                        /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, pw_dir_utf16,
+                        &si, &pi);
+        else
+                b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
+                        /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, pw_dir_utf16,
+                        &si, &pi);
+  
   if (!b)
   {
     debug("ERROR. Cannot create process (%u).\n", GetLastError());

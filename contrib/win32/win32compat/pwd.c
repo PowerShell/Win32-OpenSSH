@@ -36,17 +36,17 @@
 #define SECURITY_WIN32
 #include <security.h>
 #include "inc\pwd.h"
+#include "inc\utf.h"
 
 static struct passwd pw;
 static char* pw_shellpath = "ssh-shellhost.exe";
-char* utf16_to_utf8(const wchar_t*);
-wchar_t* utf8_to_utf16(const char *);
 
 int
 initialize_pw() {
         if (pw.pw_shell != pw_shellpath) {
                 memset(&pw, 0, sizeof(pw));
                 pw.pw_shell = pw_shellpath;
+                pw.pw_passwd = "\0";
         }
         return 0;
 }

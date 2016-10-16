@@ -46,6 +46,8 @@
 #include "digest.h"
 #include "agent.h"
 
+#include <utf.h>
+
 static int use_privsep = -1;
 Buffer cfg;
 ServerOptions options;
@@ -84,8 +86,6 @@ int GetCurrentModulePath(wchar_t *path, int pathSize)
 	}
 	return -1;
 }
-
-char* utf16_to_utf8(const wchar_t*);
 
 int load_config() {
 	wchar_t basePath[MAX_PATH] = { 0 };

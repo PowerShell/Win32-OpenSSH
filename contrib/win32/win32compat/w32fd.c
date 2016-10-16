@@ -399,7 +399,6 @@ w32_lseek(int fd, long offset, int origin) {
 	return fileio_lseek(fd_table.w32_ios[fd], offset, origin);
 }
 
-wchar_t* utf8_to_utf16(const char *);
 int 
 w32_mkdir(const char *path_utf8, unsigned short mode) {
         wchar_t *path_utf16 = utf8_to_utf16(path_utf8);
