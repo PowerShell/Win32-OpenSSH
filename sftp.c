@@ -2334,12 +2334,6 @@ main(int argc, char **argv)
 
 #ifdef WIN32_FIXME
 
-    /*
-     * Initialize I/O wrappers.
-     */
-
-	w32posix_initialize();
-     
 	setvbuf(stdout, NULL, _IONBF, 0);
 
   #endif

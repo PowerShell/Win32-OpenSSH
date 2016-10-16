@@ -1769,8 +1769,7 @@ main(int ac, char **av)
     AllocConsole();
 
     SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
-  
-    w32posix_initialize();
+ 
   
   #endif /* WIN32_FIXME */
 

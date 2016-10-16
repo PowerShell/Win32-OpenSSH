@@ -486,16 +486,6 @@ main(int argc, char **argv)
 	int xflag = 0, lflag = 0, Dflag = 0;
 	
 
-  #ifdef WIN32_FIXME
-    
-    /*
-     * Allocate stdio inside our wrapper function.
-     */
-     
-	w32posix_initialize();
-
-  #endif
-
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 

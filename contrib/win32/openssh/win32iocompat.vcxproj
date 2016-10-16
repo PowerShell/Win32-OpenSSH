@@ -151,6 +151,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_sigchld.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32log.c" />
     <ClCompile Include="..\win32compat\pwd.c" />
+    <ClCompile Include="..\win32compat\wmain.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />

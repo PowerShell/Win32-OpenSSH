@@ -67,14 +67,14 @@ int	 kexgex_server(struct ssh * sh) {
 }
 
 static
-int GetCurrentModulePath(char *path, int pathSize)
+int GetCurrentModulePath(wchar_t *path, int pathSize)
 {
-	if (GetModuleFileName(NULL, path, pathSize)) {
+	if (GetModuleFileNameW(NULL, path, pathSize)) {
 		int i;
 		int lastSlashPos = 0;
 
 		for (i = 0; path[i]; i++) {
-			if (path[i] == '/' || path[i] == '\\') {
+			if (path[i] == L'/' || path[i] == L'\\') {
 				lastSlashPos = i;
 			}
 		}
@@ -85,18 +85,23 @@ int GetCurrentModulePath(char *path, int pathSize)
 	return -1;
 }
 
-int load_config() {
-	char basePath[MAX_PATH] = { 0 };
-	char path[MAX_PATH] = { 0 };
+char* utf16_to_utf8(const wchar_t*);
 
+int load_config() {
+	wchar_t basePath[MAX_PATH] = { 0 };
+	wchar_t path[MAX_PATH] = { 0 };
+        
 	/* TODO - account for UNICODE paths*/
-	if (GetCurrentModulePath(basePath, MAX_PATH) == 0)
-	{
-		strncpy(path, basePath, MAX_PATH);
-		strncat(path, "/sshd_config", MAX_PATH);
-		config_file_name = path;
-	}
-	buffer_init(&cfg);
+        if (GetCurrentModulePath(basePath, MAX_PATH) == -1)
+                return -1;
+
+	wcsncpy(path, basePath, MAX_PATH);
+        wcsncat(path, L"/sshd_config", MAX_PATH);
+	
+        if ((config_file_name = utf16_to_utf8(path)) == NULL)
+                return -1;
+	
+        buffer_init(&cfg);
 	initialize_server_options(&options);
 	load_server_config(config_file_name, &cfg);
 	parse_server_config(&options, config_file_name, &cfg, NULL);

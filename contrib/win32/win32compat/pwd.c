@@ -30,6 +30,7 @@
  */
 
 #include <Windows.h>
+#include <stdio.h>
 #include <LM.h>
 #include <sddl.h>
 #define SECURITY_WIN32
@@ -38,6 +39,8 @@
 
 static struct passwd pw;
 static char* pw_shellpath = "ssh-shellhost.exe";
+char* utf16_to_utf8(const wchar_t*);
+wchar_t* utf8_to_utf16(const char *);
 
 int
 initialize_pw() {
@@ -56,35 +59,13 @@ reset_pw() {
                 free(pw.pw_dir);
 }
 
-wchar_t*
-utf8_to_utf16(const char *utf8) {
-        int needed = 0;
-        wchar_t* utf16 = NULL;
-        if ((needed = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0)) == 0 ||
-                (utf16 = malloc(needed*sizeof(wchar_t))) == NULL ||
-                MultiByteToWideChar(CP_UTF8, 0, utf8, -1, utf16, needed) == 0)
-                return NULL;
-        return utf16;
-}
-
-char*
-utf16_to_utf8(const wchar_t* utf16) {
-        int needed = 0;
-        char* utf8 = NULL;
-        if ((needed = WideCharToMultiByte(CP_UTF8, 0, utf16, -1, NULL, 0, NULL, NULL)) == 0 ||
-                (utf8 = malloc(needed)) == NULL ||
-                WideCharToMultiByte(CP_UTF8, 0, utf16, -1, utf8, needed, NULL, NULL) == 0)
-                return NULL;
-        return utf8;
-}
-
-struct passwd*
-w32_getpwnam(const char *user_utf8) {
+static struct passwd*
+get_passwd(const char *user_utf8, LPWSTR user_sid) {
         struct passwd *ret = NULL;
         wchar_t *user_utf16 = NULL, *uname_utf16, *udom_utf16, *tmp;
         char *uname_utf8 = NULL, *pw_home_utf8 = NULL;
-        LPBYTE *user_info = NULL;
-        LPWSTR user_sid = NULL;
+        LPBYTE user_info = NULL;
+        LPWSTR user_sid_local = NULL;
         wchar_t reg_path[MAX_PATH], profile_home[MAX_PATH];
         HKEY reg_key = 0;
         int tmp_len = MAX_PATH;
@@ -116,10 +97,13 @@ w32_getpwnam(const char *user_utf8) {
                 udom_utf16 = NULL;
         }
 
-        if (NetUserGetInfo(udom_utf16, uname_utf16, 23, user_info) != NERR_Success ||
-                ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid) == FALSE) {
-                errno = ENOMEM; //??
-                goto done;
+        if (user_sid == NULL) {
+                if (NetUserGetInfo(udom_utf16, uname_utf16, 23, &user_info) != NERR_Success ||
+                        ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid_local) == FALSE) {
+                        errno = ENOMEM; //??
+                        goto done;
+                }
+                user_sid = user_sid_local;
         }
 
         if (swprintf(reg_path, MAX_PATH, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", user_sid) == MAX_PATH ||
@@ -147,14 +131,58 @@ done:
                 free(pw_home_utf8);
         if (user_info)
                 NetApiBufferFree(user_info);
-        if (user_sid)
-                LocalFree(user_sid);
+        if (user_sid_local)
+                LocalFree(user_sid_local);
         if (reg_key)
                 RegCloseKey(reg_key);
         return ret;
 }
 
+struct passwd*
+w32_getpwnam(const char *user_utf8) {
+        return get_passwd(user_utf8, NULL);
+}
 
+struct passwd*
+w32_getpwuid(uid_t uid) {
+        wchar_t* wuser = NULL;
+        char* user_utf8 = NULL;
+        ULONG needed = 0;
+        struct passwd *ret = NULL;
+        HANDLE token = 0;
+        DWORD info_len = 0;
+        TOKEN_USER* info = NULL;
+        LPWSTR user_sid = NULL;
+
+        errno = 0;
+       
+        if (GetUserNameExW(NameSamCompatible, NULL, &needed) != 0 ||
+                (wuser = malloc(needed * sizeof(wchar_t))) == NULL ||
+                GetUserNameExW(NameSamCompatible, wuser, &needed) == 0 ||
+                (user_utf8 = utf16_to_utf8(wuser)) == NULL  ||
+                OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token) == FALSE ||
+                GetTokenInformation(token, TokenUser, NULL, 0, &info_len) == TRUE ||
+                (info = (TOKEN_USER*)malloc(info_len)) == NULL ||
+                GetTokenInformation(token, TokenUser, info, info_len, &info_len) == FALSE ||
+                ConvertSidToStringSidW(info->User.Sid, &user_sid) == FALSE){
+                errno = ENOMEM;
+                goto done;
+        }
+        ret = get_passwd(user_utf8, user_sid);
+
+done:
+        if (wuser)
+                free(wuser);
+        if (user_utf8)
+                free(user_utf8);
+        if (token)
+                CloseHandle(token);
+        if (info)
+                free(info);
+        if (user_sid)
+                LocalFree(user_sid);
+        return ret;
+}
 
 /* given a access token, find the domain name of user account of the access token */
 int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
@@ -195,33 +223,7 @@ int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
  * Temporary getpwuid implementaion of Windows. This should be replaced with getpw_currentuser
  */
 
-struct passwd*
-w32_getpwuid(uid_t uid) {
-        wchar_t* wuser = NULL;
-        char* user_utf8 = NULL;
-        ULONG needed = 0;
-        struct passwd *ret = NULL;
 
-        errno = 0;
-
-        if (GetUserNameExW(NameSamCompatible, NULL, &needed) != 0 ||
-                (wuser = malloc(needed*sizeof(wchar_t))) == NULL ||
-                GetUserNameExW(NameSamCompatible, wuser, &needed) == 0 ||
-                (user_utf8 = utf16_to_utf8(wuser) )== NULL ) {
-                errno = ENOMEM;
-                goto done;
-        }
-
-        ret = w32_getpwnam(user_utf8);
-
-done:
-        if (wuser)
-                free(wuser);
-        if (user_utf8)
-                free(user_utf8);
-
-        return ret;
-}
 
 
 

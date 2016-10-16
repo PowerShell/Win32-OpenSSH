@@ -232,7 +232,7 @@ ls_file(const char *name, const struct stat *st, int remote, int si_units)
 	strmode_from_attrib(remote, mode);
 #endif
 	if (!remote) {
-#ifndef WIN#2_FIXME
+#ifndef WIN32_FIXME
 		user = user_from_uid(st->st_uid, 0);
 #else
                 user = "\0";

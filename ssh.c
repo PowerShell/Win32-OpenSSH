@@ -528,16 +528,6 @@ main(int ac, char **av)
 	u_char conn_hash[SSH_DIGEST_MAX_LENGTH];
 	char *conn_hash_hex;
 	
-  #ifdef WIN32_FIXME
-  
-    /*
-     * Initialize wrapped stdio.
-     */
-
-    w32posix_initialize();
-   
-  #endif
-
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
@@ -1338,14 +1328,8 @@ main(int ac, char **av)
 	 * directory if it doesn't already exist.
 	 */
 	if (config == NULL) {
-#ifdef WIN32_FIXME
-  r = snprintf(buf, sizeof(buf), "%ls%s%s", pw -> pw_dir,
-                   wcscmp(pw -> pw_dir, L"/") ? "/" : "", 
-                       _PATH_SSH_USER_DIR);
-#else
 	r = snprintf(buf, sizeof buf, "%s%s%s", pw->pw_dir,
 		    strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
-#endif
 
 		if (r > 0 && (size_t)r < sizeof(buf) && stat(buf, &st) < 0) {
 #ifdef WITH_SELINUX
