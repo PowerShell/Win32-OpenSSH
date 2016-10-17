@@ -1000,3 +1000,75 @@ w32_gethostname(char *name_utf8, size_t len) {
         free(tmp_name_utf8);
         return 0;
 }
+
+void
+w32_freeaddrinfo(struct addrinfo *ai) {
+        struct addrinfo *cur;
+        while (ai) {
+                cur = ai;
+                ai = ai->ai_next;
+                if (cur->ai_addr)
+                        free(cur->ai_addr);
+                if (cur->ai_canonname)
+                        free(cur->ai_canonname);
+                free(cur);
+        }
+}
+
+int 
+w32_getaddrinfo(const char *node_utf8, const char *service_utf8,
+    const struct addrinfo *hints, struct addrinfo **res) {
+        int ret = 0;
+        wchar_t *node_utf16 = NULL, *service_utf16 = NULL;
+        struct addrinfoW *info_w = NULL;
+        *res = NULL;
+
+        if ((node_utf8 && (node_utf16 = utf8_to_utf16(node_utf8)) == NULL) ||
+            (service_utf8 && (service_utf16 = utf8_to_utf16(service_utf8)) == NULL)) {
+                ret = EAI_MEMORY;
+                goto done;
+        }
+
+        if ((ret = GetAddrInfoW(node_utf16, service_utf16, (ADDRINFOW*)hints, &info_w)) != 0)
+                goto done;
+
+        /* copy info_w to res */
+        {
+                struct addrinfoW **cur_w = &info_w;
+                struct addrinfo **cur = res;
+
+                while (*cur_w) {
+                        if ((*cur = malloc(sizeof(struct addrinfo))) == NULL) {
+                                ret = EAI_MEMORY;
+                                goto done;
+                        }
+                        memcpy(*cur, *cur_w, sizeof(struct addrinfo));
+                        (*cur)->ai_next = NULL;
+                        if (((*cur_w)->ai_canonname && ((*cur)->ai_canonname = utf16_to_utf8((*cur_w)->ai_canonname)) == NULL) ||
+                            ((*cur_w)->ai_addrlen && ((*cur)->ai_addr = malloc((*cur_w)->ai_addrlen)) == NULL) ) {
+                                ret = EAI_MEMORY;
+                                goto done;
+
+                        }
+                        if ((*cur_w)->ai_addrlen)
+                                memcpy((*cur)->ai_addr, (*cur_w)->ai_addr, (*cur_w)->ai_addrlen);
+                        cur_w = &(*cur_w)->ai_next;
+                        cur = &(*cur)->ai_next;
+                }
+        }
+
+done:
+        if (node_utf16)
+                free(node_utf16);
+        if (service_utf16)
+                free(service_utf16);
+        if (info_w)
+                FreeAddrInfoW(info_w);
+        if (ret != 0 && *res) {
+                w32_freeaddrinfo(*res);
+                *res = NULL;
+        }
+        return ret;
+}
+
+

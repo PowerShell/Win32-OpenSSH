@@ -20,3 +20,5 @@
 #define send(a,b,c,d)		w32_send((a), (b), (c), (d))
 #define shutdown(a,b)		w32_shutdown((a), (b))
 #define socketpair(a,b,c,d)	w32_socketpair((a), (b), (c), (d))
+#define freeaddrinfo            w32_freeaddrinfo
+#define getaddrinfo             w32_getaddrinfo
