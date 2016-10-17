@@ -1691,43 +1691,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	}
 }
 
-#ifdef WIN32_FIXME
-
-  /*
-   * Win32 only.
-   */
-   
-
-  /*
-   * This function handles exit signal from parent process.
-   */
-
-  BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
-  {
-		switch( dwCtrlType )
-		{
-		case CTRL_C_EVENT:
-			return TRUE; // control C will be passed to shell but sshd wil not exit
-
-	    case CTRL_BREAK_EVENT:
-		case CTRL_LOGOFF_EVENT:
-			break;
-
-		default:
-			break;
-		}
-
-	debug("Exit signal received...");
-
-    cleanup_exit(0);
-    
-    return TRUE;
-  }
-
-#endif /* WIN32_FIXME */
-
-
-
 /*
  * Main program for the daemon.
  */
@@ -1768,9 +1731,6 @@ main(int ac, char **av)
   
     AllocConsole();
 
-    SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
- 
-  
   #endif /* WIN32_FIXME */
 
 
