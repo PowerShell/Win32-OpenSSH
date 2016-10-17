@@ -34,6 +34,7 @@
 #include <errno.h>
 #include "w32fd.h"
 #include <stddef.h>
+#include "inc\utf.h"
 
 #define INTERNAL_SEND_BUFFER_SIZE 70*1024 //70KB
 
@@ -978,4 +979,24 @@ socketio_on_select(struct w32_io* pio, BOOL rd) {
 			}
 	}
 
+}
+
+int
+w32_gethostname(char *name_utf8, size_t len) {
+        wchar_t name_utf16[256];
+        char* tmp_name_utf8 = NULL;
+        if (GetHostNameW(name_utf16, 256) == SOCKET_ERROR) {
+                errno =  errno_from_WSALastError();
+                return -1;
+        }
+
+        if ((tmp_name_utf8 = utf16_to_utf8(name_utf16)) == NULL ||
+             strlen(tmp_name_utf8) >= len) {
+                errno = EFAULT; //??
+                return -1;
+        }
+
+        memcpy(name_utf8, tmp_name_utf8, strlen(tmp_name_utf8) + 1);
+        free(tmp_name_utf8);
+        return 0;
 }
