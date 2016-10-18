@@ -53,6 +53,7 @@ initialize_pw() {
 
 void
 reset_pw() {
+        initialize_pw();
         if (pw.pw_name)
                 free(pw.pw_name);
         if (pw.pw_dir)
@@ -72,8 +73,7 @@ get_passwd(const char *user_utf8, LPWSTR user_sid) {
 
         errno = 0;
 
-        if (initialize_pw() != 0)
-                goto done;
+        reset_pw();
 
         if ((user_utf16 = utf8_to_utf16(user_utf8) ) == NULL) {
                 errno = ENOMEM;
@@ -111,7 +111,7 @@ get_passwd(const char *user_utf8, LPWSTR user_sid) {
                 RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, (LPBYTE)profile_home, &tmp_len) != 0)
                 GetWindowsDirectoryW(profile_home, MAX_PATH);
 
-        if ((uname_utf8 = utf16_to_utf8(uname_utf16)) == NULL ||
+        if ((uname_utf8 = _strdup(user_utf8)) == NULL ||
                 (pw_home_utf8 = utf16_to_utf8(profile_home)) == NULL) {
                 errno = ENOMEM;
                 goto done;
