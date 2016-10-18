@@ -70,6 +70,7 @@ sighandler_t w32_signal(int signum, sighandler_t handler);
 int w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 int w32_raise(int sig);
 int w32_kill(int pid, int sig);
+FILE* w32_fopen_utf8(const char *, const char *);
 
 
 /* Shutdown constants */

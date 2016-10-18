@@ -113,6 +113,7 @@
       <AdditionalDependencies>win32iocompat.lib;bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;Netapi32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Win32-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <EntryPointSymbol>wmainCRTStartup</EntryPointSymbol>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
@@ -136,6 +137,7 @@
       <AdditionalDependencies>win32iocompat.lib;bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;Netapi32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-x64-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <EntryPointSymbol>wmainCRTStartup</EntryPointSymbol>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
@@ -162,6 +164,7 @@
       <AdditionalDependencies>win32iocompat.lib;bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;Netapi32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Win32-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <EntryPointSymbol>wmainCRTStartup</EntryPointSymbol>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
@@ -189,6 +192,7 @@
       <AdditionalDependencies>win32iocompat.lib;bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;Netapi32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-x64-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <EntryPointSymbol>wmainCRTStartup</EntryPointSymbol>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
@@ -248,6 +252,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sshd.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshlogin.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshpty.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />

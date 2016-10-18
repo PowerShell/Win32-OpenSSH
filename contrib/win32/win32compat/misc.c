@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <stdio.h>
 #include "inc\defs.h"
 #include "inc\sys\statvfs.h"
 
@@ -69,4 +70,51 @@ int dlclose(HMODULE handle) {
 
 FARPROC dlsym(HMODULE handle, const char *symbol) {
 	return GetProcAddress(handle, symbol);
+}
+
+
+/*fopen on Windows to mimic https://linux.die.net/man/3/fopen
+* only r, w, a are supported for now
+*/
+FILE*
+w32_fopen_utf8(const char *path, const char *mode) {
+	wchar_t wpath[MAX_PATH], wmode[5];
+	FILE* f;
+	char utf8_bom[] = { 0xEF,0xBB,0xBF };
+	char first3_bytes[3];
+
+	if (mode[1] != '\0') {
+		errno = ENOTSUP;
+		return NULL;
+	}
+
+	if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, MAX_PATH) == 0 ||
+		MultiByteToWideChar(CP_UTF8, 0, mode, -1, wmode, 5) == 0) {
+		errno = EFAULT;
+		debug("WideCharToMultiByte failed for %c - ERROR:%d", path, GetLastError());
+		return NULL;
+	}
+
+	f = _wfopen(wpath, wmode);
+
+	if (f) {
+		/* BOM adjustments for file streams*/
+		if (mode[0] == 'w' && fseek(f, 0, SEEK_SET) != EBADF) {
+			/* write UTF-8 BOM - should we ?*/
+			/*if (fwrite(utf8_bom, sizeof(utf8_bom), 1, f) != 1) {
+				fclose(f);
+				return NULL;
+			}*/
+
+		}
+		else if (mode[0] == 'r' && fseek(f, 0, SEEK_SET) != EBADF) {
+			/* read out UTF-8 BOM if present*/
+			if (fread(first3_bytes, 3, 1, f) != 1 ||
+				memcmp(first3_bytes, utf8_bom, 3) != 0) {
+				fseek(f, 0, SEEK_SET);
+			}
+		}
+	}
+
+	return f;
 }
