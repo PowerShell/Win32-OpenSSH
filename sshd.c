@@ -1895,9 +1895,10 @@ main(int ac, char **av)
       {
         do
         {
-          SERVICE_TABLE_ENTRY DispatchTable[] = 
+                int  wmain(int , wchar_t **);
+                SERVICE_TABLE_ENTRYW DispatchTable[] =
           { 
-            {SVCNAME, (LPSERVICE_MAIN_FUNCTION) main},
+            {L"SSHD", (LPSERVICE_MAIN_FUNCTIONW) wmain},
             {NULL, NULL} 
           };
  
@@ -1920,7 +1921,7 @@ main(int ac, char **av)
            * for any other reason, bail out.
            */
            
-          if (!StartServiceCtrlDispatcher(DispatchTable))
+          if (!StartServiceCtrlDispatcherW(DispatchTable))
           { 
             if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
             {
