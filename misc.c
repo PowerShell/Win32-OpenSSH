@@ -436,9 +436,34 @@ char *
 colon(char *cp)
 {
 	int flag = 0;
+    int len = 0;
 
 	if (*cp == ':')		/* Leading colon is part of file name. */
 		return NULL;
+
+#ifdef WINDOWS
+    for (; *cp; ++cp) {
+        len++;
+
+        if (*cp == '[')
+            flag = 1;
+
+        if (flag && *cp != ']')
+            continue;
+
+        if (*cp == ']')
+            flag = 0;
+
+        if (*cp == ':') {
+            if (len != 2) { // avoid x: format for drive letter in Windows
+                return (cp);
+            }
+        }
+        //	if ( (*cp == '/') || (*cp == '\\') )
+        //		return (0);
+    }
+    return NULL;
+#else
 	if (*cp == '[')
 		flag = 1;
 
@@ -452,7 +477,8 @@ colon(char *cp)
 		if (*cp == '/')
 			return NULL;
 	}
-	return NULL;
+    return NULL;
+#endif
 }
 
 /* function to assist building execv() arguments */

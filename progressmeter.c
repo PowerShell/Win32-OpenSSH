@@ -81,10 +81,16 @@ static const char unit[] = " KMGT";
 static int
 can_output(void)
 {
-#ifndef WIN32_FIXME//R
-	return (getpgrp() == tcgetpgrp(STDOUT_FILENO));
+#ifndef WINDOWS
+    return (getpgrp() == tcgetpgrp(STDOUT_FILENO));
 #else
-	return 1;
+    DWORD dwProcessId = -1;
+    if (GetWindowThreadProcessId(GetStdHandle(STD_OUTPUT_HANDLE), &dwProcessId)) {
+        return(GetCurrentProcess() == dwProcessId);
+    }
+    else {
+        return -1;
+    }
 #endif
 }
 
@@ -298,7 +304,7 @@ sig_winch(int sig)
 static void
 setscreensize(void)
 {
-	#ifndef WIN32_FIXME//N
+#ifndef WINDOWS
 	struct winsize winsize;
 
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) != -1 &&
@@ -310,6 +316,7 @@ setscreensize(void)
 	} else
 		win_size = DEFAULT_WINSIZE;
 	win_size += 1;					/* trailing \0 */
+#else
+    win_size = ConScreenSizeX() + 1;
 #endif
-	win_size = DEFAULT_WINSIZE + 1;
 }

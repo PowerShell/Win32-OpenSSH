@@ -50,6 +50,33 @@
 #define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
 #endif
 
+HINSTANCE   hUserLibrary;       
+HINSTANCE   hKernelLibrary;
+
+// kernel32.dll
+typedef BOOL(WINAPI * fSetCurrentConsoleFontEx)(
+    _In_ HANDLE hConsoleOutput, 
+    _In_ BOOL bMaximumWindow, 
+    _In_ PCONSOLE_FONT_INFOEX lpConsoleCurrentFontEx);
+fSetCurrentConsoleFontEx fnSetCurrentConsoleFontEx = NULL;
+
+// user32.dll
+typedef HWINEVENTHOOK (WINAPI * fSetWinEventHook)(
+    _In_ UINT         eventMin,
+    _In_ UINT         eventMax,
+    _In_ HMODULE      hmodWinEventProc,
+    _In_ WINEVENTPROC lpfnWinEventProc,
+    _In_ DWORD        idProcess,
+    _In_ DWORD        idThread,
+    _In_ UINT         dwflags
+);
+fSetWinEventHook fnSetWinEventHook = NULL;
+
+typedef BOOL (WINAPI * fUnhookWinEvent)(
+    _In_ HWINEVENTHOOK hWinEventHook
+);
+fUnhookWinEvent fnUnhookWinEvent = NULL;
+
 typedef struct consoleEvent {
     DWORD event;
     HWND  hwnd;
@@ -66,6 +93,7 @@ BOOL bRet = FALSE;
 BOOL bNoScrollRegion = FALSE;
 BOOL bStartup = TRUE;
 BOOL bAnsi = FALSE;
+BOOL bHookEvents = FALSE;
 
 HANDLE child_out = INVALID_HANDLE_VALUE;
 HANDLE child_in = INVALID_HANDLE_VALUE;
@@ -389,7 +417,8 @@ void SizeWindow(HANDLE hInput) {
     matchingFont.FontWeight = FW_NORMAL;
     wcscpy(matchingFont.FaceName, L"Consolas");
 
-    bSuccess = SetCurrentConsoleFontEx(child_out, FALSE, &matchingFont);
+    if(fnSetCurrentConsoleFontEx != NULL)
+        bSuccess = fnSetCurrentConsoleFontEx(child_out, FALSE, &matchingFont);
 
     // This information is the live screen 
     ZeroMemory(&consoleInfo, sizeof(consoleInfo));
@@ -1058,6 +1087,22 @@ int wmain(int ac, wchar_t **av) {
     DWORD dwStatus;
     HANDLE hEventHook = NULL;
 
+    HINSTANCE   hUserLibrary;
+    HINSTANCE   hKernelLibrary;
+
+    hKernelLibrary = LoadLibrary(L"kernel32.dll");
+    if (hKernelLibrary != NULL)
+    {
+        fnSetCurrentConsoleFontEx = (fSetCurrentConsoleFontEx)GetProcAddress(hKernelLibrary, "SetCurrentConsoleFontEx");
+    }
+
+    hUserLibrary = LoadLibrary(L"user32.dll");
+    if (hUserLibrary != NULL)
+    {
+        fnSetWinEventHook = (fSetWinEventHook)GetProcAddress(hUserLibrary, "SetWinEventHook");
+        fnUnhookWinEvent = (fUnhookWinEvent)GetProcAddress(hUserLibrary, "UnhookWinEvent");
+    }
+
     pipe_in  = GetStdHandle(STD_INPUT_HANDLE);
     pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
     pipe_err = GetStdHandle(STD_ERROR_HANDLE);
@@ -1094,8 +1139,9 @@ int wmain(int ac, wchar_t **av) {
 
     InitializeCriticalSection(&criticalSection);
 
-    hEventHook = SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
-        ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
+    if(fnSetWinEventHook != NULL)
+        hEventHook = SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
+            ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 
     memset(&si, 0, sizeof(STARTUPINFO));
     memset(&pi, 0, sizeof(PROCESS_INFORMATION));
@@ -1103,6 +1149,12 @@ int wmain(int ac, wchar_t **av) {
     // Copy our parent buffer sizes
     si.cb = sizeof(STARTUPINFO);
     si.dwFlags = 0;
+    if (fnSetWinEventHook == NULL) {
+        si.hStdInput = INVALID_HANDLE_VALUE;
+        si.hStdOutput = pipe_out;
+        si.hStdError = pipe_err;
+        si.dwFlags = STARTF_USESTDHANDLES;
+    }
 
     /* disable inheritance on pipe_in*/
     GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
@@ -1163,8 +1215,13 @@ cleanup:
         WaitForSingleObject(monitor_thread, INFINITE);
     if (ux_thread != INVALID_HANDLE_VALUE)
         TerminateThread(ux_thread, S_OK);
-    if (hEventHook)
-        UnhookWinEvent(hEventHook);
+    if (hEventHook && fnUnhookWinEvent != NULL)
+        fnUnhookWinEvent(hEventHook);
+
+    if (hKernelLibrary != NULL)
+        FreeLibrary(hKernelLibrary);
+    if (hUserLibrary != NULL)
+        FreeLibrary(hUserLibrary);
 
     FreeConsole();
 

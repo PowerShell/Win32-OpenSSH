@@ -93,7 +93,7 @@
 
 #include <ctype.h>
 
-#ifndef WIN32_FIXME
+#ifndef WINDOWS
 #include <dirent.h>
 #endif
 
@@ -159,13 +159,10 @@ char *ssh_program = _PATH_SSH_PROGRAM;
 pid_t do_cmd_pid = -1;
 
 
-#ifdef WIN32_FIXME
+#ifdef WINDOWS
 typedef BOOL bool;
 #define false FALSE
 #define true TRUE
-
-char *win32colon(char *);
-#define colon win32colon
 
 #ifndef _SH_DENYNO
 #define _SH_DENYNO 0x40
@@ -293,21 +290,27 @@ int start_process_io(char *exename, char **argv, char **envv,
 	unsigned long CreateFlags, PROCESS_INFORMATION  *pi,
 	char *homedir, char *lpDesktop);
 
+#ifdef WINDOWS
+
 // InitForMicrosoftWindows() will initialize Unix like settings in Windows operating system.
 struct passwd pw;
 char   username[128];
 int InitForMicrosoftWindows()
 {
-   int rc;
-   struct passwd *pwd;
+    int rc;
+    struct passwd *pwd;
 
-  /* Get user\'s passwd structure.  We need this for the home directory. */
-  pwd = &pw ;
-  rc = sizeof(username);
-  GetUserName(username,(LPDWORD)&rc);
-  pwd->pw_name = username;
+    /* Get user\'s passwd structure.  We need this for the home directory. */
+    pwd = &pw ;
+    rc = sizeof(username);
+    if (GetUserName(username, (LPDWORD)&rc)) {
+        pwd->pw_name = username;
+    }
+    else {
+        return GetLastError();
+    }
 
-  return 0;
+    return 0;
 }
 
 // start of direntry functions in Windows NT like UNIX
@@ -324,8 +327,8 @@ struct scp_dirent {
 };
 
 typedef struct {
-	long hFile;
-   struct _finddata_t c_file;
+    long hFile;
+    struct _finddata_t c_file;
 } SCPDIR;
 
 
@@ -343,21 +346,7 @@ char * fixslashes(char * str)
 	return str;
 }
 
-char * unfixslashes(char * str)
-{
-	int i;
-	if (str == NULL)
-		return str;
-
-	int len = (int)strlen(str);
-
-	for (i = 0; i < len; i++)
-		if (str[i] == '//')
-			str[i] = '/';
-	return str;
-}
-
-// force path separator to 
+// force path separator to sep
 char * forcepathsep(char * str, char sep)
 {
 	int i;
@@ -373,7 +362,6 @@ char * forcepathsep(char * str, char sep)
 
 	if (sep == '/')
 		antisep = '\\';
-
 
 	int len = (int)strlen(str);
 
@@ -406,12 +394,9 @@ bool getRootFrompath(char * path, char * root)
 	return (lastslash != NULL);
 }
 
-
-
 /*
  * get option letter from argument vector
  */
-
 
 char * getfilenamefrompath(char * path)
 {
@@ -447,7 +432,7 @@ char * getfilenamefrompath(char * path)
 	}
 	return NULL;
 }
-
+#endif
 
 #define	EMSG	""
 #define	BADCH	(int)'~'
@@ -669,7 +654,7 @@ do_local_cmd(arglist *a)
 			fprintf(stderr, " %s", a->list[i]);
 		fprintf(stderr, "\n");
 	}
-	#ifdef WIN32_FIXME
+#ifdef WINDOWS
 	// flatten the cmd into a long space separated string and execute using system(cmd) api
 	char cmdstr[2048] ;
 	cmdstr[0] = '\0' ;
@@ -680,7 +665,7 @@ do_local_cmd(arglist *a)
 	if (system(cmdstr))
 		return (-1); // failure executing
 	return (0); // success
-	#else
+#else
 	if ((pid = fork()) == -1)
 		fatal("do_local_cmd: fork: %s", strerror(errno));
 
@@ -705,7 +690,7 @@ do_local_cmd(arglist *a)
 		return (-1);
 
 	return (0);
-	#endif
+#endif
 }
 
 static int pipe_counter = 1;
@@ -770,179 +755,168 @@ error:
 int
 do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 {
-  #ifdef WIN32_FIXME
-  size_t i, j;
+#ifdef WINDOWS
+    size_t i, j;
 
-	HANDLE hSaveStdout, hSaveStdin ; 
-	HANDLE hstdout[2], hstdin[2] ;
-	PROCESS_INFORMATION  pi;
-	SECURITY_ATTRIBUTES sa ; /* simple */
-	int rc; 
-	HANDLE rfdfromssh, wfdtossh ;
-   char *args[256];
+    HANDLE hSaveStdout, hSaveStdin ; 
+    HANDLE hstdout[2], hstdin[2] ;
+    PROCESS_INFORMATION  pi;
+    SECURITY_ATTRIBUTES sa ; /* simple */
+    int rc; 
+    HANDLE rfdfromssh, wfdtossh ;
+    char *args[256];
 
-  if (verbose_mode)
-    fprintf(stderr, "Executing: host %s, user %s, command %s\n",
-	    host, remuser ? remuser : "(unspecified)", cmd);
+    if (verbose_mode)
+        fprintf(stderr, "Executing: host %s, user %s, command %s\n",
+	        host, remuser ? remuser : "(unspecified)", cmd);
 
   // Child code in Windows OS will be a new created process of ssh.exe.
   // Child to execute the command on the remote host using ssh.
 
-  if (1) { // No fork in Windows OS, so we code it such that we use CreateProcess()
+    i = 0;
+    args[i++] = ssh_program;
+    size_t	len;
+    for(j = 0; j < ssh_options_cnt; j++) {
+        args[i++] = "-o";
 
-      i = 0;
-      args[i++] = ssh_program;
-	  size_t	len;
-      for(j = 0; j < ssh_options_cnt; j++) {
-		  args[i++] = "-o";
+        //args[i++] = ssh_options[j];
+        len = strlen(ssh_options[j])+3;
 
-		  //args[i++] = ssh_options[j];
-		  len = strlen(ssh_options[j])+3;
+        args[i] = (char *) malloc(len); // add quotes
+        strcpy_s(args[i],len, "\"");
+        strcat_s(args[i],len, ssh_options[j]);
+        strcat_s(args[i],len, "\"");
+        i++ ;
 
-		  args[i] = (char *) malloc(len); // add quotes
-		  strcpy_s(args[i],len, "\"");
-		  strcat_s(args[i],len, ssh_options[j]);
-		  strcat_s(args[i],len, "\"");
-		  i++ ;
+        if (i > 250)
+            fatal("Too many -o options (total number of arguments is more than 256)");
+    }
+    args[i++] = "-x";
+    args[i++] = "-a";
+    args[i++] = "\"-oFallBackToRsh no\""; // extra double quote needed for
+										  // Windows platforms
+    //7/2/2001 args[i++] = "\"-oClearAllForwardings yes\"";
+    if (verbose_mode)
+	    args[i++] = "-v";
+    if (compress)
+	    args[i++] = "-C";
+    if (!use_privileged_port)
+	    args[i++] = "-P";
+    if (batchmode)
+	    args[i++] = "\"-oBatchMode yes\"";
+    if (password != NULL) {
+		args[i++] = "-A";
+		args[i++] = password;
+	}
+    if (cipher != NULL) {
+		args[i++] = "-c";
+		args[i++] = cipher;
+	}
+    if (identity != NULL) {
+		args[i++] = "-i";
+		args[i++] = identity;
+	}
+    if (port != NULL) {
+		args[i++] = "-p";
+		args[i++] = port;
+	}
+    if (remuser != NULL) {
+		args[i++] = "-l";
+		args[i++] = remuser;
+	}
 
-	  	  if (i > 250)
-		    fatal("Too many -o options (total number of arguments is more than 256)");
-		}
-      args[i++] = "-x";
-      args[i++] = "-a";
-      args[i++] = "\"-oFallBackToRsh no\""; // extra double quote needed for
-														  // Windows platforms
-      //7/2/2001 args[i++] = "\"-oClearAllForwardings yes\"";
-      if (verbose_mode)
-			args[i++] = "-v";
-      if (compress)
-			args[i++] = "-C";
-      if (!use_privileged_port)
-			args[i++] = "-P";
-      if (batchmode)
-			args[i++] = "\"-oBatchMode yes\"";
-	  if (password != NULL)
-			{
-			  args[i++] = "-A";
-			  args[i++] = password;
-			}
-      if (cipher != NULL)
-			{
-			  args[i++] = "-c";
-			  args[i++] = cipher;
-			}
-      if (identity != NULL)
-			{
-			  args[i++] = "-i";
-			  args[i++] = identity;
-			}
-      if (port != NULL)
-			{
-			  args[i++] = "-p";
-			  args[i++] = port;
-			}
-      if (remuser != NULL)
-			{
-			  args[i++] = "-l";
-			  args[i++] = remuser;
-			}
+    if (ipv_restrict == ONLY_IPV4)
+	    args[i++] = "-4";
+    if (ipv_restrict == ONLY_IPV6)
+	    args[i++] = "-6";
 
-	  if (ipv_restrict == ONLY_IPV4)
-		  args[i++] = "-4";
-	  if (ipv_restrict == ONLY_IPV6)
-		  args[i++] = "-6";
+    args[i++] = host;
+    args[i++] = cmd;
+    args[i++] = NULL;
 
-      args[i++] = host;
-      args[i++] = cmd;
-      args[i++] = NULL;
+    // Create a pair of pipes for communicating with ssh
+    // which we will spawn
+    // Do the plunmbing so that child ssh process to be spawned has its
+    // standard input from the pout[0] and its standard output going to
+    // pin[1]
 
-		// Create a pair of pipes for communicating with ssh
-		// which we will spawn
-		// Do the plunmbing so that child ssh process to be spawned has its
-		// standard input from the pout[0] and its standard output going to
-		// pin[1]
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = TRUE ; /* pipe handles to be inherited */
+    sa.lpSecurityDescriptor = NULL;
+    /* command processor output redirected to a nameless pipe */
 
-		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-		sa.bInheritHandle = TRUE ; /* pipe handles to be inherited */
-		sa.lpSecurityDescriptor = NULL;
-		/* command processor output redirected to a nameless pipe */
+    rc = CreateOverlappedPipe( &hstdout[0], &hstdout[1], &sa, 0 ) ;
+    /* read from this fd to get data from ssh.exe*/
 
-		rc = CreateOverlappedPipe( &hstdout[0], &hstdout[1], &sa, 0 ) ;
-		/* read from this fd to get data from ssh.exe*/
+    // make scp's pipe read handle not inheritable by ssh
+    rc = DuplicateHandle(GetCurrentProcess(), hstdout[0], 
+		GetCurrentProcess(), (PHANDLE) &rfdfromssh,
+		0, // this parm ignored if DUPLICATE_SAME_ACCESS below
+		FALSE, // not inherited
+		DUPLICATE_SAME_ACCESS); 
+    CloseHandle(hstdout[0]); // this CloseHandle() is a crucial must do
+    hstdout[0] = rfdfromssh ;
 
-		// make scp's pipe read handle not inheritable by ssh
-	   rc = DuplicateHandle(GetCurrentProcess(), hstdout[0], 
-						     GetCurrentProcess(), (PHANDLE) &rfdfromssh,
-							 0, // this parm ignored if DUPLICATE_SAME_ACCESS below
-							 FALSE, // not inherited
-						     DUPLICATE_SAME_ACCESS); 
-		CloseHandle(hstdout[0]); // this CloseHandle() is a crucial must do
-		hstdout[0] = rfdfromssh ;
+    *fdin = _open_osfhandle((intptr_t)hstdout[0],0);
+    _setmode (*fdin, O_BINARY); // set this file handle for binary I/O
 
+    rc = CreateOverlappedPipe( &hstdin[0], &hstdin[1], &sa, 0 ) ;
+    /* write to this fd to get data into ssh.exe*/
 
-		*fdin = _open_osfhandle((intptr_t)hstdout[0],0);
-		_setmode (*fdin, O_BINARY); // set this file handle for binary I/O
+    // make scp's pipe write handle not inheritable by ssh
+    rc = DuplicateHandle(GetCurrentProcess(), hstdin[1], 
+		GetCurrentProcess(), (PHANDLE) &wfdtossh,
+		0, // this parm ignored if DUPLICATE_SAME_ACCESS below
+		FALSE, // not inherited
+		DUPLICATE_SAME_ACCESS); 
+    CloseHandle(hstdin[1]); // this CloseHandle() is a crucial must do
+    hstdin[1] = (HANDLE) wfdtossh ;
 
-		rc = CreateOverlappedPipe( &hstdin[0], &hstdin[1], &sa, 0 ) ;
-		/* write to this fd to get data into ssh.exe*/
+    *fdout = _open_osfhandle((intptr_t)hstdin[1],0);
+    _setmode (*fdout, O_BINARY); // set this file handle for binary I/O
 
-		// make scp's pipe write handle not inheritable by ssh
-	   rc = DuplicateHandle(GetCurrentProcess(), hstdin[1], 
-						     GetCurrentProcess(), (PHANDLE) &wfdtossh,
-							 0, // this parm ignored if DUPLICATE_SAME_ACCESS below
-							 FALSE, // not inherited
-						     DUPLICATE_SAME_ACCESS); 
-		CloseHandle(hstdin[1]); // this CloseHandle() is a crucial must do
-		hstdin[1] = (HANDLE) wfdtossh ;
+    hSaveStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
+    //hSaveStderr = GetStdHandle(STD_ERROR_HANDLE); 
+    hSaveStdin = GetStdHandle(STD_INPUT_HANDLE); 
 
+    // Set a write handle to the pipe to be STDOUT. 
+    SetStdHandle(STD_OUTPUT_HANDLE, hstdout[1]);
+    // Set a write handle to the pipe to be STDERR. 
+    //SetStdHandle(STD_ERROR_HANDLE, hstdout[1]);
+    // Set a input handle to the pipe to be STDIN. 
+    SetStdHandle(STD_INPUT_HANDLE, hstdin[0]);
 
-		*fdout = _open_osfhandle((intptr_t)hstdin[1],0);
-		_setmode (*fdout, O_BINARY); // set this file handle for binary I/O
+    // start the child process(ssh)
+    rc = start_process_io(
+		NULL, /* executable name with .ext found in argv[0] */
+		&args[0], /* argv */
+		NULL ,
+		hstdin[0], /* std input for cmd.exe */
+		hstdout[1], /* std output for cmd.exe */
+		GetStdHandle(STD_ERROR_HANDLE), //hstdout[1],  /* std error for cmd.exe */
+		0, // dwStartupFlags,
+		&pi,
+		NULL, /* current directory is default directory we set before */
+		NULL
+	);
 
-		hSaveStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
-		//hSaveStderr = GetStdHandle(STD_ERROR_HANDLE); 
-		hSaveStdin = GetStdHandle(STD_INPUT_HANDLE); 
+    if (!rc) {
+	    printf("%s could not be started\n", ssh_program);
+	    exit(1);
+    }
+    else {
+	    hprocess = pi.hProcess ;
+    }
 
-		// Set a write handle to the pipe to be STDOUT. 
-		SetStdHandle(STD_OUTPUT_HANDLE, hstdout[1]);
-		// Set a write handle to the pipe to be STDERR. 
-		//SetStdHandle(STD_ERROR_HANDLE, hstdout[1]);
-		// Set a input handle to the pipe to be STDIN. 
-		SetStdHandle(STD_INPUT_HANDLE, hstdin[0]);
+    // After process creation, restore the saved STDOUT and STDERR. 
+    SetStdHandle(STD_OUTPUT_HANDLE, hSaveStdout);
+    //SetStdHandle(STD_ERROR_HANDLE, hSaveStderr);
+    SetStdHandle(STD_INPUT_HANDLE, hSaveStdin);
 
-
-		// start the child process(ssh)
-		rc = start_process_io(
-			 NULL, /* executable name with .ext found in argv[0] */
-			 &args[0], /* argv */
-			 NULL ,
-			 hstdin[0], /* std input for cmd.exe */
-			 hstdout[1], /* std output for cmd.exe */
-			 GetStdHandle(STD_ERROR_HANDLE), //hstdout[1],  /* std error for cmd.exe */
-			 0, // dwStartupFlags,
-			 &pi,
-			 NULL, /* current directory is default directory we set before */
-			 NULL
-		  );
-
-		if (!rc) {
-			printf("%s could not be started\n", ssh_program);
-			exit(1);
-		}
-		else {
-			hprocess = pi.hProcess ;
-		}
-
-		// After process creation, restore the saved STDOUT and STDERR. 
-		SetStdHandle(STD_OUTPUT_HANDLE, hSaveStdout);
-		//SetStdHandle(STD_ERROR_HANDLE, hSaveStderr);
-		SetStdHandle(STD_INPUT_HANDLE, hSaveStdin);
-
-		/* now close the pipe's side that the ssh.exe will use as write handle */
-		CloseHandle(hstdout[1]) ;
-		/* now close the pipe's side that the ssh.exe will use as read handle */
-		CloseHandle(hstdin[0]) ;
-  }
+    /* now close the pipe's side that the ssh.exe will use as write handle */
+    CloseHandle(hstdout[1]) ;
+    /* now close the pipe's side that the ssh.exe will use as read handle */
+    CloseHandle(hstdin[0]) ;
 
   // update passed variables with where other funstions should read and write
   // from to get I/O from above child process over pipe.
@@ -950,8 +924,8 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
   //*fdout = remout;
   //*fdin =  remin;
 
-  return 0;
-  #else
+    return 0;
+#else
 	int pin[2], pout[2], reserved[2];
 
 	if (verbose_mode)
@@ -1016,7 +990,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 	signal(SIGINT, killchild);
 	signal(SIGHUP, killchild);
 	return 0;
-  #endif
+#endif
 }
 
 /*
@@ -1027,8 +1001,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 int
 do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 {
-	#ifndef WIN32_FIXME
-
+#ifndef WIN32_FIXME
 	pid_t pid;
 	int status;
 
@@ -1062,7 +1035,7 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 	while (waitpid(pid, &status, 0) == -1)
 		if (errno != EINTR)
 			fatal("do_cmd2: waitpid: %s", strerror(errno));
-	#endif
+#endif
 	return 0;
 }
 
@@ -1104,9 +1077,7 @@ main(int argc, char **argv)
 	extern int optind;
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
-	#ifndef WIN32_FIXME
 	sanitise_stdfd();
-	#endif
 
 	/* Copy argv, because we modify it */
 	newargv = xcalloc(MAX(argc + 1, 1), sizeof(*newargv));
@@ -1208,22 +1179,18 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	#ifndef WIN32_FIXME
+#ifndef WINDOWS
 	if ((pwd = getpwuid(userid = getuid())) == NULL)
 		fatal("unknown user %u", (u_int) userid);
-	#else
+#else
 	InitForMicrosoftWindows(); // picks the username, user home dir
-	#endif
+#endif
 
 	if (!isatty(STDOUT_FILENO))
 		showprogress = 0;
 
 	remin = STDIN_FILENO;
 	remout = STDOUT_FILENO;
-	#ifdef WIN32_FIXME
-	_setmode(remin,O_BINARY); // needed for Windows OS to avoid CrLf translations of text mode
-	_setmode(remout,O_BINARY);
-	#endif
 
 	if (fflag) {
 		/* Follow "protocol", send data. */
@@ -1249,7 +1216,7 @@ main(int argc, char **argv)
 	    iamrecursive ? " -r" : "", pflag ? " -p" : "",
 	    targetshouldbedirectory ? " -d" : "");
 
-	#ifndef WIN32_FIXME
+	#ifndef WINDOWS
 	(void) signal(SIGPIPE, lostconn);
 	#endif
 
@@ -1264,7 +1231,7 @@ main(int argc, char **argv)
 	 * Finally check the exit status of the ssh process, if one was forked
 	 * and no error has occurred yet
 	 */
-	#ifndef WIN32_FIXME
+#ifndef WINDOWS
 	if (do_cmd_pid != -1 && errs == 0) {
 		if (remin != -1)
 		    (void) close(remin);
@@ -1277,7 +1244,7 @@ main(int argc, char **argv)
 				errs = 1;
 		}
 	}
-	#endif
+#endif
 	exit(errs != 0);
 }
 
@@ -1443,7 +1410,6 @@ tolocal(int argc, char **argv)
 
 	for (i = 0; i < argc - 1; i++) {
 		if (!(src = colon(argv[i]))) {	/* Local to local. */
-		#ifndef WIN32_FIXME
 			freeargs(&alist);
 			addargs(&alist, "%s", _PATH_CP);
 			if (iamrecursive)
@@ -1455,7 +1421,6 @@ tolocal(int argc, char **argv)
 			addargs(&alist, "%s", argv[argc-1]);
 			if (do_local_cmd(&alist))
 				++errs;
-		#endif
 			continue;
 		}
 		*src++ = 0;
@@ -2823,36 +2788,6 @@ lostconn(int signo)
 		exit(1);
 }
 #else
-char *win32colon(char *cp)
-{
-	int len=0;
-	bool bSkip = false;
-
-	if (*cp == ':')		/* Leading colon is part of file name. */
-		return (0);
-
-	for (; *cp; ++cp) {
-		len++;
-
-		if (*cp == '[')
-			bSkip = true;
-
-		if (bSkip && *cp!= ']')
-			continue;
-
-		if (*cp == ']')
-			bSkip = false;
-
-		if (*cp == ':') {
-			if ( len != 2 ) { // avoid x: format for drive letter in Windows
-				return (cp);
-			}
-		}
-	//	if ( (*cp == '/') || (*cp == '\\') )
-	//		return (0);
-	}
-	return (0);
-}
 
 void verifydir(char *cp)
 {
@@ -2910,8 +2845,6 @@ void lostconn(int signo)
 }
 #endif
 
-#ifdef WIN32_FIXME
-
 #ifdef WITH_SCP_STATS
 void stats_fixlen(int bwritten)
 {
@@ -2927,16 +2860,10 @@ void stats_fixlen(int bwritten)
 	fflush(SOME_STATS_FILE);
 }
 
-
 char *stat_eta_new(int msecs)
 {
 	static char stat_result[32];
 	int hours = 0, mins = 0, secs = 0;
-
-	//   hours = msecs / 3600000;
-	//   msecs %= 3600000;
-	//   mins = msecs / 60000;
-	//   msecs %= 60000;
 
 	hours = msecs / 3600000;
 	msecs %= 3600000;
@@ -2954,7 +2881,7 @@ char *stat_eta_new(int msecs)
 	return(stat_result);
 }
 
-char *stat_eta_old(int secs)
+char *stat_eta(int secs)
 {
 	static char stat_result[20];
 	int hours, mins;
@@ -2964,19 +2891,19 @@ char *stat_eta_old(int secs)
 	mins = secs / 60;
 	secs %= 60;
 
-	sprintf_s(stat_result, sizeof(stat_result), "%02d:%02d:%02d", hours, mins, secs);
+	sprintf(stat_result, "%02d:%02d:%02d", hours, mins, secs);
 	return(stat_result);
 }
 #endif /* WITH_SCP_STATS */
 
-
+#ifdef WIN32_FIXME
 char *TranslatePath(char *path, bool *bDirSpec)
 {
-	char	temp[MAX_PATH*2];
+	char	temp[MAX_PATH * 2];
 	char	resolved[MAX_PATH];
-	char *	rootpath;
+	char*	rootpath;
 
-	if ( iamremote == 0)
+	if (iamremote == 0)
 		return path; // if we are scp client, nothing special to do, return path we got.
 
 	char *s = NULL;
@@ -3007,7 +2934,6 @@ char *TranslatePath(char *path, bool *bDirSpec)
 	fixslashes(temp);
 	PathCanonicalizeA(resolved,temp);
 
-
 	*bDirSpec = (resolved[strlen(temp)-1] == '\\');
 	// Remove trailing slash unless it's a root spec (c:\ etc)
 	if (strcmp(&(resolved[1]),":\\") && resolved[strlen(temp)-1] == '\\')
@@ -3032,7 +2958,6 @@ char *TranslatePath(char *path, bool *bDirSpec)
 	// if the path doesn't begin with a slash
 	if (path[0] != '/' && path[0] != '\\')
 		return path;
-
 
 	s = (char *)LocalAlloc(LPTR,strlen(resolved)+1);
 	strcpy_s(s,strlen(resolved)+1,resolved);

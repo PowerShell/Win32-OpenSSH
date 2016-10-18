@@ -382,6 +382,23 @@ w32_write(int fd, const void *buf, unsigned int max) {
 	return fileio_write(fd_table.w32_ios[fd], buf, max);
 }
 
+int w32_writev(int fd, const struct iovec *iov, int iovcnt) {
+    int written = 0;
+    int i = 0;
+
+    CHECK_FD(fd);
+
+    for (i = 0; i < iovcnt; i++) {
+        int ret = write(fd, iov[i].iov_base, iov[i].iov_len);
+
+        if (ret > 0) {
+            written += ret;
+        }
+    }
+
+    return written;
+}
+
 int
 w32_fstat(int fd, struct w32_stat *buf) {
 	CHECK_FD(fd);

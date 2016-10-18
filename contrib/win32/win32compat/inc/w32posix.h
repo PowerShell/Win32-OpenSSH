@@ -44,6 +44,7 @@ int w32_pipe(int *pfds);
 int w32_open(const char *pathname, int flags, ...);
 int w32_read(int fd, void *dst, size_t max);
 int w32_write(int fd, const void *buf, unsigned int max);
+int w32_writev(int fd, const struct iovec *iov, int iovcnt);
 int w32_fstat(int fd, struct w32_stat *buf);
 int w32_stat(const char *path, struct w32_stat *buf);
 long w32_lseek( int fd, long offset, int origin);
@@ -116,7 +117,6 @@ int sw_add_child(HANDLE child, DWORD pid);
 #define sfd_to_handle(a) w32_fd_to_handle((a))
 #define allocate_sfd(a, b) w32_allocate_fd_for_handle((a, b))
 //#define WSHELPwopen(a, b) w32_open((a, b))
-
 
 /* TODO - These defs need to revisited and positioned appropriately */
 #define environ _environ

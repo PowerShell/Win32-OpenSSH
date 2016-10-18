@@ -1581,6 +1581,7 @@
 #define _CRT_SECURE_NO_DEPRECATE 1
 #define _CRT_NONSTDC_NO_DEPRECATE 1
 #define WIN32_FIXME 1
+#define WINDOWS 1
 
 /* Define if you must implement a startup_needs function for your platform */
 #define HAVE_STARTUP_NEEDS 1
@@ -1630,6 +1631,9 @@
 /* Define to 1 if you have the `strncasecmp' function. */
 #define HAVE_STRNCASECMP 1
 #endif
+
+/* Define to 1 if you have the locale.h header. */
+#define HAVE_LOCALE_H 1
 
 #define HAVE_STRUCT_IN6_ADDR 1
 #define HAVE_STRUCT_SOCKADDR_IN6 1

@@ -73,10 +73,6 @@ typedef void EditLine;
 #define DEFAULT_COPY_BUFLEN	32768	/* Size of buffer for up/download */
 #define DEFAULT_NUM_REQUESTS	64	/* # concurrent outstanding requests */
 
-#ifdef WIN32_FIXME
-  #define FAIL(X) if (X) goto fail
-#endif
-
 #ifdef WIN32_VS
 #include "win32_dirent.h"
 #endif
@@ -290,17 +286,12 @@ help(void)
 static void
 local_do_shell(const char *args)
 {
-  #ifdef WIN32_FIXME
-
+  #ifdef WINDOWS
 	if (!*args) {
 		args = (char *)	getenv("ComSpec"); // get name of Windows cmd shell
 	}
 	system(args); // execute the shell or cmd given
   #else
-  
-  /*
-   * Original OpenSSH code.
-   */
 	int status;
 	char *shell;
 	pid_t pid;
@@ -823,13 +814,12 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 		tmp = path_strip(path, strip_path);
 		m += strlen(tmp);
 		free(tmp);
-#ifndef WIN32_FIXME
+#ifdef WINDOWS
+        width = ConSetScreenX();
+#else
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 			width = ws.ws_col;
 #endif
-
-		
-
 		columns = width / (m + 2);
 		columns = MAX(columns, 1);
 		colspace = width / columns;
@@ -926,13 +916,12 @@ do_globbed_ls(struct sftp_conn *conn, char *path, char *strip_path,
 		return err;
 	}
 	
-
-#ifndef WIN32_FIXME
+#ifdef WINDOWS
+    width = ConSetScreenX();
+#else
 	if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 		width = ws.ws_col;
 #endif
-
-	
 
 	if (!(lflag & LS_SHORT_VIEW)) {
 		/* Count entries for sort and find longest filename */
@@ -2187,9 +2176,6 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 static void
 connect_to_server(char *path, char **args, int *in, int *out)
 {
-  /*
-   * Original OpenSSH code.
-   */
 	int c_in, c_out;
 
 #ifdef USE_PIPES
@@ -2210,9 +2196,9 @@ connect_to_server(char *path, char **args, int *in, int *out)
 	c_in = c_out = inout[1];
 #endif /* USE_PIPES */
 
-#ifdef WIN32_FIXME
+#ifdef WINDOWS
 	{
-		int i;
+		int i = 0;
 		char fullCmd[MAX_PATH] = { 0 };
 		char ioArg[1024] = { 0 };
 		PROCESS_INFORMATION pi = { 0 };
@@ -2220,8 +2206,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
 
 		debug3("Generating ssh-client command...");
 		strncat(fullCmd, path, MAX_PATH);
-		for (i = 1; args[i]; i++)
-		{
+		for (i = 1; args[i]; i++) {
 			strncat(fullCmd, " ", MAX_PATH);
 			strncat(fullCmd, args[i], MAX_PATH);
 		}
@@ -2332,40 +2317,29 @@ main(int argc, char **argv)
 	size_t num_requests = DEFAULT_NUM_REQUESTS;
 	long long limit_kbps = 0;
 
-#ifdef WIN32_FIXME
-
+#ifdef WINDOWS
     /*
      * Initialize I/O wrappers.
      */
 
-	w32posix_initialize();
-     
+	w32posix_initialize();     
 	setvbuf(stdout, NULL, _IONBF, 0);
 
-  #endif
+ #endif
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
-#ifndef WIN32_FIXME
 	setlocale(LC_CTYPE, "");
-#endif
 
 	__progname = ssh_get_progname(argv[0]);
 	memset(&args, '\0', sizeof(args));
 	args.list = NULL;
 	addargs(&args, "%s", ssh_program);
-  #ifdef WIN32_FIXME
 
-    addargs(&args, "-oForwardX11=no");
-    addargs(&args, "-oForwardAgent=no");
-    addargs(&args, "-oPermitLocalCommand=no");
-    addargs(&args, "-oClearAllForwardings=yes");
-  
-  #else
 	addargs(&args, "-oForwardX11 no");
 	addargs(&args, "-oForwardAgent no");
 	addargs(&args, "-oPermitLocalCommand no");
 	addargs(&args, "-oClearAllForwardings yes");
-#endif
+
 	ll = SYSLOG_LEVEL_INFO;
 	infile = stdin;
 
@@ -2393,16 +2367,7 @@ main(int argc, char **argv)
 			addargs(&args, "-%c", ch);
 			break;
 		case 'P':
-	#ifdef WIN32_FIXME
-      
-      addargs(&args, "-oPort=%s", optarg);      
-      
-      #else
-
-			addargs(&args, "-oPort %s", optarg);
-
-      #endif
-		
+            addargs(&args, "-oPort %s", optarg);
 			break;
 		case 'v':
 			if (debug_level < 3) {
@@ -2437,16 +2402,7 @@ main(int argc, char **argv)
 				fatal("%s (%s).", strerror(errno), optarg);
 			showprogress = 0;
 			quiet = batchmode = 1;
-		#ifdef WIN32_FIXME
-
-      addargs(&args, "-obatchmode=yes");
-      
-      #else
-
 			addargs(&args, "-obatchmode yes");
-      
-      #endif
-		
 			break;
 		case 'f':
 			global_fflag = 1;
@@ -2520,17 +2476,8 @@ main(int argc, char **argv)
 			fprintf(stderr, "Missing hostname\n");
 			usage();
 		}
-    #ifdef WIN32_FIXME
-
-    addargs(&args, "-oProtocol=%d", sshver);
-    
-    #else
-
 		addargs(&args, "-oProtocol %d", sshver);
  
-    #endif
-		
-
 		/* no subsystem if the server-spec contains a '/' */
 		if (sftp_server == NULL || strchr(sftp_server, '/') == NULL)
 			addargs(&args, "-s");
