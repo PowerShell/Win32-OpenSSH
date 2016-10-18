@@ -116,13 +116,18 @@ int config_log_level() {
 
 int pubkey_allowed(struct sshkey* pubkey, wchar_t* wuser, wchar_t* wuser_home) {
 	struct passwd pw;
-	char user[256], user_home[MAX_PATH];
+        int ret;
+	char *user = NULL, *user_home = NULL;
 	memset(&pw, 0, sizeof(pw));
 
-	if (WideCharToMultiByte(CP_UTF8, 0, wuser, -1, user, 256, NULL, NULL) == 0)
-		return 0;
-	WideCharToMultiByte(CP_UTF8, 0, wuser_home, -1, user_home, MAX_PATH, NULL, NULL);
-	pw.pw_dir = user_home;
+        if ((user_home = utf16_to_utf8(wuser_home)) == NULL ||
+            (user = utf16_to_utf8(wuser)) == NULL)
+                return 0;
+	
+        pw.pw_dir = user_home;
 	pw.pw_name = user;
-	return user_key_allowed(&pw, pubkey, 1);
+	ret = user_key_allowed(&pw, pubkey, 1);
+        free(user);
+        free(user_home);
+        return ret;
 }

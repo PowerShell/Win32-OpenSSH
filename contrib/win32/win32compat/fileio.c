@@ -36,6 +36,7 @@
 #include "inc/defs.h"
 #include <errno.h>
 #include <stddef.h>
+#include "inc\utf.h"
 
 /* internal read buffer size */
 #define READ_BUFFER_SIZE 100*1024
@@ -238,39 +239,40 @@ createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 
 /* open() implementation. Uses CreateFile to open file, console, device, etc */
 struct w32_io*
-	fileio_open(const char *pathname, int flags, int mode) {
+	fileio_open(const char *path_utf8, int flags, int mode) {
 	struct w32_io* pio = NULL;
 	struct createFile_flags cf_flags;
 	HANDLE handle;
-        wchar_t wpathname[MAX_PATH];
+        wchar_t *path_utf16 = NULL;
 
-	debug2("open - pathname:%s, flags:%d, mode:%d", pathname, flags, mode);
+	debug2("open - pathname:%s, flags:%d, mode:%d", path_utf8, flags, mode);
 	/* check input params*/
-	if (pathname == NULL) {
+	if (path_utf8 == NULL) {
 		errno = EINVAL;
 		debug("open - ERROR:%d", errno);
 		return NULL;
 	}
 
-        if (MultiByteToWideChar(CP_UTF8, 0, pathname, -1, wpathname, MAX_PATH) == 0) {
-                errno = EFAULT;
-                debug("WideCharToMultiByte failed - ERROR:%d", GetLastError());
+        if ((path_utf16 = utf8_to_utf16(path_utf8)) == NULL) {
+                errno = ENOMEM;
+                debug("utf8_to_utf16 failed - ERROR:%d", GetLastError());
                 return NULL;
         }
         
 	if (createFile_flags_setup(flags, mode, &cf_flags) == -1)
 		return NULL;
 
-	handle = CreateFileW(wpathname, cf_flags.dwDesiredAccess, cf_flags.dwShareMode,
+	handle = CreateFileW(path_utf16, cf_flags.dwDesiredAccess, cf_flags.dwShareMode,
 		&cf_flags.securityAttributes, cf_flags.dwCreationDisposition,
 		cf_flags.dwFlagsAndAttributes, NULL);
 
 	if (handle == INVALID_HANDLE_VALUE) {
 		errno = errno_from_Win32LastError();
 		debug("open - CreateFile ERROR:%d", GetLastError());
+                free(path_utf16);
 		return NULL;
 	}
-
+        free(path_utf16);
 	pio = (struct w32_io*)malloc(sizeof(struct w32_io));
 	if (pio == NULL) {
 		CloseHandle(handle);
