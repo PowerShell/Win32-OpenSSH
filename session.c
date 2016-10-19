@@ -491,16 +491,63 @@ do_authenticated1(Authctxt *authctxt)
 #ifdef WINDOWS
 
 int do_exec_windows(Session *s, const char *command, int pty) {
+        int pipein[2], pipeout[2], pipeerr[2], r;
+        char *exec_command = NULL, *progdir = w32_programdir();
+        wchar_t* exec_command_w = NULL;
 
+        if (s->is_subsystem >= SUBSYSTEM_INT_SFTP_ERROR)
+        {
+                error("sub system not supported, exiting\n");
+                fflush(NULL);
+                exit(1);
+        }
+
+        /* Create three pipes for stdin, stdout and stderr */
+        if (pipe(pipein) == -1 || pipe(pipeout) == -1 || pipe(pipeerr) == -1) {
+                error("%s: cannot create pipe: %.100s", __func__, strerror(errno));
+                return -1;
+        }
+
+        set_nonblock(pipein[0]);
+        set_nonblock(pipein[1]);
+        set_nonblock(pipeout[0]);
+        set_nonblock(pipeout[1]);
+        set_nonblock(pipeerr[0]);
+        set_nonblock(pipeerr[1]);
+
+        fcntl(pipein[1], F_SETFD, FD_CLOEXEC);
+        fcntl(pipeout[0], F_SETFD, FD_CLOEXEC);
+        fcntl(pipeerr[0], F_SETFD, FD_CLOEXEC);
+
+        /* prepare exec - path used with CreateProcess() */
+        if (s->is_subsystem) {
+                /* relative or absolute */
+                if (command == NULL || command[0] == '\0')
+                        fatal("expecting command for a subsystem");
+
+                if (command[1] != ':') /* absolute */
+                        exec_command = xstrdup(command);
+                else {/*relative*/
+                        exec_command = malloc(strlen(progdir) + 1 + strlen(command));
+                        if (exec_command == NULL)
+                                fatal("%s, out of memory");
+                        memcpy(exec_command, progdir, strlen(progdir));
+                        exec_command[strlen(progdir)] = '\\';
+                        memcpy(exec_command + strlen(progdir) + 1, command, strlen(command) + 1);
+                }
+        } else {
+                char* shell_host = pty ? "ssh-shellhost.exe -t " : "ssh-shellhost.exe ";
+                exec_command = malloc(strlen(progdir) + strlen(shell_host) + (command ? strlen(command) : 0));
+                if (exec_command == NULL)
+                        fatal("%s, out of memory");
+                
+        }
+        
         wchar_t* pw_dir_utf16 = utf8_to_utf16(s->pw->pw_dir);
         extern int debug_flag;
 
         PROCESS_INFORMATION pi;
         STARTUPINFOW si;
-
-        int pipein[2];
-        int pipeout[2];
-        int pipeerr[2];
 
         BOOL b;
 
@@ -512,12 +559,6 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         char *laddr;
         char buf[256];
 
-        if (s->is_subsystem >= SUBSYSTEM_INT_SFTP_ERROR)
-        {
-                error("sub system not supported, exiting\n");
-                fflush(NULL);
-                exit(1);
-        }
 
 
         if (!command)
@@ -529,26 +570,11 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                 exec_command = command;
         }
 
-        /*
-        * Create three socket pairs for stdin, stdout and stderr
-        */
-        pipe(pipein);
-        pipe(pipeout);
-        pipe(pipeerr);
 
         int retcode = -1;
         if ((!s->is_subsystem) && (s->ttyfd != -1))
         {
         }
-
-        debug3("sockin[0]: %d sockin[1]: %d", pipein[0], pipein[1]);
-        debug3("sockout[0]: %d sockout[1]: %d", pipeout[0], pipeout[1]);
-        debug3("sockerr[0]: %d sockerr[1]: %d", pipeerr[0], pipeerr[1]);
-
-
-        SetHandleInformation(sfd_to_handle(pipein[1]), HANDLE_FLAG_INHERIT, 0);
-        SetHandleInformation(sfd_to_handle(pipeout[0]), HANDLE_FLAG_INHERIT, 0);
-        SetHandleInformation(sfd_to_handle(pipeerr[0]), HANDLE_FLAG_INHERIT, 0);
 
         /*
         * Assign sockets to StartupInfo
@@ -579,13 +605,6 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         SetEnvironmentVariable("USER", s->pw->pw_name);
         SetEnvironmentVariable("USERNAME", s->pw->pw_name);
         SetEnvironmentVariable("LOGNAME", s->pw->pw_name);
-
-        set_nonblock(pipein[0]);
-        set_nonblock(pipein[1]);
-        set_nonblock(pipeout[0]);
-        set_nonblock(pipeout[1]);
-        set_nonblock(pipeerr[0]);
-        set_nonblock(pipeerr[1]);
 
         /*
         * If we get this far, the user has already been authenticated

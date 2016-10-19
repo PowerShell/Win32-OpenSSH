@@ -75,6 +75,7 @@ void w32_freeaddrinfo(struct addrinfo *);
 int w32_getaddrinfo(const char *, const char *,
         const struct addrinfo *, struct addrinfo **);
 FILE* w32_fopen_utf8(const char *, const char *);
+char* w32_programdir();
 
 
 /* Shutdown constants */

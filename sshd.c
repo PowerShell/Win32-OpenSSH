@@ -281,25 +281,16 @@ static void do_ssh2_kex(void);
   {
     int exitCode = -1;
     
-    //
-    // Windows.
-    //
-    
-    #ifdef WIN32_FIXME
-      
-      if (GetModuleFileName(NULL, path, pathSize)){
-        int i;
-        int lastSlashPos = 0;
-                
-	for (i = 0; path[i]; i++) {
-		if (path[i] == '/' || path[i] == '\\') {
-			lastSlashPos = i;
-		}
-	}
-        
-        path[lastSlashPos] = 0;
+    /* Windows */
+    #ifdef WINDOWS
+
+    char* dir = w32_programdir();
+    if (strnlen(dir, pathSize) == pathSize) 
+        error("program directory path size exceeded provided pathSize %d", pathSize);
+    else {
+        memcpy(path, dir, strnlen(dir, pathSize) + 1);
         exitCode = 0;
-      }  
+    }
     
     #endif
     
@@ -1972,11 +1963,7 @@ main(int ac, char **av)
     
     struct stat s;
      
-    #ifdef WIN32_FIXME
-      #define PATH_SIZE MAX_PATH
-    #else
-      #define PATH_SIZE PATH_MAX
-    #endif
+    #define PATH_SIZE PATH_MAX
 
     char basePath[PATH_SIZE] = {0};
     char path[PATH_SIZE]     = {0};
