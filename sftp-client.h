@@ -68,7 +68,7 @@ void free_sftp_dirents(SFTP_DIRENT **);
 int do_rm(struct sftp_conn *, const char *);
 
 /* Create directory 'path' */
-int do_mkdir(struct sftp_conn *, const char *, Attrib *, int);
+u_int do_mkdir(struct sftp_conn *, const char *, Attrib *, int);
 
 /* Remove directory 'path' */
 int do_rmdir(struct sftp_conn *, const char *);

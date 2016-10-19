@@ -557,7 +557,15 @@ fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 
 int
 fileio_stat(const char *path, struct _stat64 *buf) {
-	return _stat64(path, buf);
+    wchar_t wpath[MAX_PATH];
+
+    if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, MAX_PATH) == 0) {
+        errno = EFAULT;
+        debug("WideCharToMultiByte failed - ERROR:%d", GetLastError());
+        return GetLastError();
+    }
+
+	return _wstat64(wpath, buf);
 }
 
 long

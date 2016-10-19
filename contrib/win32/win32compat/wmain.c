@@ -41,7 +41,7 @@ utf16_to_utf8(wchar_t* utf16str) {
         if ((needed = WideCharToMultiByte(CP_UTF8, 0, utf16str, -1, NULL, 0, NULL, NULL)) == 0 ||
             (ret = malloc(needed)) == NULL ||
             WideCharToMultiByte(CP_UTF8, 0, utf16str, -1, ret, needed, NULL, NULL) != needed )
-                fatal("failed to covert input arguments");
+                fatal("failed to convert input arguments");
 
         return ret;
 }

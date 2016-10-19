@@ -18,11 +18,11 @@ struct dirent {
 };
 
 typedef struct {
-	intptr_t hFile;
-     struct _finddata_t c_file;
-	 int	bRoot;
-	 int	bDrive;
-	 char	initName[260];
+    intptr_t hFile;
+    struct _finddata_t c_file;
+    int	bRoot;
+    int	bDrive;
+    char initName[260];
 } DIR;
 
 DIR * opendir(char *name);

@@ -754,6 +754,7 @@ do_mkdir(struct sftp_conn *conn, const char *path, Attrib *a, int print_flag)
 	status = get_status(conn, id);
 	if (status != SSH2_FX_OK && print_flag)
 		error("Couldn't create directory: %s", fx2txt(status));
+    errno = status;
 
 	return status == SSH2_FX_OK ? 0 : -1;
 }
@@ -1878,7 +1879,7 @@ upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
 	 * if it was created successfully.
 	 */
 	if (status != SSH2_FX_OK) {
-		if (status != SSH2_FX_FAILURE)
+		if (errno != SSH2_FX_FAILURE)
 			return -1;
 		if (do_stat(conn, dst, 0) == NULL)
 			return -1;

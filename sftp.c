@@ -72,6 +72,7 @@ typedef void EditLine;
 
 #define DEFAULT_COPY_BUFLEN	32768	/* Size of buffer for up/download */
 #define DEFAULT_NUM_REQUESTS	64	/* # concurrent outstanding requests */
+#define MAX_COMMAND_LINE 2048
 
 #ifdef WINDOWS
 #include <io.h>
@@ -2032,7 +2033,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 {
 	char *remote_path;
 	char *dir = NULL;
-	char cmd[2048];
+	char cmd[MAX_COMMAND_LINE];
 	int err, interactive;
 	EditLine *el = NULL;
 #ifdef USE_LIBEDIT
@@ -2122,7 +2123,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 		if (el == NULL) {
 #ifdef WINDOWS
             if (interactive) {
-                wchar_t wcmd[2048];
+                wchar_t wcmd[MAX_COMMAND_LINE];
                 printf("sftp> ");
                 if (fgetws(wcmd, sizeof(cmd)/sizeof(wchar_t), infile) == NULL) {
                     printf("\n");
@@ -2131,8 +2132,9 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
                 else {
                     int needed;
                     if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcmd, -1, NULL, 0, NULL, NULL)) == 0 ||
-                        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcmd, -1, cmd, needed, NULL, NULL) != needed)
-                        fatal("failed to covert input arguments");
+                        (needed > MAX_COMMAND_LINE) ||
+                        (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcmd, -1, cmd, needed, NULL, NULL) != needed))
+                            fatal("failed to convert input arguments");
                 }
             }
             else {
@@ -2349,6 +2351,8 @@ main(int argc, char **argv)
 
 	w32posix_initialize();     
 	setvbuf(stdout, NULL, _IONBF, 0);
+
+    ConInit(STD_OUTPUT_HANDLE, TRUE);
 
  #endif
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */

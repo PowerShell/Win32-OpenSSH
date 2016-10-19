@@ -444,8 +444,9 @@ char *w32_getcwd(char *buffer, int maxlen) {
     wchar_t *wpwd = _wgetcwd(wdirname, MAX_PATH);
 
     if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wdirname, -1, NULL, 0, NULL, NULL)) == 0 ||
-        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wdirname, -1, buffer, needed, NULL, NULL) != needed)
-            fatal("failed to covert input arguments");
+        (needed > MAX_PATH) ||
+        (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wdirname, -1, buffer, needed, NULL, NULL) != needed))
+            fatal("failed to convert input arguments");
 
     return buffer;
 }
