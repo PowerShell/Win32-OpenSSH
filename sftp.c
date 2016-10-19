@@ -2120,6 +2120,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 		signal(SIGINT, SIG_IGN);
 
 		if (el == NULL) {
+#ifdef WINDOWS
             if (interactive) {
                 wchar_t wcmd[2048];
                 printf("sftp> ");
@@ -2140,6 +2141,15 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
                     break;
                 }
             }
+#else
+            if (interactive) {
+                printf("sftp> ");
+            if (fgets(cmd, sizeof(cmd), infile) == NULL) {
+                if (interactive)
+                    printf("\n");
+                break;
+            }
+#endif
 			if (!interactive) { /* Echo command */
 				printf("sftp> %s", cmd);
 				if (strlen(cmd) > 0 &&
