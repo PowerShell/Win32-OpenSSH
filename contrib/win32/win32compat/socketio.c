@@ -1003,6 +1003,7 @@ w32_gethostname(char *name_utf8, size_t len) {
         //        memcpy(name_utf8, tmp_name_utf8, strlen(tmp_name_utf8) + 1);
         //        free(tmp_name_utf8);
         //        return 0;
+                return gethostname(name_utf8, len);
         }
         else
                 return gethostname(name_utf8, len);
