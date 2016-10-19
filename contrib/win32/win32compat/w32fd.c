@@ -437,6 +437,19 @@ int w32_chdir(const char *dirname) {
     return 0;
 }
 
+char *w32_getcwd(char *buffer, int maxlen) {
+    wchar_t wdirname[MAX_PATH];
+    int needed;
+
+    wchar_t *wpwd = _wgetcwd(wdirname, MAX_PATH);
+
+    if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wdirname, -1, NULL, 0, NULL, NULL)) == 0 ||
+        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wdirname, -1, buffer, needed, NULL, NULL) != needed)
+            fatal("failed to covert input arguments");
+
+    return buffer;
+}
+
 int
 w32_isatty(int fd) {
 	struct w32_io* pio;

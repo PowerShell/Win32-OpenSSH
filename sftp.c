@@ -2357,8 +2357,10 @@ main(int argc, char **argv)
 	addargs(&args, "\"-oClearAllForwardings yes\"");
 
 	ll = SYSLOG_LEVEL_INFO;
-	infile = stdin;
-    _setmode(_fileno(infile), O_U16TEXT);
+#ifdef WINDOWS
+    _setmode(_fileno(stdin), O_U16TEXT);
+#endif
+    infile = stdin;
 
 	while ((ch = getopt(argc, argv,
 	    "1246afhpqrvCc:D:i:l:o:s:S:b:B:F:P:R:")) != -1) {

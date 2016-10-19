@@ -53,6 +53,7 @@ int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 int w32_mkdir(const char *pathname, unsigned short mode);
 int w32_chdir(const char *dirname);
+char *w32_getcwd(char *buffer, int maxlen);
 
 /*common i/o*/
 #define fcntl(a,b,...)		w32_fcntl((a), (b),  __VA_ARGS__)
