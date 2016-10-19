@@ -46,7 +46,6 @@
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING  0x4
 #endif
 
-HANDLE	hInputConsole = NULL;
 HANDLE	hOutputConsole = NULL;
 DWORD	dwSavedAttributes = 0;
 WORD	wStartingAttributes = 0;

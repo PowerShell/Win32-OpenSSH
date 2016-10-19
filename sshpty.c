@@ -21,7 +21,6 @@
 #ifdef WIN32_FIXME
   #undef GSSAPI
   #undef KRB5
-//#define WIN32_PRAGMA_REMCON
 #endif
 
 #include <sys/types.h>

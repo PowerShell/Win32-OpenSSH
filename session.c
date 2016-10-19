@@ -112,9 +112,6 @@ FIXME: GFPZR: Function stat() may be undeclared.
 #include <Userenv.h>
 #include <shlobj.h>
 
-#ifdef WIN32_PRAGMA_REMCON
-#include <shlwapi.h>
-#endif
 extern char HomeDirLsaW[MAX_PATH];
 
 #endif
@@ -498,24 +495,6 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         wchar_t* pw_dir_utf16 = utf8_to_utf16(s->pw->pw_dir);
         extern int debug_flag;
 
-        if (s->is_subsystem == SUBSYSTEM_INT_SFTP_ERROR)
-        {
-                printf("This service allows sftp connections only.\n");
-                fflush(NULL);
-                exit(1);
-        }
-        else if (s->is_subsystem == SUBSYSTEM_INT_SFTP)
-        {
-                u_int i;
-                for (i = 0; i < options.num_subsystems; i++)
-                {
-                        if (strcmp("sftp", options.subsystem_name[i]) == 0)
-                        {
-                                command = options.subsystem_args[i];
-                        }
-                }
-        }
-
         PROCESS_INFORMATION pi;
         STARTUPINFOW si;
 
@@ -532,9 +511,14 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         char *exec_command;
         char *laddr;
         char buf[256];
-#ifdef WIN32_PRAGMA_REMCON
-        char exec_command_str[512];
-#endif
+
+        if (s->is_subsystem >= SUBSYSTEM_INT_SFTP_ERROR)
+        {
+                error("sub system not supported, exiting\n");
+                fflush(NULL);
+                exit(1);
+        }
+
 
         if (!command)
         {
@@ -555,12 +539,6 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         int retcode = -1;
         if ((!s->is_subsystem) && (s->ttyfd != -1))
         {
-                extern HANDLE hInputConsole;
-                extern HANDLE hOutputConsole;
-                hInputConsole = GetConsoleInputHandle();
-                hOutputConsole = GetConsoleOutputHandle();
-                ConSetScreenSize(s->col, s->row);
-                s->ptyfd = pipein[1]; // hConsole; // the pty is the Windows console output handle in our Win32 port
         }
 
         debug3("sockin[0]: %d sockin[1]: %d", pipein[0], pipein[1]);
@@ -2539,9 +2517,7 @@ session_pty_req(Session *s)
 	/* for SSH1 the tty modes length is not given */
 	if (!compat20)
 		n_bytes = packet_remaining();
-	#ifndef WIN32_PRAGMA_REMCON
 	tty_parse_modes(s->ttyfd, &n_bytes);
-	#endif
 
 	if (!use_privsep)
 		pty_setowner(s->pw, s->tty);
@@ -2549,9 +2525,7 @@ session_pty_req(Session *s)
 	/* Set window size from the packet. */
 	pty_change_window_size(s->ptyfd, s->row, s->col, s->xpixel, s->ypixel);
 
-	#ifndef WIN32_PRAGMA_REMCON
 	packet_check_eom();
-	#endif
 	session_proctitle(s);
 	return 1;
 }
