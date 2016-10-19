@@ -73,7 +73,9 @@ typedef void EditLine;
 #define DEFAULT_COPY_BUFLEN	32768	/* Size of buffer for up/download */
 #define DEFAULT_NUM_REQUESTS	64	/* # concurrent outstanding requests */
 
-#ifdef WIN32_VS
+#ifdef WINDOWS
+#include <io.h>
+#include <fcntl.h>
 #include "win32_dirent.h"
 #endif
 
@@ -1425,6 +1427,7 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 	glob_t g;
 
 	path1 = path2 = NULL;
+
 	cmdnum = parse_args(&cmd, &ignore_errors, &aflag, &fflag, &hflag,
 	    &iflag, &lflag, &pflag, &rflag, &sflag, &n_arg, &path1, &path2);
 	if (ignore_errors != 0)
@@ -2104,7 +2107,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 		free(dir);
 	}
 
-	#ifndef WIN32_VS
+	#ifndef WINDOWS
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	setvbuf(infile, NULL, _IOLBF, 0);
 	#endif
@@ -2117,13 +2120,26 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 		signal(SIGINT, SIG_IGN);
 
 		if (el == NULL) {
-			if (interactive)
-				printf("sftp> ");
-			if (fgets(cmd, sizeof(cmd), infile) == NULL) {
-				if (interactive)
-					printf("\n");
-				break;
-			}
+            if (interactive) {
+                wchar_t wcmd[2048];
+                printf("sftp> ");
+                if (fgetws(wcmd, sizeof(cmd)/sizeof(wchar_t), infile) == NULL) {
+                    if (interactive)
+                        printf("\n");
+                    break;
+                }
+                else {
+                    int needed;
+                    if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcmd, -1, NULL, 0, NULL, NULL)) == 0 ||
+                        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcmd, -1, cmd, needed, NULL, NULL) != needed)
+                        fatal("failed to covert input arguments");
+                }
+            }
+            else {
+                if (fgets(cmd, sizeof(cmd), infile) == NULL) {
+                    break;
+                }
+            }
 			if (!interactive) { /* Echo command */
 				printf("sftp> %s", cmd);
 				if (strlen(cmd) > 0 &&
@@ -2335,13 +2351,14 @@ main(int argc, char **argv)
 	args.list = NULL;
 	addargs(&args, "%s", ssh_program);
 
-	addargs(&args, "-oForwardX11 no");
-	addargs(&args, "-oForwardAgent no");
-	addargs(&args, "-oPermitLocalCommand no");
-	addargs(&args, "-oClearAllForwardings yes");
+	addargs(&args, "\"-oForwardX11 no\"");
+	addargs(&args, "\"-oForwardAgent no\"");
+	addargs(&args, "\"-oPermitLocalCommand no\"");
+	addargs(&args, "\"-oClearAllForwardings yes\"");
 
 	ll = SYSLOG_LEVEL_INFO;
 	infile = stdin;
+    _setmode(_fileno(infile), O_U16TEXT);
 
 	while ((ch = getopt(argc, argv,
 	    "1246afhpqrvCc:D:i:l:o:s:S:b:B:F:P:R:")) != -1) {
@@ -2367,8 +2384,8 @@ main(int argc, char **argv)
 			addargs(&args, "-%c", ch);
 			break;
 		case 'P':
-            addargs(&args, "-oPort %s", optarg);
-			break;
+            addargs(&args, "\"-oPort %s\"", optarg);
+            break;
 		case 'v':
 			if (debug_level < 3) {
 				addargs(&args, "-v");
@@ -2402,8 +2419,8 @@ main(int argc, char **argv)
 				fatal("%s (%s).", strerror(errno), optarg);
 			showprogress = 0;
 			quiet = batchmode = 1;
-			addargs(&args, "-obatchmode yes");
-			break;
+            addargs(&args, "\"-obatchmode yes\"");
+            break;
 		case 'f':
 			global_fflag = 1;
 			break;
@@ -2476,8 +2493,8 @@ main(int argc, char **argv)
 			fprintf(stderr, "Missing hostname\n");
 			usage();
 		}
-		addargs(&args, "-oProtocol %d", sshver);
- 
+        addargs(&args, "\"-oProtocol %d\"", sshver);
+
 		/* no subsystem if the server-spec contains a '/' */
 		if (sftp_server == NULL || strchr(sftp_server, '/') == NULL)
 			addargs(&args, "-s");

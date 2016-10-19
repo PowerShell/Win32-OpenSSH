@@ -52,6 +52,7 @@ long w32_lseek( int fd, long offset, int origin);
 int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 int w32_mkdir(const char *pathname, unsigned short mode);
+int w32_chdir(const char *dirname);
 
 /*common i/o*/
 #define fcntl(a,b,...)		w32_fcntl((a), (b),  __VA_ARGS__)
@@ -71,7 +72,6 @@ int w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 int w32_raise(int sig);
 int w32_kill(int pid, int sig);
 FILE* w32_fopen_utf8(const char *, const char *);
-
 
 /* Shutdown constants */
 #define SHUT_WR SD_SEND

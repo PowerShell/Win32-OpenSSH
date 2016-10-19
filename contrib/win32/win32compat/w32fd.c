@@ -389,7 +389,7 @@ int w32_writev(int fd, const struct iovec *iov, int iovcnt) {
     CHECK_FD(fd);
 
     for (i = 0; i < iovcnt; i++) {
-        int ret = write(fd, iov[i].iov_base, iov[i].iov_len);
+        int ret = w32_write(fd, iov[i].iov_base, iov[i].iov_len);
 
         if (ret > 0) {
             written += ret;
@@ -418,7 +418,23 @@ w32_lseek(int fd, long offset, int origin) {
 
 int 
 w32_mkdir(const char *pathname, unsigned short mode) {
-	return _mkdir(pathname);
+    wchar_t wdirname[MAX_PATH];
+
+    if (MultiByteToWideChar(CP_UTF8, 0, pathname, -1, wdirname, MAX_PATH)) {
+        return _wmkdir(wdirname);
+    }
+
+    return 0;
+}
+
+int w32_chdir(const char *dirname) {
+    wchar_t wdirname[MAX_PATH];
+
+    if (MultiByteToWideChar(CP_UTF8, 0, dirname, -1, wdirname, MAX_PATH)) {
+        return _wchdir(wdirname);
+    }
+
+    return 0;
 }
 
 int

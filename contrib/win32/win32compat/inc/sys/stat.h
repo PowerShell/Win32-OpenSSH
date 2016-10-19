@@ -29,6 +29,7 @@
 #define stat w32_stat
 #define lstat w32_stat
 #define mkdir w32_mkdir
+#define chdir w32_chdir
 
 struct w32_stat {
 	dev_t     st_dev;     /* ID of device containing file */

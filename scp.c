@@ -1092,9 +1092,9 @@ main(int argc, char **argv)
 	args.list = remote_remote_args.list = NULL;
 	addargs(&args, "%s", ssh_program);
 	addargs(&args, "-x");
-	addargs(&args, "-oForwardAgent=no");
-	addargs(&args, "-oPermitLocalCommand=no");
-	addargs(&args, "-oClearAllForwardings=yes");
+	addargs(&args, "\"-oForwardAgent no\"");
+	addargs(&args, "\"-oPermitLocalCommand no\"");
+	addargs(&args, "\"-oClearAllForwardings yes\"");
 
 	fflag = tflag = 0;
 	while ((ch = getopt(argc, argv, "dfl:prtvBCc:i:P:q12346S:o:F:")) != -1)
@@ -1127,8 +1127,8 @@ main(int argc, char **argv)
 			addargs(&args, "%s", optarg);
 			break;
 		case 'B':
-			addargs(&remote_remote_args, "-oBatchmode=yes");
-			addargs(&args, "-oBatchmode=yes");
+			addargs(&remote_remote_args, "\"-oBatchmode yes\"");
+			addargs(&args, "\"-oBatchmode yes\"");
 			break;
 		case 'l':
 			limit_kbps = strtonum(optarg, 1, 100 * 1024 * 1024,
@@ -1347,7 +1347,7 @@ toremote(char *targ, int argc, char **argv)
 			freeargs(&alist);
 			addargs(&alist, "%s", ssh_program);
 			addargs(&alist, "-x");
-			addargs(&alist, "-oClearAllForwardings=yes");
+			addargs(&alist, "-\"oClearAllForwardings yes\"");
 			addargs(&alist, "-n");
 			for (j = 0; j < remote_remote_args.num; j++) {
 				addargs(&alist, "%s",
