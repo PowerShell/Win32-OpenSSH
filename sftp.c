@@ -2125,8 +2125,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
                 wchar_t wcmd[2048];
                 printf("sftp> ");
                 if (fgetws(wcmd, sizeof(cmd)/sizeof(wchar_t), infile) == NULL) {
-                    if (interactive)
-                        printf("\n");
+                    printf("\n");
                     break;
                 }
                 else {
