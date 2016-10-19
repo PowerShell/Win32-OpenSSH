@@ -491,308 +491,228 @@ do_authenticated1(Authctxt *authctxt)
 	}
 }
 
-// PRAGMA:TODO
-#ifndef WIN32_FIXME
-#define USE_PIPES 1
-#endif
+#ifdef WINDOWS
 
-#ifdef WIN32_FIXME
-extern int debug_flag;
-#endif
+int do_exec_windows(Session *s, const char *command, int pty) {
 
-/*
- * This is called to fork and execute a command when we have no tty.  This
- * will call do_child from the child, and server_loop from the parent after
- * setting up file descriptors and such.
- */
-int
-do_exec_no_pty(Session *s, const char *command)
-{
-#ifdef WIN32_FIXME
         wchar_t* pw_dir_utf16 = utf8_to_utf16(s->pw->pw_dir);
-  
-  /*
-   * Win32 code.
-   */
+        extern int debug_flag;
 
-  if (s -> is_subsystem == SUBSYSTEM_INT_SFTP_ERROR)
-  {
-    printf("This service allows sftp connections only.\n");
-    fflush(NULL);
-    exit(1);
-  }
-  else if (s -> is_subsystem == SUBSYSTEM_INT_SFTP)
-  {
-    u_int i;
-    for (i = 0; i < options.num_subsystems; i++)
-    {
-      if (strcmp("sftp", options.subsystem_name[i]) == 0)
-      {
-        command = options.subsystem_args[i];
-      }
-    }
-  }
+        if (s->is_subsystem == SUBSYSTEM_INT_SFTP_ERROR)
+        {
+                printf("This service allows sftp connections only.\n");
+                fflush(NULL);
+                exit(1);
+        }
+        else if (s->is_subsystem == SUBSYSTEM_INT_SFTP)
+        {
+                u_int i;
+                for (i = 0; i < options.num_subsystems; i++)
+                {
+                        if (strcmp("sftp", options.subsystem_name[i]) == 0)
+                        {
+                                command = options.subsystem_args[i];
+                        }
+                }
+        }
 
-  PROCESS_INFORMATION pi;
-  STARTUPINFOW si;
-  
-  int pipein[2];
-  int pipeout[2];
-  int pipeerr[2];
-  
-  BOOL b;
-  
-  HANDLE hToken = INVALID_HANDLE_VALUE;
-  
-  int do_xauth;
-  
-  FILE *f = NULL;
-  
-  char cmd[1024];
-  char *exec_command;
-  char *laddr;
-  char buf[256];
-  #ifdef WIN32_PRAGMA_REMCON
-  char exec_command_str[512];
-  #endif
+        PROCESS_INFORMATION pi;
+        STARTUPINFOW si;
 
-  if (!command)
-  {
-	#ifndef WIN32_PRAGMA_REMCON
-    exec_command = s->pw->pw_shell;
-	#else
-	if ( PathFileExists("\\program files\\pragma\\shared files\\cmdserver.exe") )
-	 snprintf(exec_command_str, sizeof(exec_command_str),
-		"\\program files\\pragma\\shared files\\cmdserver.exe SSHD %d %d", s->row, s->col );
-	else {
-		// find base path of our executable
-		char basepath[MAX_PATH];
-		strcpy_s(basepath, MAX_PATH, __progname);
-		PathRemoveFileSpec(basepath); // get the full dir part of the name
-		snprintf(exec_command_str, sizeof(exec_command_str),
-			"%s\\cmdserver.exe SSHD %d %d", basepath,s->row, s->col);
-	}
-	exec_command = exec_command_str;
-	#endif
-  }  
-  else
-  {
-    exec_command = command;
-  }  
+        int pipein[2];
+        int pipeout[2];
+        int pipeerr[2];
 
-  do_xauth = s -> display != NULL && s -> auth_proto != NULL && s -> auth_data != NULL;
+        BOOL b;
 
-  /*
-   * Create three socket pairs for stdin, stdout and stderr 
-   */
-  pipe(pipein);
-  pipe(pipeout);
-  pipe(pipeerr);
-
-  int retcode = -1;
-  if ( (!s -> is_subsystem) && (s ->ttyfd != -1))
-  {
-    extern HANDLE hInputConsole;
-    extern HANDLE hOutputConsole ;
-    hInputConsole = GetConsoleInputHandle();
-    hOutputConsole = GetConsoleOutputHandle();
-	ConSetScreenSize( s->col, s->row );
-	s->ptyfd = pipein[1]; // hConsole; // the pty is the Windows console output handle in our Win32 port
-  }
-
-  debug3("sockin[0]: %d sockin[1]: %d", pipein[0], pipein[1]);
-  debug3("sockout[0]: %d sockout[1]: %d", pipeout[0], pipeout[1]);
-  debug3("sockerr[0]: %d sockerr[1]: %d", pipeerr[0], pipeerr[1]);
+        HANDLE hToken = INVALID_HANDLE_VALUE;
 
 
-  SetHandleInformation(sfd_to_handle(pipein[1]), HANDLE_FLAG_INHERIT, 0);
-  SetHandleInformation(sfd_to_handle(pipeout[0]), HANDLE_FLAG_INHERIT, 0);
-  SetHandleInformation(sfd_to_handle(pipeerr[0]), HANDLE_FLAG_INHERIT, 0);
+        char cmd[1024];
+        char *exec_command;
+        char *laddr;
+        char buf[256];
+#ifdef WIN32_PRAGMA_REMCON
+        char exec_command_str[512];
+#endif
 
-  /*
-   * Assign sockets to StartupInfo 
-   */
-  
-  memset(&si, 0 , sizeof(STARTUPINFO));
-  
-  si.cb = sizeof(STARTUPINFO);
-  si.lpReserved       = 0;
-  si.lpTitle          = NULL; /* NULL means use exe name as title */
-  si.dwX              = 0;
-  si.dwY              = 0;
-  si.dwXSize          = 5;
-  si.dwYSize          = 5;
-  si.dwXCountChars    = s->col;
-  si.dwYCountChars    = s->row;
-  si.dwFillAttribute  = 0;
-  si.dwFlags          = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS;
-  si.wShowWindow      = 0; // FALSE ;
-  si.cbReserved2      = 0;
-  si.lpReserved2      = 0;
+        if (!command)
+        {
+                exec_command = s->pw->pw_shell;
+        }
+        else
+        {
+                exec_command = command;
+        }
 
-  si.hStdInput = (HANDLE) sfd_to_handle(pipein[0]);
-  si.hStdOutput = (HANDLE) sfd_to_handle(pipeout[1]);
-  si.hStdError = (HANDLE) sfd_to_handle(pipeerr[1]);
-  si.lpDesktop = NULL; 
+        /*
+        * Create three socket pairs for stdin, stdout and stderr
+        */
+        pipe(pipein);
+        pipe(pipeout);
+        pipe(pipeerr);
 
-  SetEnvironmentVariable("USER", s->pw->pw_name);
-  SetEnvironmentVariable("USERNAME", s->pw->pw_name);
-  SetEnvironmentVariable("LOGNAME", s->pw->pw_name);
+        int retcode = -1;
+        if ((!s->is_subsystem) && (s->ttyfd != -1))
+        {
+                extern HANDLE hInputConsole;
+                extern HANDLE hOutputConsole;
+                hInputConsole = GetConsoleInputHandle();
+                hOutputConsole = GetConsoleOutputHandle();
+                ConSetScreenSize(s->col, s->row);
+                s->ptyfd = pipein[1]; // hConsole; // the pty is the Windows console output handle in our Win32 port
+        }
 
-  /*
-   * Setup xauth if needed 
-   */
-   
-  if (do_xauth && options.xauth_location != NULL) 
-  {
-    /*
-     * Add authority data to .Xauthority if appropriate. 
-     */
-  
-    if (debug_flag) 
-    {
-      fprintf(stderr, "Running %.500s remove %.100s\n",
-                  options.xauth_location, s->auth_display);
-      
-      fprintf(stderr, "%.500s add %.100s %.100s %.100s\n", options.xauth_location, 
-                  s -> auth_display, s -> auth_proto, s -> auth_data);
-    }
-    
-    snprintf(cmd, sizeof cmd, "%s -q -", options.xauth_location);
-    
-    f = _popen(cmd, "w");
-    
-    if (f) 
-    {
-      fprintf(f, "remove %s\n", s -> auth_display);
-
-      fprintf(f, "add %s %s %s\n", s -> auth_display, s -> auth_proto, s -> auth_data);
-      
-      _pclose(f);
-    } 
-    else 
-    {
-      fprintf(stderr, "Could not run %s\n", cmd);
-    }
-  }
-
-  #if 1
-  
-  set_nonblock(pipein[0]);
-  set_nonblock(pipein[1]);
-  set_nonblock(pipeout[0]);
-  set_nonblock(pipeout[1]);
-  set_nonblock(pipeerr[0]);
-  set_nonblock(pipeerr[1]);
-  
-  #endif
-
-  /* 
-   * If we get this far, the user has already been authenticated 
-   * We should either have a user token in authctxt -> methoddata 
-   * (e.g. for password auth) or we need to create a more restrictive
-   * token using CreateUserToken for non-password auth mechanisms.
-   */
-  
-    hToken = s -> authctxt -> methoddata;
+        debug3("sockin[0]: %d sockin[1]: %d", pipein[0], pipein[1]);
+        debug3("sockout[0]: %d sockout[1]: %d", pipeout[0], pipeout[1]);
+        debug3("sockerr[0]: %d sockerr[1]: %d", pipeerr[0], pipeerr[1]);
 
 
-  if (s -> display)
-  {
-    SetEnvironmentVariable("DISPLAY", s -> display);
-  }
+        SetHandleInformation(sfd_to_handle(pipein[1]), HANDLE_FLAG_INHERIT, 0);
+        SetHandleInformation(sfd_to_handle(pipeout[0]), HANDLE_FLAG_INHERIT, 0);
+        SetHandleInformation(sfd_to_handle(pipeerr[0]), HANDLE_FLAG_INHERIT, 0);
 
-  /*
-   * Change to users home directory
-   * TODO - pw_dir is utf-8, convert it to utf-16 and call _wchdir
-   * also change subsequent calls to SetEnvironmentVariable
-   */
+        /*
+        * Assign sockets to StartupInfo
+        */
 
-  _wchdir(pw_dir_utf16);
+        memset(&si, 0, sizeof(STARTUPINFO));
 
-  SetEnvironmentVariableW(L"HOME", pw_dir_utf16);
-  SetEnvironmentVariableW(L"USERPROFILE", pw_dir_utf16);
+        si.cb = sizeof(STARTUPINFO);
+        si.lpReserved = 0;
+        si.lpTitle = NULL; /* NULL means use exe name as title */
+        si.dwX = 0;
+        si.dwY = 0;
+        si.dwXSize = 5;
+        si.dwYSize = 5;
+        si.dwXCountChars = s->col;
+        si.dwYCountChars = s->row;
+        si.dwFillAttribute = 0;
+        si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS;
+        si.wShowWindow = 0; // FALSE ;
+        si.cbReserved2 = 0;
+        si.lpReserved2 = 0;
 
-  wchar_t *wstr, wchr;
-  wstr = wcschr(pw_dir_utf16, L':');
-  if (wstr) {
-	  wchr = *(wstr + 1);
-	  *(wstr + 1) = '\0';
-	  SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_utf16);
-	  *(wstr + 1) = wchr;
-	  SetEnvironmentVariableW(L"HOMEPATH", (wstr+1));
-  }
+        si.hStdInput = (HANDLE)sfd_to_handle(pipein[0]);
+        si.hStdOutput = (HANDLE)sfd_to_handle(pipeout[1]);
+        si.hStdError = (HANDLE)sfd_to_handle(pipeerr[1]);
+        si.lpDesktop = NULL;
 
+        SetEnvironmentVariable("USER", s->pw->pw_name);
+        SetEnvironmentVariable("USERNAME", s->pw->pw_name);
+        SetEnvironmentVariable("LOGNAME", s->pw->pw_name);
 
-  
-  // find the server name of the domain controller which created this token
-  GetDomainFromToken ( &hToken, buf, sizeof(buf));
-  if (buf[0])
-	  SetEnvironmentVariable("USERDOMAIN", buf );
+        set_nonblock(pipein[0]);
+        set_nonblock(pipein[1]);
+        set_nonblock(pipeout[0]);
+        set_nonblock(pipeout[1]);
+        set_nonblock(pipeerr[0]);
+        set_nonblock(pipeerr[1]);
 
-  /*
-   * Set SSH_CLIENT variable.
-   */
-  
-  snprintf(buf, sizeof buf, "%.50s %d %d",
-               get_remote_ipaddr(), get_remote_port(), get_local_port());
-  
-  SetEnvironmentVariableA("SSH_CLIENT", buf);
+        /*
+        * If we get this far, the user has already been authenticated
+        * We should either have a user token in authctxt -> methoddata
+        * (e.g. for password auth) or we need to create a more restrictive
+        * token using CreateUserToken for non-password auth mechanisms.
+        */
 
-  /*
-   * Set SSH_CONNECTION variable.
-   */
-  
-  laddr = get_local_ipaddr(packet_get_connection_in());
-
-  snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
-               get_remote_ipaddr(), get_remote_port(), laddr, get_local_port());
-               
-  free(laddr);
-  
-  SetEnvironmentVariableA("SSH_CONNECTION", buf);
-
-  if (original_command)
-          SetEnvironmentVariableA("SSH_ORIGINAL_COMMAND", original_command);
+        hToken = s->authctxt->methoddata;
 
 
-  // set better prompt for Windows cmd shell
-  if (!s -> is_subsystem) {
-	  snprintf(buf,sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
-	  SetEnvironmentVariableA("PROMPT", buf);
-  }
+        if (s->display)
+        {
+                SetEnvironmentVariable("DISPLAY", s->display);
+        }
 
-  /*
-   * Get the current user's name (associated with sshd thread).
-   */
+        /*
+        * Change to users home directory
+        * TODO - pw_dir is utf-8, convert it to utf-16 and call _wchdir
+        * also change subsequent calls to SetEnvironmentVariable
+        */
 
-  debug3("Home path before CreateProcessAsUser [%ls]", s -> pw -> pw_dir);
-  
-  DWORD size = 256;
-  
-  char name[256];
-  
-  GetUserName(name, &size);
+        _wchdir(pw_dir_utf16);
 
-  if ( (s->term) && (s->term[0]) )
-		  SetEnvironmentVariable("TERM", s->term);
-  /*
-   * Create new process as other user using access token object.
-   */
-  
-  debug("Executing command: %s", exec_command);
+        SetEnvironmentVariableW(L"HOME", pw_dir_utf16);
+        SetEnvironmentVariableW(L"USERPROFILE", pw_dir_utf16);
 
-  /*
-   * Create the child process 
-   */
-   
-  wchar_t exec_command_w[MAX_PATH];
-  
-  MultiByteToWideChar(CP_UTF8, 0, exec_command, -1, exec_command_w, MAX_PATH);
-  DWORD	dwStartupFlags = DETACHED_PROCESS;// CREATE_SUSPENDED;  // 0
- 
-  SetConsoleCtrlHandler(NULL, FALSE);
-  
+        wchar_t *wstr, wchr;
+        wstr = wcschr(pw_dir_utf16, L':');
+        if (wstr) {
+                wchr = *(wstr + 1);
+                *(wstr + 1) = '\0';
+                SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_utf16);
+                *(wstr + 1) = wchr;
+                SetEnvironmentVariableW(L"HOMEPATH", (wstr + 1));
+        }
+
+        // find the server name of the domain controller which created this token
+        GetDomainFromToken(&hToken, buf, sizeof(buf));
+        if (buf[0])
+                SetEnvironmentVariable("USERDOMAIN", buf);
+
+        /*
+        * Set SSH_CLIENT variable.
+        */
+
+        snprintf(buf, sizeof buf, "%.50s %d %d",
+                get_remote_ipaddr(), get_remote_port(), get_local_port());
+
+        SetEnvironmentVariableA("SSH_CLIENT", buf);
+
+        /*
+        * Set SSH_CONNECTION variable.
+        */
+
+        laddr = get_local_ipaddr(packet_get_connection_in());
+
+        snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
+                get_remote_ipaddr(), get_remote_port(), laddr, get_local_port());
+
+        free(laddr);
+
+        SetEnvironmentVariableA("SSH_CONNECTION", buf);
+
+        if (original_command)
+                SetEnvironmentVariableA("SSH_ORIGINAL_COMMAND", original_command);
+
+
+        // set better prompt for Windows cmd shell
+        if (!s->is_subsystem) {
+                snprintf(buf, sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
+                SetEnvironmentVariableA("PROMPT", buf);
+        }
+
+        /*
+        * Get the current user's name (associated with sshd thread).
+        */
+
+        debug3("Home path before CreateProcessAsUser [%ls]", s->pw->pw_dir);
+
+        DWORD size = 256;
+
+        char name[256];
+
+        GetUserName(name, &size);
+
+        if ((s->term) && (s->term[0]))
+                SetEnvironmentVariable("TERM", s->term);
+        /*
+        * Create new process as other user using access token object.
+        */
+
+        debug("Executing command: %s", exec_command);
+
+        /*
+        * Create the child process
+        */
+
+        wchar_t exec_command_w[MAX_PATH];
+
+        MultiByteToWideChar(CP_UTF8, 0, exec_command, -1, exec_command_w, MAX_PATH);
+        DWORD	dwStartupFlags = DETACHED_PROCESS;// CREATE_SUSPENDED;  // 0
+
+        SetConsoleCtrlHandler(NULL, FALSE);
+
         wchar_t* p_dir = utf8_to_utf16(s->pw->pw_dir);
         if (debug_flag)
                 b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
@@ -802,114 +722,131 @@ do_exec_no_pty(Session *s, const char *command)
                 b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
                         /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, pw_dir_utf16,
                         &si, &pi);
-  
-  if (!b)
-  {
-    debug("ERROR. Cannot create process (%u).\n", GetLastError());
-    
-    CloseHandle(hToken);
-    
-    exit(1);
-  }
-  else if (s->ttyfd != -1) { /*attach to shell console */
-	  FreeConsole();
-	  if (!debug_flag)
-		ImpersonateLoggedOnUser(hToken);
-	  while (AttachConsole(pi.dwProcessId) == FALSE) {
-		  Sleep(200);
-	  }
-	  if (!debug_flag)
-		  RevertToSelf();
-	  {
-		  /* TODO - check this - Create Process above is not respecting x# and y# chars, so we are doing this explicity on the 
-		   * attached console agein */
 
-		  COORD coord;
-		  coord.X = s->col;
-		  coord.Y = 9999;;
-		  SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coord);
-	  }
-  }
-  
-  /* 
-   * Save token used for create child process. We'll need it on cleanup
-   * to clean up DACL of Winsta0.
-   */
-  
-  /*
-   * Log the process handle (fake it as the pid) for termination lookups 
-   */
-   
-  s -> pid = pi.dwProcessId;
-  sw_add_child(pi.hProcess, pi.dwProcessId);
-  
-  // Add the child process created to select mux so that during our select data call we know if the process has exited
-  /* TODO - fix thi s*/
-  //int WSHELPAddChildToWatch ( HANDLE processtowatch);
-  //WSHELPAddChildToWatch ( pi.hProcess);
+        if (!b)
+        {
+                debug("ERROR. Cannot create process (%u).\n", GetLastError());
 
-  /* 
-   * Set interactive/non-interactive mode. 
-   */
-  
-  packet_set_interactive(s -> display != NULL, options.ip_qos_interactive, 
-                             options.ip_qos_bulk);
+                CloseHandle(hToken);
 
-  /* 
-   * We are the parent.  Close the child sides of the socket pairs. 
-   */
+                exit(1);
+        }
+        else if (s->ttyfd != -1) { /*attach to shell console */
+                FreeConsole();
+                if (!debug_flag)
+                        ImpersonateLoggedOnUser(hToken);
+                while (AttachConsole(pi.dwProcessId) == FALSE) {
+                        Sleep(200);
+                }
+                if (!debug_flag)
+                        RevertToSelf();
+                {
+                        /* TODO - check this - Create Process above is not respecting x# and y# chars, so we are doing this explicity on the
+                        * attached console agein */
 
-  close(pipein[0]);
-  close(pipeout[1]);
-  close(pipeerr[1]);
+                        COORD coord;
+                        coord.X = s->col;
+                        coord.Y = 9999;;
+                        SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+                }
+        }
 
-  ResumeThread ( pi.hThread ); /* now let cmd shell main thread be active s we have closed all i/o file handle that cmd will use */
-  SetConsoleCtrlHandler(NULL, TRUE);
+        /*
+        * Save token used for create child process. We'll need it on cleanup
+        * to clean up DACL of Winsta0.
+        */
 
-  /*
-   * Close child thread handles as we do not need it. Process handle we keep so that we can know if it has died o not
-   */
+        /*
+        * Log the process handle (fake it as the pid) for termination lookups
+        */
 
-  CloseHandle(pi.hThread);
+        s->pid = pi.dwProcessId;
+        sw_add_child(pi.hProcess, pi.dwProcessId);
 
-  // CloseHandle(pi.hProcess);
+        // Add the child process created to select mux so that during our select data call we know if the process has exited
+        /* TODO - fix thi s*/
+        //int WSHELPAddChildToWatch ( HANDLE processtowatch);
+        //WSHELPAddChildToWatch ( pi.hProcess);
 
-  /*
-   * Clear loginmsg, since it's the child's responsibility to display
-   * it to the user, otherwise multiple sessions may accumulate
-   * multiple copies of the login messages.
-   */
-  
-  buffer_clear(&loginmsg);
+        /*
+        * Set interactive/non-interactive mode.
+        */
 
-  /*
-   * Enter the interactive session.  Note: server_loop must be able to
-   * handle the case that fdin and fdout are the same.
-   */
-   
-  if (compat20) 
-  {
-	if ( s->ttyfd == -1)
-		session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s -> is_subsystem, 0);
-	else
-		session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s -> is_subsystem, 1); // tty interactive session
-  } 
-  else 
-  {
-    server_loop(pi.hProcess, pipein[1], pipeout[0], pipeerr[0]);
-    
-    /* 
-     * server_loop has closed inout[0] and err[0]. 
-     */
-  }
-  
-  return 0;
+        packet_set_interactive(s->display != NULL, options.ip_qos_interactive,
+                options.ip_qos_bulk);
 
-  #else
-  
-  /*
-   * Original OpenSSH code.
-   */
+        /*
+        * We are the parent.  Close the child sides of the socket pairs.
+        */
+
+        close(pipein[0]);
+        close(pipeout[1]);
+        close(pipeerr[1]);
+
+        ResumeThread(pi.hThread); /* now let cmd shell main thread be active s we have closed all i/o file handle that cmd will use */
+        SetConsoleCtrlHandler(NULL, TRUE);
+
+        /*
+        * Close child thread handles as we do not need it. Process handle we keep so that we can know if it has died o not
+        */
+
+        CloseHandle(pi.hThread);
+
+        // CloseHandle(pi.hProcess);
+
+        /*
+        * Clear loginmsg, since it's the child's responsibility to display
+        * it to the user, otherwise multiple sessions may accumulate
+        * multiple copies of the login messages.
+        */
+
+        buffer_clear(&loginmsg);
+
+        /*
+        * Enter the interactive session.  Note: server_loop must be able to
+        * handle the case that fdin and fdout are the same.
+        */
+
+        if (compat20)
+        {
+                if (s->ttyfd == -1)
+                        session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s->is_subsystem, 0);
+                else
+                        session_set_fds(s, pipein[1], pipeout[0], pipeerr[0], s->is_subsystem, 1); // tty interactive session
+        }
+        else
+        {
+                server_loop(pi.hProcess, pipein[1], pipeout[0], pipeerr[0]);
+
+                /*
+                * server_loop has closed inout[0] and err[0].
+                */
+        }
+
+        return 0;
+
+}
+
+int
+do_exec_no_pty(Session *s, const char *command) {
+        return do_exec_windows(s, command, 0);
+}
+
+int
+do_exec_pty(Session *s, const char *command) {
+        return do_exec_windows(s, command, 1);
+}
+
+#else
+
+/*
+ * This is called to fork and execute a command when we have no tty.  This
+ * will call do_child from the child, and server_loop from the parent after
+ * setting up file descriptors and such.
+ */
+int
+do_exec_no_pty(Session *s, const char *command)
+{
 	pid_t pid;
 
 #ifdef USE_PIPES
@@ -1094,7 +1031,7 @@ do_exec_no_pty(Session *s, const char *command)
 	}
 #endif
 	return 0;
-#endif /* else WIN32_FIXME */
+
 }
 
 /*
@@ -1106,11 +1043,6 @@ do_exec_no_pty(Session *s, const char *command)
 int
 do_exec_pty(Session *s, const char *command)
 {
-#ifndef WIN32_FIXME
-
-  /*
-   * Original OpenSSH code.
-   */
 	int fdout, ptyfd, ttyfd, ptymaster;
 	pid_t pid;
 
@@ -1222,17 +1154,8 @@ do_exec_pty(Session *s, const char *command)
 		/* server_loop _has_ closed ptyfd and fdout. */
 	}
 	return 0;
-#else
-
-  /*
-   * Win32 code.
-   */
-   
-  //return 0;
-  return do_exec_no_pty(s, command);
-
-#endif 
 }
+#endif 
 
 #ifdef LOGIN_NEEDS_UTMPX
 static void
