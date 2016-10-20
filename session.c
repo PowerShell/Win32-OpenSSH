@@ -552,7 +552,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                         memcpy(c, command, strlen(command));
                         c += strlen(command);
                 }
-                *c == '\0';
+                *c = '\0';
         }
 
         /* setup Environment varibles */
@@ -561,7 +561,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                 char buf[128];
                 char* laddr;
 
-                if ((tmp == utf8_to_utf16(s->pw->pw_name)) != NULL)
+                if ((tmp = utf8_to_utf16(s->pw->pw_name)) == NULL)
                         fatal("%s, out of memory");
                 SetEnvironmentVariableW(L"USERNAME", tmp);
                 free(tmp);               
@@ -579,6 +579,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                         wchar_t wc = pw_dir_w[2];
                         pw_dir_w[2] = L'\0';
                         SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_w);
+                        pw_dir_w[2] = wc;
                 }
 
                 snprintf(buf, sizeof buf, "%.50s %d %d",

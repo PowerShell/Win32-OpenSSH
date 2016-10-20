@@ -90,8 +90,8 @@ BOOL WINAPI ctrl_c_handler(
 	return TRUE;
 }
 
-int main(int argc, char **argv) {
-	
+int wmain(int argc, wchar_t **argv) {
+        
 	w32posix_initialize();
 	load_config();
 	if (!StartServiceCtrlDispatcherW(dispatch_table))  {
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
 			if (argc == 2) {
 				/*agent process is likely a spawned child*/
 				char* h = 0;
-				h += atoi(*(argv + 1));
+				h += _wtoi(*(argv + 1));
 				if (h != 0) {
 					log_init("ssh-agent", config_log_level(), 1, 0);
 					agent_start(FALSE, TRUE, h);
@@ -146,7 +146,7 @@ int scm_start_service(DWORD num, LPWSTR* args) {
 	ZeroMemory(&service_status, sizeof(service_status));
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
-	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
+        ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	log_init("ssh-agent", config_log_level(), 1, 0);
 	agent_start(FALSE, FALSE, 0);
 	return 0;
