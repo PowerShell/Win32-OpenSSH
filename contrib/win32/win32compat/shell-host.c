@@ -1047,7 +1047,7 @@ cleanup:
     return 0;
 }
 
-int wmain(int ac, wchar_t **av) {
+int start_with_pty(int ac, wchar_t **av) {
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
     wchar_t cmd[MAX_PATH];
@@ -1075,18 +1075,6 @@ int wmain(int ac, wchar_t **av) {
 
     memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
     sa.bInheritHandle = TRUE;
-
-    /* create job to hold all child processes */
-    {
-        /* TODO - this does not work as expected*/
-        HANDLE job = CreateJobObject(NULL, NULL);
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_info;
-        memset(&job_info, 0, sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
-        job_info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &job_info, sizeof(job_info)))
-            return -1;
-        CloseHandle(job);
-    }
 
     /* WM_APPEXIT */
     hostThreadId = GetCurrentThreadId();
@@ -1169,4 +1157,178 @@ cleanup:
     FreeConsole();
 
     return 0;
+}
+
+HANDLE child_pipe_read;
+HANDLE child_pipe_write;
+DWORD WINAPI MonitorChild_nopty(
+        _In_ LPVOID lpParameter
+        ) {
+        WaitForSingleObject(child, INFINITE);
+        CloseHandle(pipe_in);
+        //printf("XXXX CHILD PROCESS DEAD XXXXX");
+        return 0;
+}
+
+int start_withno_pty(int ac, wchar_t **av) {
+        STARTUPINFO si;
+        PROCESS_INFORMATION pi;
+        wchar_t cmd[MAX_PATH];
+        SECURITY_ATTRIBUTES sa;
+        BOOL ret;
+
+        pipe_in = GetStdHandle(STD_INPUT_HANDLE);
+        pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
+        pipe_err = GetStdHandle(STD_ERROR_HANDLE);
+
+        /* copy pipe handles passed through std io*/
+        if ((pipe_in == INVALID_HANDLE_VALUE)
+                || (pipe_out == INVALID_HANDLE_VALUE)
+                || (pipe_err == INVALID_HANDLE_VALUE))
+                return -1;
+
+        memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
+        sa.bInheritHandle = TRUE;
+        if (!CreatePipe(&child_pipe_read, &child_pipe_write, &sa, 128))
+                return -1;
+
+        memset(&si, 0, sizeof(STARTUPINFO));
+        memset(&pi, 0, sizeof(PROCESS_INFORMATION));
+
+        si.cb = sizeof(STARTUPINFO);
+        si.dwFlags = STARTF_USESTDHANDLES;
+        si.hStdInput = child_pipe_read;
+        si.hStdOutput = pipe_out;
+        si.hStdError = pipe_err;
+
+        /* disable inheritance on child_pipe_write and pipe_in*/
+        GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
+        GOTO_CLEANUP_ON_FALSE(SetHandleInformation(child_pipe_write, HANDLE_FLAG_INHERIT, 0));
+
+        /*TODO - pick this up from system32*/
+        cmd[0] = L'\0';
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L"cmd.exe"));
+        ac -= 2;
+        av += 2;
+        if (ac)
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" /c"));
+        while (ac) {
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" "));
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, *av));
+                ac--;
+                av++;
+        }
+
+        GOTO_CLEANUP_ON_FALSE(CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi));
+
+        /* close unwanted handles*/
+        CloseHandle(child_pipe_read);
+        child_pipe_read = INVALID_HANDLE_VALUE;
+
+        child = pi.hProcess;
+        /* monitor child exist */
+        monitor_thread = CreateThread(NULL, 0, MonitorChild_nopty, NULL, 0, NULL);
+        if (monitor_thread == INVALID_HANDLE_VALUE)
+                goto cleanup;
+
+        /* disable Ctrl+C hander in this process*/
+        SetConsoleCtrlHandler(NULL, TRUE);
+
+        /* process data from pipe_in and route appropriately */
+        while (1) {
+                char buf[128];
+                DWORD rd = 0, wr = 0, i = 0;
+                GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, 128, &rd, NULL));
+
+                while (i < rd) {
+
+                        /* skip arrow keys */
+                        if ((rd - i >= 3) && (buf[i] == '\033') && (buf[i + 1] == '[')
+                                && (buf[i + 2] >= 'A') && (buf[i + 2] <= 'D')) {
+                                i += 3;
+                                continue;
+                        }
+
+                        /* skip tab */
+                        if (buf[i] == '\t') {
+                                i++;
+                                continue;
+                        }
+
+                        // Ctrl +C
+                        if (buf[i] == '\003') {
+                                GOTO_CLEANUP_ON_FALSE(GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0));
+                                in_cmd_len = 0;
+                                i++;
+                                continue;
+                        }
+
+                        // for backspace, we need to send space and another backspace for visual erase
+                        if (buf[i] == '\b') {
+                                if (in_cmd_len > 0) {
+                                        GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, "\b \b", 3, &wr, NULL));
+                                        in_cmd_len--;
+                                }
+                                i++;
+                                continue;
+                        }
+
+                        //for CR and LF
+                        if ((buf[i] == '\r') || (buf[i] == '\n')) {
+
+                                /* TODO - do a much accurate mapping */
+                                GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
+                                if ((buf[i] == '\r') && ((i == rd - 1) || (buf[i + 1] != '\n'))) {
+                                        buf[i] = '\n';
+                                        GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
+                                }
+                                in_cmd[in_cmd_len] = buf[i];
+                                in_cmd_len++;
+                                GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
+                                in_cmd_len = 0;
+                                i++;
+                                continue;
+                        }
+
+
+                        GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
+                        in_cmd[in_cmd_len] = buf[i];
+                        in_cmd_len++;
+                        if (in_cmd_len == MAX_CMD_LEN - 1) {
+                                GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
+                                in_cmd_len = 0;
+                        }
+
+                        i++;
+                }
+        }
+
+cleanup:
+
+        if (child != INVALID_HANDLE_VALUE)
+                TerminateProcess(child, 0);
+        if (monitor_thread != INVALID_HANDLE_VALUE)
+                WaitForSingleObject(monitor_thread, INFINITE);
+        return 0;        
+}
+
+int wmain(int ac, wchar_t **av) {
+
+
+        /* create job to hold all child processes */
+        {
+                /* TODO - this does not work as expected*/
+                HANDLE job = CreateJobObject(NULL, NULL);
+                JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_info;
+                memset(&job_info, 0, sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+                job_info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &job_info, sizeof(job_info)))
+                        return -1;
+                CloseHandle(job);
+        }
+
+        if ((ac == 1) || wcscmp(av[1], L"-nopty"))
+                return start_with_pty(ac, av);
+        else
+                return start_withno_pty(ac, av);
 }
