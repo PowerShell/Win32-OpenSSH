@@ -493,7 +493,7 @@ do_authenticated1(Authctxt *authctxt)
 int do_exec_windows(Session *s, const char *command, int pty) {
         int pipein[2], pipeout[2], pipeerr[2], r;
         char *exec_command = NULL, *progdir = w32_programdir();
-        wchar_t* exec_command_w = NULL;
+        wchar_t *exec_command_w = NULL, *pw_dir_w;
 
         if (s->is_subsystem >= SUBSYSTEM_INT_SFTP_ERROR)
         {
@@ -503,10 +503,12 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         }
 
         /* Create three pipes for stdin, stdout and stderr */
-        if (pipe(pipein) == -1 || pipe(pipeout) == -1 || pipe(pipeerr) == -1) {
-                error("%s: cannot create pipe: %.100s", __func__, strerror(errno));
-                return -1;
-        }
+        if (pipe(pipein) == -1 || pipe(pipeout) == -1 || pipe(pipeerr) == -1) 
+                fatal("%s: cannot create pipe: %.100s", __func__, strerror(errno));
+        
+        if ((pw_dir_w = utf8_to_utf16(s->pw->pw_dir)) == NULL)
+                fatal("%s: out of memory");
+
 
         set_nonblock(pipein[0]);
         set_nonblock(pipein[1]);
@@ -536,14 +538,76 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                         memcpy(exec_command + strlen(progdir) + 1, command, strlen(command) + 1);
                 }
         } else {
-                char* shell_host = pty ? "ssh-shellhost.exe -t " : "ssh-shellhost.exe ";
-                exec_command = malloc(strlen(progdir) + strlen(shell_host) + (command ? strlen(command) : 0));
+                char *shell_host = pty ? "ssh-shellhost.exe " : "ssh-shellhost.exe -nopty ", *c;
+                exec_command = malloc(strlen(progdir) + 1 + strlen(shell_host) + (command ? strlen(command) : 0) + 1);
                 if (exec_command == NULL)
                         fatal("%s, out of memory");
+                c = exec_command;
+                memcpy(c, progdir, strlen(progdir));
+                c += strlen(progdir);
+                *c++ = '\\';
+                memcpy(c, shell_host, strlen(shell_host));
+                c += strlen(shell_host);
+                if (command) {
+                        memcpy(c, command, strlen(command));
+                        c += strlen(command);
+                }
+                *c == '\0';
+        }
+
+        /* setup Environment varibles */
+        {
+                wchar_t* tmp;
+                char buf[128];
+                char* laddr;
+
+                if ((tmp == utf8_to_utf16(s->pw->pw_name)) != NULL)
+                        fatal("%s, out of memory");
+                SetEnvironmentVariableW(L"USERNAME", tmp);
+                free(tmp);               
+
+                if (s->display)
+                        SetEnvironmentVariableW(L"DISPLAY", s->display);
                 
+
+                //_wchdir(pw_dir_w);
+
+                SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w);
+                SetEnvironmentVariableW(L"USERPROFILE", pw_dir_w);
+
+                if (pw_dir_w[1] == L':') {
+                        wchar_t wc = pw_dir_w[2];
+                        pw_dir_w[2] = L'\0';
+                        SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_w);
+                }
+
+                snprintf(buf, sizeof buf, "%.50s %d %d",
+                        get_remote_ipaddr(), get_remote_port(), get_local_port());
+
+                SetEnvironmentVariableA("SSH_CLIENT", buf);
+
+                laddr = get_local_ipaddr(packet_get_connection_in());
+
+                snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
+                        get_remote_ipaddr(), get_remote_port(), laddr, get_local_port());
+
+                free(laddr);
+
+                SetEnvironmentVariableA("SSH_CONNECTION", buf);
+
+                if (original_command)
+                        SetEnvironmentVariableA("SSH_ORIGINAL_COMMAND", original_command);
+
+
+                if ((s->term) && (s->term[0]))
+                        SetEnvironmentVariable("TERM", s->term);
+
+                if (!s->is_subsystem) {
+                        snprintf(buf, sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
+                        SetEnvironmentVariableA("PROMPT", buf);
+                }
         }
         
-        wchar_t* pw_dir_utf16 = utf8_to_utf16(s->pw->pw_dir);
         extern int debug_flag;
 
         PROCESS_INFORMATION pi;
@@ -553,28 +617,6 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 
         HANDLE hToken = INVALID_HANDLE_VALUE;
 
-
-        char cmd[1024];
-        char *exec_command;
-        char *laddr;
-        char buf[256];
-
-
-
-        if (!command)
-        {
-                exec_command = s->pw->pw_shell;
-        }
-        else
-        {
-                exec_command = command;
-        }
-
-
-        int retcode = -1;
-        if ((!s->is_subsystem) && (s->ttyfd != -1))
-        {
-        }
 
         /*
         * Assign sockets to StartupInfo
@@ -602,122 +644,21 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         si.hStdError = (HANDLE)sfd_to_handle(pipeerr[1]);
         si.lpDesktop = NULL;
 
-        SetEnvironmentVariable("USER", s->pw->pw_name);
-        SetEnvironmentVariable("USERNAME", s->pw->pw_name);
-        SetEnvironmentVariable("LOGNAME", s->pw->pw_name);
-
-        /*
-        * If we get this far, the user has already been authenticated
-        * We should either have a user token in authctxt -> methoddata
-        * (e.g. for password auth) or we need to create a more restrictive
-        * token using CreateUserToken for non-password auth mechanisms.
-        */
-
         hToken = s->authctxt->methoddata;
-
-
-        if (s->display)
-        {
-                SetEnvironmentVariable("DISPLAY", s->display);
-        }
-
-        /*
-        * Change to users home directory
-        * TODO - pw_dir is utf-8, convert it to utf-16 and call _wchdir
-        * also change subsequent calls to SetEnvironmentVariable
-        */
-
-        _wchdir(pw_dir_utf16);
-
-        SetEnvironmentVariableW(L"HOME", pw_dir_utf16);
-        SetEnvironmentVariableW(L"USERPROFILE", pw_dir_utf16);
-
-        wchar_t *wstr, wchr;
-        wstr = wcschr(pw_dir_utf16, L':');
-        if (wstr) {
-                wchr = *(wstr + 1);
-                *(wstr + 1) = '\0';
-                SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_utf16);
-                *(wstr + 1) = wchr;
-                SetEnvironmentVariableW(L"HOMEPATH", (wstr + 1));
-        }
-
-        // find the server name of the domain controller which created this token
-        GetDomainFromToken(&hToken, buf, sizeof(buf));
-        if (buf[0])
-                SetEnvironmentVariable("USERDOMAIN", buf);
-
-        /*
-        * Set SSH_CLIENT variable.
-        */
-
-        snprintf(buf, sizeof buf, "%.50s %d %d",
-                get_remote_ipaddr(), get_remote_port(), get_local_port());
-
-        SetEnvironmentVariableA("SSH_CLIENT", buf);
-
-        /*
-        * Set SSH_CONNECTION variable.
-        */
-
-        laddr = get_local_ipaddr(packet_get_connection_in());
-
-        snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
-                get_remote_ipaddr(), get_remote_port(), laddr, get_local_port());
-
-        free(laddr);
-
-        SetEnvironmentVariableA("SSH_CONNECTION", buf);
-
-        if (original_command)
-                SetEnvironmentVariableA("SSH_ORIGINAL_COMMAND", original_command);
-
-
-        // set better prompt for Windows cmd shell
-        if (!s->is_subsystem) {
-                snprintf(buf, sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
-                SetEnvironmentVariableA("PROMPT", buf);
-        }
-
-        /*
-        * Get the current user's name (associated with sshd thread).
-        */
-
-        debug3("Home path before CreateProcessAsUser [%ls]", s->pw->pw_dir);
-
-        DWORD size = 256;
-
-        char name[256];
-
-        GetUserName(name, &size);
-
-        if ((s->term) && (s->term[0]))
-                SetEnvironmentVariable("TERM", s->term);
-        /*
-        * Create new process as other user using access token object.
-        */
 
         debug("Executing command: %s", exec_command);
 
-        /*
-        * Create the child process
-        */
+        /* Create the child process     */
 
-        wchar_t exec_command_w[MAX_PATH];
+        exec_command_w = utf8_to_utf16(exec_command);
 
-        MultiByteToWideChar(CP_UTF8, 0, exec_command, -1, exec_command_w, MAX_PATH);
-        DWORD	dwStartupFlags = DETACHED_PROCESS;// CREATE_SUSPENDED;  // 0
-
-        SetConsoleCtrlHandler(NULL, FALSE);
-
-        wchar_t* p_dir = utf8_to_utf16(s->pw->pw_dir);
         if (debug_flag)
                 b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
-                        /*CREATE_NEW_PROCESS_GROUP*/ 	dwStartupFlags, NULL, pw_dir_utf16,
+                        DETACHED_PROCESS, NULL, pw_dir_w,
                         &si, &pi);
         else
                 b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
-                        /*CREATE_NEW_PROCESS_GROUP*/ dwStartupFlags, NULL, pw_dir_utf16,
+                        DETACHED_PROCESS , NULL, pw_dir_w,
                         &si, &pi);
 
         if (!b)
@@ -728,7 +669,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 
                 exit(1);
         }
-        else if (s->ttyfd != -1) { /*attach to shell console */
+        else if (pty) { /*attach to shell console */
                 FreeConsole();
                 if (!debug_flag)
                         ImpersonateLoggedOnUser(hToken);
@@ -748,22 +689,8 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                 }
         }
 
-        /*
-        * Save token used for create child process. We'll need it on cleanup
-        * to clean up DACL of Winsta0.
-        */
-
-        /*
-        * Log the process handle (fake it as the pid) for termination lookups
-        */
-
         s->pid = pi.dwProcessId;
         sw_add_child(pi.hProcess, pi.dwProcessId);
-
-        // Add the child process created to select mux so that during our select data call we know if the process has exited
-        /* TODO - fix thi s*/
-        //int WSHELPAddChildToWatch ( HANDLE processtowatch);
-        //WSHELPAddChildToWatch ( pi.hProcess);
 
         /*
         * Set interactive/non-interactive mode.
@@ -780,9 +707,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         close(pipeout[1]);
         close(pipeerr[1]);
 
-        ResumeThread(pi.hThread); /* now let cmd shell main thread be active s we have closed all i/o file handle that cmd will use */
-        SetConsoleCtrlHandler(NULL, TRUE);
-
+        
         /*
         * Close child thread handles as we do not need it. Process handle we keep so that we can know if it has died o not
         */
