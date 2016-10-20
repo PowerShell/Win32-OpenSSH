@@ -118,3 +118,26 @@ w32_fopen_utf8(const char *path, const char *mode) {
 
 	return f;
 }
+
+
+wchar_t*
+utf8_to_utf16(const char *utf8) {
+        int needed = 0;
+        wchar_t* utf16 = NULL;
+        if ((needed = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0)) == 0 ||
+                (utf16 = malloc(needed * sizeof(wchar_t))) == NULL ||
+                MultiByteToWideChar(CP_UTF8, 0, utf8, -1, utf16, needed) == 0)
+                return NULL;
+        return utf16;
+}
+
+char*
+utf16_to_utf8(const wchar_t* utf16) {
+        int needed = 0;
+        char* utf8 = NULL;
+        if ((needed = WideCharToMultiByte(CP_UTF8, 0, utf16, -1, NULL, 0, NULL, NULL)) == 0 ||
+                (utf8 = malloc(needed)) == NULL ||
+                WideCharToMultiByte(CP_UTF8, 0, utf16, -1, utf8, needed, NULL, NULL) == 0)
+                return NULL;
+        return utf8;
+}

@@ -46,6 +46,8 @@
 #include "digest.h"
 #include "agent.h"
 
+#include <utf.h>
+
 static int use_privsep = -1;
 Buffer cfg;
 ServerOptions options;
@@ -67,14 +69,14 @@ int	 kexgex_server(struct ssh * sh) {
 }
 
 static
-int GetCurrentModulePath(char *path, int pathSize)
+int GetCurrentModulePath(wchar_t *path, int pathSize)
 {
-	if (GetModuleFileName(NULL, path, pathSize)) {
+	if (GetModuleFileNameW(NULL, path, pathSize)) {
 		int i;
 		int lastSlashPos = 0;
 
 		for (i = 0; path[i]; i++) {
-			if (path[i] == '/' || path[i] == '\\') {
+			if (path[i] == L'/' || path[i] == L'\\') {
 				lastSlashPos = i;
 			}
 		}
@@ -86,17 +88,20 @@ int GetCurrentModulePath(char *path, int pathSize)
 }
 
 int load_config() {
-	char basePath[MAX_PATH] = { 0 };
-	char path[MAX_PATH] = { 0 };
-
+	wchar_t basePath[MAX_PATH] = { 0 };
+	wchar_t path[MAX_PATH] = { 0 };
+        
 	/* TODO - account for UNICODE paths*/
-	if (GetCurrentModulePath(basePath, MAX_PATH) == 0)
-	{
-		strncpy(path, basePath, MAX_PATH);
-		strncat(path, "/sshd_config", MAX_PATH);
-		config_file_name = path;
-	}
-	buffer_init(&cfg);
+        if (GetCurrentModulePath(basePath, MAX_PATH) == -1)
+                return -1;
+
+	wcsncpy(path, basePath, MAX_PATH);
+        wcsncat(path, L"/sshd_config", MAX_PATH);
+	
+        if ((config_file_name = utf16_to_utf8(path)) == NULL)
+                return -1;
+	
+        buffer_init(&cfg);
 	initialize_server_options(&options);
 	load_server_config(config_file_name, &cfg);
 	parse_server_config(&options, config_file_name, &cfg, NULL);
@@ -111,14 +116,18 @@ int config_log_level() {
 
 int pubkey_allowed(struct sshkey* pubkey, wchar_t* wuser, wchar_t* wuser_home) {
 	struct passwd pw;
-	char user[256], user_home[MAX_PATH];
+        int ret;
+	char *user = NULL, *user_home = NULL;
 	memset(&pw, 0, sizeof(pw));
 
-	if (WideCharToMultiByte(CP_UTF8, 0, wuser, -1, user, 256, NULL, NULL) == 0)
-		return 0;
-	/* BUG - pw structure is assumed to be filled with unicode strings by expand_authorized_keys()*/
-	//WideCharToMultiByte(CP_UTF8, 0, wuser_home, -1, user_home, MAX_PATH, NULL, NULL);
-	pw.pw_dir = wuser_home;
+        if ((user_home = utf16_to_utf8(wuser_home)) == NULL ||
+            (user = utf16_to_utf8(wuser)) == NULL)
+                return 0;
+	
+        pw.pw_dir = user_home;
 	pw.pw_name = user;
-	return user_key_allowed(&pw, pubkey, 1);
+	ret = user_key_allowed(&pw, pubkey, 1);
+        free(user);
+        free(user_home);
+        return ret;
 }

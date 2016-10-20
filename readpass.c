@@ -334,7 +334,7 @@ read_passphrase(const char *prompt, int flags)
   /*
    * Show prompt for user.
    */
-  _cputs(prompt);
+  _cputws(utf8_to_utf16(prompt));
 
    len = retr = 0;
   int bufsize = sizeof(buf);

@@ -528,16 +528,6 @@ main(int ac, char **av)
 	u_char conn_hash[SSH_DIGEST_MAX_LENGTH];
 	char *conn_hash_hex;
 	
-  #ifdef WIN32_FIXME
-  
-    /*
-     * Initialize wrapped stdio.
-     */
-
-    w32posix_initialize();
-   
-  #endif
-
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
@@ -560,6 +550,7 @@ main(int ac, char **av)
 	 */
 	closefrom(STDERR_FILENO + 1);
 
+#ifndef WINDOWS
 	/*
 	 * Save the original real uid.  It will be needed later (uid-swapping
 	 * may clobber the real uid).
@@ -575,6 +566,7 @@ main(int ac, char **av)
 	 * has been made, as we may need to create the port several times).
 	 */
 	PRIV_END;
+#endif
 
 #ifdef HAVE_SETRLIMIT
 	/* If we are installed setuid root be careful to not drop core. */
@@ -1336,14 +1328,8 @@ main(int ac, char **av)
 	 * directory if it doesn't already exist.
 	 */
 	if (config == NULL) {
-#ifdef WIN32_FIXME
-  r = snprintf(buf, sizeof(buf), "%ls%s%s", pw -> pw_dir,
-                   wcscmp(pw -> pw_dir, L"/") ? "/" : "", 
-                       _PATH_SSH_USER_DIR);
-#else
 	r = snprintf(buf, sizeof buf, "%s%s%s", pw->pw_dir,
 		    strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
-#endif
 
 		if (r > 0 && (size_t)r < sizeof(buf) && stat(buf, &st) < 0) {
 #ifdef WITH_SELINUX
@@ -2081,16 +2067,8 @@ load_public_identity_files(void)
 	if ((pw = getpwuid(original_real_uid)) == NULL)
 		fatal("load_public_identity_files: getpwuid failed");
 	pwname = xstrdup(pw->pw_name);
-#ifdef WIN32_FIXME
-  pwdir = _wcsdup(pw -> pw_dir);
-  
-  if (pwdir)
-  {
-    sprintf(pwdir, "%ls", pw -> pw_dir);
-  }
-#else
 	pwdir = xstrdup(pw->pw_dir);
-#endif
+
 	if (gethostname(thishost, sizeof(thishost)) == -1)
 		fatal("load_public_identity_files: gethostname: %s",
 		    strerror(errno));

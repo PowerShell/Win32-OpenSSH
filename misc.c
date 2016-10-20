@@ -223,11 +223,8 @@ pwcopy(struct passwd *pw)
 	copy->pw_class = xstrdup(pw->pw_class);
 #endif
 
-#ifdef WIN32_FIXME//N
-  copy -> pw_dir = (char*)_wcsdup((wchar_t*)pw->pw_dir);
-#else
+
 	copy->pw_dir = xstrdup(pw->pw_dir);
-#endif
 	copy->pw_shell = xstrdup(pw->pw_shell);
 	return copy;
 }
@@ -677,64 +674,6 @@ percent_expand(const char *string, ...)
 #undef EXPAND_MAX_KEYS
 }
 
-#ifdef WIN32_FIXME
-wchar_t    *percent_expand_w(const wchar_t *string, ...)
-{
-#define EXPAND_MAX_KEYS 16
-        u_int num_keys, i, j;
-        struct {
-                const wchar_t *key;
-                const wchar_t *repl;
-        } keys[EXPAND_MAX_KEYS];
-        wchar_t buf[4096];
-        wchar_t *aptr = NULL;
-        va_list ap;
-
-        /* Gather keys */
-        va_start(ap, string);
-        for (num_keys = 0; num_keys < EXPAND_MAX_KEYS; num_keys++) {
-                keys[num_keys].key = va_arg(ap, wchar_t *);
-                if (keys[num_keys].key == NULL)
-                        break;
-                keys[num_keys].repl = va_arg(ap, wchar_t *);
-                if (keys[num_keys].repl == NULL)
-                        fatal("%s: NULL replacement", __func__);
-        }
-        if (num_keys == EXPAND_MAX_KEYS && va_arg(ap, wchar_t *) != NULL)
-                fatal("%s: too many keys", __func__);
-        va_end(ap);
-
-        /* Expand string */
-        *buf = L'\0';
-        for (i = 0; *string != L'\0'; string++) {
-                if (*string != L'%') {
- append:
-                        buf[i++] = *string;
-                        if (i >= sizeof(buf))
-                                fatal("%s: string too long", __func__);
-                        buf[i] = L'\0';
-                        continue;
-                }
-                string++;
-                /* %% case */
-                if (*string == L'%')
-                        goto append;
-                for (j = 0; j < num_keys; j++) {
-                        if (wcschr(keys[j].key, *string) != NULL) {
-                                aptr = wcsncat(buf, keys[j].repl, sizeof(buf));
-                                buf[sizeof(buf)-1] = 0;
-                                if (aptr == NULL)
-                                        fatal("%s: string too long", __func__);
-                                break;
-                        }
-                }
-                if (j >= num_keys)
-                        fatal("%s: unknown key %%%c", __func__, *string);
-        }
-        return (_wcsdup(buf));
-#undef EXPAND_MAX_KEYS
-}
-#endif
 /*
  * Read an entire line from a public key file into a static buffer, discarding
  * lines that exceed the buffer size.  Returns 0 on success, -1 on failure.

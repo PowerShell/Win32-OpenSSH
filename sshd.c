@@ -1691,43 +1691,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	}
 }
 
-#ifdef WIN32_FIXME
-
-  /*
-   * Win32 only.
-   */
-   
-
-  /*
-   * This function handles exit signal from parent process.
-   */
-
-  BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
-  {
-		switch( dwCtrlType )
-		{
-		case CTRL_C_EVENT:
-			return TRUE; // control C will be passed to shell but sshd wil not exit
-
-	    case CTRL_BREAK_EVENT:
-		case CTRL_LOGOFF_EVENT:
-			break;
-
-		default:
-			break;
-		}
-
-	debug("Exit signal received...");
-
-    cleanup_exit(0);
-    
-    return TRUE;
-  }
-
-#endif /* WIN32_FIXME */
-
-
-
 /*
  * Main program for the daemon.
  */
@@ -1768,10 +1731,6 @@ main(int ac, char **av)
   
     AllocConsole();
 
-    SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
-  
-    w32posix_initialize();
-  
   #endif /* WIN32_FIXME */
 
 
@@ -1936,9 +1895,10 @@ main(int ac, char **av)
       {
         do
         {
-          SERVICE_TABLE_ENTRY DispatchTable[] = 
+                int  wmain(int , wchar_t **);
+                SERVICE_TABLE_ENTRYW DispatchTable[] =
           { 
-            {SVCNAME, (LPSERVICE_MAIN_FUNCTION) main},
+            {L"SSHD", (LPSERVICE_MAIN_FUNCTIONW) wmain},
             {NULL, NULL} 
           };
  
@@ -1961,7 +1921,7 @@ main(int ac, char **av)
            * for any other reason, bail out.
            */
            
-          if (!StartServiceCtrlDispatcher(DispatchTable))
+          if (!StartServiceCtrlDispatcherW(DispatchTable))
           { 
             if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
             {
@@ -2213,6 +2173,7 @@ main(int ac, char **av)
   logit("[Build " __DATE__ " " __TIME__ "]");
 #endif
 
+#ifndef WINDOWS
 	/* Store privilege separation user for later use if required. */
 	if ((privsep_pw = getpwnam(SSH_PRIVSEP_USER)) == NULL) {
 		if (use_privsep || options.kerberos_authentication)
@@ -2226,6 +2187,7 @@ main(int ac, char **av)
 		privsep_pw->pw_passwd = xstrdup("*");
 	}
 	endpwent();
+#endif
 
 	/* load host keys */
 	sensitive_data.host_keys = xcalloc(options.num_host_key_files,

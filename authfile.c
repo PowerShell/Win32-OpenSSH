@@ -183,7 +183,7 @@ sshkey_perm_ok(int fd, const char *filename)
 	if (check_ntsec(filename))
 #endif
 
-#ifndef WIN32_FIXME//R
+#ifndef WINDOWS /*TODO - implement permission checks on Windows*/
 	if ((st.st_uid == getuid()) && (st.st_mode & 077) != 0) {
 		error("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 		error("@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @");

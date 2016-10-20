@@ -30,7 +30,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sftp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\win32compat\wmain.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)win32_dirent.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -60,8 +60,8 @@
 #include "sftp.h"
 #include "sftp-common.h"
 
-
 #ifdef WIN32_FIXME
+#include <Shlwapi.h>
 
   char * get_inside_path(char *, BOOL, BOOL);
   int readlink(const char *path, char *link, int linklen);
@@ -72,6 +72,8 @@
    * without slash at the end).
    */
 
+  char *realpathWin32(const char *path, char resolved[PATH_MAX]);
+  char *realpathWin32i(const char *path, char resolved[PATH_MAX]);
   #define realpath realpathWin32
 
 #endif /* WIN32_FIXME */
@@ -2157,3 +2159,59 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	}
 //#endif /* else WIN32 */
 }
+
+#ifdef WIN32_FIXME
+char *realpathWin32(const char *path, char resolved[PATH_MAX])
+{
+    char realpath[PATH_MAX];
+
+    strlcpy(resolved, path + 1, sizeof(realpath));
+    backslashconvert(resolved);
+    PathCanonicalizeA(realpath, resolved);
+    slashconvert(realpath);
+
+    /*
+    * Store terminating slash in 'X:/' on Windows.
+    */
+
+    if (realpath[1] == ':' && realpath[2] == 0)
+    {
+        realpath[2] = '/';
+        realpath[3] = 0;
+    }
+
+    resolved[0] = *path; // will be our first slash in /x:/users/test1 format
+    strncpy(resolved + 1, realpath, sizeof(realpath));
+    return resolved;
+}
+
+// like realpathWin32() but takes out the first slash so that windows systems can work on the actual file or directory
+char *realpathWin32i(const char *path, char resolved[PATH_MAX])
+{
+    char realpath[PATH_MAX];
+
+    if (path[0] != '/') {
+        // absolute form x:/abc/def given, no first slash to take out
+        strlcpy(resolved, path, sizeof(realpath));
+    }
+    else
+        strlcpy(resolved, path + 1, sizeof(realpath));
+
+    backslashconvert(resolved);
+    PathCanonicalizeA(realpath, resolved);
+    slashconvert(realpath);
+
+    /*
+    * Store terminating slash in 'X:/' on Windows.
+    */
+
+    if (realpath[1] == ':' && realpath[2] == 0)
+    {
+        realpath[2] = '/';
+        realpath[3] = 0;
+    }
+
+    strncpy(resolved, realpath, sizeof(realpath));
+    return resolved;
+}
+#endif

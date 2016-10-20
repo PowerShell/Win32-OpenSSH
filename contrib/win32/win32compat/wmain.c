@@ -31,20 +31,10 @@
 */
 
 #include <Windows.h>
+#include "inc\utf.h"
 
 int main(int, char **);
-
-char*
-utf16_to_utf8(wchar_t* utf16str) {
-        char* ret;
-        int needed;
-        if ((needed = WideCharToMultiByte(CP_UTF8, 0, utf16str, -1, NULL, 0, NULL, NULL)) == 0 ||
-            (ret = malloc(needed)) == NULL ||
-            WideCharToMultiByte(CP_UTF8, 0, utf16str, -1, ret, needed, NULL, NULL) != needed )
-                fatal("failed to convert input arguments");
-
-        return ret;
-}
+void w32posix_initialize();
 
 int
 wmain(int argc, wchar_t **wargv) {
@@ -58,5 +48,6 @@ wmain(int argc, wchar_t **wargv) {
                         argv[i] = utf16_to_utf8(wargv[i]);
         }
 
+        w32posix_initialize();
         return main(argc, argv);
 }

@@ -417,24 +417,23 @@ w32_lseek(int fd, long offset, int origin) {
 }
 
 int 
-w32_mkdir(const char *pathname, unsigned short mode) {
-    wchar_t wdirname[MAX_PATH];
-
-    if (MultiByteToWideChar(CP_UTF8, 0, pathname, -1, wdirname, MAX_PATH)) {
-        return _wmkdir(wdirname);
+w32_mkdir(const char *path_utf8, unsigned short mode) {
+    wchar_t *path_utf16 = utf8_to_utf16(path_utf8);
+    if (path_utf16 == NULL) {
+        errno = ENOMEM;
+        return -1;
     }
-
-    return 0;
+    return _wmkdir(path_utf16);
 }
 
-int w32_chdir(const char *dirname) {
-    wchar_t wdirname[MAX_PATH];
-
-    if (MultiByteToWideChar(CP_UTF8, 0, dirname, -1, wdirname, MAX_PATH)) {
-        return _wchdir(wdirname);
+int w32_chdir(const char *dirname_utf8) {
+    wchar_t *dirname_utf16 = utf8_to_utf16(dirname_utf8);
+    if (dirname_utf16 == NULL) {
+        errno = ENOMEM;
+        return -1;
     }
 
-    return 0;
+    return _wchdir(dirname_utf16);
 }
 
 char *w32_getcwd(char *buffer, int maxlen) {

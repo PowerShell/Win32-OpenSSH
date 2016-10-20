@@ -50,9 +50,6 @@ char	*colon(char *);
 long	 convtime(const char *);
 char	*tilde_expand_filename(const char *, uid_t);
 char	*percent_expand(const char *, ...) __attribute__((__sentinel__));
-#ifdef WIN32_FIXME
-wchar_t    *percent_expand_w(const wchar_t *, ...) __attribute__((__sentinel__));
-#endif
 char	*tohex(const void *, size_t);
 void	 sanitise_stdfd(void);
 void	 ms_subtract_diff(struct timeval *, int *);

@@ -58,13 +58,6 @@
 #include "krl.h"
 #include "digest.h"
 
-#ifdef	WIN32_FIXME
-#undef open
-#undef fdopen
-#define open(a,b,...) _open((a), (b), __VA_ARGS__)
-#define fdopen(a,b) _fdopen((a), (b))
-#endif
-
 #ifdef WITH_OPENSSL
 # define DEFAULT_KEY_TYPE_NAME "rsa"
 #else
@@ -997,6 +990,11 @@ do_gen_all_hostkeys(struct passwd *pw)
 		}
 		sshkey_free(private);
 		strlcat(identity_file, ".pub", sizeof(identity_file));
+#ifdef WINDOWS
+                if ((f = fopen(identity_file, "w")) == NULL) {
+                        error("fopen %s failed: %s", identity_file, strerror(errno));
+                /* TODO - set permissions on file */
+#else
 		fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (fd == -1) {
 			error("Could not save your public key in %s",
@@ -1006,9 +1004,11 @@ do_gen_all_hostkeys(struct passwd *pw)
 			continue;
 		}
 		f = fdopen(fd, "w");
+
 		if (f == NULL) {
 			error("fdopen %s failed", identity_file);
 			close(fd);
+#endif
 			sshkey_free(public);
 			first = 0;
 			continue;
@@ -2232,11 +2232,6 @@ main(int argc, char **argv)
 #ifdef WIN32_FIXME
   
     /*
-     * Init wrapped stdio.
-     */
-     
-	w32posix_initialize();
-    /*
      * -rand option used for generate random password.
      */
      
@@ -2777,11 +2772,17 @@ passphrase_again:
 		printf("Your identification has been saved in %s.\n", identity_file);
 
 	strlcat(identity_file, ".pub", sizeof(identity_file));
+#ifdef WINDOWS
+        if ((f = fopen(identity_file, "w")) == NULL)
+                fatal("fopen %s failed: %s", identity_file, strerror(errno));
+        /* TODO - set permissions on file */
+#else
 	if ((fd = open(identity_file, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1)
 		fatal("Unable to save public key to %s: %s",
 		    identity_file, strerror(errno));
 	if ((f = fdopen(fd, "w")) == NULL)
 		fatal("fdopen %s failed: %s", identity_file, strerror(errno));
+#endif
 	if ((r = sshkey_write(public, f)) != 0)
 		error("write key failed: %s", ssh_err(r));
 	fprintf(f, " %s\n", comment);

@@ -10,7 +10,10 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_sigalrm.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_sigchld.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32log.c" />
-    <ClCompile Include="..\win32compat\win32_dirent.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\pwd.c" />
+    
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\wmain.c" />
+
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -53,6 +56,23 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dlfcn.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\syslog.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h">
+
+      <Filter>inc</Filter>
+
+    </ClInclude>
+
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\param.h">
+
+      <Filter>inc\sys</Filter>
+
+    </ClInclude>
+
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\utf.h">
+
+      <Filter>inc</Filter>
+
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">

@@ -8,6 +8,7 @@
 #include <WS2tcpip.h>
 #include <stdio.h>
 #include "defs.h"
+#include "utf.h"
 
 #ifndef _OFF_T_DEFINED
 #define _OFF_T_DEFINED

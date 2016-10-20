@@ -74,7 +74,7 @@ typedef void EditLine;
 #define DEFAULT_NUM_REQUESTS	64	/* # concurrent outstanding requests */
 #define MAX_COMMAND_LINE 2048
 
-#ifdef WINDOWS
+#ifdef WIN32_VS
 #include "win32_dirent.h"
 #endif
 

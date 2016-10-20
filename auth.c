@@ -379,78 +379,6 @@ auth_root_allowed(const char *method)
  * This returns a buffer allocated by xmalloc.
  */
  
-/*
- * Win32 implementation uses UTF16 names.
- */
- 
-#ifdef WIN32_FIXME
-
-wchar_t *expand_authorized_keys(const wchar_t *filename, struct passwd *pw)
-{
-  wchar_t *file_w, ret[MAXPATHLEN], pw_name_w[MAXPATHLEN], filename_w[MAXPATHLEN];
-
-  int i;
-  
-  wchar_t *slash;
-  
-  i = MultiByteToWideChar(CP_UTF8, 0, filename, -1, filename_w, MAXPATHLEN);
-  
-  if (i == 0)
-  {
-    fatal("expand_authorized_keys: unable to convert path to UTF-16");
-  }  
-  
-  MultiByteToWideChar(CP_UTF8, 0, pw -> pw_name, -1, pw_name_w, MAXPATHLEN);
-  
-  if (i == 0)
-  {
-    fatal("expand_authorized_keys: unable to convert path to UTF-16");
-  }
-  
-  file_w = percent_expand_w(filename_w, L"h", pw -> pw_dir,
-                                L"u", pw_name_w, (char *) NULL);
-  
-  /*
-   * Replace '/'  with '\'
-   */
-
-  slash = file_w; 
-  
-  while ((slash = wcschr(slash, L'/')))
-  {
-    *slash = L'\\';
-  }
-  
-  /*
-   * Absolute path given.
-   */
-   
-  if (wcschr(file_w, ':'))
-  {
-    i = _snwprintf(ret, sizeof(ret), L"%ls", file_w);
-  }
-   
-  /*
-   * Relative path given. Expand to user homedir.
-   */
-   
-  else
-  {
-    i = _snwprintf(ret, sizeof(ret), L"%ls\\%ls", pw->pw_dir, file_w);
-  }  
-  
-  if (i < 0 || (size_t) i >= sizeof(ret))
-  {  
-    fatal("expand_authorized_keys: path too long");
-  }  
-
-  free(file_w);
-  
-  return (_wcsdup(ret));
-}
-
-#else /* WIN32_FIXME */
-
 char *
 expand_authorized_keys(const char *filename, struct passwd *pw)
 {
@@ -473,7 +401,6 @@ expand_authorized_keys(const char *filename, struct passwd *pw)
 	free(file);
 	return (xstrdup(ret));
 }
-#endif /* WIN32_FIXME */
 
 char *
 authorized_principals_file(struct passwd *pw)
@@ -639,23 +566,15 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 	FILE *f;
 	
 #ifdef WIN32_FIXME
-    if ((fd = _wopen(file, O_RDONLY|O_NONBLOCK)) == -1) {
+	if ((f = fopen(file, "r")) == NULL)
+		return NULL;
 #else
 	if ((fd = open(file, O_RDONLY|O_NONBLOCK)) == -1) {
-#endif
 		if (log_missing || errno != ENOENT)
 			debug("Could not open %s '%s': %s", file_type, file,
 			   strerror(errno));
 		return NULL;
 	}
-
-#ifdef WIN32_FIXME
-	if ((f = _fdopen(fd, "r")) == NULL) {
-		_close(fd);
-		return NULL;
-	}
-
-#else
 	if (fstat(fd, &st) < 0) {
 		close(fd);
 		return NULL;

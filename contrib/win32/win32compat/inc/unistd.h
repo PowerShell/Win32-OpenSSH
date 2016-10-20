@@ -35,6 +35,7 @@
 #define lseek w32_lseek
 
 #define getdtablesize() MAX_FDS
+#define gethostname w32_gethostname
 
 #define fopen w32_fopen_utf8
 

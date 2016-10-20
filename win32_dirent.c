@@ -40,8 +40,8 @@ DIR * opendir(char *name)
         pdir->c_file.time_create = c_file.time_create;
         pdir->c_file.time_write = c_file.time_write;
 
-        if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, c_file.name, -1, NULL, 0, NULL, NULL)) == 0 ||
-            WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, c_file.name, -1, pdir->c_file.name, needed, NULL, NULL) != needed)
+        if ((needed = WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, NULL, 0, NULL, NULL)) == 0 ||
+            WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, pdir->c_file.name, needed, NULL, NULL) != needed)
             fatal("failed to covert input arguments");
 
         strcpy_s(pdir->initName, sizeof(pdir->initName), pdir->c_file.name);
@@ -82,9 +82,9 @@ struct dirent *readdir(void *avp)
 		    }
 		    pdirentry = (struct dirent *) malloc( sizeof(struct dirent) );
 
-            if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, c_file.name, -1, NULL, 0, NULL, NULL)) == 0 ||
+            if ((needed = WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, NULL, 0, NULL, NULL)) == 0 ||
                 (pdirentry->d_name = malloc(needed)) == NULL ||
-                WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, c_file.name, -1, pdirentry->d_name, needed, NULL, NULL) != needed)
+                WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, pdirentry->d_name, needed, NULL, NULL) != needed)
                 fatal("failed to covert input arguments");
 
 		    pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero
