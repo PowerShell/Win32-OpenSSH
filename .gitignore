@@ -277,5 +277,17 @@ Makefile.in
 d2utmpa*
 configure
 contrib/win32/openssh/Win32-OpenSSH.VC.opendb
+contrib/win32/openssh/Win32-OpenSSH.VC.db
 *.opendb
 *.db
+
+# Visual C++ cache files
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
