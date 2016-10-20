@@ -2,11 +2,11 @@
 // directory entry functions in Windows platform like Ubix/Linux
 // opendir(), readdir(), closedir().
 
+#include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
-#include <windows.h>
 
 #include "win32_dirent.h"
 

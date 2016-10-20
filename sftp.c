@@ -75,8 +75,6 @@ typedef void EditLine;
 #define MAX_COMMAND_LINE 2048
 
 #ifdef WINDOWS
-#include <io.h>
-#include <fcntl.h>
 #include "win32_dirent.h"
 #endif
 

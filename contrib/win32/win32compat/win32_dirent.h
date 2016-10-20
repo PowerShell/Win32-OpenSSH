@@ -8,7 +8,8 @@
 #define __DIRENT_H__
 
 #include <direct.h>
-#include <io.h> 
+#include <io.h>
+#include <fcntl.h>
 
 // Windows directory structure content
 struct dirent {

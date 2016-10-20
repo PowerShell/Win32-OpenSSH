@@ -60,9 +60,6 @@
 #include "sftp.h"
 #include "sftp-common.h"
 
-#ifdef WIN32_VS
-#include "win32_dirent.c"
-#endif
 
 #ifdef WIN32_FIXME
 

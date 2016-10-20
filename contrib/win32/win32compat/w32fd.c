@@ -847,3 +847,17 @@ int
 w32_kill(int pid, int sig) {
 	return sw_kill(pid, sig);
 }
+
+int 
+w32_ftruncate(int fd, off_t length) {
+    CHECK_FD(fd);
+
+    if (!SetEndOfFile(w32_fd_to_handle(fd)))
+        return -1;
+    if (!SetFileValidData(w32_fd_to_handle(fd), length))
+        return -1;
+    if (!SetFilePointer(w32_fd_to_handle(fd), 0, 0, FILE_BEGIN))
+        return -1;
+
+    return 0;
+}

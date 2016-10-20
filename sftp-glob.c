@@ -37,10 +37,6 @@
 #include "sftp-common.h"
 #include "sftp-client.h"
 
-#ifdef WINDOWS
-#include "win32_dirent.c"
-#endif
-
 int remote_glob(struct sftp_conn *, const char *, int,
     int (*)(const char *, int), glob_t *);
 

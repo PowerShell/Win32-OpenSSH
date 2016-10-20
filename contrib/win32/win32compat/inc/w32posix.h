@@ -9,6 +9,15 @@
 #include <stdio.h>
 #include "defs.h"
 
+#ifndef _OFF_T_DEFINED
+#define _OFF_T_DEFINED
+
+typedef long _off_t; // file offset value
+
+#if !__STDC__
+typedef _off_t off_t;
+#endif
+#endif
 
 typedef struct w32_fd_set_ {
 	unsigned char bitmap[MAX_FDS >> 3];
@@ -73,6 +82,7 @@ int w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 int w32_raise(int sig);
 int w32_kill(int pid, int sig);
 FILE* w32_fopen_utf8(const char *, const char *);
+int w32_ftruncate(int fd, off_t length);
 
 /* Shutdown constants */
 #define SHUT_WR SD_SEND

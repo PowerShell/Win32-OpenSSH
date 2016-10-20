@@ -7,9 +7,10 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\fileio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\termio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\misc.c" />
-    <ClCompile Include="..\win32compat\w32log.c" />
-    <ClCompile Include="..\win32compat\signal_sigchld.c" />
-    <ClCompile Include="..\win32compat\signal_sigalrm.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_sigalrm.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_sigchld.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32log.c" />
+    <ClCompile Include="..\win32compat\win32_dirent.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -49,13 +50,9 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\statvfs.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
-    <ClInclude Include="..\win32compat\inc\syslog.h">
-      <Filter>inc</Filter>
-    </ClInclude>
-    <ClInclude Include="..\win32compat\inc\dlfcn.h">
-      <Filter>inc</Filter>
-    </ClInclude>
-    <ClInclude Include="..\win32compat\signal_internal.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dlfcn.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\syslog.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">
