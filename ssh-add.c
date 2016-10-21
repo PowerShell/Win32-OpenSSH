@@ -484,6 +484,7 @@ main(int argc, char **argv)
 	char *pkcs11provider = NULL;
 	int r, i, ch, deleting = 0, ret = 0, key_only = 0;
 	int xflag = 0, lflag = 0, Dflag = 0;
+	
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();

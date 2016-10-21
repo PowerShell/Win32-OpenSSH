@@ -82,6 +82,10 @@ sighandler_t w32_signal(int signum, sighandler_t handler);
 int w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 int w32_raise(int sig);
 int w32_kill(int pid, int sig);
+int w32_gethostname(char *, size_t);
+void w32_freeaddrinfo(struct addrinfo *);
+int w32_getaddrinfo(const char *, const char *,
+        const struct addrinfo *, struct addrinfo **);
 FILE* w32_fopen_utf8(const char *, const char *);
 int w32_ftruncate(int fd, off_t length);
 
