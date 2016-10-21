@@ -567,7 +567,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                 free(tmp);               
 
                 if (s->display)
-                        SetEnvironmentVariableW(L"DISPLAY", s->display);
+                        SetEnvironmentVariableA("DISPLAY", s->display);
                 
 
                 //_wchdir(pw_dir_w);
@@ -674,8 +674,12 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                 FreeConsole();
                 if (!debug_flag)
                         ImpersonateLoggedOnUser(hToken);
+                Sleep(20);
                 while (AttachConsole(pi.dwProcessId) == FALSE) {
-                        Sleep(200);
+                        DWORD exit_code;
+                        if (GetExitCodeProcess(pi.hProcess, &exit_code) && exit_code != STILL_ACTIVE)
+                                break;
+                        Sleep(100);
                 }
                 if (!debug_flag)
                         RevertToSelf();

@@ -1116,9 +1116,13 @@ int start_with_pty(int ac, wchar_t **av) {
     childProcessId = pi.dwProcessId;
 
     FreeConsole();
+    Sleep(20);
     while (!AttachConsole(pi.dwProcessId))
     {
-        Sleep(1000);
+        DWORD exit_code;
+        if (GetExitCodeProcess(pi.hProcess, &exit_code) && exit_code != STILL_ACTIVE)
+                break;
+        Sleep(100);
     }
 
     /* monitor child exist */
