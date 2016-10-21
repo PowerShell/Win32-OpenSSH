@@ -855,7 +855,9 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 				    (lflag & LS_SI_UNITS));
 #ifdef WINDOWS
                 wchar_t* wtmp = utf8_to_utf16(lname);
-                wprintf_s(L"%ls\n", wtmp);
+                WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+                WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"\n", 1, 0, 0);
+
                 free(tmp);
 #else
                 printf("%s\n", lname);                
@@ -865,7 +867,8 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
             else {
 #ifdef WINDOWS
                 wchar_t* wtmp = utf8_to_utf16(d[n]->longname);
-                wprintf_s(L"%ls\n", wtmp);
+                WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+                WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"\n", 1, 0, 0);
                 free(wtmp);
 #else
                 printf("%s\n", d[n]->longname);
@@ -875,7 +878,9 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
         else {
 #ifdef WINDOWS
             wchar_t* wtmp = utf8_to_utf16(fname);
-            wprintf_s(L"%-*ls", colspace, wtmp);
+            // TODO: Deal with the sizing wprintf_s(L"%-*s", colspace, wtmp);
+            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L" ", 1, 0, 0);
             free(wtmp);
 #else
             printf("%-*s", colspace, fname);
@@ -1641,7 +1646,10 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 		}
 		break;
 	case I_PWD:
-		printf("Remote working directory: %s\n", *pwd);
+        printf("Remote working directory: ");
+        wchar_t* wtmp = utf8_to_utf16(*pwd);
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+        WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"\n", 1, 0, 0);
 		break;
 	case I_LPWD:
 		if (!getcwd(path_buf, sizeof(path_buf))) {
