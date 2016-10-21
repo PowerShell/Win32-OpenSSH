@@ -76,7 +76,6 @@ typedef void EditLine;
 
 #ifdef WIN32_VS
 #include "win32_dirent.h"
-extern int ScreenX;
 #endif
 
 /* File to read commands from */
@@ -817,8 +816,7 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 		m += strlen(tmp);
 		free(tmp);
 #ifdef WINDOWS
-        ConSetScreenX();
-        width = ScreenX ;
+        width = ConScreenSizeX();
 #else
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 			width = ws.ws_col;
@@ -941,8 +939,7 @@ do_globbed_ls(struct sftp_conn *conn, char *path, char *strip_path,
 	}
 	
 #ifdef WINDOWS
-    ConSetScreenX();
-    width = ScreenX;
+    width = ConScreenSizeX();
 #else
 	if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 		width = ws.ws_col;

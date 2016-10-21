@@ -1728,6 +1728,6 @@ typedef long ssize_t;
 #define HAVE_MBLEN 1
 
 #define SSHDIR "."
-#define _PATH_SFTP_SERVER "./sftp-server.exe"
-#define _PATH_SSH_PROGRAM "./ssh.exe"
+#define _PATH_SFTP_SERVER "sftp-server.exe"
+#define _PATH_SSH_PROGRAM "ssh.exe"
 #define _PATH_LS			"dir"

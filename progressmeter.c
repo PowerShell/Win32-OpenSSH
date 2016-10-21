@@ -78,6 +78,10 @@ static volatile sig_atomic_t win_resized; /* for window resizing */
 /* units for format_size */
 static const char unit[] = " KMGT";
 
+#ifdef WINDOWS
+extern int ScreenX;
+#endif
+
 static int
 can_output(void)
 {

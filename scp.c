@@ -850,6 +850,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 
     *fdin = _open_osfhandle((intptr_t)hstdout[0],0);
     _setmode (*fdin, O_BINARY); // set this file handle for binary I/O
+    w32_allocate_fd_for_handle(hstdout[0], FALSE);
 
     rc = CreateOverlappedPipe( &hstdin[0], &hstdin[1], &sa, 0 ) ;
     /* write to this fd to get data into ssh.exe*/
@@ -865,6 +866,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 
     *fdout = _open_osfhandle((intptr_t)hstdin[1],0);
     _setmode (*fdout, O_BINARY); // set this file handle for binary I/O
+    w32_allocate_fd_for_handle(hstdin[1], FALSE);
 
     hSaveStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
     //hSaveStderr = GetStdHandle(STD_ERROR_HANDLE); 
@@ -1066,6 +1068,10 @@ main(int argc, char **argv)
 	const char *errstr;
 	extern char *optarg;
 	extern int optind;
+
+#ifdef WINDOWS
+    ConInit(STD_OUTPUT_HANDLE, TRUE);
+#endif
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
@@ -1450,7 +1456,7 @@ source(int argc, char **argv)
 	off_t i, statbytes;
 	size_t amt, nr;
 	int fd = -1, haderr, indx;
-	char *last, *name, buf[2048], encname[PATH_MAX];
+	char *last, *lastf, *lastr, *name, buf[2048], encname[PATH_MAX];
 	int len;
 
 	for (indx = 0; indx < argc; ++indx) {
@@ -1487,10 +1493,15 @@ syserr:			run_err("%s: %s", name, strerror(errno));
 			run_err("%s: not a regular file", name);
 			goto next;
 		}
-		if ((last = strrchr(name, '/')) == NULL)
+		if ((lastf = strrchr(name, '/')) == NULL && (lastr = strrchr(name, '\\')) == NULL)
 			last = name;
-		else
-			++last;
+        else {
+            if (lastf)
+                last = lastf;
+            if (lastr)
+                last = lastr;
+            ++last;
+        }
 		curfile = last;
 		if (pflag) {
 			if (do_times(remout, verbose_mode, &stb) < 0)
@@ -2149,7 +2160,7 @@ int start_process_io(char *exename, char **argv, char **envv,
 		ctr++;
 	}
 
-	ret = CreateProcess(
+    ret = CreateProcess(
 		exename, // given in form like "d:\\util\\cmd.exe"
 		cmdbuf, /* in "arg0 arg1 arg2" form command line */
 		NULL, /* process security */
