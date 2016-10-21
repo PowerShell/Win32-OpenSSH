@@ -73,6 +73,7 @@ struct dirent *readdir(void *avp)
     struct dirent *pdirentry;
     struct _wfinddata_t c_file;
     DIR *dirp = (DIR *)avp;
+    char *tmp = NULL;
 
     for (;;) {
         if ( _wfindnext( dirp->hFile, &c_file ) == 0 ) {
@@ -82,10 +83,11 @@ struct dirent *readdir(void *avp)
 		    }
 		    pdirentry = (struct dirent *) malloc( sizeof(struct dirent) );
 
-            if ((needed = WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, NULL, 0, NULL, NULL)) == 0 ||
-                (pdirentry->d_name = malloc(needed)) == NULL ||
-                WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, pdirentry->d_name, needed, NULL, NULL) != needed)
+            if ((tmp = utf16_to_utf8(pdirentry->d_name)) == NULL)
                 fatal("failed to covert input arguments");
+            strcpy(c_file.name[0], tmp);
+            free(tmp);
+            tmp = NULL;
 
 		    pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero
 		    return pdirentry ;

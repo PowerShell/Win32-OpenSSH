@@ -438,13 +438,10 @@ int w32_chdir(const char *dirname_utf8) {
 
 char *w32_getcwd(char *buffer, int maxlen) {
     wchar_t wdirname[MAX_PATH];
-    int needed;
 
     wchar_t *wpwd = _wgetcwd(wdirname, MAX_PATH);
 
-    if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wdirname, -1, NULL, 0, NULL, NULL)) == 0 ||
-        (needed > MAX_PATH) ||
-        (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wdirname, -1, buffer, needed, NULL, NULL) != needed))
+    if (buffer = utf16_to_utf8(wpwd))
             fatal("failed to convert input arguments");
 
     return buffer;

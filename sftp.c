@@ -76,6 +76,7 @@ typedef void EditLine;
 
 #ifdef WIN32_VS
 #include "win32_dirent.h"
+extern int ScreenX;
 #endif
 
 /* File to read commands from */
@@ -816,7 +817,8 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 		m += strlen(tmp);
 		free(tmp);
 #ifdef WINDOWS
-        width = ConSetScreenX();
+        ConSetScreenX();
+        width = ScreenX ;
 #else
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 			width = ws.ws_col;
@@ -853,12 +855,33 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 				attrib_to_stat(&d[n]->a, &sb);
 				lname = ls_file(fname, &sb, 1,
 				    (lflag & LS_SI_UNITS));
-				printf("%s\n", lname);
+#ifdef WINDOWS
+                wchar_t* wtmp = utf8_to_utf16(lname);
+                wprintf_s(L"%ls\n", wtmp);
+                free(tmp);
+#else
+                printf("%s\n", lname);                
+#endif
 				free(lname);
-			} else
-				printf("%s\n", d[n]->longname);
-		} else {
-			printf("%-*s", colspace, fname);
+            }
+            else {
+#ifdef WINDOWS
+                wchar_t* wtmp = utf8_to_utf16(d[n]->longname);
+                wprintf_s(L"%ls\n", wtmp);
+                free(wtmp);
+#else
+                printf("%s\n", d[n]->longname);
+#endif       
+            }
+		} 
+        else {
+#ifdef WINDOWS
+            wchar_t* wtmp = utf8_to_utf16(fname);
+            wprintf_s(L"%-*ls", colspace, wtmp);
+            free(wtmp);
+#else
+            printf("%-*s", colspace, fname);
+#endif
 			if (c >= columns) {
 				printf("\n");
 				c = 1;
@@ -918,7 +941,8 @@ do_globbed_ls(struct sftp_conn *conn, char *path, char *strip_path,
 	}
 	
 #ifdef WINDOWS
-    width = ConSetScreenX();
+    ConSetScreenX();
+    width = ScreenX;
 #else
 	if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 		width = ws.ws_col;
@@ -2128,11 +2152,11 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
                     break;
                 }
                 else {
-                    int needed;
-                    if ((needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcmd, -1, NULL, 0, NULL, NULL)) == 0 ||
-                        (needed > MAX_COMMAND_LINE) ||
-                        (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcmd, -1, cmd, needed, NULL, NULL) != needed))
+                    char *pcmd = NULL;
+                    if ((pcmd = utf16_to_utf8(wcmd)) == NULL)
                             fatal("failed to convert input arguments");
+                    strcpy(cmd, pcmd);
+                    free(pcmd);                    
                 }
             }
             else {
