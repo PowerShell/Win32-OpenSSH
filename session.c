@@ -490,6 +490,157 @@ do_authenticated1(Authctxt *authctxt)
 
 #ifdef WINDOWS
 
+#define SET_USER_ENV(folder_id, evn_variable) do  {                \
+       if (SHGetKnownFolderPath(&folder_id,0,token,&path) == S_OK)              \
+        {                                                                       \
+                SetEnvironmentVariableW(evn_variable, path);                    \
+                CoTaskMemFree(path);                                            \
+       }                                                                        \
+} while (0)    
+
+void setup_session_vars(Session* s)
+{
+        wchar_t* pw_dir_w;
+        wchar_t* tmp;
+        char buf[128];
+        char* laddr;
+
+        if ((pw_dir_w = utf8_to_utf16(s->pw->pw_dir)) == NULL)
+                fatal("%s: out of memory");
+        
+
+
+        if ((tmp = utf8_to_utf16(s->pw->pw_name)) == NULL)
+                fatal("%s, out of memory");
+        SetEnvironmentVariableW(L"USERNAME", tmp);
+        free(tmp);
+
+        if (s->display)
+                SetEnvironmentVariableA("DISPLAY", s->display);
+
+
+        SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w);
+        SetEnvironmentVariableW(L"USERPROFILE", pw_dir_w);
+
+        if (pw_dir_w[1] == L':') {
+                wchar_t wc = pw_dir_w[2];
+                pw_dir_w[2] = L'\0';
+                SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_w);
+                pw_dir_w[2] = wc;
+        }
+
+        snprintf(buf, sizeof buf, "%.50s %d %d",
+                get_remote_ipaddr(), get_remote_port(), get_local_port());
+
+        SetEnvironmentVariableA("SSH_CLIENT", buf);
+
+        laddr = get_local_ipaddr(packet_get_connection_in());
+
+        snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
+                get_remote_ipaddr(), get_remote_port(), laddr, get_local_port());
+
+        free(laddr);
+
+        SetEnvironmentVariableA("SSH_CONNECTION", buf);
+
+        if (original_command)
+                SetEnvironmentVariableA("SSH_ORIGINAL_COMMAND", original_command);
+
+
+        if ((s->term) && (s->term[0]))
+                SetEnvironmentVariable("TERM", s->term);
+
+        if (!s->is_subsystem) {
+                snprintf(buf, sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
+                SetEnvironmentVariableA("PROMPT", buf);
+        }
+
+        /*set user environment variables*/
+        {
+                UCHAR InfoBuffer[1000];
+                PTOKEN_USER pTokenUser = (PTOKEN_USER)InfoBuffer;
+                DWORD dwInfoBufferSize, tmp_len;
+                LPWSTR sid_str = NULL;
+                wchar_t reg_path[MAX_PATH];
+                HKEY reg_key = 0;
+                HANDLE token = s->authctxt->methoddata;
+                
+                tmp_len = MAX_PATH;
+                if (GetTokenInformation(token, TokenUser, InfoBuffer,
+                        1000, &dwInfoBufferSize) == FALSE ||
+                        ConvertSidToStringSidW(pTokenUser->User.Sid, &sid_str) == FALSE ||
+                        swprintf(reg_path, MAX_PATH, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", sid_str) == MAX_PATH ||
+                        RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
+                        RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, pw_dir_w, &tmp_len) != 0) {
+                        /* one of the above failed */
+                        debug("cannot retirve profile path - perhaps user profile is not created yet");
+                }
+
+                if (sid_str)
+                        LocalFree(sid_str);
+
+                if (reg_key)
+                        RegCloseKey(reg_key);
+
+                { /* retrieve and set env variables. */
+                  /* TODO - Get away with fixed limits and dynamically allocate required memory, cleanup this logic*/
+#define MAX_VALUE_LEN  1000
+#define MAX_DATA_LEN   2000
+#define MAX_EXPANDED_DATA_LEN 5000
+                        wchar_t *path;
+                        wchar_t value_name[MAX_VALUE_LEN];
+                        wchar_t value_data[MAX_DATA_LEN], value_data_expanded[MAX_EXPANDED_DATA_LEN], *to_apply;
+                        DWORD value_type, name_len, data_len;
+                        int i;
+                        LONG ret;
+
+                        if (ImpersonateLoggedOnUser(token) == FALSE)
+                                debug("Failed to impersonate user token, %d", GetLastError());
+                        SET_USER_ENV(FOLDERID_LocalAppData, L"LOCALAPPDATA");
+                        SET_USER_ENV(FOLDERID_Profile, L"USERPROFILE");
+                        SET_USER_ENV(FOLDERID_RoamingAppData, L"APPDATA");
+                        reg_key = 0;
+                        if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_QUERY_VALUE, &reg_key) == ERROR_SUCCESS) {
+                                i = 0;
+                                while (1) {
+                                        name_len = MAX_VALUE_LEN * 2;
+                                        data_len = MAX_DATA_LEN * 2;
+                                        to_apply = NULL;
+                                        if (RegEnumValueW(reg_key, i++, &value_name, &name_len, 0, &value_type, &value_data, &data_len) != ERROR_SUCCESS)
+                                                break;
+                                        if (value_type == REG_SZ)
+                                                to_apply = value_data;
+                                        else if (value_type == REG_EXPAND_SZ) {
+                                                ExpandEnvironmentStringsW(value_data, value_data_expanded, MAX_EXPANDED_DATA_LEN);
+                                                to_apply = value_data_expanded;
+                                        }
+
+                                        if (wcsicmp(value_name, L"PATH") == 0) {
+                                                DWORD size;
+                                                if ((size = GetEnvironmentVariableW(L"PATH", NULL, 0)) != ERROR_ENVVAR_NOT_FOUND) {
+                                                        memcpy(value_data_expanded + size, to_apply, (wcslen(to_apply) + 1) * 2);
+                                                        GetEnvironmentVariableW(L"PATH", value_data_expanded, MAX_EXPANDED_DATA_LEN);
+                                                        value_data_expanded[size - 1] = L';';
+                                                        to_apply = value_data_expanded;
+                                                }
+
+                                        }
+                                        if (to_apply)
+                                                SetEnvironmentVariableW(value_name, to_apply);
+
+
+                                }
+                                RegCloseKey(reg_key);
+                        }
+
+
+                        RevertToSelf();
+                }
+        }
+
+        free(pw_dir_w);
+}
+
 int do_exec_windows(Session *s, const char *command, int pty) {
         int pipein[2], pipeout[2], pipeerr[2], r;
         char *exec_command = NULL, *progdir = w32_programdir();
@@ -556,58 +707,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         }
 
         /* setup Environment varibles */
-        {
-                wchar_t* tmp;
-                char buf[128];
-                char* laddr;
-
-                if ((tmp = utf8_to_utf16(s->pw->pw_name)) == NULL)
-                        fatal("%s, out of memory");
-                SetEnvironmentVariableW(L"USERNAME", tmp);
-                free(tmp);               
-
-                if (s->display)
-                        SetEnvironmentVariableA("DISPLAY", s->display);
-                
-
-                //_wchdir(pw_dir_w);
-
-                SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w);
-                SetEnvironmentVariableW(L"USERPROFILE", pw_dir_w);
-
-                if (pw_dir_w[1] == L':') {
-                        wchar_t wc = pw_dir_w[2];
-                        pw_dir_w[2] = L'\0';
-                        SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_w);
-                        pw_dir_w[2] = wc;
-                }
-
-                snprintf(buf, sizeof buf, "%.50s %d %d",
-                        get_remote_ipaddr(), get_remote_port(), get_local_port());
-
-                SetEnvironmentVariableA("SSH_CLIENT", buf);
-
-                laddr = get_local_ipaddr(packet_get_connection_in());
-
-                snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
-                        get_remote_ipaddr(), get_remote_port(), laddr, get_local_port());
-
-                free(laddr);
-
-                SetEnvironmentVariableA("SSH_CONNECTION", buf);
-
-                if (original_command)
-                        SetEnvironmentVariableA("SSH_ORIGINAL_COMMAND", original_command);
-
-
-                if ((s->term) && (s->term[0]))
-                        SetEnvironmentVariable("TERM", s->term);
-
-                if (!s->is_subsystem) {
-                        snprintf(buf, sizeof buf, "%s@%s $P$G", s->pw->pw_name, getenv("COMPUTERNAME"));
-                        SetEnvironmentVariableA("PROMPT", buf);
-                }
-        }
+        setup_session_vars(s);
         
         extern int debug_flag;
 

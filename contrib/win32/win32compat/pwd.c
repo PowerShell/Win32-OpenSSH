@@ -184,14 +184,6 @@ done:
         return ret;
 }
 
-#define SET_USER_ENV(folder_id, evn_variable) do  {                \
-       if (SHGetKnownFolderPath(&folder_id,0,token,&path) == S_OK)              \
-        {                                                                       \
-                SetEnvironmentVariableW(evn_variable, path);                    \
-                CoTaskMemFree(path);                                            \
-       }                                                                        \
-} while (0)                                                                     
-
 
 /* TODO - this is moved from realpath.c in openbsdcompat. Review and finalize its position*/
 
