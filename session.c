@@ -678,7 +678,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
                 if (command == NULL || command[0] == '\0')
                         fatal("expecting command for a subsystem");
 
-                if (command[1] != ':') /* absolute */
+                if (command[1] == ':') /* absolute */
                         exec_command = xstrdup(command);
                 else {/*relative*/
                         exec_command = malloc(strlen(progdir) + 1 + strlen(command));
