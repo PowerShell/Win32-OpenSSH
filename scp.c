@@ -3082,6 +3082,10 @@ int start_process_io(char *exename, char **argv, char **envv,
 
 	ctr = 0;
 	cmdbuf[0] = '\0';
+        if (argv[0][0] != '\0' && argv[0][1] != ':') {
+                strcat(cmdbuf, w32_programdir());
+                strcat(cmdbuf, "\\");
+        }
 	while (argv[ctr]) {
 		strcat_s(cmdbuf, sizeof(cmdbuf), argv[ctr]);
 		strcat_s(cmdbuf, sizeof(cmdbuf), " ");

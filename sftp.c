@@ -2219,6 +2219,11 @@ connect_to_server(char *path, char **args, int *in, int *out)
 		STARTUPINFO si = { 0 };
 
 		debug3("Generating ssh-client command...");
+                fullCmd[0] = '\0';
+                if (path[0] != '\0' && path[1] != ':') {
+                        strncat(fullCmd, w32_programdir(), MAX_PATH);
+                        strncat(fullCmd, "\\", MAX_PATH);
+                }
 		strncat(fullCmd, path, MAX_PATH);
 		for (i = 1; args[i]; i++)
 		{
