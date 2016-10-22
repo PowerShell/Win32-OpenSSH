@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <time.h>
 #include <assert.h>
+#include <direct.h>
 
 /* internal table that stores the fd to w32_io mapping*/
 struct w32fd_table {
@@ -438,11 +439,14 @@ int w32_chdir(const char *dirname_utf8) {
 
 char *w32_getcwd(char *buffer, int maxlen) {
     wchar_t wdirname[MAX_PATH];
+    char* putf8 = NULL;
 
-    wchar_t *wpwd = _wgetcwd(wdirname, MAX_PATH);
+    wchar_t *wpwd = _wgetcwd(&wdirname[0], MAX_PATH);
 
-    if (buffer = utf16_to_utf8(wpwd))
+    if ((putf8 = utf16_to_utf8(&wdirname[0])) == NULL)
             fatal("failed to convert input arguments");
+    strcpy(buffer, putf8);
+    free(putf8);
 
     return buffer;
 }

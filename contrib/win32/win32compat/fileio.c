@@ -559,12 +559,12 @@ fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 
 int
 fileio_stat(const char *path, struct _stat64 *buf) {
-    wchar_t* wpath[MAX_PATH];
+    wchar_t wpath[MAX_PATH];
     wchar_t* wtmp = NULL;
 
     if ((wtmp = utf8_to_utf16(path)) == NULL)
         fatal("failed to covert input arguments");
-    strcpy(wpath, wtmp);
+    wcscpy(&wpath[0], wtmp);
     free(wtmp);
 
     return _wstat64(wpath, buf);
