@@ -826,7 +826,7 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
             INPUT_RECORD ir;
 
 	    if (buf[i] == 3) {/*Ctrl+C - Raise Ctrl+C*/
-		    GenerateConsoleCtrlEvent(CTRL_C_EVENT, childProcessId);
+		    GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
 		    continue;
 	    }
 
@@ -1111,6 +1111,7 @@ int start_with_pty(int ac, wchar_t **av) {
         av++;
     }
 
+    SetConsoleCtrlHandler(NULL, FALSE);
     GOTO_CLEANUP_ON_FALSE(CreateProcess(NULL, cmd, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, 
         NULL, NULL, &si, &pi));
     childProcessId = pi.dwProcessId;
