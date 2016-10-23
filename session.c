@@ -673,7 +673,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
         fcntl(pipeerr[0], F_SETFD, FD_CLOEXEC);
 
         /* prepare exec - path used with CreateProcess() */
-        if (s->is_subsystem) {
+        if (s->is_subsystem || (command && memcmp(command, "scp", 3) == 0)) {
                 /* relative or absolute */
                 if (command == NULL || command[0] == '\0')
                         fatal("expecting command for a subsystem");
