@@ -99,6 +99,7 @@
 #include "sftp.h"
 #ifdef WIN32_FIXME
 #include "console.h"
+#include <Sddl.h>
 #endif
 
 #ifdef WIN32_FIXME

@@ -35,6 +35,7 @@
 
 #ifdef WIN32_VS
 #include "win32_dirent.h"
+#include <Shlwapi.h>
 #else
 #include <dirent.h>
 #endif
