@@ -1117,12 +1117,6 @@ int start_with_pty(int ac, wchar_t **av) {
     // Copy our parent buffer sizes
     si.cb = sizeof(STARTUPINFO);
     si.dwFlags = 0;
-    if (fnSetWinEventHook == NULL) {
-        si.hStdInput = INVALID_HANDLE_VALUE;
-        si.hStdOutput = pipe_out;
-        si.hStdError = pipe_err;
-        si.dwFlags = STARTF_USESTDHANDLES;
-    }
 
     /* disable inheritance on pipe_in*/
     GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
