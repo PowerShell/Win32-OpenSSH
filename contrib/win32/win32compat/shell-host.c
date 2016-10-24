@@ -90,6 +90,7 @@ BOOL bRet = FALSE;
 BOOL bNoScrollRegion = FALSE;
 BOOL bStartup = TRUE;
 BOOL bAnsi = FALSE;
+BOOL bHookEvents = FALSE;
 
 HANDLE child_out = INVALID_HANDLE_VALUE;
 HANDLE child_in = INVALID_HANDLE_VALUE;
@@ -413,7 +414,7 @@ void SizeWindow(HANDLE hInput) {
     matchingFont.FontWeight = FW_NORMAL;
     wcscpy(matchingFont.FaceName, L"Consolas");
 
-    bSuccess = __SetCurrentConsoleFontEx(child_out, FALSE, &matchingFont);
+    bSuccess = SetCurrentConsoleFontEx(child_out, FALSE, &matchingFont);
 
     // This information is the live screen 
     ZeroMemory(&consoleInfo, sizeof(consoleInfo));
@@ -1083,13 +1084,6 @@ int start_with_pty(int ac, wchar_t **av) {
     HANDLE hEventHook = NULL;
     HMODULE hm_kernel32 = NULL, hm_user32 = NULL;
 
-    if ((hm_kernel32 = LoadLibraryW(L"kernel32.dll")) == NULL ||
-            (hm_user32 = LoadLibraryW(L"user32.dll")) == NULL ||
-            (__SetCurrentConsoleFontEx = GetProcAddress(hm_kernel32, "SetCurrentConsoleFontEx")) == NULL ||
-            (__UnhookWinEvent = GetProcAddress(hm_user32, "UnhookWinEvent")) == NULL ||
-            (__SetWinEventHook = GetProcAddress(hm_user32, "SetWinEventHook")) == NULL)
-            return -1;
-
     pipe_in  = GetStdHandle(STD_INPUT_HANDLE);
     pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
     pipe_err = GetStdHandle(STD_ERROR_HANDLE);
@@ -1114,7 +1108,7 @@ int start_with_pty(int ac, wchar_t **av) {
 
     InitializeCriticalSection(&criticalSection);
 
-    hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
+    hEventHook = SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
         ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 
     memset(&si, 0, sizeof(STARTUPINFO));
@@ -1123,6 +1117,12 @@ int start_with_pty(int ac, wchar_t **av) {
     // Copy our parent buffer sizes
     si.cb = sizeof(STARTUPINFO);
     si.dwFlags = 0;
+    if (fnSetWinEventHook == NULL) {
+        si.hStdInput = INVALID_HANDLE_VALUE;
+        si.hStdOutput = pipe_out;
+        si.hStdError = pipe_err;
+        si.dwFlags = STARTF_USESTDHANDLES;
+    }
 
     /* disable inheritance on pipe_in*/
     GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
@@ -1189,7 +1189,7 @@ cleanup:
     if (ux_thread != INVALID_HANDLE_VALUE)
         TerminateThread(ux_thread, S_OK);
     if (hEventHook)
-        __UnhookWinEvent(hEventHook);
+        UnhookWinEvent(hEventHook);
 
     FreeConsole();
 

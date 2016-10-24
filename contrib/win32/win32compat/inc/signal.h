@@ -12,6 +12,7 @@
 #define mysignal(a,b)	w32_signal((a), (b))
 #define raise(a)	w32_raise(a)
 #define kill(a,b)	w32_kill((a), (b))
+#define ftruncate(a, b) w32_ftruncate((a), (b))
 #define sigprocmask(a,b,c) w32_sigprocmask((a), (b), (c))
 
 #define SIGINT	W32_SIGINT		
@@ -26,6 +27,7 @@
 #define SIGTTIN	W32_SIGTTIN		
 #define SIGTTOU	W32_SIGTTOU		
 #define SIGWINCH W32_SIGWINCH
+#define SIGSTOP  W32_SIGSTOP
 
 #define SIG_DFL	W32_SIG_DFL
 #define SIG_IGN	W32_SIG_IGN

@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <time.h>
 #include <assert.h>
+#include <direct.h>
 
 /* internal table that stores the fd to w32_io mapping*/
 struct w32fd_table {
@@ -384,6 +385,23 @@ w32_write(int fd, const void *buf, unsigned int max) {
 	return fileio_write(fd_table.w32_ios[fd], buf, max);
 }
 
+int w32_writev(int fd, const struct iovec *iov, int iovcnt) {
+    int written = 0;
+    int i = 0;
+
+    CHECK_FD(fd);
+
+    for (i = 0; i < iovcnt; i++) {
+        int ret = w32_write(fd, iov[i].iov_base, iov[i].iov_len);
+
+        if (ret > 0) {
+            written += ret;
+        }
+    }
+
+    return written;
+}
+
 int
 w32_fstat(int fd, struct w32_stat *buf) {
 	CHECK_FD(fd);
@@ -403,12 +421,36 @@ w32_lseek(int fd, long offset, int origin) {
 
 int 
 w32_mkdir(const char *path_utf8, unsigned short mode) {
-        wchar_t *path_utf16 = utf8_to_utf16(path_utf8);
-        if (path_utf16 == NULL) {
-                errno = ENOMEM;
-                return -1;
-        }
-	return _wmkdir(path_utf16);
+    wchar_t *path_utf16 = utf8_to_utf16(path_utf8);
+    if (path_utf16 == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+    return _wmkdir(path_utf16);
+}
+
+int w32_chdir(const char *dirname_utf8) {
+    wchar_t *dirname_utf16 = utf8_to_utf16(dirname_utf8);
+    if (dirname_utf16 == NULL) {
+        errno = ENOMEM;
+        return -1;
+    }
+
+    return _wchdir(dirname_utf16);
+}
+
+char *w32_getcwd(char *buffer, int maxlen) {
+    wchar_t wdirname[MAX_PATH];
+    char* putf8 = NULL;
+
+    wchar_t *wpwd = _wgetcwd(&wdirname[0], MAX_PATH);
+
+    if ((putf8 = utf16_to_utf8(&wdirname[0])) == NULL)
+            fatal("failed to convert input arguments");
+    strcpy(buffer, putf8);
+    free(putf8);
+
+    return buffer;
 }
 
 int
@@ -806,4 +848,18 @@ w32_raise(int sig) {
 int 
 w32_kill(int pid, int sig) {
 	return sw_kill(pid, sig);
+}
+
+int 
+w32_ftruncate(int fd, off_t length) {
+    CHECK_FD(fd);
+
+    if (!SetEndOfFile(w32_fd_to_handle(fd)))
+        return -1;
+    if (!SetFileValidData(w32_fd_to_handle(fd), length))
+        return -1;
+    if (!SetFilePointer(w32_fd_to_handle(fd), 0, 0, FILE_BEGIN))
+        return -1;
+
+    return 0;
 }

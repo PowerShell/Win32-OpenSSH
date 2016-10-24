@@ -26,7 +26,7 @@
 
 #include "includes.h"
 
-#ifdef WIN32_FIXME
+#ifdef WINDOWS
 void strmode(mode_t mode, char *p);
 void strmode_from_attrib(unsigned attrib, char *p);
 #endif
@@ -225,38 +225,32 @@ ls_file(const char *name, const struct stat *st, int remote, int si_units)
 	char sbuf[FMT_SCALED_STRSIZE];
 	time_t now;
 
-#ifndef WIN32_FIXME
-	strmode(st->st_mode, mode);
-#else
-	strmode(st->st_mode, mode);
+    strmode(st->st_mode, mode);
+#ifdef WINDOWS
 	strmode_from_attrib(remote, mode);
 #endif
 	if (!remote) {
 #ifndef WIN32_FIXME
-		user = user_from_uid(st->st_uid, 0);
+        user = user_from_uid(st->st_uid, 0);
 #else
-                user = "\0";
-		snprintf(gbuf, sizeof gbuf, "%u", (u_int)st->st_gid);
-		group = gbuf;
+        user = "\0";
+        snprintf(gbuf, sizeof gbuf, "%u", (u_int)st->st_gid);
+        group = gbuf;
 #endif
 	} else {
 		snprintf(ubuf, sizeof ubuf, "%u", (u_int)st->st_uid);
 		user = ubuf;
-#ifdef WIN32_FIXME
-  
-  snprintf(gbuf, sizeof gbuf, "%u", (u_int) st -> st_gid);
-  
-  group = gbuf;
-
+#ifdef WINDOWS
+        snprintf(gbuf, sizeof gbuf, "%u", (u_int) st -> st_gid);  
+        group = gbuf;
 #else
-	if (!remote) {
-		group = group_from_gid(st->st_gid, 0);
-	} else {
-		snprintf(gbuf, sizeof gbuf, "%u", (u_int)st->st_gid);
-		group = gbuf;
-	}
+	    if (!remote) {
+		    group = group_from_gid(st->st_gid, 0);
+	    } else {
+		    snprintf(gbuf, sizeof gbuf, "%u", (u_int)st->st_gid);
+		    group = gbuf;
+	    }
 #endif
-
 	}
 	if (ltime != NULL) {
 		now = time(NULL);
@@ -283,7 +277,7 @@ ls_file(const char *name, const struct stat *st, int remote, int si_units)
 	return xstrdup(buf);
 }
 
-#ifdef WIN32_FIXME
+#ifdef WINDOWS
 
 #include <sys/types.h>
 #include <windows.h>
@@ -298,7 +292,6 @@ strmode_from_attrib(unsigned attrib, char *p)
 	else
 		*p = '-';
 }
-
 
 void
 strmode(mode_t mode, char *p)

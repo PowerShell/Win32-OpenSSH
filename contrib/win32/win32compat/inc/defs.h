@@ -47,9 +47,10 @@
 #define W32_SIGTERM		8
 #define W32_SIGTTIN		9
 #define W32_SIGTTOU		10
-#define W32_SIGWINCH		11
+#define W32_SIGWINCH	11
 
 #define W32_SIGMAX		12
+#define W32_SIGSTOP     13
 
 /* singprocmask "how" codes*/
 #define SIG_BLOCK		0

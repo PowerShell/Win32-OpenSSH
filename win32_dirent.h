@@ -8,7 +8,8 @@
 #define __DIRENT_H__
 
 #include <direct.h>
-#include <io.h> 
+#include <io.h>
+#include <fcntl.h>
 
 // Windows directory structure content
 struct dirent {
@@ -18,11 +19,11 @@ struct dirent {
 };
 
 typedef struct {
-	intptr_t hFile;
-     struct _finddata_t c_file;
-	 int	bRoot;
-	 int	bDrive;
-	 char	initName[260];
+    intptr_t hFile;
+    struct _finddata_t c_file;
+    int	bRoot;
+    int	bDrive;
+    char initName[260];
 } DIR;
 
 DIR * opendir(char *name);

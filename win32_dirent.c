@@ -2,11 +2,11 @@
 // directory entry functions in Windows platform like Ubix/Linux
 // opendir(), readdir(), closedir().
 
+#include <windows.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
-#include <windows.h>
 
 #include "win32_dirent.h"
 
@@ -14,40 +14,53 @@
    Return a DIR stream on the directory, or NULL if it could not be opened.  */
 DIR * opendir(char *name)
 {
-   struct _finddata_t c_file;
-   intptr_t hFile;
-	DIR *pdir;
-	char searchstr[256];
+    struct _wfinddata_t c_file;
+    intptr_t hFile;
+    DIR *pdir;
+    wchar_t searchstr[MAX_PATH];
+    wchar_t wname[MAX_PATH];
+    int needed;
 
-	// add *.* for Windows _findfirst() search pattern
-	sprintf_s(searchstr, sizeof(searchstr), "%s\\*.*",name);
+    MultiByteToWideChar(CP_UTF8, 0, name, -1, wname, MAX_PATH);
 
-   if ((hFile = _findfirst(searchstr, &c_file)) == -1L) {
-       if (1) // verbose
-			printf( "No files found for %s search.\n", name );
-		return (DIR *) NULL;
-   }
-   else {
-		pdir = (DIR *) malloc( sizeof(DIR) );
-		pdir->hFile = hFile ;
-		pdir->c_file = c_file ;
-		strcpy_s(pdir->initName,sizeof(pdir->initName), c_file.name);
+    // add *.* for Windows _findfirst() search pattern
+    swprintf_s(searchstr, MAX_PATH, L"%s\\*.*", wname);
 
-		return pdir ;
-	}
+    if ((hFile = _wfindfirst(searchstr, &c_file)) == -1L) {
+        if (1) // verbose
+            printf( "No files found for %s search.\n", name );
+        return (DIR *) NULL;
+    }
+    else {
+        pdir = (DIR *) malloc( sizeof(DIR) );
+        pdir->hFile = hFile ;
+        pdir->c_file.attrib = c_file.attrib ;
+        pdir->c_file.size = c_file.size;
+        pdir->c_file.time_access = c_file.time_access;
+        pdir->c_file.time_create = c_file.time_create;
+        pdir->c_file.time_write = c_file.time_write;
+
+        if ((needed = WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, NULL, 0, NULL, NULL)) == 0 ||
+            WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, pdir->c_file.name, needed, NULL, NULL) != needed)
+            fatal("failed to covert input arguments");
+
+        strcpy_s(pdir->initName, sizeof(pdir->initName), pdir->c_file.name);
+
+        return pdir ;
+    }
 }
 
 /* Close the directory stream DIRP.
    Return 0 if successful, -1 if not.  */
 int closedir(DIR *dirp)
 {
-   if ( dirp && (dirp->hFile) ) {
-	   _findclose( dirp->hFile );
-	   dirp->hFile = 0;
-		free (dirp);
-   }
+    if ( dirp && (dirp->hFile) ) {
+        _findclose( dirp->hFile );
+        dirp->hFile = 0;
+        free (dirp);
+    }
 
-	return 0;
+    return 0;
 }
 
 /* Read a directory entry from DIRP.
@@ -56,24 +69,33 @@ int closedir(DIR *dirp)
    by a later readdir call on the same DIR stream.  */
 struct dirent *readdir(void *avp)
 {
-	struct dirent *pdirentry;
-	DIR *dirp = (DIR *)avp;
+    int needed;
+    struct dirent *pdirentry;
+    struct _wfinddata_t c_file;
+    DIR *dirp = (DIR *)avp;
+    char *tmp = NULL;
 
- for (;;) {
-  if ( _findnext( dirp->hFile, &(dirp->c_file) ) == 0 ) {
-		if ( ( strcmp (dirp->c_file.name,".") == 0 ) ||
-			  ( strcmp (dirp->c_file.name,"..") == 0 ) ) {
-			continue ;
-		}
-		pdirentry = (struct dirent *) malloc( sizeof(struct dirent) );
-		pdirentry->d_name = dirp->c_file.name ;
-		pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero
-		return pdirentry ;
-  }
-  else {
-	return (struct dirent *) NULL;
-  }
- }
+    for (;;) {
+        if ( _wfindnext( dirp->hFile, &c_file ) == 0 ) {
+		    if ( ( wcscmp (c_file.name, L".") == 0 ) ||
+			     ( wcscmp (c_file.name, L"..") == 0 ) ) {
+			    continue ;
+		    }
+		    pdirentry = (struct dirent *) malloc( sizeof(struct dirent) );
+
+            if ((tmp = utf16_to_utf8(pdirentry->d_name)) == NULL)
+                fatal("failed to covert input arguments");
+            strcpy(c_file.name[0], tmp);
+            free(tmp);
+            tmp = NULL;
+
+		    pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero
+		    return pdirentry ;
+        }
+        else {
+	        return (struct dirent *) NULL;
+        }
+    }
 }
 
 // return last part of a path. The last path being a filename.

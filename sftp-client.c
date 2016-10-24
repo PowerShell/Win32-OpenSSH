@@ -109,29 +109,7 @@
     }
   }
 
-  /** TODO - Move this to POSIX wrapper**/
-  /* ??? What if fd is nonblocking ???*/
-  int writev(int fd, struct iovec *iov, int iovcnt)
-  {
-	  int written = 0;
-
-	  int i = 0;
-
-	  for (i = 0; i < iovcnt; i++)
-	  {
-		  int ret = write(fd, iov[i].iov_base, iov[i].iov_len);
-
-		  if (ret > 0)
-		  {
-			  written += ret;
-		  }
-	  }
-
-	  return written;
-  }
-
 #endif
-
 
 extern volatile sig_atomic_t interrupted;
 extern int showprogress;
@@ -776,6 +754,7 @@ do_mkdir(struct sftp_conn *conn, const char *path, Attrib *a, int print_flag)
 	status = get_status(conn, id);
 	if (status != SSH2_FX_OK && print_flag)
 		error("Couldn't create directory: %s", fx2txt(status));
+    errno = status;
 
 	return status == SSH2_FX_OK ? 0 : -1;
 }
@@ -1502,15 +1481,19 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 				error("Can't set times on \"%s\": %s",
 				    local_path, strerror(errno));
 		}
-#ifndef WIN32_FIXME
-// PRAGMA:TODO
+
 		if (fsync_flag) {
 			debug("syncing \"%s\"", local_path);
+#ifdef WINDOWS
+            if(FlushFileBuffers(local_fd))
+                error("Couldn't sync file \"%s\": %s",
+                    local_path, strerror(GetLastError()));
+#else
 			if (fsync(local_fd) == -1)
 				error("Couldn't sync file \"%s\": %s",
 				    local_path, strerror(errno));
-		}
 #endif
+        }
 	}
 	close(local_fd);
 	sshbuf_free(msg);
@@ -1657,15 +1640,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 
 	TAILQ_INIT(&acks);
 
-	  #if(0)//def WIN32_FIXME
-
-  if ((local_fd = _open(local_path, O_RDONLY | O_BINARY, 0)) == -1) {
-
-  #else
-
 	if ((local_fd = open(local_path, O_RDONLY, 0)) == -1) {  
-
-  #endif
 		error("Couldn't open local file \"%s\" for reading: %s",
 		    local_path, strerror(errno));
 		return(-1);
@@ -1904,7 +1879,7 @@ upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
 	 * if it was created successfully.
 	 */
 	if (status != SSH2_FX_OK) {
-		if (status != SSH2_FX_FAILURE)
+		if (errno != SSH2_FX_FAILURE)
 			return -1;
 		if (do_stat(conn, dst, 0) == NULL)
 			return -1;

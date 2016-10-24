@@ -24,6 +24,7 @@
 #define open w32_open
 #define read w32_read
 #define write w32_write
+#define writev w32_writev
 //#define isatty w32_isatty
 #define close w32_close
 #define dup w32_dup
