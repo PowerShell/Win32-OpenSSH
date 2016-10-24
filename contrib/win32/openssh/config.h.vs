@@ -1632,6 +1632,9 @@
 #define HAVE_STRNCASECMP 1
 #endif
 
+/* Define to 1 if you have the locale.h header. */
+#define HAVE_LOCALE_H 1
+
 #define HAVE_STRUCT_IN6_ADDR 1
 #define HAVE_STRUCT_SOCKADDR_IN6 1
 #define HAVE_STRUCT_TIMEVAL 1
@@ -1725,6 +1728,6 @@ typedef long ssize_t;
 #define HAVE_MBLEN 1
 
 #define SSHDIR "."
-#define _PATH_SFTP_SERVER "./sftp-server.exe"
-#define _PATH_SSH_PROGRAM "./ssh.exe"
+#define _PATH_SFTP_SERVER "sftp-server.exe"
+#define _PATH_SSH_PROGRAM "ssh.exe"
 #define _PATH_LS			"dir"

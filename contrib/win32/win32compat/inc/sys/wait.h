@@ -13,5 +13,7 @@
 #define WIFSIGNALED(w)	FALSE
 #define WEXITSTATUS(w)	w
 #define WTERMSIG(w)	-1
+#define WNOHANG 1
+#define WUNTRACED 2
 
 int waitpid(int pid, int *status, int options);

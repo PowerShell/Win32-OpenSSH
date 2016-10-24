@@ -10,6 +10,15 @@
 #include "defs.h"
 #include "utf.h"
 
+#ifndef _OFF_T_DEFINED
+#define _OFF_T_DEFINED
+
+typedef long _off_t; // file offset value
+
+#if !__STDC__
+typedef _off_t off_t;
+#endif
+#endif
 
 typedef struct w32_fd_set_ {
 	unsigned char bitmap[MAX_FDS >> 3];
@@ -45,6 +54,7 @@ int w32_pipe(int *pfds);
 int w32_open(const char *pathname, int flags, ...);
 int w32_read(int fd, void *dst, size_t max);
 int w32_write(int fd, const void *buf, unsigned int max);
+int w32_writev(int fd, const struct iovec *iov, int iovcnt);
 int w32_fstat(int fd, struct w32_stat *buf);
 int w32_stat(const char *path, struct w32_stat *buf);
 long w32_lseek( int fd, long offset, int origin);
@@ -52,6 +62,8 @@ long w32_lseek( int fd, long offset, int origin);
 int w32_isatty(int fd);
 FILE* w32_fdopen(int fd, const char *mode);
 int w32_mkdir(const char *pathname, unsigned short mode);
+int w32_chdir(const char *dirname);
+char *w32_getcwd(char *buffer, int maxlen);
 
 /*common i/o*/
 #define fcntl(a,b,...)		w32_fcntl((a), (b),  __VA_ARGS__)
@@ -75,6 +87,7 @@ void w32_freeaddrinfo(struct addrinfo *);
 int w32_getaddrinfo(const char *, const char *,
         const struct addrinfo *, struct addrinfo **);
 FILE* w32_fopen_utf8(const char *, const char *);
+int w32_ftruncate(int fd, off_t length);
 char* w32_programdir();
 
 
@@ -123,7 +136,6 @@ int sw_add_child(HANDLE child, DWORD pid);
 #define sfd_to_handle(a) w32_fd_to_handle((a))
 #define allocate_sfd(a, b) w32_allocate_fd_for_handle((a, b))
 //#define WSHELPwopen(a, b) w32_open((a, b))
-
 
 /* TODO - These defs need to revisited and positioned appropriately */
 #define environ _environ
