@@ -1547,6 +1547,7 @@ syserr:			run_err("%s: %s", name, strerror(errno));
 			run_err("%s: not a regular file", name);
 			goto next;
 		}
+#ifdef WINDOWS
 		if ((lastf = strrchr(name, '/')) == NULL && (lastr = strrchr(name, '\\')) == NULL)
 			last = name;
         else {
@@ -1556,6 +1557,12 @@ syserr:			run_err("%s: %s", name, strerror(errno));
                 last = lastr;
             ++last;
         }
+#else
+        if ((last = strrchr(name, '/')) == NULL)
+            last = name;
+        else
+            ++last;
+#endif
 		curfile = last;
 		if (pflag) {
 			if (do_times(remout, verbose_mode, &stb) < 0)
