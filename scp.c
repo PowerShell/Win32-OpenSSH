@@ -251,6 +251,9 @@ char *port = NULL;
 /* This is set password if given on the command line. */
 char *password = NULL;
 
+/* This is set ssh_config if given on the command line. */
+char *ssh_config = NULL;
+
 int ipv_restrict = 0;
 
 #define ONLY_IPV4	1
@@ -811,6 +814,10 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 		args[i++] = "-p";
 		args[i++] = port;
 	}
+    if (ssh_config) {
+        args[i++] = "-F";
+        args[i++] = ssh_config;
+    }
     if (remuser != NULL) {
 		args[i++] = "-l";
 		args[i++] = remuser;
@@ -892,6 +899,18 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 		NULL, /* current directory is default directory we set before */
 		NULL
 	);
+
+    if (port)
+        free(port);
+
+    if (cipher)
+        free(cipher);
+
+    if (identity)
+        free(identity);
+
+    if (ssh_config)
+        free(ssh_config);
 
     if (!rc) {
 	    printf("%s could not be started\n", ssh_program);
@@ -1100,32 +1119,67 @@ main(int argc, char **argv)
 		case '1':
 		case '2':
 		case '4':
+            ipv_restrict = ONLY_IPV4;
+            break;
 		case '6':
+            ipv_restrict = ONLY_IPV6;
+            break;
 		case 'C':
 			addargs(&args, "-%c", ch);
 			addargs(&remote_remote_args, "-%c", ch);
+
+            compress = ch;
+
 			break;
 		case '3':
 			throughlocal = 1;
 			break;
 		case 'o':
 		case 'c':
+            addargs(&remote_remote_args, "-%c", ch);
+            addargs(&remote_remote_args, "%s", optarg);
+            addargs(&args, "-%c", ch);
+            addargs(&args, "%s", optarg);
+
+            cipher = malloc(strlen(optarg) + 1);
+            if (cipher)
+                strcpy(cipher, optarg);
+            break;
 		case 'i':
-		case 'F':
+            addargs(&remote_remote_args, "-%c", ch);
+            addargs(&remote_remote_args, "%s", optarg);
+            addargs(&args, "-%c", ch);
+            addargs(&args, "%s", optarg);
+
+            identity = malloc(strlen(optarg) + 1);
+            if (identity)
+                strcpy(identity, optarg);
+            break;
+        case 'F':
 			addargs(&remote_remote_args, "-%c", ch);
 			addargs(&remote_remote_args, "%s", optarg);
 			addargs(&args, "-%c", ch);
 			addargs(&args, "%s", optarg);
-			break;
+            
+            ssh_config = malloc(strlen(optarg) + 1);
+            if (ssh_config)
+                strcpy(ssh_config, optarg);
+            break;
 		case 'P':
 			addargs(&remote_remote_args, "-p");
 			addargs(&remote_remote_args, "%s", optarg);
 			addargs(&args, "-p");
 			addargs(&args, "%s", optarg);
+
+            port = malloc(strlen(optarg) + 1);
+            if (port)
+                strcpy(port, optarg);
 			break;
 		case 'B':
 			addargs(&remote_remote_args, "\"-oBatchmode yes\"");
 			addargs(&args, "\"-oBatchmode yes\"");
+
+            batchmode = 1;
 			break;
 		case 'l':
 			limit_kbps = strtonum(optarg, 1, 100 * 1024 * 1024,
@@ -1590,7 +1644,17 @@ rsource(char *name, struct stat *statp)
 	(void) snprintf(path, sizeof path, "D%04o %d %.1024s\n",
 	    (u_int) (statp->st_mode & FILEMODEMASK), 0, last);
 	if (verbose_mode)
-		fprintf(stderr, "Entering directory: %s", path);
+#ifdef WINDOWS
+        {
+            printf("Entering directory: ");
+            wchar_t* wtmp = utf8_to_utf16(path);
+            WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+            free(wtmp);
+        }
+#else
+        fprintf(stderr, "Entering directory: %s", path);
+#endif
+
 	(void) atomicio(vwrite, remout, path, strlen(path));
 	if (response() < 0) {
 		closedir(dirp);
@@ -1665,8 +1729,16 @@ sink(int argc, char **argv)
 		} while (cp < &buf[sizeof(buf) - 1] && ch != '\n');
 		*cp = 0;
 		if (verbose_mode)
-			fprintf(stderr, "Sink: %s", buf);
-
+#ifdef WINDOWS
+            {
+                printf("Sink: ");
+                wchar_t* wtmp = utf8_to_utf16(buf);
+                WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+                free(wtmp);
+            }
+#else
+            fprintf(stderr, "Sink: %s", buf);
+#endif
 		if (buf[0] == '\01' || buf[0] == '\02') {
 			if (iamremote == 0)
 				(void) atomicio(vwrite, STDERR_FILENO,
