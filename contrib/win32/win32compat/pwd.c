@@ -33,7 +33,6 @@
 #include <stdio.h>
 #include <LM.h>
 #include <sddl.h>
-#include <DsGetDC.h>
 #define SECURITY_WIN32
 #include <security.h>
 #include "inc\pwd.h"
@@ -71,7 +70,6 @@ get_passwd(const char *user_utf8, LPWSTR user_sid) {
         wchar_t reg_path[MAX_PATH], profile_home[MAX_PATH];
         HKEY reg_key = 0;
         int tmp_len = MAX_PATH;
-        PDOMAIN_CONTROLLER_INFOW pdc = NULL;
 
         errno = 0;
 
@@ -100,26 +98,12 @@ get_passwd(const char *user_utf8, LPWSTR user_sid) {
         }
 
         if (user_sid == NULL) {
-            if (NetUserGetInfo(udom_utf16, uname_utf16, 23, &user_info) != NERR_Success) {
-                if (DsGetDcNameW(NULL, udom_utf16, NULL, NULL, DS_DIRECTORY_SERVICE_PREFERRED, &pdc) == ERROR_SUCCESS) {
-                    if (NetUserGetInfo(pdc->DomainControllerName, uname_utf16, 23, &user_info) != NERR_Success ||
+                if (NetUserGetInfo(udom_utf16, uname_utf16, 23, &user_info) != NERR_Success ||
                         ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid_local) == FALSE) {
                         errno = ENOMEM; //??
                         goto done;
-                    } 
                 }
-                else {
-                    errno = ENOMEM; //??
-                    goto done;
-                }
-            }
-            else {
-                if (ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid_local) == FALSE) {
-                    errno = ENOMEM; //??
-                    goto done;
-                }
-            }
-            user_sid = user_sid_local;
+                user_sid = user_sid_local;
         }
 
         if (swprintf(reg_path, MAX_PATH, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", user_sid) == MAX_PATH ||
@@ -151,8 +135,6 @@ done:
                 LocalFree(user_sid_local);
         if (reg_key)
                 RegCloseKey(reg_key);
-        if (pdc)
-            NetApiBufferFree(pdc);
         return ret;
 }
 

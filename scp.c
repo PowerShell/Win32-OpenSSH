@@ -1135,18 +1135,15 @@ main(int argc, char **argv)
 			throughlocal = 1;
 			break;
 		case 'o':
-            addargs(&remote_remote_args, "-%c", ch);
-            addargs(&remote_remote_args, "%s", optarg);
-            addargs(&args, "-%c", ch);
-            addargs(&args, "%s", optarg);
-            break;
-        case 'c':
+		case 'c':
             addargs(&remote_remote_args, "-%c", ch);
             addargs(&remote_remote_args, "%s", optarg);
             addargs(&args, "-%c", ch);
             addargs(&args, "%s", optarg);
 
-            cipher = xstrdup(optarg);;
+            cipher = malloc(strlen(optarg) + 1);
+            if (cipher)
+                strcpy(cipher, optarg);
             break;
 		case 'i':
             addargs(&remote_remote_args, "-%c", ch);
@@ -1154,7 +1151,9 @@ main(int argc, char **argv)
             addargs(&args, "-%c", ch);
             addargs(&args, "%s", optarg);
 
-            identity = xstrdup(optarg);;
+            identity = malloc(strlen(optarg) + 1);
+            if (identity)
+                strcpy(identity, optarg);
             break;
         case 'F':
 			addargs(&remote_remote_args, "-%c", ch);
@@ -1162,7 +1161,9 @@ main(int argc, char **argv)
 			addargs(&args, "-%c", ch);
 			addargs(&args, "%s", optarg);
             
-            ssh_config = xstrdup(optarg);;
+            ssh_config = malloc(strlen(optarg) + 1);
+            if (ssh_config)
+                strcpy(ssh_config, optarg);
             break;
 		case 'P':
 			addargs(&remote_remote_args, "-p");
@@ -1170,7 +1171,9 @@ main(int argc, char **argv)
 			addargs(&args, "-p");
 			addargs(&args, "%s", optarg);
 
-            port = xstrdup(optarg);;
+            port = malloc(strlen(optarg) + 1);
+            if (port)
+                strcpy(port, optarg);
 			break;
 		case 'B':
 			addargs(&remote_remote_args, "\"-oBatchmode yes\"");
@@ -1358,7 +1361,7 @@ toremote(char *targ, int argc, char **argv)
 		return;
 	}
 
-    for (i = 0; i < argc - 1; i++) {
+	for (i = 0; i < argc - 1; i++) {
 		src = colon(argv[i]);
 		if (src && throughlocal) {	/* extended remote to remote */
 			*src++ = 0;
