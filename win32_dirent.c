@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <utf.h>
 
 #include "win32_dirent.h"
 
@@ -18,13 +19,16 @@ DIR * opendir(char *name)
     intptr_t hFile;
     DIR *pdir;
     wchar_t searchstr[MAX_PATH];
-    wchar_t wname[MAX_PATH];
+    wchar_t* wname = NULL;
     int needed;
+    char *tmp = NULL;
 
-    MultiByteToWideChar(CP_UTF8, 0, name, -1, wname, MAX_PATH);
+    if ((wname = utf8_to_utf16(name)) == NULL)
+        fatal("failed to covert input arguments");
 
     // add *.* for Windows _findfirst() search pattern
     swprintf_s(searchstr, MAX_PATH, L"%s\\*.*", wname);
+    free(wname);
 
     if ((hFile = _wfindfirst(searchstr, &c_file)) == -1L) {
         if (1) // verbose
@@ -40,11 +44,12 @@ DIR * opendir(char *name)
         pdir->c_file.time_create = c_file.time_create;
         pdir->c_file.time_write = c_file.time_write;
 
-        if ((needed = WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, NULL, 0, NULL, NULL)) == 0 ||
-            WideCharToMultiByte(CP_UTF8, 0, c_file.name, -1, pdir->c_file.name, needed, NULL, NULL) != needed)
+        if ((tmp = utf16_to_utf8(&(c_file.name))) == NULL)
             fatal("failed to covert input arguments");
 
+        strcpy_s(pdir->c_file.name, MAX_PATH, tmp);
         strcpy_s(pdir->initName, sizeof(pdir->initName), pdir->c_file.name);
+        free(tmp);
 
         return pdir ;
     }
@@ -69,7 +74,6 @@ int closedir(DIR *dirp)
    by a later readdir call on the same DIR stream.  */
 struct dirent *readdir(void *avp)
 {
-    int needed;
     struct dirent *pdirentry;
     struct _wfinddata_t c_file;
     DIR *dirp = (DIR *)avp;
@@ -83,10 +87,9 @@ struct dirent *readdir(void *avp)
 		    }
 		    pdirentry = (struct dirent *) malloc( sizeof(struct dirent) );
 
-            if ((tmp = utf16_to_utf8(pdirentry->d_name)) == NULL)
+            if ((tmp = utf16_to_utf8(&(c_file.name))) == NULL)
                 fatal("failed to covert input arguments");
-            strcpy(c_file.name[0], tmp);
-            free(tmp);
+            pdirentry->d_name= tmp;
             tmp = NULL;
 
 		    pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero

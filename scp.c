@@ -834,7 +834,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 
     // Create a pair of pipes for communicating with ssh
     // which we will spawn
-    // Do the plunmbing so that child ssh process to be spawned has its
+    // Do the plumbing so that child ssh process to be spawned has its
     // standard input from the pout[0] and its standard output going to
     // pin[1]
 
@@ -1006,7 +1006,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 }
 
 /*
- * This functions executes a command simlar to do_cmd(), but expects the
+ * This functions executes a command similar to do_cmd(), but expects the
  * input and output descriptors to be setup by a previous call to do_cmd().
  * This way the input and output of two commands can be connected.
  */
