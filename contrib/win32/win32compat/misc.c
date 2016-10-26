@@ -2,11 +2,45 @@
 #include <stdio.h>
 #include "inc\defs.h"
 #include "inc\sys\statvfs.h"
+#include "inc\sys\time.h"
 
 int usleep(unsigned int useconds)
 {
 	Sleep(useconds / 1000);
 	return 1;
+}
+
+/* Difference in us between UNIX Epoch and Win32 Epoch */
+#define EPOCH_DELTA_US  11644473600000000ULL
+
+/* This routine is contributed by  * Author: NoMachine <developers@nomachine.com>
+* Copyright (c) 2009, 2010 NoMachine
+* All rights reserved
+*/
+int
+gettimeofday(struct timeval *tv, void *tz)
+{
+        union
+        {
+                FILETIME ft;
+                unsigned long long ns;
+        } timehelper;
+        unsigned long long us;
+
+        /* Fetch time since Jan 1, 1601 in 100ns increments */
+        GetSystemTimeAsFileTime(&timehelper.ft);
+
+        /* Convert to microseconds from 100 ns units */
+        us = timehelper.ns / 10;
+
+        /* Remove the epoch difference */
+        us -= EPOCH_DELTA_US;
+
+        /* Stuff result into the timeval */
+        tv->tv_sec = (long)(us / 1000000ULL);
+        tv->tv_usec = (long)(us % 1000000ULL);
+
+        return 0;
 }
 
 void
@@ -164,4 +198,10 @@ char* w32_programdir() {
 
         return s_programdir;
 
+}
+
+int daemon(int nochdir, int noclose)
+{
+        /* this should never be invoked from Windows code*/
+        DebugBreak();
 }

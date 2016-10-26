@@ -147,9 +147,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\conio.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\daemon.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\deskright.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\gettimeofday.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\homedirhelp.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\kerberos.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\startupneeds.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\strcasecmp.c" />

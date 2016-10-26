@@ -31,7 +31,4 @@
 
 #include "includes.h"
 
-int daemon(int nochdir, int noclose)
-{
-  return 0;
-}
+
