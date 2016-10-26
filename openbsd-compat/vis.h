@@ -48,7 +48,7 @@
  */
 #define	VIS_OCTAL	0x01	/* use octal \ddd format */
 #define	VIS_CSTYLE	0x02	/* use \[nrft0..] where appropriate */
-
+#define	VIS_ALL		0x400	/* encode all characters */
 /*
  * to alter set of characters encoded (default is to encode all
  * non-graphic except space, tab, and newline).
