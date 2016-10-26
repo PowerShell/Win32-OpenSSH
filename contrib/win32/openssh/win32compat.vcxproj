@@ -149,7 +149,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\daemon.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\kerberos.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\startupneeds.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\strcasecmp.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32auth.c" />

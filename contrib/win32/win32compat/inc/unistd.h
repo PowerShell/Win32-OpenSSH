@@ -27,26 +27,6 @@
 #define getdtablesize() MAX_FDS
 #define gethostname w32_gethostname
 
-#define fopen w32_fopen_utf8
-
 int daemon(int nochdir, int noclose);
-
-/* Compatibility header to avoid lots of #ifdefs in includes.h on Win32 */
-
-#include <conio.h>
-
-/* We can't put these in string.h since we can't easily override that header, so here they are */
-#if !defined(HAVE_STRCASECMP) && !defined(__MINGW32__)
-size_t strcasecmp(const char *left, const char *right);
-#endif
-
-#if !defined(HAVE_STRNCASECMP) && !defined(__MINGW32__)
-size_t strncasecmp(const char *left, const char *right, size_t n);
-#endif
-
-#define popen _popen
-#define pclose _pclose
-
-/* End of prototypes in the wrong file */
 
 #endif
