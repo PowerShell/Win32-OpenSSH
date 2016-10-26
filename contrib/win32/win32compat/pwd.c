@@ -202,48 +202,6 @@ done:
         return ret;
 }
 
-/* given a access token, find the domain name of user account of the access token */
-int GetDomainFromToken ( HANDLE *hAccessToken, UCHAR *domain, DWORD dwSize)
-{
-   UCHAR InfoBuffer[1000],username[200];
-   PTOKEN_USER pTokenUser = (PTOKEN_USER)InfoBuffer;
-   DWORD dwInfoBufferSize,dwAccountSize = 200, dwDomainSize = dwSize;
-   SID_NAME_USE snu;
-
-   domain[0] = '\0' ;
-   GetTokenInformation(*hAccessToken,TokenUser,InfoBuffer,
-						1000, &dwInfoBufferSize);
-
-   LookupAccountSid(NULL, pTokenUser->User.Sid, (LPSTR)username,
-				        &dwAccountSize,(LPSTR)domain, &dwDomainSize, &snu);
-   return 0;
-}
-
-/*
- * Retrieve user homedir from token, save it in static string
- * and return pointer to this string.
- *
- * userName - user's name (IN)
- * token    - logon user's token (IN)
- *
- * RETURNS: pointer to static string with homedir or NULL if fails.
- */
-
-#define SET_USER_ENV(folder_id, evn_variable) do  {                \
-       if (SHGetKnownFolderPath(&folder_id,0,token,&path) == S_OK)              \
-        {                                                                       \
-                SetEnvironmentVariableW(evn_variable, path);                    \
-                CoTaskMemFree(path);                                            \
-       }                                                                        \
-} while (0)                                                                     
-
-/*
- * Temporary getpwuid implementaion of Windows. This should be replaced with getpw_currentuser
- */
-
-
-
-
 
 /* TODO - this is moved from realpath.c in openbsdcompat. Review and finalize its position*/
 

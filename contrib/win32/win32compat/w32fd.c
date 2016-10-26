@@ -126,8 +126,10 @@ w32posix_initialize() {
 		|| (socketio_initialize() != 0))
 		DebugBreak();
 	main_thread = OpenThread(THREAD_SET_CONTEXT, FALSE, GetCurrentThreadId());
-	if ((main_thread == NULL) || (sw_initialize() != 0))
-		DebugBreak();
+        if ((main_thread == NULL) || (sw_initialize() != 0) || w32_programdir() == NULL) {
+                DebugBreak();
+                fatal("failed to initialize w32posix wrapper");
+        }
 }
 
 void

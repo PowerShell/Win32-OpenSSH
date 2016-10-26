@@ -141,3 +141,27 @@ utf16_to_utf8(const wchar_t* utf16) {
                 return NULL;
         return utf8;
 }
+
+static char* s_programdir = NULL;
+char* w32_programdir() {
+        if (s_programdir != NULL)
+                return s_programdir;
+
+        if ((s_programdir = utf16_to_utf8(_wpgmptr)) == NULL)
+                return NULL;
+
+        /* null terminate after directory path */
+        {
+                char* tail = s_programdir + strlen(s_programdir);
+                while (tail > s_programdir && *tail != '\\' && *tail != '/')
+                        tail--;
+
+                if (tail > s_programdir)
+                        *tail = '\0';
+                else
+                        *tail = '.'; /* current directory */
+        }
+
+        return s_programdir;
+
+}

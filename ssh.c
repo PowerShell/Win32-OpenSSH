@@ -118,7 +118,6 @@
   #include <sys/stat.h>
 
   char dotsshdir[MAX_PATH];
-  extern HANDLE hInputConsole;
 
 #endif /* WIN32_FIXME */
 
@@ -1393,7 +1392,6 @@ main(int ac, char **av)
 	if (tty_flag) {
 		//AllocConsole();
 	    ConInputInitParams(); // init the Console input side with global parameters
-        hInputConsole = GetStdHandle(STD_INPUT_HANDLE);
 	    ConInit(STD_OUTPUT_HANDLE, TRUE); //init the output console surface for us to write
         ConClearScreen();
 	}

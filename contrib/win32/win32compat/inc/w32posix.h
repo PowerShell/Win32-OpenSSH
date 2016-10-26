@@ -88,6 +88,8 @@ int w32_getaddrinfo(const char *, const char *,
         const struct addrinfo *, struct addrinfo **);
 FILE* w32_fopen_utf8(const char *, const char *);
 int w32_ftruncate(int fd, off_t length);
+char* w32_programdir();
+
 
 /* Shutdown constants */
 #define SHUT_WR SD_SEND
