@@ -202,6 +202,6 @@ char* w32_programdir() {
 
 int daemon(int nochdir, int noclose)
 {
-        /* this should never be invoked from Windows code*/
-        DebugBreak();
+        FreeConsole();
+        return 0;
 }

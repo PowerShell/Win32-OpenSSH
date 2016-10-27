@@ -1,7 +1,7 @@
 /*
  * Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
  * ssh-agent implementation on Windows
- * 
+ *
  * Copyright (c) 2015 Microsoft Corp.
  * All rights reserved
  *
@@ -49,16 +49,16 @@ static VOID ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
 	service_status.dwWin32ExitCode = dwWin32ExitCode;
 	service_status.dwWaitHint = dwWaitHint;
 
-	if (dwCurrentState == SERVICE_START_PENDING) 
+	if (dwCurrentState == SERVICE_START_PENDING)
 		service_status.dwControlsAccepted = 0;
 	else
 		service_status.dwControlsAccepted = SERVICE_ACCEPT_STOP;
-	
+
 	if ((dwCurrentState == SERVICE_RUNNING) || (dwCurrentState == SERVICE_STOPPED))
 		service_status.dwCheckPoint = 0;
 	else
 		service_status.dwCheckPoint = 1;
-	
+
 	SetServiceStatus(service_status_handle, &service_status);
 }
 
@@ -83,7 +83,7 @@ static VOID WINAPI service_handler(DWORD dwControl)
 
 BOOL WINAPI ctrl_c_handler(
 	_In_ DWORD dwCtrlType
-	) {
+) {
 	/* for any Ctrl type, shutdown agent*/
 	debug("Ctrl+C received");
 	agent_shutdown();
@@ -91,21 +91,26 @@ BOOL WINAPI ctrl_c_handler(
 }
 
 int wmain(int argc, wchar_t **argv) {
-        
+
 	w32posix_initialize();
 	load_config();
-	if (!StartServiceCtrlDispatcherW(dispatch_table))  {
+	if (!StartServiceCtrlDispatcherW(dispatch_table)) {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
-			/*todo - support debug mode*/
-			/*
-			if (debugMode) {
-				SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
-				log_init("ssh-agent", 7, 1, 1);
-				agent_start(TRUE, FALSE, 0);
-				return 0;
-			}
-			*/
+
 			if (argc == 2) {
+				if (wcsncmp(argv[1], L"-ddd", 4) == 0)
+					log_init("ssh-agent", 7, 1, 1);
+				else if (wcsncmp(argv[1], L"-dd", 3) == 0)
+					log_init("ssh-agent", 6, 1, 1);
+				else if (wcsncmp(argv[1], L"-d", 2) == 0)
+					log_init("ssh-agent", 5, 1, 1);
+
+				if (wcsncmp(argv[1], L"-d", 2) == 0) {
+					SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
+					agent_start(TRUE, FALSE, 0);
+					return 0;
+				}
+
 				/*agent process is likely a spawned child*/
 				char* h = 0;
 				h += _wtoi(*(argv + 1));
@@ -120,13 +125,13 @@ int wmain(int argc, wchar_t **argv) {
 			{
 				SC_HANDLE sc_handle, svc_handle;
 				DWORD err;
-								
+
 				if ((sc_handle = OpenSCManagerW(NULL, NULL, SERVICE_START)) == NULL ||
-				    (svc_handle = OpenServiceW(sc_handle, L"ssh-agent", SERVICE_START)) == NULL){
+					(svc_handle = OpenServiceW(sc_handle, L"ssh-agent", SERVICE_START)) == NULL) {
 					fatal("unable to open service handle");
 					return -1;
 				}
-				
+
 				if (StartService(svc_handle, 0, NULL) == FALSE && GetLastError() != ERROR_SERVICE_ALREADY_RUNNING) {
 					fatal("unable to start ssh-agent service, error :%d", GetLastError());
 					return -1;
@@ -146,7 +151,7 @@ int scm_start_service(DWORD num, LPWSTR* args) {
 	ZeroMemory(&service_status, sizeof(service_status));
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
-        ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
+	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	log_init("ssh-agent", config_log_level(), 1, 0);
 	agent_start(FALSE, FALSE, 0);
 	return 0;
