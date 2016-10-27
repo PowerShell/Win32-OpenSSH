@@ -163,3 +163,11 @@ struct iovec
 
 void
 explicit_bzero(void *b, size_t len);
+
+/* string.h overrides */
+#define strcasecmp _stricmp
+#define strncasecmp _strnicmp
+/* stdio.h overrides */
+#define fopen w32_fopen_utf8
+#define popen _popen
+#define pclose _pclose

@@ -45,22 +45,10 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\daemon.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\deskright.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\gettimeofday.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\homedirhelp.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\kerberos.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\startupneeds.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\strcasecmp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c">
@@ -145,12 +133,6 @@
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\termios.h">
       <Filter>includes</Filter>
-    </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\ioctl.h">
-      <Filter>includes\sys</Filter>
-    </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\param.h">
-      <Filter>includes\sys</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\includes\sys\resource.h">
       <Filter>includes\sys</Filter>

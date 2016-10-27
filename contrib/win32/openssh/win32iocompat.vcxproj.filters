@@ -11,9 +11,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_sigchld.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32log.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\pwd.c" />
-    
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\wmain.c" />
-
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -57,21 +55,58 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\syslog.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h">
-
       <Filter>inc</Filter>
-
     </ClInclude>
-
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\param.h">
-
       <Filter>inc\sys</Filter>
-
     </ClInclude>
-
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\utf.h">
-
       <Filter>inc</Filter>
-
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\ioctl.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\resource.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\uio.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\un.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\arpa\inet.h">
+      <Filter>inc\arpa</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\arpa\nameser.h">
+      <Filter>inc\arpa</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\in.h">
+      <Filter>inc\netinet</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\in_systm.h">
+      <Filter>inc\netinet</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\ip.h">
+      <Filter>inc\netinet</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\tcp.h">
+      <Filter>inc\netinet</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\grp.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netdb.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\process.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\resolv.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\termios.h">
+      <Filter>inc</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -80,6 +115,12 @@
     </Filter>
     <Filter Include="inc\sys">
       <UniqueIdentifier>{9fd6aa70-2efb-4577-87eb-d285a9cbbaa0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="inc\arpa">
+      <UniqueIdentifier>{6e4a035d-0b38-4507-9eec-19097d4ac16f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="inc\netinet">
+      <UniqueIdentifier>{d943f1aa-2df9-4df3-b499-4403a899fe8d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

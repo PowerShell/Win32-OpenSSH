@@ -151,9 +151,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_sigchld.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32log.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\pwd.c" />
-    
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\wmain.c" />
-  
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -173,11 +171,23 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\syslog.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h" />
-    
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\param.h" />
-    
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\utf.h" />
- 
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\arpa\inet.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\arpa\nameser.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\grp.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netdb.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\in.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\in_systm.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\ip.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\netinet\tcp.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\process.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\resolv.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\ioctl.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\resource.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\uio.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\un.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\termios.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
