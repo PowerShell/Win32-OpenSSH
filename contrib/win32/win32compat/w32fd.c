@@ -854,11 +854,9 @@ int
 w32_ftruncate(int fd, off_t length) {
     CHECK_FD(fd);
 
+    if (!SetFilePointer(w32_fd_to_handle(fd), length, 0, FILE_BEGIN))
+        return -1;
     if (!SetEndOfFile(w32_fd_to_handle(fd)))
-        return -1;
-    if (!SetFileValidData(w32_fd_to_handle(fd), length))
-        return -1;
-    if (!SetFilePointer(w32_fd_to_handle(fd), 0, 0, FILE_BEGIN))
         return -1;
 
     return 0;

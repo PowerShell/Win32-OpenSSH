@@ -78,6 +78,7 @@
 #else
 #include <io.h>
 #include <fcntl.h>
+#include <Shlwapi.h>
 #include "win32_dirent.h"
 #endif
 
@@ -104,6 +105,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <locale.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -122,10 +124,8 @@
 #include "log.h"
 #include "misc.h"
 #include "progressmeter.h"
+#include "utf8.h"
 
-#ifdef WINDOWS
-#include <Shlwapi.h>
-#endif
 extern char *__progname;
 
 #define COPY_BUFLEN	16384
@@ -319,125 +319,6 @@ int InitForMicrosoftWindows()
     return 0;
 }
 
-// start of direntry functions in Windows NT like UNIX
-// opendir(), readdir(), closedir().
-// 	NT_DIR * nt_opendir(char *name) ;
-// 	struct nt_dirent *nt_readdir(NT_DIR *dirp);
-// 	int nt_closedir(NT_DIR *dirp) ;
-
-// Windows NT directory structure content
-struct scp_dirent {
-	char *d_name ; // name of the directory entry
-	int  d_ino; // UNIX inode
-	//unsigned attrib ; // its attributes
-};
-
-typedef struct {
-    long hFile;
-    struct _finddata_t c_file;
-} SCPDIR;
-
-
-char * fixslashes(char * str)
-{
-	int i;
-	if (str == NULL)
-		return str;
-
-	int len = (int)strlen(str);
-
-	for (i = 0; i < len; i++)
-		if (str[i] == '/')
-			str[i] = '\\';
-	return str;
-}
-
-// force path separator to sep
-char * forcepathsep(char * str, char sep)
-{
-	int i;
-	// bail if str is null;
-	if (str == NULL)
-		return str;
-
-	// bail if sep isn't valid
-	if ((sep != '\\') || (sep != '/'))
-		return str;
-
-	char antisep = '/';
-
-	if (sep == '/')
-		antisep = '\\';
-
-	int len = (int)strlen(str);
-
-	for (i = 0; i < len; i++)
-		if (str[i] == antisep)
-			str[i] = sep;
-	return str;
-}
-
-// get the path separator character
-char getpathsep(char * path)
-{
-	char sep = '/';
-	char * p = strpbrk(path,"/\\");
-	if (p != NULL)
-		sep = p[0];
-
-	return sep;
-}
-
-bool getRootFrompath(char * path, char * root)
-{
-	strcpy(root,path);
-
-	char sep = getpathsep(root);
-	forcepathsep(root,sep);
-	char * lastslash = strrchr(root,sep);
-	if (lastslash)
-		*lastslash = 0x00;
-	return (lastslash != NULL);
-}
-
-/*
- * get option letter from argument vector
- */
-
-char * getfilenamefrompath(char * path)
-{
-	char * lastslash;
-	char * lastbackslash;
-
-	lastslash = strrchr(path,'/');
-	lastbackslash = strrchr(path, '\\');
-
-	if (lastslash == NULL && lastbackslash == NULL)
-	{
-		// no delimiters, just return the original string
-		return path;
-	}
-	else if (lastslash == NULL)
-	{
-		// no slashes, return the backslash search minus the last char
-		return ++lastbackslash;
-	}
-	else if (lastbackslash == NULL)
-	{
-		// no backslashes, return the slash search minus the last char
-		return ++lastslash;
-	}
-	else
-	{
-		// string has both slashes and backslashes.  return whichever is larger
-		// (i.e. further down the string)
-		lastslash++;
-		lastbackslash++;
-		return ((lastslash > lastbackslash)?lastslash:lastbackslash);
-
-	}
-	return NULL;
-}
 #endif
 
 #define	EMSG	""
@@ -526,33 +407,6 @@ sgetopt(int nargc,
 	return(optopt);				/* dump back option letter */
 }
 
-
-
-/* Open a directory stream on NAME.
-   Return a SCPDIR stream on the directory, or NULL if it could not be opened.  */
-SCPDIR * scp_opendir(char *name)
-{
-   struct _finddata_t c_file;
-   long hFile;
-	SCPDIR *pdir;
-	char searchstr[256];
-
-	sprintf_s(searchstr,sizeof(searchstr),"%s\\*.*",name); // add *.* to it for NT
-
-   if( (hFile = (long)_findfirst( searchstr, &c_file )) == -1L ) {
-       if ( scpverbose)
-			printf( "No files found for %s search.\n", name );
-		return (SCPDIR *) NULL;
-   }
-   else {
-		pdir = (SCPDIR *) malloc( sizeof(SCPDIR) );
-		pdir->hFile = hFile ;
-		pdir->c_file = c_file ;
-
-		return pdir ;
-	}
-}
-
 int _utimedir (char *name, struct _utimbuf *filetime)
 {
    int rc, chandle;
@@ -579,30 +433,6 @@ int _utimedir (char *name, struct _utimbuf *filetime)
 HANDLE hprocess=(HANDLE) 0; // we made it a global to stop child process(ssh) of scp
 #else
 
-/* Read a directory entry from SCPDIRP.
-Return a pointer to a `struct scp_dirent' describing the entry,
-or NULL for EOF or error.  The storage returned may be overwritten
-by a later readdir call on the same SCPDIR stream.  */
-struct scp_dirent *readdir(SCPDIR *dirp)
-{
-    struct scp_dirent *pdirentry;
-
-    for (;;) {
-        if (_findnext(dirp->hFile, &(dirp->c_file)) == 0) {
-            if ((strcmp(dirp->c_file.name, ".") == 0) ||
-                (strcmp(dirp->c_file.name, "..") == 0)) {
-                continue;
-            }
-            pdirentry = (struct scp_dirent *)malloc(sizeof(struct scp_dirent));
-            pdirentry->d_name = dirp->c_file.name;
-            pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero
-            return pdirentry;
-        }
-        else {
-            return (struct scp_dirent *) NULL;
-        }
-    }
-}
 #endif
 
 static void
@@ -645,7 +475,7 @@ do_local_cmd(arglist *a)
 	if (verbose_mode) {
 		fprintf(stderr, "Executing:");
 		for (i = 0; i < a->num; i++)
-			fprintf(stderr, " %s", a->list[i]);
+			fmprintf(stderr, " %s", a->list[i]);
 		fprintf(stderr, "\n");
 	}
 #ifdef WINDOWS
@@ -941,7 +771,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 	int pin[2], pout[2], reserved[2];
 
 	if (verbose_mode)
-		fprintf(stderr,
+		fmprintf(stderr,
 		    "Executing: program %s host %s, user %s, command %s\n",
 		    ssh_program, host,
 		    remuser ? remuser : "(unspecified)", cmd);
@@ -1018,7 +848,7 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 	int status;
 
 	if (verbose_mode)
-		fprintf(stderr,
+		fmprintf(stderr,
 		    "Executing: 2nd program %s host %s, user %s, command %s\n",
 		    ssh_program, host,
 		    remuser ? remuser : "(unspecified)", cmd);
@@ -1089,11 +919,18 @@ main(int argc, char **argv)
 	extern int optind;
 
 #ifdef WINDOWS
+    /*
+    * Initialize I/O wrappers.
+    */
+
+    w32posix_initialize();
     ConInit(STD_OUTPUT_HANDLE, TRUE);
 #endif
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
+
+    setlocale(LC_CTYPE, "");
 
 	/* Copy argv, because we modify it */
 	newargv = xcalloc(MAX(argc + 1, 1), sizeof(*newargv));
@@ -1247,7 +1084,7 @@ main(int argc, char **argv)
 		exit(errs != 0);
 	}
 	if (tflag) {
-		/* Receive data. */
+        /* Receive data. */
 		sink(argc, argv);
 		exit(errs != 0);
 	}
@@ -1569,9 +1406,8 @@ syserr:			run_err("%s: %s", name, strerror(errno));
 		snprintf(buf, sizeof buf, "C%04o %lld %s\n",
 		    (u_int) (stb.st_mode & FILEMODEMASK),
 		    (long long)stb.st_size, last);
-		if (verbose_mode) {
-			fprintf(stderr, "Sending file modes: %s", buf);
-		}
+		if (verbose_mode)
+			fmprintf(stderr, "Sending file modes: %s", buf);
 		(void) atomicio(vwrite, remout, buf, strlen(buf));
 		if (response() < 0)
 			goto next;
@@ -1607,8 +1443,6 @@ next:			if (fd != -1) {
 				haderr = errno;
 		}
 		unset_nonblock(remout);
-		if (showprogress)
-			stop_progress_meter();
 
 		if (fd != -1) {
 			if (close(fd) < 0 && !haderr)
@@ -1620,6 +1454,8 @@ next:			if (fd != -1) {
 		else
 			run_err("%s: %s", name, strerror(haderr));
 		(void) response();
+        if (showprogress)
+            stop_progress_meter();
 	}
 }
 
@@ -1635,7 +1471,7 @@ rsource(char *name, struct stat *statp)
 		return;
 	}
 	last = strrchr(name, '/');
-	if (last == 0)
+	if (last == NULL)
 		last = name;
 	else
 		last++;
@@ -1656,7 +1492,7 @@ rsource(char *name, struct stat *statp)
             free(wtmp);
         }
 #else
-        fprintf(stderr, "Entering directory: %s", path);
+        fmprintf(stderr, "Entering directory: %s", path);
 #endif
 
 	(void) atomicio(vwrite, remout, path, strlen(path));
@@ -1741,7 +1577,7 @@ sink(int argc, char **argv)
                 free(wtmp);
             }
 #else
-            fprintf(stderr, "Sink: %s", buf);
+            fmprintf(stderr, "Sink: %s", buf);
 #endif
 		if (buf[0] == '\01' || buf[0] == '\02') {
 			if (iamremote == 0)
@@ -1922,8 +1758,6 @@ bad:			run_err("%s: %s", np, strerror(errno));
 			}
 		}
 		unset_nonblock(remin);
-		if (showprogress)
-			stop_progress_meter();
 		if (count != 0 && wrerr == NO &&
 		    atomicio(vwrite, ofd, bp->buf, count) != count) {
 			wrerr = YES;
@@ -1962,6 +1796,8 @@ bad:			run_err("%s: %s", np, strerror(errno));
 			wrerrno = errno;
 		}
 		(void) response();
+        if (showprogress)
+            stop_progress_meter();
 		if (setimes && wrerr == NO) {
 			setimes = 0;
 			if (utimes(np, tv) < 0) {
@@ -2048,7 +1884,7 @@ run_err(const char *fmt,...)
 
 	if (!iamremote) {
 		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
+		vfmprintf(stderr, fmt, ap);
 		va_end(ap);
 		fprintf(stderr, "\n");
 	}
@@ -2094,7 +1930,7 @@ okname(char *cp0)
 	} while (*++cp);
 	return (1);
 
-bad:	fprintf(stderr, "%s: invalid user name\n", cp0);
+bad:	fmprintf(stderr, "%s: invalid user name\n", cp0);
 	return (0);
 }
 
