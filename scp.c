@@ -919,6 +919,11 @@ main(int argc, char **argv)
 	extern int optind;
 
 #ifdef WINDOWS
+    /*
+    * Initialize I/O wrappers.
+    */
+
+    w32posix_initialize();
     ConInit(STD_OUTPUT_HANDLE, TRUE);
 #endif
 
@@ -1079,7 +1084,7 @@ main(int argc, char **argv)
 		exit(errs != 0);
 	}
 	if (tflag) {
-		/* Receive data. */
+        /* Receive data. */
 		sink(argc, argv);
 		exit(errs != 0);
 	}
