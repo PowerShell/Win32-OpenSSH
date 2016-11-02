@@ -1,4 +1,4 @@
-﻿#Abstract layer 
+﻿#Abstract layer
 Enum MachineRole {
     Client
     Server
@@ -117,7 +117,10 @@ Class Machine
                     Restart-Service sshd
                 }
                 ([Protocol]::WSMAN) {
-                    Enable-PSRemoting -Force
+                    if( (Get-ComputerInfo).osproductType -notcontains 'Server' )
+                        {
+                            Enable-PSRemoting -Force
+                        }
                 }
                 default {
                 }

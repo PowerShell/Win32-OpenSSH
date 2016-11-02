@@ -2,6 +2,14 @@
 
 Describe "Tests for powershell over ssh" -Tags "CI" {
     BeforeAll {
+        $defaultParamValues = $PSDefaultParameterValues.Clone()
+        #Skip on windows powershell. this feature only supported in powershell core from git
+	#due to known issue, these tests need to be disabled.
+        #if ($psversiontable.GitCommitId -eq $null)
+        if ($true)
+        {
+            $PSDefaultParameterValues["It:Skip"] = $true
+        }
         
         [Machine] $client = [Machine]::new([MachineRole]::Client)
         [Machine] $server = [Machine]::new([MachineRole]::Server)
@@ -10,6 +18,7 @@ Describe "Tests for powershell over ssh" -Tags "CI" {
         $server.SetupServerRemoting([Protocol]::SSH)
     }
     AfterAll {
+        $global:PSDefaultParameterValues = $defaultParamValues
         $client.CleanupClient()
         $server.CleanupServer()
     }
