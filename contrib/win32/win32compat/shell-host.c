@@ -250,7 +250,7 @@ void SendHorizontalScroll(HANDLE hInput, int cells) {
         WriteFile(hInput, formatted_output, out, &wr, NULL);
 }
 
-void SendCharacter(HANDLE hInput, WORD attributes, char character) {
+void SendCharacter(HANDLE hInput, WORD attributes, wchar_t character) {
 
     DWORD wr = 0;
     DWORD out = 0;
@@ -265,6 +265,9 @@ void SendCharacter(HANDLE hInput, WORD attributes, char character) {
 	
 	PSTR Next;
     size_t SizeLeft;
+
+    if (!character)
+        return;
 
     Next = formatted_output;
     SizeLeft = sizeof formatted_output;
@@ -339,52 +342,33 @@ void SendCharacter(HANDLE hInput, WORD attributes, char character) {
     if (bUseAnsiEmulation && attributes != pattributes)
         WriteFile(hInput, formatted_output, (Next - formatted_output), &wr, NULL);
 
-    WriteFile(hInput, &character, 1, &wr, NULL);
+    // East asian languages have 2 bytes for each character, only use the first
+    if (!(attributes & COMMON_LVB_TRAILING_BYTE))
+    {
+        int nSize = WideCharToMultiByte(CP_UTF8,
+            0,
+            &character,
+            1,
+            Next,
+            10,
+            NULL,
+            NULL);
+
+        if(nSize > 0)
+            WriteFile(hInput, Next, nSize, &wr, NULL);
+    }
 
     pattributes = attributes;
 }
 
 void SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize) {
-
-    DWORD wr = 0;
-    DWORD out = 0;
-    DWORD current = 0;
-
-    char* formatted_output = NULL;
-
-    USHORT Color = 0;
-	ULONG Status = 0;
 	
     if (bufferSize <= 0)
         return;
 
-    formatted_output = (char *)malloc(bufferSize);
-
-	PSTR Next;
-    Next = formatted_output;
-
     for (DWORD i = 0; i < bufferSize; i++)
     { 
-        // East asian languages have 2 bytes for each character, only use the first
-        if (!(buffer[i].Attributes & COMMON_LVB_TRAILING_BYTE))
-        {
-            WideCharToMultiByte(cp,
-                0,
-                &buffer[i].Char.UnicodeChar,
-                1,
-                Next,
-                1,
-                NULL,
-                NULL);
-
-            SendCharacter(hInput, buffer[i].Attributes, *Next);
-
-            Next++;
-        }
-    }
-
-    if (formatted_output) {
-        free(formatted_output);
+        SendCharacter(hInput, buffer[i].Attributes, buffer[i].Char.UnicodeChar);
     }
 }
 
@@ -465,7 +449,8 @@ DWORD WINAPI MonitorChild(_In_ LPVOID lpParameter) {
 DWORD ProcessEvent(void *p) {
 
     char f[255];
-    char chUpdate;
+    wchar_t chUpdate;
+
     WORD  wAttributes;
     WORD  wX;
     WORD  wY;

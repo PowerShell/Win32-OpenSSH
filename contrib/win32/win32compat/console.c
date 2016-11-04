@@ -315,6 +315,9 @@ void ConSetAttribute(int *iParam, int iParamCount)
                 case ANSI_ATTR_RESET:
                     iAttr |= FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
 
+                    iAttr = iAttr & ~BACKGROUND_RED;
+                    iAttr = iAttr & ~BACKGROUND_BLUE;
+                    iAttr = iAttr & ~BACKGROUND_GREEN;
                     iAttr = iAttr & ~BACKGROUND_INTENSITY;
                     iAttr = iAttr & ~FOREGROUND_INTENSITY;
                     iAttr = iAttr & ~COMMON_LVB_UNDERSCORE;
@@ -530,12 +533,24 @@ void ConFillToEndOfLine()
 int ConWriteString(char* pszString, int cbString)
 {
     DWORD Result = 0;
+    int needed = 0;
+    int cnt = 0;
+    wchar_t* utf16 = NULL;
 
-    if (hOutputConsole)
-        WriteConsole(hOutputConsole, pszString, cbString, &Result, 0);
-    else
-        Result = (DWORD) printf(pszString);
-                
+    if ((needed = MultiByteToWideChar(CP_UTF8, 0, pszString, cbString, NULL, 0)) == 0 ||
+        (utf16 = malloc(needed * sizeof(wchar_t))) == NULL ||
+        (cnt = MultiByteToWideChar(CP_UTF8, 0, pszString, cbString, utf16, needed)) == 0) {
+        Result = (DWORD)printf(pszString);
+    } else {
+        if (hOutputConsole)
+            WriteConsoleW(hOutputConsole, utf16, cnt, &Result, 0);
+        else
+            Result = (DWORD)wprintf(utf16);
+    }
+         
+    if(utf16)
+        free(utf16);
+
     return cbString;
 }
 

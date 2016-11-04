@@ -166,7 +166,7 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                 if (InputRecord.Event.KeyEvent.bKeyDown)
                 {
                     int n = WideCharToMultiByte(
-                        GetConsoleCP(), 
+                        CP_UTF8, 
                         0, 
                         &(InputRecord.Event.KeyEvent.uChar.UnicodeChar), 
                         1, 
