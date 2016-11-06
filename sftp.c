@@ -2393,7 +2393,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
 		char fullCmd[MAX_PATH] = { 0 };
 		char ioArg[1024] = { 0 };
 		PROCESS_INFORMATION pi = { 0 };
-		STARTUPINFO si = { 0 };
+		STARTUPINFOW si = { 0 };
 
 		debug3("Generating ssh-client command...");
                 fullCmd[0] = '\0';
@@ -2428,7 +2428,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
 
 		debug("Executing ssh client: \"%.500s\"...\n", fullCmd);
 
-		if (CreateProcessA(NULL, fullCmd, NULL, NULL, TRUE,
+		if (CreateProcessW(NULL, utf8_to_utf16(fullCmd), NULL, NULL, TRUE,
 			NORMAL_PRIORITY_CLASS, NULL,
 			NULL, &si, &pi) == TRUE) {
 			sshpid = pi.dwProcessId;

@@ -924,7 +924,9 @@ main(int argc, char **argv)
     */
 
     w32posix_initialize();
-    ConInit(STD_OUTPUT_HANDLE, TRUE);
+	/*scp is invoked on client side*/
+	if (!(argc >= 2  && ( strcmp(argv[1], "-f" ) == 0 || strcmp(argv[1], "-t") == 0  )))
+		ConInit(STD_OUTPUT_HANDLE, TRUE);
 #endif
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
@@ -2037,7 +2039,7 @@ int start_process_io(char *exename, char **argv, char **envv,
 	char *homedir, char *lpDesktop)
 {
 	UNREFERENCED_PARAMETER(envv);
-	STARTUPINFO          sui;
+	STARTUPINFOW          sui;
 	DWORD ret;
 	char cmdbuf[2048];
 	int ctr;
@@ -2047,7 +2049,7 @@ int start_process_io(char *exename, char **argv, char **envv,
 	*/
 	sui.cb = sizeof(STARTUPINFO);
 	sui.lpReserved = 0;
-	sui.lpDesktop = lpDesktop;
+	sui.lpDesktop = utf8_to_utf16(lpDesktop);
 	sui.lpTitle = NULL; /* NULL means use exe name as title */
 	sui.dwX = 0;
 	sui.dwY = 0;
@@ -2076,9 +2078,9 @@ int start_process_io(char *exename, char **argv, char **envv,
 		ctr++;
 	}
 
-    ret = CreateProcess(
-		exename, // given in form like "d:\\util\\cmd.exe"
-		cmdbuf, /* in "arg0 arg1 arg2" form command line */
+    ret = CreateProcessW(
+		utf8_to_utf16(exename), // given in form like "d:\\util\\cmd.exe"
+		utf8_to_utf16(cmdbuf), /* in "arg0 arg1 arg2" form command line */
 		NULL, /* process security */
 		NULL, /* thread security */
 		TRUE, /* inherit handles is YES */
@@ -2086,7 +2088,7 @@ int start_process_io(char *exename, char **argv, char **envv,
 		/* give new proc a new screen, suspend it for debugging also */
 		NULL, /* in "E1=a0E2=b0E3=c00" form environment,
 			  NULL means use parent's */
-		homedir, /* Current Directory, NULL means use whats for parent */
+		utf8_to_utf16(homedir), /* Current Directory, NULL means use whats for parent */
 		&sui, /* start up info */
 		pi); /* process created info kept here */
 

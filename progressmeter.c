@@ -240,7 +240,6 @@ refresh_progress_meter(void)
 #ifdef WINDOWS
     wchar_t* wtmp = utf8_to_utf16(buf);
     WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
-    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"\n", 1, 0, 0);
     free(wtmp);
 #else
 	atomicio(vwrite, STDOUT_FILENO, buf, win_size - 1);

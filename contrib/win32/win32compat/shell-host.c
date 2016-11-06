@@ -398,7 +398,7 @@ void SizeWindow(HANDLE hInput) {
     matchingFont.FontWeight = FW_NORMAL;
     wcscpy(matchingFont.FaceName, L"Consolas");
 
-    bSuccess = SetCurrentConsoleFontEx(child_out, FALSE, &matchingFont);
+    bSuccess = __SetCurrentConsoleFontEx(child_out, FALSE, &matchingFont);
 
     // This information is the live screen 
     ZeroMemory(&consoleInfo, sizeof(consoleInfo));
@@ -1069,6 +1069,15 @@ int start_with_pty(int ac, wchar_t **av) {
     HANDLE hEventHook = NULL;
     HMODULE hm_kernel32 = NULL, hm_user32 = NULL;
 
+	if ((hm_kernel32 = LoadLibraryW(L"kernel32.dll")) == NULL ||
+		(hm_user32 = LoadLibraryW(L"user32.dll")) == NULL ||
+		(__SetCurrentConsoleFontEx = (__t_SetCurrentConsoleFontEx)GetProcAddress(hm_kernel32, "SetCurrentConsoleFontEx")) == NULL ||
+		(__UnhookWinEvent = (__t_UnhookWinEvent)GetProcAddress(hm_user32, "UnhookWinEvent")) == NULL ||
+		(__SetWinEventHook = (__t_SetWinEventHook)GetProcAddress(hm_user32, "SetWinEventHook")) == NULL) {
+		printf("cannot support a pseudo terminal. \n");
+		return -1;
+	}
+
     pipe_in  = GetStdHandle(STD_INPUT_HANDLE);
     pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
     pipe_err = GetStdHandle(STD_ERROR_HANDLE);
@@ -1093,7 +1102,7 @@ int start_with_pty(int ac, wchar_t **av) {
 
     InitializeCriticalSection(&criticalSection);
 
-    hEventHook = SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
+    hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
         ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 
     memset(&si, 0, sizeof(STARTUPINFO));
@@ -1168,7 +1177,7 @@ cleanup:
     if (ux_thread != INVALID_HANDLE_VALUE)
         TerminateThread(ux_thread, S_OK);
     if (hEventHook)
-        UnhookWinEvent(hEventHook);
+        __UnhookWinEvent(hEventHook);
 
     FreeConsole();
 
