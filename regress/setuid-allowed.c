@@ -30,6 +30,7 @@
 void debug3(const char *fmt,...) {/*stub*/}
 #endif
 void
+static void
 usage(void)
 {
 	fprintf(stderr, "check-setuid [path]\n");

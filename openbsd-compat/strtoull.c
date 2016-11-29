@@ -102,7 +102,7 @@ strtoull(const char *nptr, char **endptr, int base)
 		}
 	}
 	if (neg && any > 0)
-		acc = (~acc + 1u);
+		acc = -acc;
 	if (endptr != 0)
 		*endptr = (char *) (any ? s - 1 : nptr);
 	return (acc);

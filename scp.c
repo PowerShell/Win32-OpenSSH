@@ -1,4 +1,4 @@
-/* $OpenBSD: scp.c,v 1.182 2015/04/24 01:36:00 deraadt Exp $ */
+/* $OpenBSD: scp.c,v 1.186 2016/05/25 23:48:45 schwarze Exp $ */
 /*
  * scp - secure remote copy.  This is basically patched BSD rcp which
  * uses ssh to do the data transfer (instead of using rcmd).
@@ -73,14 +73,7 @@
 
 #include "includes.h"
 
-#ifndef WINDOWS
 #include <dirent.h>
-#else
-#include <io.h>
-#include <fcntl.h>
-#include <Shlwapi.h>
-#include "win32_dirent.h"
-#endif
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -162,304 +155,31 @@ char *ssh_program = _PATH_SSH_PROGRAM;
 /* This is used to store the pid of ssh_program */
 pid_t do_cmd_pid = -1;
 
-
-#ifdef WINDOWS
-typedef BOOL bool;
-#define false FALSE
-#define true TRUE
-
-#ifndef _SH_DENYNO
-#define _SH_DENYNO 0x40
-#endif
-
-#define HAVE_UTIME_H
-
-#ifdef HAVE_UTIME_H
-#include <sys/utime.h>
-#if defined(_NEXT_SOURCE) && !defined(_POSIX_SOURCE)
-struct utimbuf {
-  time_t actime;
-  time_t modtime;
-};
-#endif /* _NEXT_SOURCE */
-#else
-struct utimbuf
-{
-  long actime;
-  long modtime;
-};
-#endif
-
-#ifndef _PATH_CP
-#define _PATH_CP "copy"
-//CHECK should we change in NT/2000 to copy ?? #define _PATH_CP "copy"
-#endif
-
-#ifndef STDIN_FILENO
-#define STDIN_FILENO 0
-#endif
-#ifndef STDOUT_FILENO
-#define STDOUT_FILENO 1
-#endif
-#ifndef STDERR_FILENO
-#define STDERR_FILENO 2
-#endif
-
-
-/* This is set to non-zero to enable verbose mode. */
-int scpverbose = 0;
-
-#define SCP_STATISTICS_ENABLED
-#define WITH_SCP_STATS
-#define SCP_ALL_STATISTICS_ENABLED
-
-/* This is set to non-zero to enable statistics mode. */
-#ifdef SCP_STATISTICS_ENABLED
-int statistics = 1;
-#else /* SCP_STATISTICS_ENABLED */
-int statistics = 0;
-#endif /* SCP_STATISTICS_ENABLED */
-
-/* This is set to non-zero to enable printing statistics for each file */
-#ifdef SCP_ALL_STATISTICS_ENABLED
-int all_statistics = 1;
-#else /* SCP_ALL_STATISTICS_ENABLED */
-int all_statistics = 0;
-#endif /* SCP_ALL_STATISTICS_ENABLED */
-
-/* This is set to non-zero if compression is desired. */
-int compress = 0;
-
-/* This is set to non-zero if running in batch mode (that is, password
-   and passphrase queries are not allowed). */
-int batchmode = 0;
-
-/* This is to call ssh with argument -P (for using non-privileged
-   ports to get through some firewalls.) */
-int use_privileged_port = 1;
-
-/* This is set to the cipher type string if given on the command line. */
-char *cipher = NULL;
-
-/* This is set to the RSA authentication identity file name if given on 
-   the command line. */
-char *identity = NULL;
-
-/* This is the port to use in contacting the remote site (is non-NULL). */
-char *port = NULL;
-
-/* This is set password if given on the command line. */
-char *password = NULL;
-
-/* This is set ssh_config if given on the command line. */
-char *ssh_config = NULL;
-
-int ipv_restrict = 0;
-
-#define ONLY_IPV4	1
-#define ONLY_IPV6   2
-
-#ifdef WITH_SCP_STATS
-
-#define SOME_STATS_FILE stderr
-
-#define ssh_max(a,b) (((a) > (b)) ? (a) : (b))
-
-/*unsigned long*/ u_int64_t statbytes = 0;
-DWORD stat_starttimems = 0;
-time_t stat_starttime = 0;
-time_t stat_lasttime = 0;
-double ratebs = 0.0;
-
-void stats_fixlen(int bytes);
-//char *stat_eta(int secs);
-char *stat_eta_new(int msecs);
-#endif /* WITH_SCP_STATS */
-
-/* Ssh options */
-char **ssh_options = NULL;
-size_t ssh_options_cnt = 0;
-size_t ssh_options_alloc = 0;
-
-// start: Windows specfic functions
-#define S_ISDIR(x) (x & _S_IFDIR)
-
-static int g_RootMode = 0;
-#define M_ADMIN  4
-
-CHAR	g_HomeDir[MAX_PATH];
-CHAR	g_FSRoot[MAX_PATH];
-int		isRootedPath = 0;  // set to 1 if we prepend a home root
-
-int start_process_io(char *exename, char **argv, char **envv,
-	HANDLE StdInput, HANDLE StdOutput, HANDLE StdError,
-	unsigned long CreateFlags, PROCESS_INFORMATION  *pi,
-	char *homedir, char *lpDesktop);
-
-#ifdef WINDOWS
-struct passwd pw;
-char   username[128];
-
-// InitForMicrosoftWindows() will initialize Unix like settings in Windows operating system.
-int InitForMicrosoftWindows()
-{
-    int rc;
-    struct passwd *pwd;
-
-    /* Get user\'s passwd structure.  We need this for the home directory. */
-    pwd = &pw ;
-    rc = sizeof(username);
-    if (GetUserName(username, (LPDWORD)&rc)) {
-        pwd->pw_name = username;
-    }
-    else {
-        return GetLastError();
-    }
-
-    return 0;
-}
-
-#endif
-
-#define	EMSG	""
-#define	BADCH	(int)'~'
-
-int
-sgetopt(int nargc,
-	char * const *nargv,
-	const char *ostr)
-{
-	static char *place = EMSG;		/* option letter processing */
-	register char *oli;			/* option letter list index */
-	char *p;
-	extern char *optarg;
-	extern int optind;
-	extern int optopt;
-	extern int opterr;
-
-	if (!*place) 
-	{				/* update scanning pointer */
-		if (optind >= nargc ||  (*(place = nargv[optind]) != '-'))
-		{
-			place = EMSG;
-			if (optind >= nargc )
-				return(EOF);
-			else
-				return(BADCH);
-		}
-		if (place[1] && *++place == '-') 
-		{	/* found "--" */
-			++optind;
-			place = EMSG;
-			return(EOF);
-		}
-	}					/* option letter okay? */
-	if ((optopt = (int)*place++) == (int)':' ||
-	    !(oli = strchr((char *)ostr, optopt))) 
-	{
-		/*
-		 * if the user didn't specify '-' as an option,
-		 * assume it means EOF.
-		 */
-		if ((optopt == (int)'-'))
-			return(EOF);
-		if (!*place)
-			++optind;
-		if (opterr) 
-		{
-			if (!(p = strrchr(*nargv, '/')))
-				p = *nargv;
-			else
-				++p;
-			(void)fprintf(stderr, "%s: illegal option -- %c\n",
-			    p, optopt);
-		}
-		return(BADCH);
-	}
-	if (*++oli != ':') 
-	{			/* don't need argument */
-		optarg = NULL;
-		if (!*place)
-			++optind;
-	}
-	else 
-	{					/* need an argument */
-		if (*place)			/* no white space */
-			optarg = place;
-		else if (nargc <= ++optind) 
-		{	/* no arg */
-			place = EMSG;
-			if (!(p = strrchr(*nargv, '/')))
-				p = *nargv;
-			else
-				++p;
-			if (opterr)
-				(void)fprintf(stderr,
-				    "%s: option requires an argument -- %c\n",
-				    p, optopt);
-			return(BADCH);
-		}
-	 	else				/* white space */
-			optarg = nargv[optind];
-		place = EMSG;
-		++optind;
-	}
-	return(optopt);				/* dump back option letter */
-}
-
-int _utimedir (char *name, struct _utimbuf *filetime)
-{
-   int rc, chandle;
-	HANDLE	hFile;
-
-	hFile = CreateFile( name,
-							  GENERIC_WRITE,
-						FILE_SHARE_READ,
-						NULL,
-						OPEN_EXISTING,
-						FILE_FLAG_BACKUP_SEMANTICS,
-						NULL );
-	if ( hFile != INVALID_HANDLE_VALUE ) {
-		chandle = _open_osfhandle ( (intptr_t)hFile, 0 );
-		rc=_futime(chandle,filetime); // update access time to what we want
-		_close(chandle);
-		CloseHandle(hFile);
-	}
-
-	return rc;
-}
-
-// end of direntry functions
-HANDLE hprocess=(HANDLE) 0; // we made it a global to stop child process(ssh) of scp
-#else
-
-#endif
-
 static void
 killchild(int signo)
 {
-    if (do_cmd_pid > 1) {
-        kill(do_cmd_pid, signo ? signo : SIGTERM);
-        waitpid(do_cmd_pid, NULL, 0);
-    }
+	if (do_cmd_pid > 1) {
+		kill(do_cmd_pid, signo ? signo : SIGTERM);
+		waitpid(do_cmd_pid, NULL, 0);
+	}
 
-    if (signo)
-        _exit(1);
-    exit(1);
+	if (signo)
+		_exit(1);
+	exit(1);
 }
 
 static void
 suspchild(int signo)
 {
-    int status;
+	int status;
 
-    if (do_cmd_pid > 1) {
-        kill(do_cmd_pid, signo);
-        while (waitpid(do_cmd_pid, &status, WUNTRACED) == -1 &&
-            errno == EINTR)
-            ;
-        kill(getpid(), SIGSTOP);
-    }
+	if (do_cmd_pid > 1) {
+		kill(do_cmd_pid, signo);
+		while (waitpid(do_cmd_pid, &status, WUNTRACED) == -1 &&
+		    errno == EINTR)
+			;
+		kill(getpid(), SIGSTOP);
+	}
 }
 
 static int
@@ -579,195 +299,6 @@ error:
 int
 do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 {
-#ifdef WINDOWS
-    size_t i, j;
-
-    HANDLE hSaveStdout, hSaveStdin ; 
-    HANDLE hstdout[2], hstdin[2] ;
-    PROCESS_INFORMATION  pi;
-    SECURITY_ATTRIBUTES sa ; /* simple */
-    int rc; 
-    HANDLE rfdfromssh, wfdtossh ;
-    char *args[256];
-
-    if (verbose_mode)
-        fprintf(stderr, "Executing: host %s, user %s, command %s\n",
-	        host, remuser ? remuser : "(unspecified)", cmd);
-
-  // Child code in Windows OS will be a new created process of ssh.exe.
-  // Child to execute the command on the remote host using ssh.
-
-    i = 0;
-    args[i++] = ssh_program;
-    size_t	len;
-    for(j = 0; j < ssh_options_cnt; j++) {
-        args[i++] = "-o";
-
-        //args[i++] = ssh_options[j];
-        len = strlen(ssh_options[j])+3;
-
-        args[i] = (char *) malloc(len); // add quotes
-        strcpy_s(args[i],len, "\"");
-        strcat_s(args[i],len, ssh_options[j]);
-        strcat_s(args[i],len, "\"");
-        i++ ;
-
-        if (i > 250)
-            fatal("Too many -o options (total number of arguments is more than 256)");
-    }
-    args[i++] = "-x";
-    args[i++] = "-a";
-    args[i++] = "\"-oFallBackToRsh no\""; // extra double quote needed for
-										  // Windows platforms
-    //7/2/2001 args[i++] = "\"-oClearAllForwardings yes\"";
-    if (verbose_mode)
-	    args[i++] = "-v";
-    if (compress)
-	    args[i++] = "-C";
-    if (!use_privileged_port)
-	    args[i++] = "-P";
-    if (batchmode)
-	    args[i++] = "\"-oBatchMode yes\"";
-    if (password != NULL) {
-		args[i++] = "-A";
-		args[i++] = password;
-	}
-    if (cipher != NULL) {
-		args[i++] = "-c";
-		args[i++] = cipher;
-	}
-    if (identity != NULL) {
-		args[i++] = "-i";
-		args[i++] = identity;
-	}
-    if (port != NULL) {
-		args[i++] = "-p";
-		args[i++] = port;
-	}
-    if (ssh_config) {
-        args[i++] = "-F";
-        args[i++] = ssh_config;
-    }
-    if (remuser != NULL) {
-		args[i++] = "-l";
-		args[i++] = remuser;
-	}
-
-    if (ipv_restrict == ONLY_IPV4)
-	    args[i++] = "-4";
-    if (ipv_restrict == ONLY_IPV6)
-	    args[i++] = "-6";
-
-    args[i++] = host;
-    args[i++] = cmd;
-    args[i++] = NULL;
-
-    // Create a pair of pipes for communicating with ssh
-    // which we will spawn
-    // Do the plumbing so that child ssh process to be spawned has its
-    // standard input from the pout[0] and its standard output going to
-    // pin[1]
-
-    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-    sa.bInheritHandle = TRUE ; /* pipe handles to be inherited */
-    sa.lpSecurityDescriptor = NULL;
-    /* command processor output redirected to a nameless pipe */
-
-    rc = CreateOverlappedPipe( &hstdout[0], &hstdout[1], &sa, 0 ) ;
-    /* read from this fd to get data from ssh.exe*/
-
-    // make scp's pipe read handle not inheritable by ssh
-    rc = DuplicateHandle(GetCurrentProcess(), hstdout[0], 
-		GetCurrentProcess(), (PHANDLE) &rfdfromssh,
-		0, // this parm ignored if DUPLICATE_SAME_ACCESS below
-		FALSE, // not inherited
-		DUPLICATE_SAME_ACCESS); 
-    CloseHandle(hstdout[0]); // this CloseHandle() is a crucial must do
-    hstdout[0] = rfdfromssh ;
-
-    *fdin = _open_osfhandle((intptr_t)hstdout[0],0);
-    _setmode (*fdin, O_BINARY); // set this file handle for binary I/O
-    w32_allocate_fd_for_handle(hstdout[0], FALSE);
-
-    rc = CreateOverlappedPipe( &hstdin[0], &hstdin[1], &sa, 0 ) ;
-    /* write to this fd to get data into ssh.exe*/
-
-    // make scp's pipe write handle not inheritable by ssh
-    rc = DuplicateHandle(GetCurrentProcess(), hstdin[1], 
-		GetCurrentProcess(), (PHANDLE) &wfdtossh,
-		0, // this parm ignored if DUPLICATE_SAME_ACCESS below
-		FALSE, // not inherited
-		DUPLICATE_SAME_ACCESS); 
-    CloseHandle(hstdin[1]); // this CloseHandle() is a crucial must do
-    hstdin[1] = (HANDLE) wfdtossh ;
-
-    *fdout = _open_osfhandle((intptr_t)hstdin[1],0);
-    _setmode (*fdout, O_BINARY); // set this file handle for binary I/O
-    w32_allocate_fd_for_handle(hstdin[1], FALSE);
-
-    hSaveStdout = GetStdHandle(STD_OUTPUT_HANDLE); 
-    //hSaveStderr = GetStdHandle(STD_ERROR_HANDLE); 
-    hSaveStdin = GetStdHandle(STD_INPUT_HANDLE); 
-
-    // Set a write handle to the pipe to be STDOUT. 
-    SetStdHandle(STD_OUTPUT_HANDLE, hstdout[1]);
-    // Set a write handle to the pipe to be STDERR. 
-    //SetStdHandle(STD_ERROR_HANDLE, hstdout[1]);
-    // Set a input handle to the pipe to be STDIN. 
-    SetStdHandle(STD_INPUT_HANDLE, hstdin[0]);
-
-    // start the child process(ssh)
-    rc = start_process_io(
-		NULL, /* executable name with .ext found in argv[0] */
-		&args[0], /* argv */
-		NULL ,
-		hstdin[0], /* std input for cmd.exe */
-		hstdout[1], /* std output for cmd.exe */
-		GetStdHandle(STD_ERROR_HANDLE), //hstdout[1],  /* std error for cmd.exe */
-		0, // dwStartupFlags,
-		&pi,
-		NULL, /* current directory is default directory we set before */
-		NULL
-	);
-
-    if (port)
-        free(port);
-
-    if (cipher)
-        free(cipher);
-
-    if (identity)
-        free(identity);
-
-    if (ssh_config)
-        free(ssh_config);
-
-    if (!rc) {
-	    printf("%s could not be started\n", ssh_program);
-	    exit(1);
-    }
-    else {
-	    hprocess = pi.hProcess ;
-    }
-
-    // After process creation, restore the saved STDOUT and STDERR. 
-    SetStdHandle(STD_OUTPUT_HANDLE, hSaveStdout);
-    //SetStdHandle(STD_ERROR_HANDLE, hSaveStderr);
-    SetStdHandle(STD_INPUT_HANDLE, hSaveStdin);
-
-    /* now close the pipe's side that the ssh.exe will use as write handle */
-    CloseHandle(hstdout[1]) ;
-    /* now close the pipe's side that the ssh.exe will use as read handle */
-    CloseHandle(hstdin[0]) ;
-
-  // update passed variables with where other funstions should read and write
-  // from to get I/O from above child process over pipe.
-
-  //*fdout = remout;
-  //*fdin =  remin;
-
-    return 0;
-#else
 	int pin[2], pout[2], reserved[2];
 
 	if (verbose_mode)
@@ -798,7 +329,57 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 	signal(SIGTTOU, suspchild);
 
 	/* Fork a child to execute the command on the remote host using ssh. */
-	do_cmd_pid = fork();
+#ifdef WINDOWS
+	replacearg(&args, 0, "%s", ssh_program);
+	if (remuser != NULL) {
+		addargs(&args, "-l");
+		addargs(&args, "%s", remuser);
+	}
+	addargs(&args, "--");
+	addargs(&args, "%s", host);
+	addargs(&args, "%s", cmd);
+
+	{
+		PROCESS_INFORMATION pi = { 0 };
+		STARTUPINFOW si = { 0 };
+		char* buf = xmalloc(1024);
+		/* TODO - check that 1024 buffer size is sufficient for resulting cmdline */
+		char* ptr = buf;
+		char** list = args.list;
+		*ptr = '\0';
+		while (*list) {
+			memcpy(ptr, *list, strlen(*list));
+			ptr += strlen(*list);
+			*ptr++ = ' ';
+			list++;
+		}
+		*--ptr = '\0';
+
+		fcntl(pout[0], F_SETFD, FD_CLOEXEC);
+		fcntl(pin[1], F_SETFD, FD_CLOEXEC);
+
+		si.cb = sizeof(STARTUPINFOW);
+		si.hStdInput = sfd_to_handle(pin[0]);
+		si.hStdOutput = sfd_to_handle(pout[1]);
+		si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+		si.wShowWindow = SW_HIDE;
+		si.dwFlags = STARTF_USESTDHANDLES;
+		si.lpDesktop = NULL;
+		if (CreateProcessW(NULL, utf8_to_utf16(buf), NULL, NULL, TRUE,
+			NORMAL_PRIORITY_CLASS, NULL,
+			NULL, &si, &pi) == TRUE) {
+			do_cmd_pid = pi.dwProcessId;
+			CloseHandle(pi.hThread);
+			sw_add_child(pi.hProcess, pi.dwProcessId);
+		}
+		else
+			errno = GetLastError();
+	}
+
+
+#else
+        do_cmd_pid = fork();
+#endif
 	if (do_cmd_pid == 0) {
 		/* Child. */
 		close(pin[1]);
@@ -832,7 +413,6 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 	signal(SIGINT, killchild);
 	signal(SIGHUP, killchild);
 	return 0;
-#endif
 }
 
 /*
@@ -902,7 +482,6 @@ char cmd[CMDNEEDS];		/* must hold "rcp -r -p -d\0" */
 
 int response(void);
 void rsource(char *, struct stat *);
-
 void sink(int, char *[]);
 void source(int, char *[]);
 void tolocal(int, char *[]);
@@ -918,21 +497,10 @@ main(int argc, char **argv)
 	extern char *optarg;
 	extern int optind;
 
-#ifdef WINDOWS
-    /*
-    * Initialize I/O wrappers.
-    */
-
-    w32posix_initialize();
-	/*scp is invoked on client side*/
-	if (!(argc >= 2  && ( strcmp(argv[1], "-f" ) == 0 || strcmp(argv[1], "-t") == 0  )))
-		ConInit(STD_OUTPUT_HANDLE, TRUE);
-#endif
-
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
-    setlocale(LC_CTYPE, "");
+	setlocale(LC_CTYPE, "");
 
 	/* Copy argv, because we modify it */
 	newargv = xcalloc(MAX(argc + 1, 1), sizeof(*newargv));
@@ -958,65 +526,33 @@ main(int argc, char **argv)
 		case '1':
 		case '2':
 		case '4':
-            ipv_restrict = ONLY_IPV4;
-            break;
 		case '6':
-            ipv_restrict = ONLY_IPV6;
-            break;
 		case 'C':
 			addargs(&args, "-%c", ch);
 			addargs(&remote_remote_args, "-%c", ch);
-
-            compress = ch;
-
 			break;
 		case '3':
 			throughlocal = 1;
 			break;
 		case 'o':
-            addargs(&remote_remote_args, "-%c", ch);
-            addargs(&remote_remote_args, "%s", optarg);
-            addargs(&args, "-%c", ch);
-            addargs(&args, "%s", optarg);
-            break;
-        case 'c':
-            addargs(&remote_remote_args, "-%c", ch);
-            addargs(&remote_remote_args, "%s", optarg);
-            addargs(&args, "-%c", ch);
-            addargs(&args, "%s", optarg);
-
-            cipher = xstrdup(optarg);;
-            break;
+                case 'c':
 		case 'i':
-            addargs(&remote_remote_args, "-%c", ch);
-            addargs(&remote_remote_args, "%s", optarg);
-            addargs(&args, "-%c", ch);
-            addargs(&args, "%s", optarg);
-
-            identity = xstrdup(optarg);;
-            break;
-        case 'F':
+		case 'F':
 			addargs(&remote_remote_args, "-%c", ch);
 			addargs(&remote_remote_args, "%s", optarg);
 			addargs(&args, "-%c", ch);
 			addargs(&args, "%s", optarg);
-            
-            ssh_config = xstrdup(optarg);;
-            break;
+                        break;
 		case 'P':
 			addargs(&remote_remote_args, "-p");
 			addargs(&remote_remote_args, "%s", optarg);
 			addargs(&args, "-p");
 			addargs(&args, "%s", optarg);
-
-            port = xstrdup(optarg);;
-			break;
+                        break;
 		case 'B':
 			addargs(&remote_remote_args, "\"-oBatchmode yes\"");
 			addargs(&args, "\"-oBatchmode yes\"");
-
-            batchmode = 1;
-			break;
+                        break;
 		case 'l':
 			limit_kbps = strtonum(optarg, 1, 100 * 1024 * 1024,
 			    &errstr);
@@ -1066,15 +602,21 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-#ifndef WINDOWS
 	if ((pwd = getpwuid(userid = getuid())) == NULL)
 		fatal("unknown user %u", (u_int) userid);
-#else
-	InitForMicrosoftWindows(); // picks the username, user home dir
-#endif
 
 	if (!isatty(STDOUT_FILENO))
 		showprogress = 0;
+
+	if (pflag) {
+		/* Cannot pledge: -p allows setuid/setgid files... */
+	} else {
+		if (pledge("stdio rpath wpath cpath fattr tty proc exec",
+		    NULL) == -1) {
+			perror("pledge");
+			exit(1);
+		}
+	}
 
 	remin = STDIN_FILENO;
 	remout = STDOUT_FILENO;
@@ -1086,7 +628,7 @@ main(int argc, char **argv)
 		exit(errs != 0);
 	}
 	if (tflag) {
-        /* Receive data. */
+		/* Receive data. */
 		sink(argc, argv);
 		exit(errs != 0);
 	}
@@ -1103,9 +645,7 @@ main(int argc, char **argv)
 	    iamrecursive ? " -r" : "", pflag ? " -p" : "",
 	    targetshouldbedirectory ? " -d" : "");
 
-	#ifndef WINDOWS
 	(void) signal(SIGPIPE, lostconn);
-	#endif
 
 	if ((targ = colon(argv[argc - 1])))	/* Dest is remote host. */
 		toremote(targ, argc, argv);
@@ -1118,7 +658,6 @@ main(int argc, char **argv)
 	 * Finally check the exit status of the ssh process, if one was forked
 	 * and no error has occurred yet
 	 */
-#ifndef WINDOWS
 	if (do_cmd_pid != -1 && errs == 0) {
 		if (remin != -1)
 		    (void) close(remin);
@@ -1131,7 +670,6 @@ main(int argc, char **argv)
 				errs = 1;
 		}
 	}
-#endif
 	exit(errs != 0);
 }
 
@@ -1197,7 +735,7 @@ toremote(char *targ, int argc, char **argv)
 		return;
 	}
 
-    for (i = 0; i < argc - 1; i++) {
+	for (i = 0; i < argc - 1; i++) {
 		src = colon(argv[i]);
 		if (src && throughlocal) {	/* extended remote to remote */
 			*src++ = 0;
@@ -1234,7 +772,7 @@ toremote(char *targ, int argc, char **argv)
 			freeargs(&alist);
 			addargs(&alist, "%s", ssh_program);
 			addargs(&alist, "-x");
-			addargs(&alist, "-\"oClearAllForwardings yes\"");
+			addargs(&alist, "-oClearAllForwardings=yes");
 			addargs(&alist, "-n");
 			for (j = 0; j < remote_remote_args.num; j++) {
 				addargs(&alist, "%s",
@@ -1346,7 +884,7 @@ source(int argc, char **argv)
 	off_t i, statbytes;
 	size_t amt, nr;
 	int fd = -1, haderr, indx;
-	char *last, *lastf, *lastr, *name, buf[2048], encname[PATH_MAX];
+	char *last, *name, buf[2048], encname[PATH_MAX];
 	int len;
 
 	for (indx = 0; indx < argc; ++indx) {
@@ -1384,15 +922,18 @@ syserr:			run_err("%s: %s", name, strerror(errno));
 			goto next;
 		}
 #ifdef WINDOWS
-		if ((lastf = strrchr(name, '/')) == NULL && (lastr = strrchr(name, '\\')) == NULL)
-			last = name;
-        else {
-            if (lastf)
-                last = lastf;
-            if (lastr)
-                last = lastr;
-            ++last;
-        }
+		{
+			char *lastf = NULL, *lastr = NULL;
+			if ((lastf = strrchr(name, '/')) == NULL && (lastr = strrchr(name, '\\')) == NULL)
+				last = name;
+			else {
+				if (lastf)
+					last = lastf;
+				if (lastr)
+					last = lastr;
+				++last;
+			}
+		}
 #else
         if ((last = strrchr(name, '/')) == NULL)
             last = name;
@@ -1456,8 +997,8 @@ next:			if (fd != -1) {
 		else
 			run_err("%s: %s", name, strerror(haderr));
 		(void) response();
-        if (showprogress)
-            stop_progress_meter();
+		if (showprogress)
+			stop_progress_meter();
 	}
 }
 
@@ -1536,7 +1077,7 @@ sink(int argc, char **argv)
 	off_t size, statbytes;
 	unsigned long long ull;
 	int setimes, targisdir, wrerrno = 0;
-	char ch, *cp, *np, *targ, *why, *vect[1], buf[2048];
+	char ch, *cp, *np, *targ, *why, *vect[1], buf[2048], visbuf[2048];
 	struct timeval tv[2];
 
 #define	atime	tv[0]
@@ -1582,9 +1123,12 @@ sink(int argc, char **argv)
             fmprintf(stderr, "Sink: %s", buf);
 #endif
 		if (buf[0] == '\01' || buf[0] == '\02') {
-			if (iamremote == 0)
+			if (iamremote == 0) {
+				(void) snmprintf(visbuf, sizeof(visbuf),
+				    NULL, "%s", buf + 1);
 				(void) atomicio(vwrite, STDERR_FILENO,
-				    buf + 1, strlen(buf + 1));
+				    visbuf, strlen(visbuf));
+			}
 			if (buf[0] == '\02')
 				exit(1);
 			++errs;
@@ -1798,8 +1342,8 @@ bad:			run_err("%s: %s", np, strerror(errno));
 			wrerrno = errno;
 		}
 		(void) response();
-        if (showprogress)
-            stop_progress_meter();
+		if (showprogress)
+			stop_progress_meter();
 		if (setimes && wrerr == NO) {
 			setimes = 0;
 			if (utimes(np, tv) < 0) {
@@ -1827,7 +1371,7 @@ screwup:
 int
 response(void)
 {
-	char ch, *cp, resp, rbuf[2048];
+	char ch, *cp, resp, rbuf[2048], visbuf[2048];
 
 	if (atomicio(read, remin, &resp, sizeof(resp)) != sizeof(resp))
 		lostconn(0);
@@ -1847,8 +1391,13 @@ response(void)
 			*cp++ = ch;
 		} while (cp < &rbuf[sizeof(rbuf) - 1] && ch != '\n');
 
-		if (!iamremote)
-			(void) atomicio(vwrite, STDERR_FILENO, rbuf, cp - rbuf);
+		if (!iamremote) {
+			cp[-1] = '\0';
+			(void) snmprintf(visbuf, sizeof(visbuf),
+			    NULL, "%s\n", rbuf);
+			(void) atomicio(vwrite, STDERR_FILENO,
+			    visbuf, strlen(visbuf));
+		}
 		++errs;
 		if (resp == 1)
 			return (-1);
@@ -1974,135 +1523,3 @@ lostconn(int signo)
 	else
 		exit(1);
 }
-
-#ifdef WITH_SCP_STATS
-void stats_fixlen(int bwritten)
-{
-	char rest[80];
-	int i = 0;
-
-	while (bwritten++ < 77)
-	{
-		rest[i++] = ' ';
-	}
-	rest[i] = '\0';
-	fputs(rest, SOME_STATS_FILE);
-	fflush(SOME_STATS_FILE);
-}
-
-char *stat_eta_new(int msecs)
-{
-	static char stat_result[32];
-	int hours = 0, mins = 0, secs = 0;
-
-	hours = msecs / 3600000;
-	msecs %= 3600000;
-	mins = msecs / 60000;
-	msecs %= 60000;
-	secs = msecs / 1000;
-	msecs %= 1000;
-
-	if (hours > 0) {
-		sprintf_s(stat_result, sizeof(stat_result),"%02d:%02d:%02d:%03d", hours, mins, secs, msecs);
-	}
-	else
-		sprintf_s(stat_result, sizeof(stat_result), "%02d:%02d:%03d", mins, secs, msecs);
-
-	return(stat_result);
-}
-
-char *stat_eta(int secs)
-{
-	static char stat_result[20];
-	int hours, mins;
-
-	hours = secs / 3600;
-	secs %= 3600;
-	mins = secs / 60;
-	secs %= 60;
-
-	sprintf(stat_result, "%02d:%02d:%02d", hours, mins, secs);
-	return(stat_result);
-}
-#endif /* WITH_SCP_STATS */
-
-#ifdef WINDOWS
-/* start_process_io()
-input parameters:
-	exename - name of executable
-	StdXXXX - the three stdin, stdout, stdout I/O handles.
-*/
-
-int start_process_io(char *exename, char **argv, char **envv,
-	HANDLE StdInput, HANDLE StdOutput, HANDLE StdError,
-	unsigned long CreateFlags, PROCESS_INFORMATION  *pi,
-	char *homedir, char *lpDesktop)
-{
-	UNREFERENCED_PARAMETER(envv);
-	STARTUPINFOW          sui;
-	DWORD ret;
-	char cmdbuf[2048];
-	int ctr;
-
-	/* set up the STARTUPINFO structure,
-	*  then call CreateProcess to try and start the new exe.
-	*/
-	sui.cb = sizeof(STARTUPINFO);
-	sui.lpReserved = 0;
-	sui.lpDesktop = utf8_to_utf16(lpDesktop);
-	sui.lpTitle = NULL; /* NULL means use exe name as title */
-	sui.dwX = 0;
-	sui.dwY = 0;
-	sui.dwXSize = 132;
-	sui.dwYSize = 60;
-	sui.dwXCountChars = 132;
-	sui.dwYCountChars = 60;
-	sui.dwFillAttribute = 0;
-	sui.dwFlags = STARTF_USESTDHANDLES | STARTF_USESIZE | STARTF_USECOUNTCHARS; // | STARTF_USESHOWWINDOW ;
-	sui.wShowWindow = 0; // FALSE ;
-	sui.cbReserved2 = 0;
-	sui.lpReserved2 = 0;
-	sui.hStdInput = (HANDLE)StdInput;
-	sui.hStdOutput = (HANDLE)StdOutput;
-	sui.hStdError = (HANDLE)StdError;
-
-	ctr = 0;
-	cmdbuf[0] = '\0';
-        if (argv[0][0] != '\0' && argv[0][1] != ':') {
-                strcat(cmdbuf, w32_programdir());
-                strcat(cmdbuf, "\\");
-        }
-	while (argv[ctr]) {
-		strcat_s(cmdbuf, sizeof(cmdbuf), argv[ctr]);
-		strcat_s(cmdbuf, sizeof(cmdbuf), " ");
-		ctr++;
-	}
-
-    ret = CreateProcessW(
-		utf8_to_utf16(exename), // given in form like "d:\\util\\cmd.exe"
-		utf8_to_utf16(cmdbuf), /* in "arg0 arg1 arg2" form command line */
-		NULL, /* process security */
-		NULL, /* thread security */
-		TRUE, /* inherit handles is YES */
-		CreateFlags,
-		/* give new proc a new screen, suspend it for debugging also */
-		NULL, /* in "E1=a0E2=b0E3=c00" form environment,
-			  NULL means use parent's */
-		utf8_to_utf16(homedir), /* Current Directory, NULL means use whats for parent */
-		&sui, /* start up info */
-		pi); /* process created info kept here */
-
-	if (ret == TRUE) {
-		//cprintf ( "Process created, pid=%d, threadid=%d\n",pi->dwProcessId,
-		//			  pi->dwThreadId ) ;
-
-		return pi->dwProcessId;
-
-	}
-	else {
-		/* report failure to the user. */
-		return ret;
-	}
-}
-#endif
-

@@ -47,6 +47,16 @@
 #define APP_RIGHT_ARROW             "\x1bOC"
 #define APP_LEFT_ARROW              "\x1bOD"
 
+#define FIND_KEY                    "\x1b[1~"
+#define INSERT_KEY                  "\x1b[2~"
+#define REMOVE_KEY                  "\x1b[3~"
+#define SELECT_KEY                  "\x1b[4~"
+#define PREV_KEY                    "\x1b[5~"
+#define NEXT_KEY                    "\x1b[6~"
+#define SHIFT_TAB_KEY               "\x1b[~"
+#define ESCAPE_KEY		            "\x1b"
+#define BACKSPACE_KEY               "\b"
+
 // VT100 Function Key's
 #define VT100_PF1_KEY               "\x1bO2"
 #define VT100_PF2_KEY               "\x1bO3"
@@ -163,16 +173,6 @@
 #define SHIFT_ALT_CTRL_PF10_KEY     "\x1b[21;8~"
 #define SHIFT_ALT_CTRL_PF11_KEY     "\x1b[24;8~"
 #define SHIFT_ALT_CTRL_PF12_KEY     "\x1b[25;8~"
-
-#define FIND_KEY                    "\x1b[1~"
-#define INSERT_KEY                  "\x1b[2~"
-#define REMOVE_KEY                  "\x1b[3~"
-#define SELECT_KEY                  "\x1b[4~"
-#define PREV_KEY                    "\x1b[5~"
-#define NEXT_KEY                    "\x1b[6~"
-#define SHIFT_TAB_KEY               "\x1b[~"
-#define ESCAPE_KEY		            "\x1b"
-#define BACKSPACE_KEY               "\b"
 
 #define TERMINAL_ID                 "\x1b[?1;2c"
 #define STATUS_REPORT               "\x1b[2;5R"

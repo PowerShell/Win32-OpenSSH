@@ -4,7 +4,7 @@
 #include <openssl/bn.h>
 #include <VersionHelpers.h>
 #include <dh.h>
-#include "crypto-wrap.h"
+#include <crypto-wrap.h>
 
 
 // CNG Diffie-hellman Kex context 

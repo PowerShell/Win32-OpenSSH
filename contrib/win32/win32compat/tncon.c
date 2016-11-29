@@ -58,7 +58,24 @@ extern int ScreenX;
 extern int ScrollTop;
 extern int ScrollBottom;
 
-TelParams Parameters;
+/* terminal global switches*/
+TelParams Parameters = {
+        0, // int fLogging;
+        NULL, //FILE *fplogfile;
+        NULL, //char *pInputFile;
+        NULL, // char *szDebugInputFile;
+        FALSE, //BOOL fDebugWait;
+        0, //int timeOut;
+        0, //int fLocalEcho;
+        0, //int fTreatLFasCRLF;
+        0, //int	fSendCROnly;
+        ENUM_LF, //int nReceiveCRLF;
+        '`', //char sleepChar;
+        '\035', //char menuChar; // CTRL-]
+        0, //SOCKET Socket;
+        FALSE, //BOOL bVT100Mode;
+        "\x01", //char *pAltKey; 
+};
 TelParams* pParams = &Parameters;
 
 // For our case, in NetWriteString2(), we do not use socket, but write the out going data to
@@ -76,44 +93,16 @@ int NetWriteString2(SOCKET sock, char* source, size_t len, int options)
 	return glob_outlen;
 }
 
-void ConInputInitParams(void)
-{
-    DWORD	dwMode = 0;
-
-    memset(&Parameters, '\0', sizeof(TelParams));
-
-	// Default values
-	Parameters.szDebugInputFile = NULL;
-	Parameters.fDebugWait = FALSE;
-	Parameters.nReceiveCRLF = ENUM_LF;
-	Parameters.sleepChar = '`';
-	Parameters.menuChar = '\035'; // CTRL-]
-	Parameters.pAltKey = "\x01";		// default 
-	
-	HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
-
-    if (hInput && hInput != INVALID_HANDLE_VALUE) {
-
-        GetConsoleMode(hInput, &dwMode);
-        SetConsoleMode(hInput, (dwMode & ~(ENABLE_LINE_INPUT |
-            ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT)) | ENABLE_WINDOW_INPUT);
-    }
-}
-
 BOOL DataAvailable(HANDLE h)
 {
-    INPUT_RECORD irec;
-    DWORD events_read = 0;
-
-    if (!PeekConsoleInput(h, &irec, 1, &events_read)) {
-        return FALSE;
-    }
-
-    if (events_read) {
+    DWORD dwRet = WaitForSingleObject(h, INFINITE);
+    if(dwRet == WAIT_OBJECT_0)
         return TRUE;
-    }
 
-	return FALSE;
+    if(dwRet == WAIT_FAILED)
+        return FALSE;
+
+    return FALSE;
 }
 
 void queue_terminal_window_change_event();
@@ -150,7 +139,7 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
         switch (InputRecord.EventType)
         {
             case WINDOW_BUFFER_SIZE_EVENT:
-		queue_terminal_window_change_event();
+		        queue_terminal_window_change_event();
                 break;
 
             case FOCUS_EVENT:
@@ -207,13 +196,39 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                                 case VK_LEFT:
                                     NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_LEFT_ARROW : LEFT_ARROW), 3, 0);
                                     break;
+                                case VK_END:
+                                    NetWriteString2(pParams->Socket, (char *)SELECT_KEY, 4, 0);
+                                    break;
+                                case VK_HOME:
+                                    NetWriteString2(pParams->Socket, (char *)FIND_KEY, 4, 0);
+                                    break;
+                                case VK_INSERT:
+                                    NetWriteString2(pParams->Socket, (char *)INSERT_KEY, 4, 0);
+                                    break;
+                                case VK_DELETE:
+                                    NetWriteString2(pParams->Socket, (char *)REMOVE_KEY, 4, 0);
+                                    break;
+                                case VK_BACK:
+                                    NetWriteString2(pParams->Socket, (char *)BACKSPACE_KEY, 1, 0);
+                                    break;
+                                case VK_TAB:
+                                    if (dwControlKeyState == SHIFT_PRESSED)
+                                        NetWriteString2(pParams->Socket, (char *)SHIFT_TAB_KEY, 3, 0);
+                                    else
+                                        NetWriteString2(pParams->Socket, (char *)octets, n, 0);
+                                    break;
+                                case VK_ESCAPE:
+                                    NetWriteString2(pParams->Socket, (char *)ESCAPE_KEY, 1, 0);
+                                    break;
+                                case VK_SHIFT:
+                                case VK_CONTROL:
+                                case VK_CAPITAL:
+                                    // NOP on these
+                                    break;
                                 case VK_F1:
                                     if (dwControlKeyState == 0)
                                     {
-                                        if (pParams->bVT100Mode)
-                                            NetWriteString2(pParams->Socket, (char *)VT100_PF1_KEY, strlen(VT100_PF1_KEY), 0);
-                                        else
-                                            NetWriteString2(pParams->Socket, (char *)PF1_KEY, strlen(PF1_KEY), 0);
+                                        NetWriteString2(pParams->Socket, (char *)PF1_KEY, strlen(PF1_KEY), 0);
                                     }
                                     else if (dwControlKeyState == SHIFT_PRESSED)
                                         NetWriteString2(pParams->Socket, (char *)SHIFT_PF1_KEY, strlen(SHIFT_PF1_KEY), 0);
@@ -246,10 +261,7 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                                 case VK_F2:
                                     if (dwControlKeyState == 0)
                                     {
-                                        if (pParams->bVT100Mode)
-                                            NetWriteString2(pParams->Socket, (char *)VT100_PF2_KEY, strlen(VT100_PF2_KEY), 0);
-                                        else
-                                            NetWriteString2(pParams->Socket, (char *)PF2_KEY, strlen(PF2_KEY), 0);
+                                        NetWriteString2(pParams->Socket, (char *)PF2_KEY, strlen(PF2_KEY), 0);
                                     }
                                     else if (dwControlKeyState == SHIFT_PRESSED)
                                         NetWriteString2(pParams->Socket, (char *)SHIFT_PF2_KEY, strlen(SHIFT_PF2_KEY), 0);
@@ -282,10 +294,7 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                                 case VK_F3:
                                     if (dwControlKeyState == 0)
                                     {
-                                        if (pParams->bVT100Mode)
-                                            NetWriteString2(pParams->Socket, (char *)VT100_PF3_KEY, strlen(VT100_PF3_KEY), 0);
-                                        else
-                                            NetWriteString2(pParams->Socket, (char *)PF3_KEY, strlen(PF3_KEY), 0);
+                                        NetWriteString2(pParams->Socket, (char *)PF3_KEY, strlen(PF3_KEY), 0);
                                     }
                                     else if (dwControlKeyState == SHIFT_PRESSED)
                                         NetWriteString2(pParams->Socket, (char *)SHIFT_PF3_KEY, strlen(SHIFT_PF3_KEY), 0);
@@ -318,10 +327,7 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                                 case VK_F4:
                                     if (dwControlKeyState == 0)
                                     {
-                                        if (pParams->bVT100Mode)
-                                            NetWriteString2(pParams->Socket, (char *)VT100_PF4_KEY, strlen(VT100_PF4_KEY), 0);
-                                        else
-                                            NetWriteString2(pParams->Socket, (char *)PF4_KEY, strlen(PF4_KEY), 0);
+                                        NetWriteString2(pParams->Socket, (char *)PF4_KEY, strlen(PF4_KEY), 0);
                                     }
                                     else if (dwControlKeyState == SHIFT_PRESSED)
                                         NetWriteString2(pParams->Socket, (char *)SHIFT_PF4_KEY, strlen(SHIFT_PF4_KEY), 0);
@@ -600,62 +606,6 @@ int ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
                                             ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
                                              (dwControlKeyState & RIGHT_CTRL_PRESSED)))
                                         NetWriteString2(pParams->Socket, (char *)SHIFT_CTRL_PF12_KEY, strlen(SHIFT_CTRL_PF12_KEY), 0);
-                                    break;
-                                case VK_PRIOR:
-#ifdef PHYS_KEY_MAP
-                                    NetWriteString2(pParams->Socket, (char *)REMOVE_KEY, 4, 0);
-#else
-                                    NetWriteString2(pParams->Socket, (char *)PREV_KEY, 4, 0);
-#endif
-                                    break;
-                                case VK_NEXT:
-                                    NetWriteString2(pParams->Socket, (char *)NEXT_KEY, 4, 0);
-                                    break;
-                                case VK_END:
-#ifdef PHYS_KEY_MAP
-                                    NetWriteString2(pParams->Socket, (char *)PREV_KEY, 4, 0);
-#else
-                                    NetWriteString2(pParams->Socket, (char *)SELECT_KEY, 4, 0);
-#endif
-                                    break;
-
-                                case VK_HOME:
-#ifdef PHYS_KEY_MAP
-                                    NetWriteString2(pParams->Socket, (char *)INSERT_KEY, 4, 0);
-#else
-                                    NetWriteString2(pParams->Socket, (char *)FIND_KEY, 4, 0);
-#endif
-                                    break;
-                                case VK_INSERT:
-#ifdef PHYS_KEY_MAP
-                                    NetWriteString2(pParams->Socket, (char *)FIND_KEY, 4, 0);
-#else
-                                    NetWriteString2(pParams->Socket, (char *)INSERT_KEY, 4, 0);
-#endif
-                                    break;
-                                case VK_DELETE:
-#ifdef PHYS_KEY_MAP
-                                    NetWriteString2(pParams->Socket, (char *)SELECT_KEY, 4, 0);
-#else
-                                    NetWriteString2(pParams->Socket, (char *)REMOVE_KEY, 4, 0);
-#endif
-                                    break;
-                                case VK_BACK:
-                                    NetWriteString2(pParams->Socket, (char *)BACKSPACE_KEY, 1, 0);
-                                    break;
-                                case VK_TAB:
-                                        if (dwControlKeyState == SHIFT_PRESSED)
-                                                NetWriteString2(pParams->Socket, (char *)SHIFT_TAB_KEY, 3, 0);
-                                        else
-                                                NetWriteString2(pParams->Socket, (char *)octets, n, 0);
-                                        break;
-                                case VK_ESCAPE:
-                                    NetWriteString2(pParams->Socket, (char *)ESCAPE_KEY, 1, 0);
-                                    break;
-                                case VK_SHIFT:
-                                case VK_CONTROL:
-                                case VK_CAPITAL:
-                                    // NOP on these
                                     break;
                                 default:
                                 {

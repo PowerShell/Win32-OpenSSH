@@ -196,7 +196,7 @@ static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
 		goto done;
 
 	if (sshkey_private_deserialize(tmpbuf, &prikey) != 0 ||
-	    sshkey_sign(prikey, sig, siglen, blob, blen, 0) != 0) {
+	    sshkey_sign(prikey, sig, siglen, blob, blen, NULL, 0) != 0) {
 		debug("cannot sign using retrieved key");
 		goto done;
 	}

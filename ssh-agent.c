@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-agent.c,v 1.204 2015/07/08 20:24:02 markus Exp $ */
+/* $OpenBSD: ssh-agent.c,v 1.213 2016/05/02 08:49:03 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -88,10 +88,6 @@
 #include "ssh-pkcs11.h"
 #endif
 
-#if defined(HAVE_SYS_PRCTL_H)
-#include <sys/prctl.h>	/* For prctl() and PR_SET_DUMPABLE */
-#endif
-
 typedef enum {
 	AUTH_UNUSED,
 	AUTH_SOCKET,
@@ -144,8 +140,8 @@ char socket_dir[PATH_MAX];
 #define LOCK_SALT_SIZE	16
 #define LOCK_ROUNDS	1
 int locked = 0;
-char lock_passwd[LOCK_SIZE];
-char lock_salt[LOCK_SALT_SIZE];
+u_char lock_pwhash[LOCK_SIZE];
+u_char lock_salt[LOCK_SALT_SIZE];
 
 extern char *__progname;
 
@@ -653,6 +649,18 @@ process_authentication_challenge1(SocketEntry *e)
 }
 #endif
 
+static char *
+agent_decode_alg(struct sshkey *key, u_int flags)
+{
+	if (key->type == KEY_RSA) {
+		if (flags & SSH_AGENT_RSA_SHA2_256)
+			return "rsa-sha2-256";
+		else if (flags & SSH_AGENT_RSA_SHA2_512)
+			return "rsa-sha2-512";
+	}
+	return NULL;
+}
+
 /* ssh2 only */
 static void
 process_sign_request2(SocketEntry *e)
@@ -674,7 +682,7 @@ process_sign_request2(SocketEntry *e)
 	if (flags & SSH_AGENT_OLD_SIGNATURE)
 		compat = SSH_BUG_SIGBLOB;
 	if ((r = sshkey_from_blob(blob, blen, &key)) != 0) {
-		error("%s: cannot parse key blob: %s", __func__, ssh_err(ok));
+		error("%s: cannot parse key blob: %s", __func__, ssh_err(r));
 		goto send;
 	}
 	if ((id = lookup_identity(key, 2)) == NULL) {
@@ -686,8 +694,8 @@ process_sign_request2(SocketEntry *e)
 		goto send;
 	}
 	if ((r = sshkey_sign(id->key, &signature, &slen,
-	    data, dlen, compat)) != 0) {
-		error("%s: sshkey_sign: %s", __func__, ssh_err(ok));
+	    data, dlen, agent_decode_alg(key, flags), compat)) != 0) {
+		error("%s: sshkey_sign: %s", __func__, ssh_err(r));
 		goto send;
 	}
 	/* Success */
@@ -950,7 +958,8 @@ static void
 process_lock_agent(SocketEntry *e, int lock)
 {
 	int r, success = 0, delay;
-	char *passwd, passwdhash[LOCK_SIZE];
+	char *passwd;
+	u_char passwdhash[LOCK_SIZE];
 	static u_int fail_count = 0;
 	size_t pwlen;
 
@@ -962,11 +971,11 @@ process_lock_agent(SocketEntry *e, int lock)
 		if (bcrypt_pbkdf(passwd, pwlen, lock_salt, sizeof(lock_salt),
 		    passwdhash, sizeof(passwdhash), LOCK_ROUNDS) < 0)
 			fatal("bcrypt_pbkdf");
-		if (timingsafe_bcmp(passwdhash, lock_passwd, LOCK_SIZE) == 0) {
+		if (timingsafe_bcmp(passwdhash, lock_pwhash, LOCK_SIZE) == 0) {
 			debug("agent unlocked");
 			locked = 0;
 			fail_count = 0;
-			explicit_bzero(lock_passwd, sizeof(lock_passwd));
+			explicit_bzero(lock_pwhash, sizeof(lock_pwhash));
 			success = 1;
 		} else {
 			/* delay in 0.1s increments up to 10s */
@@ -983,7 +992,7 @@ process_lock_agent(SocketEntry *e, int lock)
 		locked = 1;
 		arc4random_buf(lock_salt, sizeof(lock_salt));
 		if (bcrypt_pbkdf(passwd, pwlen, lock_salt, sizeof(lock_salt),
-		    lock_passwd, sizeof(lock_passwd), LOCK_ROUNDS) < 0)
+		    lock_pwhash, sizeof(lock_pwhash), LOCK_ROUNDS) < 0)
 			fatal("bcrypt_pbkdf");
 		success = 1;
 	}
@@ -1519,6 +1528,7 @@ main(int ac, char **av)
 
 
 
+	ssh_malloc_init();	/* must be called before any mallocs */
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
@@ -1526,10 +1536,7 @@ main(int ac, char **av)
 	setegid(getgid());
 	setgid(getgid());
 
-#if defined(HAVE_PRCTL) && defined(PR_SET_DUMPABLE)
-	/* Disable ptrace on Linux without sgid bit */
-	prctl(PR_SET_DUMPABLE, 0);
-#endif
+	platform_disable_tracing(0);	/* strict=no */
 
 #ifdef WITH_OPENSSL
 	OpenSSL_add_all_algorithms();
@@ -1726,6 +1733,7 @@ main(int ac, char **av)
 		printf(format, SSH_AUTHSOCKET_ENV_NAME, socket_name,
 		    SSH_AUTHSOCKET_ENV_NAME);
 		printf("echo Agent pid %ld;\n", (long)parent_pid);
+		fflush(stdout);
 		goto skip;
 	}
 	pid = fork();
@@ -1816,6 +1824,10 @@ skip:
 	signal(SIGTERM, cleanup_handler);
 #endif
 	nalloc = 0;
+
+	if (pledge("stdio cpath unix id proc exec", NULL) == -1)
+		fatal("%s: pledge: %s", __progname, strerror(errno));
+	platform_pledge_agent();
 
 	while (1) {
 		prepare_select(&readsetp, &writesetp, &max_fd, &nalloc, &tvp);

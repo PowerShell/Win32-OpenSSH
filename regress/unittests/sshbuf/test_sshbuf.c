@@ -24,12 +24,6 @@
 
 void sshbuf_tests(void);
 
-#ifdef WIN32_FIXME
-void fatal(const char *fmt,...) {/*stub*/}
-void logit(const char *fmt,...) {/*stub*/}
-void debug3(const char *fmt,...) {/*stub*/}
-#endif
-
 void
 sshbuf_tests(void)
 {

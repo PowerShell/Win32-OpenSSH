@@ -47,23 +47,16 @@
 static struct termios _saved_tio;
 static int _in_raw_mode = 0;
 
+#ifndef WINDOWS
 struct termios *
 get_saved_tio(void)
 {
-  #ifdef WIN32_FIXME
-  DebugBreak();
-  #endif
 	return _in_raw_mode ? &_saved_tio : NULL;
 }
 
 void
 leave_raw_mode(int quiet)
 {
-  /*
-   * Win32 has no ttys so there is no raw mode to leave 
-   */
-   
-#ifndef WIN32_FIXME
 	if (!_in_raw_mode)
 		return;
 	if (tcsetattr(fileno(stdin), TCSADRAIN, &_saved_tio) == -1) {
@@ -71,17 +64,11 @@ leave_raw_mode(int quiet)
 			perror("tcsetattr");
 	} else
 		_in_raw_mode = 0;
-#endif
 }
 
 void
 enter_raw_mode(int quiet)
 {
-  /*
-   * Win32 has no ttys so there is no raw mode to enter 
-   */
-   
-#ifndef WIN32_FIXME
 	struct termios tio;
 
 	if (tcgetattr(fileno(stdin), &tio) == -1) {
@@ -107,5 +94,30 @@ enter_raw_mode(int quiet)
 			perror("tcsetattr");
 	} else
 		_in_raw_mode = 1;
-#endif
 }
+
+#else
+int ConInit(DWORD OutputHandle, BOOL fSmartInit);
+int ConUnInit(void);
+
+struct termios term_settings;
+
+/* TODO - clean this up for Windows, ConInit should return previous terminal settings that need to be stored in term_settings*/
+
+struct termios *
+get_saved_tio(void) {
+        memset(&term_settings, 0, sizeof(term_settings));
+        return &term_settings;
+}
+
+void	 
+leave_raw_mode(int quiet) {
+        ConUnInit();
+}
+
+void	 
+enter_raw_mode(int quiet) {
+        ConInit(STD_OUTPUT_HANDLE, TRUE);
+}
+
+#endif

@@ -95,29 +95,23 @@ int ConInit( DWORD OutputHandle, BOOL fSmartInit )
         return dwRet;
     }
 
-    if (!GetConsoleMode(hOutputConsole, &dwSavedAttributes)) {
+    if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwSavedAttributes)) {
         dwRet = GetLastError();
         printf("GetConsoleMode failed with %d\n", GetLastError());
         return dwRet;
     }
 
     dwAttributes = dwSavedAttributes;
+    dwAttributes &= ~(ENABLE_LINE_INPUT |
+            ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT);
+    dwAttributes |= ENABLE_WINDOW_INPUT;
 
-    if ( os.dwPlatformId == VER_PLATFORM_WIN32_NT )
-    {
-        char *term = getenv("TERM");
-        dwAttributes = (DWORD)ENABLE_PROCESSED_OUTPUT;  // PERFECT in NT
+    char *term = getenv("TERM");
 
-        if (term != NULL && (_stricmp(term, "ansi") == 0 || _stricmp(term, "passthru")))
-            dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    if (term != NULL && (_stricmp(term, "ansi") == 0 || _stricmp(term, "passthru") == 0))
+        dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
-        SetConsoleMode(hOutputConsole, dwAttributes); // Windows NT
-    }
-    else
-    {
-        dwAttributes = (DWORD)ENABLE_WRAP_AT_EOL_OUTPUT;	// Doesn't always print last column & doesn't handle CRLF
-        SetConsoleMode(hOutputConsole, dwAttributes);	// Windows 95
-    }
+    SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwAttributes); // Windows NT
 
     ConSetScreenX();
     ConSetScreenY();
@@ -327,6 +321,9 @@ void ConSetAttribute(int *iParam, int iParamCount)
                     iAttr |= FOREGROUND_INTENSITY;
                     break;
                 case ANSI_DIM:
+                    break;
+                case ANSI_NOUNDERSCORE:
+                    iAttr = iAttr & ~COMMON_LVB_UNDERSCORE;
                     break;
                 case ANSI_UNDERSCORE:
                     iAttr |= COMMON_LVB_UNDERSCORE;

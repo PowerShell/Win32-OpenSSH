@@ -145,10 +145,12 @@ do_kex_with_key(char *kex, int keytype, int bits)
 	sshbuf_free(state);
 	ASSERT_PTR_NE(server2->kex, NULL);
 	/* XXX we need to set the callbacks */
+#ifdef WITH_OPENSSL
 	server2->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	server2->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 	server2->kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 	server2->kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
+#endif
 #ifdef OPENSSL_HAS_ECC
 	server2->kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
 #endif

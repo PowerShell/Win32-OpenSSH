@@ -126,9 +126,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)hostfile.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)jpake.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kex.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -222,9 +219,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sc25519.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)schnorr.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)smult_curve25519_ref.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -273,9 +267,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)umac.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)umac128.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)uuencode.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -285,16 +276,22 @@
     <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openssl-bn.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openssl-dh.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\openssl-epoint.c">
+    <ClCompile Include="..\..\..\utf8.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\utf8.c">
+    <ClCompile Include="..\..\..\platform-pledge.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\sandbox-pledge.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\platform.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\platform-tracing.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

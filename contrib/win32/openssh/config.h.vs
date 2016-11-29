@@ -218,7 +218,8 @@
 /* #undef HAVE_B64_PTON */
 
 /* Define if you have the basename function. */
-#define HAVE_BASENAME 1
+/* For Windows, this is defined in dirent.h, but that header is not included in sftp.c */
+/* #define HAVE_BASENAME */
 
 /* Define to 1 if you have the `bcopy' function. */
 /* #undef HAVE_BCOPY */
@@ -336,7 +337,7 @@
 /* #undef HAVE_DIRFD */
 
 /* Define to 1 if you have the `dirname' function. */
-#define HAVE_DIRNAME 1
+/* #define HAVE_DIRNAME 1 */
 
 /* Define to 1 if you have the `DSA_generate_parameters_ex' function. */
 #define HAVE_DSA_GENERATE_PARAMETERS_EX 1
@@ -770,7 +771,7 @@
 /* #undef HAVE_READPASSPHRASE_H */
 
 /* Define to 1 if you have the `realpath' function. */
-#define HAVE_REALPATH 1
+/* #define HAVE_REALPATH 1 */
 
 /* Define to 1 if you have the `recvmsg' function. */
 /* #undef HAVE_RECVMSG */
@@ -1642,12 +1643,11 @@
 #undef HAVE_SYS_SYSMACROS_H
 #undef HAVE_SYS_MMAN_H
 #undef HAVE_SYS_UN_H
+#define _STRUCT_WINSIZE 1
 
 #define HAVE_TCGETPGRP 1
 
 #undef HAVE_TIME
-
-#define HAVE_TRUNCATE 1
 
 #define HAVE_VIS_H 1
 
@@ -1680,14 +1680,6 @@
 #define WIN32_ZLIB_NO 1
 #define USE_MSCNG 1
 
-#ifndef ssize_t
-#ifdef _WIN64
-typedef __int64		 ssize_t;
-#else
-typedef long ssize_t;
-#endif
-#endif
-
 #define HAVE_STRTOULL 1
 #define HAVE_USLEEP 1
 
@@ -1704,11 +1696,10 @@ typedef long ssize_t;
 //#define SHUT_WR		   1
 //#define SHUT_RD        0
 
-
 #define HAVE_EXPLICIT_BZERO
 
 #define WIN32_ZLIB_NO 1
-
+#define HAVE_MBTOWC 1
 
 #include <signal.h>
 #include <io.h>
@@ -1724,6 +1715,10 @@ typedef long ssize_t;
 // works remotely over SSH like they operate in a local machine
 //#define WIN32_PRAGMA_REMCON
 
+#define umac128_new umac_new
+#define umac128_update umac_update 
+#define umac_final umac128_final
+#define umac_delete umac128_delete
 
 #define HAVE_MBLEN 1
 

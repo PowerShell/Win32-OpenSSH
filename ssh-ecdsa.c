@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-ecdsa.c,v 1.11 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: ssh-ecdsa.c,v 1.13 2016/04/21 06:08:02 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -99,10 +99,8 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	ret = 0;
  out:
 	explicit_bzero(digest, sizeof(digest));
-	if (b != NULL)
-		sshbuf_free(b);
-	if (bb != NULL)
-		sshbuf_free(bb);
+	sshbuf_free(b);
+	sshbuf_free(bb);
 	if (sig != NULL)
 		ECDSA_SIG_free(sig);
 	return ret;
@@ -123,7 +121,8 @@ ssh_ecdsa_verify(const struct sshkey *key,
 	char *ktype = NULL;
 
 	if (key == NULL || key->ecdsa == NULL ||
-	    sshkey_type_plain(key->type) != KEY_ECDSA)
+	    sshkey_type_plain(key->type) != KEY_ECDSA ||
+	    signature == NULL || signaturelen == 0)
 		return SSH_ERR_INVALID_ARGUMENT;
 
 	if ((hash_alg = sshkey_ec_nid_to_hash_alg(key->ecdsa_nid)) == -1 ||
@@ -179,10 +178,8 @@ ssh_ecdsa_verify(const struct sshkey *key,
 
  out:
 	explicit_bzero(digest, sizeof(digest));
-	if (sigbuf != NULL)
-		sshbuf_free(sigbuf);
-	if (b != NULL)
-		sshbuf_free(b);
+	sshbuf_free(sigbuf);
+	sshbuf_free(b);
 	if (sig != NULL)
 		ECDSA_SIG_free(sig);
 	free(ktype);

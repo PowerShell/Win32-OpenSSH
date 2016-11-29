@@ -5,6 +5,7 @@
 * instead of the one in Windows SDK. 
 */
 #pragma once
+#include "..\fcntl.h"
 
 /* flags COPIED FROM STAT.H
  */
@@ -16,7 +17,10 @@
 #define _S_IREAD  0x0100 // Read permission, owner
 #define _S_IWRITE 0x0080 // Write permission, owner
 #define _S_IEXEC  0x0040 // Execute/search permission, owner
+#define _S_IFLNK  0xA000 // symbolic link
+#define _S_IFSOCK 0xC000 // socket
 
+#define S_ISLNK(mode)	(((mode) & S_IFMT) == S_IFLNK)
 
 #define S_IFMT   _S_IFMT
 #define S_IFDIR  _S_IFDIR
@@ -25,6 +29,9 @@
 #define S_IREAD  _S_IREAD
 #define S_IWRITE _S_IWRITE
 #define S_IEXEC  _S_IEXEC
+#define S_IFLNK  _S_IFLNK
+#define S_IFSOCK _S_IFSOCK
+
 
 #define stat w32_stat
 #define lstat w32_stat

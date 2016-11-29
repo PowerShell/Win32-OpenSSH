@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.280 2015/08/06 14:53:21 deraadt Exp $ */
+/* $OpenBSD: servconf.c,v 1.292 2016/06/23 05:17:51 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -12,15 +12,6 @@
  */
 
 #include "includes.h"
-
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -191,6 +182,20 @@ option_clear_or_none(const char *o)
 	return o == NULL || strcasecmp(o, "none") == 0;
 }
 
+static void
+assemble_algorithms(ServerOptions *o)
+{
+	if (kex_assemble_names(KEX_SERVER_ENCRYPT, &o->ciphers) != 0 ||
+	    kex_assemble_names(KEX_SERVER_MAC, &o->macs) != 0 ||
+	    kex_assemble_names(KEX_SERVER_KEX, &o->kex_algorithms) != 0 ||
+	    kex_assemble_names(KEX_DEFAULT_PK_ALG,
+	    &o->hostkeyalgorithms) != 0 ||
+	    kex_assemble_names(KEX_DEFAULT_PK_ALG,
+	    &o->hostbased_key_types) != 0 ||
+	    kex_assemble_names(KEX_DEFAULT_PK_ALG, &o->pubkey_key_types) != 0)
+		fatal("kex_assemble_names failed");
+}
+
 void
 fill_default_server_options(ServerOptions *options)
 {
@@ -272,8 +277,6 @@ fill_default_server_options(ServerOptions *options)
 		options->hostbased_authentication = 0;
 	if (options->hostbased_uses_name_from_packet_only == -1)
 		options->hostbased_uses_name_from_packet_only = 0;
-	if (options->hostkeyalgorithms == NULL)
-		options->hostkeyalgorithms = xstrdup(KEX_DEFAULT_PK_ALG);
 	if (options->rsa_authentication == -1)
 		options->rsa_authentication = 1;
 	if (options->pubkey_authentication == -1)
@@ -355,18 +358,11 @@ fill_default_server_options(ServerOptions *options)
 	if (options->fingerprint_hash == -1)
 		options->fingerprint_hash = SSH_FP_HASH_DEFAULT;
 
-	if (kex_assemble_names(KEX_SERVER_ENCRYPT, &options->ciphers) != 0 ||
-	    kex_assemble_names(KEX_SERVER_MAC, &options->macs) != 0 ||
-	    kex_assemble_names(KEX_SERVER_KEX, &options->kex_algorithms) != 0 ||
-	    kex_assemble_names(KEX_DEFAULT_PK_ALG,
-	    &options->hostbased_key_types) != 0 ||
-	    kex_assemble_names(KEX_DEFAULT_PK_ALG,
-	    &options->pubkey_key_types) != 0)
-		fatal("%s: kex_assemble_names failed", __func__);
+	assemble_algorithms(options);
 
-	/* Turn privilege separation on by default */
+	/* Turn privilege separation and sandboxing on by default */
 	if (use_privsep == -1)
-		use_privsep = PRIVSEP_NOSANDBOX;
+		use_privsep = PRIVSEP_ON;
 
 #define CLEAR_ON_NONE(v) \
 	do { \
@@ -381,11 +377,21 @@ fill_default_server_options(ServerOptions *options)
 	CLEAR_ON_NONE(options->trusted_user_ca_keys);
 	CLEAR_ON_NONE(options->revoked_keys_file);
 	CLEAR_ON_NONE(options->authorized_principals_file);
+	CLEAR_ON_NONE(options->adm_forced_command);
+	CLEAR_ON_NONE(options->chroot_directory);
 	for (i = 0; i < options->num_host_key_files; i++)
 		CLEAR_ON_NONE(options->host_key_files[i]);
 	for (i = 0; i < options->num_host_cert_files; i++)
 		CLEAR_ON_NONE(options->host_cert_files[i]);
 #undef CLEAR_ON_NONE
+
+	/* Similar handling for AuthenticationMethods=any */
+	if (options->num_auth_methods == 1 &&
+	    strcmp(options->auth_methods[0], "any") == 0) {
+		free(options->auth_methods[0]);
+		options->auth_methods[0] = NULL;
+		options->num_auth_methods = 0;
+	}
 
 #ifndef HAVE_MMAP
 	if (use_privsep && options->compression == 1) {
@@ -527,7 +533,11 @@ static struct {
 	{ "listenaddress", sListenAddress, SSHCFG_GLOBAL },
 	{ "addressfamily", sAddressFamily, SSHCFG_GLOBAL },
 	{ "printmotd", sPrintMotd, SSHCFG_GLOBAL },
+#ifdef DISABLE_LASTLOG
+	{ "printlastlog", sUnsupported, SSHCFG_GLOBAL },
+#else
 	{ "printlastlog", sPrintLastLog, SSHCFG_GLOBAL },
+#endif
 	{ "ignorerhosts", sIgnoreRhosts, SSHCFG_GLOBAL },
 	{ "ignoreuserknownhosts", sIgnoreUserKnownHosts, SSHCFG_GLOBAL },
 	{ "x11forwarding", sX11Forwarding, SSHCFG_ALL },
@@ -727,14 +737,15 @@ process_queued_listen_addrs(ServerOptions *options)
 struct connection_info *
 get_connection_info(int populate, int use_dns)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	static struct connection_info ci;
 
 	if (!populate)
 		return &ci;
-	ci.host = get_canonical_hostname(use_dns);
-	ci.address = get_remote_ipaddr();
-	ci.laddress = get_local_ipaddr(packet_get_connection_in());
-	ci.lport = get_local_port();
+	ci.host = auth_get_canonical_hostname(ssh, use_dns);
+	ci.address = ssh_remote_ipaddr(ssh);
+	ci.laddress = ssh_local_ipaddr(ssh);
+	ci.lport = ssh_local_port(ssh);
 	return &ci;
 }
 
@@ -1366,16 +1377,12 @@ process_server_config_line(ServerOptions *options, char *line,
 			if (scan_scaled(arg, &val64) == -1)
 				fatal("%.200s line %d: Bad number '%s': %s",
 				    filename, linenum, arg, strerror(errno));
-			/* check for too-large or too-small limits */
-			if (val64 > UINT_MAX)
-				fatal("%.200s line %d: RekeyLimit too large",
-				    filename, linenum);
 			if (val64 != 0 && val64 < 16)
 				fatal("%.200s line %d: RekeyLimit too small",
 				    filename, linenum);
 		}
 		if (*activep && options->rekey_limit == -1)
-			options->rekey_limit = (u_int32_t)val64;
+			options->rekey_limit = val64;
 		if (cp != NULL) { /* optional rekey interval present */
 			if (strcmp(cp, "none") == 0) {
 				(void)strdelim(&cp);	/* discard */
@@ -1843,20 +1850,40 @@ process_server_config_line(ServerOptions *options, char *line,
 
 	case sAuthenticationMethods:
 		if (options->num_auth_methods == 0) {
+			value = 0; /* seen "any" pseudo-method */
+			value2 = 0; /* sucessfully parsed any method */
 			while ((arg = strdelim(&cp)) && *arg != '\0') {
 				if (options->num_auth_methods >=
 				    MAX_AUTH_METHODS)
 					fatal("%s line %d: "
 					    "too many authentication methods.",
 					    filename, linenum);
-				if (auth2_methods_valid(arg, 0) != 0)
+				if (strcmp(arg, "any") == 0) {
+					if (options->num_auth_methods > 0) {
+						fatal("%s line %d: \"any\" "
+						    "must appear alone in "
+						    "AuthenticationMethods",
+						    filename, linenum);
+					}
+					value = 1;
+				} else if (value) {
+					fatal("%s line %d: \"any\" must appear "
+					    "alone in AuthenticationMethods",
+					    filename, linenum);
+				} else if (auth2_methods_valid(arg, 0) != 0) {
 					fatal("%s line %d: invalid "
 					    "authentication method list.",
 					    filename, linenum);
+				}
+				value2 = 1;
 				if (!*activep)
 					continue;
 				options->auth_methods[
 				    options->num_auth_methods++] = xstrdup(arg);
+			}
+			if (value2 == 0) {
+				fatal("%s line %d: no AuthenticationMethods "
+				    "specified", filename, linenum);
 			}
 		}
 		return 0;
@@ -2035,6 +2062,7 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(allow_agent_forwarding);
 	M_CP_INTOPT(permit_tun);
 	M_CP_INTOPT(fwd_opts.gateway_ports);
+	M_CP_INTOPT(fwd_opts.streamlocal_bind_unlink);
 	M_CP_INTOPT(x11_display_offset);
 	M_CP_INTOPT(x11_forwarding);
 	M_CP_INTOPT(x11_use_localhost);
@@ -2046,6 +2074,16 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(ip_qos_bulk);
 	M_CP_INTOPT(rekey_limit);
 	M_CP_INTOPT(rekey_interval);
+
+	/*
+	 * The bind_mask is a mode_t that may be unsigned, so we can't use
+	 * M_CP_INTOPT - it does a signed comparison that causes compiler
+	 * warnings.
+	 */
+	if (src->fwd_opts.streamlocal_bind_mask != (mode_t)-1) {
+		dst->fwd_opts.streamlocal_bind_mask =
+		    src->fwd_opts.streamlocal_bind_mask;
+	}
 
 	/* M_CP_STROPT and M_CP_STRARRAYOPT should not appear before here */
 #define M_CP_STROPT(n) do {\
@@ -2064,6 +2102,9 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	/* See comment in servconf.h */
 	COPY_MATCH_STRING_OPTS();
 
+	/* Arguments that accept '+...' need to be expanded */
+	assemble_algorithms(dst);
+
 	/*
 	 * The only things that should be below this point are string options
 	 * which are only used after authentication.
@@ -2071,8 +2112,17 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	if (preauth)
 		return;
 
+	/* These options may be "none" to clear a global setting */
 	M_CP_STROPT(adm_forced_command);
+	if (option_clear_or_none(dst->adm_forced_command)) {
+		free(dst->adm_forced_command);
+		dst->adm_forced_command = NULL;
+	}
 	M_CP_STROPT(chroot_directory);
+	if (option_clear_or_none(dst->chroot_directory)) {
+		free(dst->chroot_directory);
+		dst->chroot_directory = NULL;
+	}
 }
 
 #undef M_CP_INTOPT
@@ -2088,7 +2138,8 @@ parse_server_config(ServerOptions *options, const char *filename, Buffer *conf,
 
 	debug2("%s: config %s len %d", __func__, filename, buffer_len(conf));
 
-	obuf = cbuf = xstrdup(buffer_ptr(conf));
+	if ((obuf = cbuf = sshbuf_dup_string(conf)) == NULL)
+		fatal("%s: sshbuf_dup_string failed", __func__);
 	active = connectinfo ? 0 : 1;
 	linenum = 1;
 	while ((cp = strsep(&cbuf, "\n")) != NULL) {
@@ -2212,11 +2263,13 @@ dump_cfg_strarray_oneline(ServerOpCodes code, u_int count, char **vals)
 {
 	u_int i;
 
-	if (count <= 0)
+	if (count <= 0 && code != sAuthenticationMethods)
 		return;
 	printf("%s", lookup_opcode_name(code));
 	for (i = 0; i < count; i++)
 		printf(" %s",  vals[i]);
+	if (code == sAuthenticationMethods && count == 0)
+		printf(" any");
 	printf("\n");
 }
 
@@ -2303,7 +2356,9 @@ dump_config(ServerOptions *o)
 	dump_cfg_fmtint(sChallengeResponseAuthentication,
 	    o->challenge_response_authentication);
 	dump_cfg_fmtint(sPrintMotd, o->print_motd);
+#ifndef DISABLE_LASTLOG
 	dump_cfg_fmtint(sPrintLastLog, o->print_lastlog);
+#endif
 	dump_cfg_fmtint(sX11Forwarding, o->x11_forwarding);
 	dump_cfg_fmtint(sX11UseLocalhost, o->x11_use_localhost);
 	dump_cfg_fmtint(sPermitTTY, o->permit_tty);
@@ -2319,6 +2374,7 @@ dump_config(ServerOptions *o)
 	dump_cfg_fmtint(sAllowTcpForwarding, o->allow_tcp_forwarding);
 	dump_cfg_fmtint(sAllowAgentForwarding, o->allow_agent_forwarding);
 	dump_cfg_fmtint(sAllowStreamLocalForwarding, o->allow_streamlocal_forwarding);
+	dump_cfg_fmtint(sStreamLocalBindUnlink, o->fwd_opts.streamlocal_bind_unlink);
 	dump_cfg_fmtint(sUsePrivilegeSeparation, use_privsep);
 	dump_cfg_fmtint(sFingerprintHash, o->fingerprint_hash);
 
@@ -2387,7 +2443,7 @@ dump_config(ServerOptions *o)
 	printf("ipqos %s ", iptos2str(o->ip_qos_interactive));
 	printf("%s\n", iptos2str(o->ip_qos_bulk));
 
-	printf("rekeylimit %lld %d\n", (long long)o->rekey_limit,
+	printf("rekeylimit %llu %d\n", (unsigned long long)o->rekey_limit,
 	    o->rekey_interval);
 
 	channel_print_adm_permitted_opens();

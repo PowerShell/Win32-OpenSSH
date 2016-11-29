@@ -44,6 +44,9 @@ int w32_send(int fd, const void *buf, size_t len, int flags);
 int w32_shutdown(int fd, int how);
 int w32_socketpair(int domain, int type, int protocol, int sv[2]);
 
+char *realpathWin32(const char *path, char resolved[MAX_PATH]);
+char *realpathWin32i(const char *path, char resolved[MAX_PATH]);
+
 /*non-network (file) i/o*/
 #undef fdopen
 #define fdopen(a,b)	w32_fdopen((a), (b))
@@ -89,7 +92,8 @@ int w32_getaddrinfo(const char *, const char *,
 FILE* w32_fopen_utf8(const char *, const char *);
 int w32_ftruncate(int fd, off_t length);
 char* w32_programdir();
-
+int w32_fsync(int fd);
+int w32_ioctl(int d, int request, ...);
 
 /* Shutdown constants */
 #define SHUT_WR SD_SEND

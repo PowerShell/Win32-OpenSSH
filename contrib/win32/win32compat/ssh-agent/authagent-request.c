@@ -204,7 +204,7 @@ generate_user_token(wchar_t* user) {
             debug("LsaLogonUser failed %d", ret);
                 goto done;
         }
-
+		debug3("LsaLogonUser succeeded");
 done:
         if (lsa_handle)
                 LsaDeregisterLogonProcess(lsa_handle);

@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-bsdauth.c,v 1.13 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: auth-bsdauth.c,v 1.14 2015/10/20 23:24:25 mmcc Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -24,14 +24,6 @@
  */
 
 #include "includes.h"
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
 
 #include <sys/types.h>
 #include <stdarg.h>
@@ -111,7 +103,7 @@ bsdauth_respond(void *ctx, u_int numresponses, char **responses)
 	if (!authctxt->valid)
 		return -1;
 
-	if (authctxt->as == 0)
+	if (authctxt->as == NULL)
 		error("bsdauth_respond: no bsd auth session");
 
 	if (numresponses != 1)

@@ -228,7 +228,6 @@ void	 channel_cancel_cleanup(int);
 int	 channel_close_fd(int *);
 void	 channel_send_window_changes(void);
 
-
 /* protocol handler */
 
 int	 channel_input_close(int, u_int32_t, void *);

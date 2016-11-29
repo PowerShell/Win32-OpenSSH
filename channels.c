@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.347 2015/07/01 02:26:31 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.351 2016/07/19 11:38:53 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -41,7 +41,6 @@
 
 #include "includes.h"
 
-
 #include <sys/types.h>
 #include <sys/param.h>	/* MIN MAX */
 #include <sys/stat.h>
@@ -83,7 +82,6 @@
 #include "key.h"
 #include "authfd.h"
 #include "pathnames.h"
-
 
 /* -- channel core */
 
@@ -139,6 +137,9 @@ static int num_adm_permitted_opens = 0;
 
 /* special-case port number meaning allow any port */
 #define FWD_PERMIT_ANY_PORT	0
+
+/* special-case wildcard meaning allow any host */
+#define FWD_PERMIT_ANY_HOST	"*"
 
 /*
  * If this is true, all opens are permitted.  This is the case on the server
@@ -664,7 +665,7 @@ channel_open_message(void)
 		case SSH_CHANNEL_INPUT_DRAINING:
 		case SSH_CHANNEL_OUTPUT_DRAINING:
 			snprintf(buf, sizeof buf,
-			    "  #%d %.300s (t%d r%d i%d/%d o%d/%d fd %d/%d cc %d)\r\n",
+			    "  #%d %.300s (t%d r%d i%u/%d o%u/%d fd %d/%d cc %d)\r\n",
 			    c->self, c->remote_name,
 			    c->type, c->remote_id,
 			    c->istate, buffer_len(&c->input),
@@ -1371,9 +1372,8 @@ channel_post_x11_listener(Channel *c, fd_set *readset, fd_set *writeset)
 			errno = oerrno;
 		}
 		if (newsock < 0) {
-			if (errno != EINTR && errno != EWOULDBLOCK 
-			&& errno != ECONNABORTED
-			)
+			if (errno != EINTR && errno != EWOULDBLOCK &&
+			    errno != ECONNABORTED)
 				error("accept: %.100s", strerror(errno));
 			if (errno == EMFILE || errno == ENFILE)
 				c->notbefore = monotime() + 1;
@@ -1419,7 +1419,7 @@ port_open_helper(Channel *c, char *rtype)
 {
 	char buf[1024];
 	char *local_ipaddr = get_local_ipaddr(c->sock);
-	int local_port = c->sock == -1 ? 65536 : get_sock_port(c->sock, 1);
+	int local_port = c->sock == -1 ? 65536 : get_local_port(c->sock);
 	char *remote_ipaddr = get_peer_ipaddr(c->sock);
 	int remote_port = get_peer_port(c->sock);
 
@@ -1540,9 +1540,8 @@ channel_post_port_listener(Channel *c, fd_set *readset, fd_set *writeset)
 		addrlen = sizeof(addr);
 		newsock = accept(c->sock, (struct sockaddr *)&addr, &addrlen);
 		if (newsock < 0) {
-			if (errno != EINTR && errno != EWOULDBLOCK 
-			&& errno != ECONNABORTED
-			)
+			if (errno != EINTR && errno != EWOULDBLOCK &&
+			    errno != ECONNABORTED)
 				error("accept: %.100s", strerror(errno));
 			if (errno == EMFILE || errno == ENFILE)
 				c->notbefore = monotime() + 1;
@@ -1723,8 +1722,8 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
 
 	/* Send buffered output data to the socket. */
 	if (c->wfd != -1 &&
-		FD_ISSET(c->wfd, writeset) &&
-		buffer_len(&c->output) > 0) {
+	    FD_ISSET(c->wfd, writeset) &&
+	    buffer_len(&c->output) > 0) {
 		olen = buffer_len(&c->output);
 		if (c->output_filter != NULL) {
 			if ((buf = c->output_filter(c, &data, &dlen)) == NULL) {
@@ -1908,13 +1907,13 @@ read_mux(Channel *c, u_int need)
 	if (buffer_len(&c->input) < need) {
 		rlen = need - buffer_len(&c->input);
 		len = read(c->rfd, buf, MIN(rlen, CHAN_RBUF));
+		if (len < 0 && (errno == EINTR || errno == EAGAIN))
+			return buffer_len(&c->input);
 		if (len <= 0) {
-			if (errno != EINTR && errno != EAGAIN) {
-				debug2("channel %d: ctl read<=0 rfd %d len %d",
-				    c->self, c->rfd, len);
-				chan_read_failed(c);
-				return 0;
-			}
+			debug2("channel %d: ctl read<=0 rfd %d len %d",
+			    c->self, c->rfd, len);
+			chan_read_failed(c);
+			return 0;
 		} else
 			buffer_append(&c->input, buf, len);
 	}
@@ -2212,10 +2211,7 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 	u_int n, sz, nfdset;
 
 	n = MAX(*maxfdp, channel_max_fd);
-  /*
-   * Winsock can't support this sort of fdset reallocation 
-   */
-   
+
 	nfdset = howmany(n+1, NFDBITS);
 	/* Explicitly test here, because xrealloc isn't always called */
 	if (nfdset && SIZE_MAX / nfdset < sizeof(fd_mask))
@@ -2228,9 +2224,7 @@ channel_prepare_select(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 		*writesetp = xreallocarray(*writesetp, nfdset, sizeof(fd_mask));
 		*nallocp = sz;
 	}
-
 	*maxfdp = n;
-
 	memset(*readsetp, 0, sz);
 	memset(*writesetp, 0, sz);
 
@@ -2376,6 +2370,7 @@ channel_output_poll(void)
 	}
 }
 
+
 /* -- protocol input */
 
 /* ARGSUSED */
@@ -2431,12 +2426,10 @@ channel_input_data(int type, u_int32_t seq, void *ctxt)
 		}
 		c->local_window -= win_len;
 	}
-
 	if (c->datagram)
 		buffer_put_string(&c->output, data, data_len);
-	else {
+	else
 		buffer_append(&c->output, data, data_len);
-	}
 	packet_check_eom();
 	return 0;
 }
@@ -2449,10 +2442,6 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	char *data;
 	u_int data_len, tcode;
 	Channel *c;
-#ifdef WIN32_FIXME
-        char *respbuf = NULL;
-        size_t resplen = 0;
-#endif
 
 	/* Get the channel number and verify it. */
 	id = packet_get_int();
@@ -2488,20 +2477,7 @@ channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
 	}
 	debug2("channel %d: rcvd ext data %d", c->self, data_len);
 	c->local_window -= data_len;
-	#ifndef WIN32_FIXME//N
 	buffer_append(&c->extended, data, data_len);
-	#else
-        if (c->client_tty) {
-                if (telProcessNetwork(data, data_len, &respbuf, &resplen) > 0) // run it by ANSI engine if it is the ssh client
-                        buffer_append(&c->extended, data, data_len);
-
-                if (respbuf != NULL) {
-                        sshbuf_put(&c->input, respbuf, resplen);
-                }
-        }
-	else
-		buffer_append(&c->extended, data, data_len);
-	#endif
 	free(data);
 	return 0;
 }
@@ -2971,7 +2947,7 @@ channel_setup_fwd_listener_tcpip(int type, struct Forward *fwd,
 		if (type == SSH_CHANNEL_RPORT_LISTENER && fwd->listen_port == 0 &&
 		    allocated_listen_port != NULL &&
 		    *allocated_listen_port == 0) {
-			*allocated_listen_port = get_sock_port(sock, 1);
+			*allocated_listen_port = get_local_port(sock);
 			debug("Allocated listen port %d",
 			    *allocated_listen_port);
 		}
@@ -3334,7 +3310,8 @@ open_match(ForwardPermission *allowed_open, const char *requestedhost,
 	if (allowed_open->port_to_connect != FWD_PERMIT_ANY_PORT &&
 	    allowed_open->port_to_connect != requestedport)
 		return 0;
-	if (strcmp(allowed_open->host_to_connect, requestedhost) != 0)
+	if (strcmp(allowed_open->host_to_connect, FWD_PERMIT_ANY_HOST) != 0 &&
+	    strcmp(allowed_open->host_to_connect, requestedhost) != 0)
 		return 0;
 	return 1;
 }
@@ -3899,7 +3876,6 @@ channel_connect_to_path(const char *path, char *ctype, char *rname)
 void
 channel_send_window_changes(void)
 {
-
 	u_int i;
 	struct winsize ws;
 
@@ -3908,20 +3884,11 @@ channel_send_window_changes(void)
 		    channels[i]->type != SSH_CHANNEL_OPEN)
 			continue;
 #ifndef WIN32_FIXME
-		if (ioctl(channels[i]->rfd, TIOCGWINSZ, &ws) < 0)
-			continue
-#else
-		{
-			CONSOLE_SCREEN_BUFFER_INFO c_info;
-			/* TODO - Fix this for multiple channels*/
-			if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &c_info))
-				continue;
-			ws.ws_col = c_info.dwSize.X;
-			ws.ws_row = c_info.dwSize.Y;
-			ws.ws_xpixel = 640;
-			ws.ws_ypixel = 480;
-		}
+                /* TODO - Fix this for multiple channels*/
 #endif
+                if (ioctl(channels[i]->rfd, TIOCGWINSZ, &ws) < 0)
+                        continue;
+
 		channel_request_start(i, "window-change", 0);
 		packet_put_int((u_int)ws.ws_col);
 		packet_put_int((u_int)ws.ws_row);
@@ -3930,7 +3897,6 @@ channel_send_window_changes(void)
 		packet_send();
 	}
 }
-
 
 /* -- X11 forwarding */
 

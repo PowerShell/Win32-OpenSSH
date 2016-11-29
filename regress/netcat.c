@@ -61,6 +61,9 @@
 #  include <sys/poll.h>
 # endif
 #endif
+#ifdef HAVE_ERR_H
+# include <err.h>
+#endif
 
 /* Telnet options from arpa/telnet.h */
 #define IAC	255
@@ -134,55 +137,6 @@ void	usage(int);
 ssize_t drainbuf(int, unsigned char *, size_t *);
 ssize_t fillbuf(int, unsigned char *, size_t *);
 
-static void err(int, const char *, ...) __attribute__((format(printf, 2, 3)));
-static void errx(int, const char *, ...) __attribute__((format(printf, 2, 3)));
-static void warn(const char *, ...) __attribute__((format(printf, 1, 2)));
-
-#ifdef WIN32_FIXME	
-void logit(const char *fmt,...) {}
-void debug(const char *fmt,...) {}
-void debug2(const char *fmt,...) {}
-void debug3(const char *fmt,...) {}
-void error(const char *fmt,...) {}
-void fatal(const char *fmt,...) {}
-#endif
-
-static void
-err(int r, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	fprintf(stderr, "%s: ", strerror(errno));
-	vfprintf(stderr, fmt, args);
-	fputc('\n', stderr);
-	va_end(args);
-	exit(r);
-}
-
-static void
-errx(int r, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	fputc('\n', stderr);
-	va_end(args);
-	exit(r);
-}
-
-static void
-warn(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	fprintf(stderr, "%s: ", strerror(errno));
-	vfprintf(stderr, fmt, args);
-	fputc('\n', stderr);
-	va_end(args);
-}
 
 int
 main(int argc, char *argv[])

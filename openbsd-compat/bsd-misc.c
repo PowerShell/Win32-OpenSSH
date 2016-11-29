@@ -105,8 +105,6 @@ const char *strerror(int e)
 #endif
 
 #ifndef HAVE_UTIMES
-
-
 int utimes(char *filename, struct timeval *tvp)
 {
 	struct utimbuf ub;
@@ -279,4 +277,31 @@ getpgid(pid_t pid)
 	errno = ESRCH;
 	return -1;
 }
+#endif
+
+#ifndef HAVE_PLEDGE
+int
+pledge(const char *promises, const char *paths[])
+{
+	return 0;
+}
+#endif
+
+#ifndef WINDOWS
+#ifndef HAVE_MBTOWC
+/* a mbtowc that only supports ASCII */
+int
+mbtowc(wchar_t *pwc, const char *s, size_t n)
+{
+	if (s == NULL || *s == '\0')
+		return 0;	/* ASCII is not state-dependent */
+	if (*s < 0 || *s > 0x7f || n < 1) {
+		errno = EOPNOTSUPP;
+		return -1;
+	}
+	if (pwc != NULL)
+		*pwc = *s;
+	return 1;
+}
+#endif
 #endif

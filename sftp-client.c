@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-client.c,v 1.120 2015/05/28 04:50:53 djm Exp $ */
+/* $OpenBSD: sftp-client.c,v 1.124 2016/05/25 23:48:45 schwarze Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -36,12 +36,7 @@
 #endif
 #include <sys/uio.h>
 
-#ifdef WIN32_VS
-#include "win32_dirent.h"
-#else
 #include <dirent.h>
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -58,6 +53,7 @@
 #include "atomicio.h"
 #include "progressmeter.h"
 #include "misc.h"
+#include "utf8.h"
 
 #include "sftp.h"
 #include "sftp-common.h"
@@ -568,8 +564,7 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 	struct sshbuf *msg;
 	u_int count, id, i, expected_id, ents = 0;
 	size_t handle_len;
-	u_char type;
-	char *handle;
+	u_char type, *handle;
 	int status = SSH2_FX_FAILURE;
 	int r;
 
@@ -664,7 +659,7 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 			}
 
 			if (print_flag)
-				printf("%s\n", longname);
+				mprintf("%s\n", longname);
 
 			/*
 			 * Directory entries should never contain '/'
@@ -754,7 +749,6 @@ do_mkdir(struct sftp_conn *conn, const char *path, Attrib *a, int print_flag)
 	status = get_status(conn, id);
 	if (status != SSH2_FX_OK && print_flag)
 		error("Couldn't create directory: %s", fx2txt(status));
-    errno = status;
 
 	return status == SSH2_FX_OK ? 0 : -1;
 }
@@ -1267,8 +1261,6 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 
 	local_fd = open(local_path,
 	    O_WRONLY | O_CREAT | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
-
-	
 	if (local_fd == -1) {
 		error("Couldn't open local file \"%s\" for writing: %s",
 		    local_path, strerror(errno));
@@ -1377,7 +1369,6 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 				    "%zu > %zu", len, req->len);
 			if ((lseek(local_fd, req->offset, SEEK_SET) == -1 ||
 			    atomicio(vwrite, local_fd, data, len) != len) &&
-
 			    !write_error) {
 				write_errno = errno;
 				write_error = 1;
@@ -1481,7 +1472,6 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 				error("Can't set times on \"%s\": %s",
 				    local_path, strerror(errno));
 		}
-
 		if (fsync_flag) {
 			debug("syncing \"%s\"", local_path);
 #ifdef WINDOWS
@@ -1527,7 +1517,7 @@ download_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
 		return -1;
 	}
 	if (print_flag)
-		printf("Retrieving %s\n", src);
+		mprintf("Retrieving %s\n", src);
 
 	if (dirattrib->flags & SSH2_FILEXFER_ATTR_PERMISSIONS)
 		mode = dirattrib->perm & 01777;
@@ -1640,7 +1630,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 
 	TAILQ_INIT(&acks);
 
-	if ((local_fd = open(local_path, O_RDONLY, 0)) == -1) {  
+	if ((local_fd = open(local_path, O_RDONLY, 0)) == -1) {
 		error("Couldn't open local file \"%s\" for reading: %s",
 		    local_path, strerror(errno));
 		return(-1);
@@ -1667,7 +1657,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	if (resume) {
 		/* Get remote file size if it exists */
 		if ((c = do_stat(conn, remote_path, 0)) == NULL) {
-			close(local_fd);                
+			close(local_fd);
 			return -1;
 		}
 
@@ -1731,7 +1721,6 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 			len = 0;
 		else do
 			len = read(local_fd, data, conn->transfer_buflen);
-
 		while ((len == -1) &&
 		    (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK));
 
@@ -1827,7 +1816,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	if (fsync_flag)
 		(void)do_fsync(conn, handle, handle_len);
 
-	if (do_close(conn, handle, handle_len) != SSH2_FX_OK)
+	if (do_close(conn, handle, handle_len) != 0)
 		status = SSH2_FX_FAILURE;
 
 	free(handle);
@@ -1840,12 +1829,11 @@ upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
     int depth, int preserve_flag, int print_flag, int resume, int fsync_flag)
 {
 	int ret = 0;
-	u_int status;
 	DIR *dirp;
 	struct dirent *dp;
 	char *filename, *new_src, *new_dst;
 	struct stat sb;
-	Attrib a;
+	Attrib a, *dirattrib;
 
 	if (depth >= MAX_DIR_DEPTH) {
 		error("Maximum directory depth exceeded: %d levels", depth);
@@ -1862,7 +1850,7 @@ upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
 		return -1;
 	}
 	if (print_flag)
-		printf("Entering %s\n", src);
+		mprintf("Entering %s\n", src);
 
 	attrib_clear(&a);
 	stat_to_attrib(&sb, &a);
@@ -1872,17 +1860,18 @@ upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
 	if (!preserve_flag)
 		a.flags &= ~SSH2_FILEXFER_ATTR_ACMODTIME;
 
-	status = do_mkdir(conn, dst, &a, 0);
 	/*
-	 * we lack a portable status for errno EEXIST,
-	 * so if we get a SSH2_FX_FAILURE back we must check
-	 * if it was created successfully.
+	 * sftp lacks a portable status value to match errno EEXIST,
+	 * so if we get a failure back then we must check whether
+	 * the path already existed and is a directory.
 	 */
-	if (status != SSH2_FX_OK) {
-		if (errno != SSH2_FX_FAILURE)
+	if (do_mkdir(conn, dst, &a, 0) != 0) {
+		if ((dirattrib = do_stat(conn, dst, 0)) == NULL)
 			return -1;
-		if (do_stat(conn, dst, 0) == NULL)
+		if (!S_ISDIR(dirattrib->perm)) {
+			error("\"%s\" exists but is not a directory", dst);
 			return -1;
+		}
 	}
 
 	if ((dirp = opendir(src)) == NULL) {

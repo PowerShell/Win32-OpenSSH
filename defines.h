@@ -43,6 +43,19 @@ enum
 #endif
 
 /*
+ * Cygwin doesn't really have a notion of reserved ports.  It is still
+ * is useful on the client side so for compatibility it defines as 1024 via
+ * netinet/in.h inside an enum.  We * don't actually want that restriction
+ * so we want to set that to zero, but we can't do it direct in config.h
+ * because it'll cause a conflicting definition the first time we include
+ * netinet/in.h.
+ */
+
+#ifdef HAVE_CYGWIN
+#define IPPORT_RESERVED 0
+#endif
+
+/*
  * Definitions for IP type of service (ip_tos)
  */
 #include <netinet/in_systm.h>
@@ -852,7 +865,13 @@ struct winsize {
 # endif /* gcc version */
 #endif /* __predict_true */
 
-/* WIN32_FIXME */
+#if defined(HAVE_GLOB_H) && defined(GLOB_HAS_ALTDIRFUNC) && \
+    defined(GLOB_HAS_GL_MATCHC) && defined(GLOB_HAS_GL_STATV) && \
+    defined(HAVE_DECL_GLOB_NOMATCH) &&  HAVE_DECL_GLOB_NOMATCH != 0 && \
+    !defined(BROKEN_GLOB)
+# define USE_SYSTEM_GLOB
+#endif
+
 #ifdef _WIN32
 # define CUSTOM_SYS_AUTH_PASSWD 1
 #endif

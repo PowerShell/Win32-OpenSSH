@@ -26,9 +26,7 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
+#ifdef WITH_OPENSSL
 
 #include <sys/types.h>
 
@@ -42,23 +40,22 @@
 #include "ssherr.h"
 #include "sshbuf.h"
 #include "digest.h"
-#include "crypto-wrap.h"
 
 int
 kexgex_hash(
-	int hash_alg,
-	const char *client_version_string,
-	const char *server_version_string,
-	const u_char *ckexinit, size_t ckexinitlen,
-	const u_char *skexinit, size_t skexinitlen,
-	const u_char *serverhostkeyblob, size_t sbloblen,
-	int min, int wantbits, int max,
-	const struct sshbn *prime,
-	const struct sshbn *gen,
-	const struct sshbn *client_dh_pub,
-	const struct sshbn *server_dh_pub,
-	const struct sshbn *shared_secret,
-	u_char *hash, size_t *hashlen)
+    int hash_alg,
+    const char *client_version_string,
+    const char *server_version_string,
+    const u_char *ckexinit, size_t ckexinitlen,
+    const u_char *skexinit, size_t skexinitlen,
+    const u_char *serverhostkeyblob, size_t sbloblen,
+    int min, int wantbits, int max,
+    const BIGNUM *prime,
+    const BIGNUM *gen,
+    const BIGNUM *client_dh_pub,
+    const BIGNUM *server_dh_pub,
+    const BIGNUM *shared_secret,
+    u_char *hash, size_t *hashlen)
 {
 	struct sshbuf *b;
 	int r;
@@ -68,23 +65,23 @@ kexgex_hash(
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if ((r = sshbuf_put_cstring(b, client_version_string)) != 0 ||
-		(r = sshbuf_put_cstring(b, server_version_string)) != 0 ||
-		/* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
-		(r = sshbuf_put_u32(b, ckexinitlen + 1)) != 0 ||
-		(r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
-		(r = sshbuf_put(b, ckexinit, ckexinitlen)) != 0 ||
-		(r = sshbuf_put_u32(b, skexinitlen + 1)) != 0 ||
-		(r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
-		(r = sshbuf_put(b, skexinit, skexinitlen)) != 0 ||
-		(r = sshbuf_put_string(b, serverhostkeyblob, sbloblen)) != 0 ||
-		(min != -1 && (r = sshbuf_put_u32(b, min)) != 0) ||
-		(r = sshbuf_put_u32(b, wantbits)) != 0 ||
-		(max != -1 && (r = sshbuf_put_u32(b, max)) != 0) ||
-		(r = sshbuf_put_bignum2_wrap(b, prime)) != 0 ||
-		(r = sshbuf_put_bignum2_wrap(b, gen)) != 0 ||
-		(r = sshbuf_put_bignum2_wrap(b, client_dh_pub)) != 0 ||
-		(r = sshbuf_put_bignum2_wrap(b, server_dh_pub)) != 0 ||
-		(r = sshbuf_put_bignum2_wrap(b, shared_secret)) != 0) {
+	    (r = sshbuf_put_cstring(b, server_version_string)) != 0 ||
+	    /* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
+	    (r = sshbuf_put_u32(b, ckexinitlen+1)) != 0 ||
+	    (r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
+	    (r = sshbuf_put(b, ckexinit, ckexinitlen)) != 0 ||
+	    (r = sshbuf_put_u32(b, skexinitlen+1)) != 0 ||
+	    (r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
+	    (r = sshbuf_put(b, skexinit, skexinitlen)) != 0 ||
+	    (r = sshbuf_put_string(b, serverhostkeyblob, sbloblen)) != 0 ||
+	    (min != -1 && (r = sshbuf_put_u32(b, min)) != 0) ||
+	    (r = sshbuf_put_u32(b, wantbits)) != 0 ||
+	    (max != -1 && (r = sshbuf_put_u32(b, max)) != 0) ||
+	    (r = sshbuf_put_bignum2(b, prime)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, gen)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, client_dh_pub)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, server_dh_pub)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, shared_secret)) != 0) {
 		sshbuf_free(b);
 		return r;
 	}
@@ -102,63 +99,4 @@ kexgex_hash(
 #endif
 	return 0;
 }
-
-
-int
-kexgex_hash_old(
-	int hash_alg,
-	const char *client_version_string,
-	const char *server_version_string,
-	const u_char *ckexinit, size_t ckexinitlen,
-	const u_char *skexinit, size_t skexinitlen,
-	const u_char *serverhostkeyblob, size_t sbloblen,
-	int min, int wantbits, int max,
-	const BIGNUM *prime,
-	const BIGNUM *gen,
-	const BIGNUM *client_dh_pub,
-	const BIGNUM *server_dh_pub,
-	const BIGNUM *shared_secret,
-	u_char *hash, size_t *hashlen)
-{
-	struct sshbuf *b;
-	int r;
-
-	if (*hashlen < ssh_digest_bytes(SSH_DIGEST_SHA1))
-		return SSH_ERR_INVALID_ARGUMENT;
-	if ((b = sshbuf_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-	if ((r = sshbuf_put_cstring(b, client_version_string)) != 0 ||
-		(r = sshbuf_put_cstring(b, server_version_string)) != 0 ||
-		/* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
-		(r = sshbuf_put_u32(b, ckexinitlen + 1)) != 0 ||
-		(r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
-		(r = sshbuf_put(b, ckexinit, ckexinitlen)) != 0 ||
-		(r = sshbuf_put_u32(b, skexinitlen + 1)) != 0 ||
-		(r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
-		(r = sshbuf_put(b, skexinit, skexinitlen)) != 0 ||
-		(r = sshbuf_put_string(b, serverhostkeyblob, sbloblen)) != 0 ||
-		(min != -1 && (r = sshbuf_put_u32(b, min)) != 0) ||
-		(r = sshbuf_put_u32(b, wantbits)) != 0 ||
-		(max != -1 && (r = sshbuf_put_u32(b, max)) != 0) ||
-		(r = sshbuf_put_bignum2(b, prime)) != 0 ||
-		(r = sshbuf_put_bignum2(b, gen)) != 0 ||
-		(r = sshbuf_put_bignum2(b, client_dh_pub)) != 0 ||
-		(r = sshbuf_put_bignum2(b, server_dh_pub)) != 0 ||
-		(r = sshbuf_put_bignum2(b, shared_secret)) != 0) {
-		sshbuf_free(b);
-		return r;
-	}
-#ifdef DEBUG_KEXDH
-	sshbuf_dump(b, stderr);
-#endif
-	if (ssh_digest_buffer(hash_alg, b, hash, *hashlen) != 0) {
-		sshbuf_free(b);
-		return SSH_ERR_LIBCRYPTO_ERROR;
-	}
-	sshbuf_free(b);
-	*hashlen = ssh_digest_bytes(hash_alg);
-#ifdef DEBUG_KEXDH
-	dump_digest("hash", hash, *hashlen);
-#endif
-	return 0;
-}
+#endif /* WITH_OPENSSL */

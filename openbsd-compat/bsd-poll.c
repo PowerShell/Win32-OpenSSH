@@ -20,8 +20,7 @@
 #if !defined(HAVE_POLL)
 
 #include <sys/types.h>
-/*#include <sys/time.h> */
-#include <time.h>
+#include <sys/time.h>
 #ifdef HAVE_SYS_SELECT_H
 # include <sys/select.h>
 #endif

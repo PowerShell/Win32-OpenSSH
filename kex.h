@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.73 2015/07/30 00:01:34 djm Exp $ */
+/* $OpenBSD: kex.h,v 1.78 2016/05/02 10:26:04 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -29,19 +29,34 @@
 #include "mac.h"
 #include "buffer.h" /* XXX for typedef */
 #include "key.h" /* XXX for typedef */
-#include "crypto-wrap.h"
 
 #ifdef WITH_LEAKMALLOC
 #include "leakmalloc.h"
 #endif
 
+#ifdef WITH_OPENSSL
+# ifdef OPENSSL_HAS_ECC
+#  include <openssl/ec.h>
+# else /* OPENSSL_HAS_ECC */
+#  define EC_KEY	void
+#  define EC_GROUP	void
+#  define EC_POINT	void
+# endif /* OPENSSL_HAS_ECC */
+#else /* WITH_OPENSSL */
+# define EC_KEY		void
+# define EC_GROUP	void
+# define EC_POINT	void
+#endif /* WITH_OPENSSL */
+
 #define KEX_COOKIE_LEN	16
 
 #define	KEX_DH1			"diffie-hellman-group1-sha1"
-#define	KEX_DH14		"diffie-hellman-group14-sha1"
+#define	KEX_DH14_SHA1		"diffie-hellman-group14-sha1"
+#define	KEX_DH14_SHA256		"diffie-hellman-group14-sha256"
+#define	KEX_DH16_SHA512		"diffie-hellman-group16-sha512"
+#define	KEX_DH18_SHA512		"diffie-hellman-group18-sha512"
 #define	KEX_DHGEX_SHA1		"diffie-hellman-group-exchange-sha1"
 #define	KEX_DHGEX_SHA256	"diffie-hellman-group-exchange-sha256"
-#define	KEX_RESUME		"resume@appgate.com"
 #define	KEX_ECDH_SHA2_NISTP256	"ecdh-sha2-nistp256"
 #define	KEX_ECDH_SHA2_NISTP384	"ecdh-sha2-nistp384"
 #define	KEX_ECDH_SHA2_NISTP521	"ecdh-sha2-nistp521"
@@ -76,6 +91,9 @@ enum kex_modes {
 enum kex_exchange {
 	KEX_DH_GRP1_SHA1,
 	KEX_DH_GRP14_SHA1,
+	KEX_DH_GRP14_SHA256,
+	KEX_DH_GRP16_SHA512,
+	KEX_DH_GRP18_SHA512,
 	KEX_DH_GEX_SHA1,
 	KEX_DH_GEX_SHA256,
 	KEX_ECDH_SHA2,
@@ -116,10 +134,12 @@ struct kex {
 	u_int	dh_need;
 	int	server;
 	char	*name;
+	char	*hostkey_alg;
 	int	hostkey_type;
 	int	hostkey_nid;
 	u_int	kex_type;
-	int	roaming;
+	int	rsa_sha2;
+	int	ext_info_c;
 	struct sshbuf *my;
 	struct sshbuf *peer;
 	sig_atomic_t done;
@@ -129,15 +149,15 @@ struct kex {
 	char	*client_version_string;
 	char	*server_version_string;
 	char	*failed_choice;
-	int(*verify_host_key)(struct sshkey *, struct ssh *);
+	int	(*verify_host_key)(struct sshkey *, struct ssh *);
 	struct sshkey *(*load_host_public_key)(int, int, struct ssh *);
 	struct sshkey *(*load_host_private_key)(int, int, struct ssh *);
-	int(*host_key_index)(struct sshkey *, int, struct ssh *);
-	int(*sign)(struct sshkey *, struct sshkey *,
-		u_char **, size_t *, const u_char *, size_t, u_int);
-	int(*kex[KEX_MAX])(struct ssh *);
+	int	(*host_key_index)(struct sshkey *, int, struct ssh *);
+	int	(*sign)(struct sshkey *, struct sshkey *, u_char **, size_t *,
+	    const u_char *, size_t, const char *, u_int);
+	int	(*kex[KEX_MAX])(struct ssh *);
 	/* kex specific state */
-	struct sshdh *dh;			/* DH */
+	DH	*dh;			/* DH */
 	u_int	min, max, nbits;	/* GEX */
 	EC_KEY	*ec_client_key;		/* ECDH */
 	const EC_GROUP *ec_group;	/* ECDH */
@@ -161,10 +181,11 @@ void	 kex_prop_free(char **);
 
 int	 kex_send_kexinit(struct ssh *);
 int	 kex_input_kexinit(int, u_int32_t, void *);
+int	 kex_input_ext_info(int, u_int32_t, void *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, const struct sshbuf *);
-int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int,
-	const struct sshbn *);
+int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int, const BIGNUM *);
 int	 kex_send_newkeys(struct ssh *);
+int	 kex_start_rekex(struct ssh *);
 
 int	 kexdh_client(struct ssh *);
 int	 kexdh_server(struct ssh *);
@@ -175,31 +196,31 @@ int	 kexecdh_server(struct ssh *);
 int	 kexc25519_client(struct ssh *);
 int	 kexc25519_server(struct ssh *);
 
-int	 kex_dh_hash(const char *, const char *,
-	const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-	const struct sshbn *, const struct sshbn *,
-	const struct sshbn *, u_char *, size_t *);
+int	 kex_dh_hash(int, const char *, const char *,
+    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+    const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char *, size_t *);
 
 int	 kexgex_hash(int, const char *, const char *,
-	const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-	int, int, int,
-	const struct sshbn *, const struct sshbn *, const struct sshbn *,
-	const struct sshbn *, const struct sshbn *,
-	u_char *, size_t *);
+    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+    int, int, int,
+    const BIGNUM *, const BIGNUM *, const BIGNUM *,
+    const BIGNUM *, const BIGNUM *,
+    u_char *, size_t *);
 
 int kex_ecdh_hash(int, const EC_GROUP *, const char *, const char *,
-	const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-	const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char *, size_t *);
+    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+    const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char *, size_t *);
 
-int	 kex_c25519_hash(int, const char *, const char *, const char *, size_t,
-	const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
-	const u_char *, size_t, u_char *, size_t *);
+int	 kex_c25519_hash(int, const char *, const char *,
+    const u_char *, size_t, const u_char *, size_t,
+    const u_char *, size_t, const u_char *, const u_char *,
+    const u_char *, size_t, u_char *, size_t *);
 
 void	kexc25519_keygen(u_char key[CURVE25519_SIZE], u_char pub[CURVE25519_SIZE])
-__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
-__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
+	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
+	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
 int	kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
-	const u_char pub[CURVE25519_SIZE], struct sshbuf *out)
+    const u_char pub[CURVE25519_SIZE], struct sshbuf *out)
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
 
@@ -208,6 +229,12 @@ derive_ssh1_session_id(BIGNUM *, BIGNUM *, u_int8_t[8], u_int8_t[16]);
 
 #if defined(DEBUG_KEX) || defined(DEBUG_KEXDH) || defined(DEBUG_KEXECDH)
 void	dump_digest(char *, u_char *, int);
+#endif
+
+#if !defined(WITH_OPENSSL) || !defined(OPENSSL_HAS_ECC)
+# undef EC_KEY
+# undef EC_GROUP
+# undef EC_POINT
 #endif
 
 #endif

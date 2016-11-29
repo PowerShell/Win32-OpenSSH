@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.h,v 1.110 2015/07/10 06:21:53 markus Exp $ */
+/* $OpenBSD: readconf.h,v 1.117 2016/07/15 00:24:30 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -98,6 +98,14 @@ typedef struct {
 	int    identity_file_userprovided[SSH_MAX_IDENTITY_FILES];
 	struct sshkey *identity_keys[SSH_MAX_IDENTITY_FILES];
 
+	int	num_certificate_files; /* Number of extra certificates for ssh. */
+	char	*certificate_files[SSH_MAX_CERTIFICATE_FILES];
+	int	certificate_file_userprovided[SSH_MAX_CERTIFICATE_FILES];
+	struct sshkey *certificates[SSH_MAX_CERTIFICATE_FILES];
+
+	int	add_keys_to_agent;
+	char   *identity_agent;		/* Optional path to ssh-agent socket */
+
 	/* Local TCP/IP forward requests. */
 	int     num_local_forwards;
 	struct Forward *local_forwards;
@@ -106,6 +114,10 @@ typedef struct {
 	int     num_remote_forwards;
 	struct Forward *remote_forwards;
 	int	clear_forwardings;
+
+	/* stdio forwarding (-W) host and port */
+	char   *stdio_forward_host;
+	int	stdio_forward_port;
 
 	int	enable_ssh_keysign;
 	int64_t rekey_limit;
@@ -133,8 +145,6 @@ typedef struct {
 	int	permit_local_command;
 	int	visual_host_key;
 
-	int	use_roaming;
-
 	int	request_tty;
 
 	int	proxy_use_fdpass;
@@ -155,6 +165,11 @@ typedef struct {
 
 	char   *hostbased_key_types;
 	char   *pubkey_key_types;
+
+	char   *jump_user;
+	char   *jump_host;
+	int	jump_port;
+	char   *jump_extra;
 
 	char	*ignored_unknown; /* Pattern list of unknown tokens to ignore */
 }       Options;
@@ -177,33 +192,28 @@ typedef struct {
 #define SSHCONF_CHECKPERM	1  /* check permissions on config file */
 #define SSHCONF_USERCONF	2  /* user provided config file not system */
 #define SSHCONF_POSTCANON	4  /* After hostname canonicalisation */
+#define SSHCONF_NEVERMATCH	8  /* Match/Host never matches; internal only */
 
 #define SSH_UPDATE_HOSTKEYS_NO	0
 #define SSH_UPDATE_HOSTKEYS_YES	1
 #define SSH_UPDATE_HOSTKEYS_ASK	2
 
 void     initialize_options(Options *);
-#ifdef WIN32_FIXME
-void     fill_default_options(Options *, struct passwd *pw);
-#else
 void     fill_default_options(Options *);
-#endif
 void	 fill_default_options_for_canonicalization(Options *);
 int	 process_config_line(Options *, struct passwd *, const char *,
     const char *, char *, const char *, int, int *, int);
 int	 read_config_file(const char *, struct passwd *, const char *,
     const char *, Options *, int);
 int	 parse_forward(struct Forward *, const char *, int, int);
+int	 parse_jump(const char *, Options *, int);
 int	 default_ssh_port(void);
 int	 option_clear_or_none(const char *);
 void	 dump_client_config(Options *o, const char *host);
 
 void	 add_local_forward(Options *, const struct Forward *);
 void	 add_remote_forward(Options *, const struct Forward *);
-#ifdef WIN32_FIXME
-void	 add_identity_file(Options *, const char *, const char *, int, struct passwd *);
-#else
 void	 add_identity_file(Options *, const char *, const char *, int);
-#endif
+void	 add_certificate_file(Options *, const char *, int);
 
 #endif				/* READCONF_H */

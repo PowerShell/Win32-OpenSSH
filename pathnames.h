@@ -1,4 +1,4 @@
-/* $OpenBSD: pathnames.h,v 1.24 2013/12/06 13:39:49 markus Exp $ */
+/* $OpenBSD: pathnames.h,v 1.25 2016/03/31 05:24:06 dtucker Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -34,7 +34,6 @@
  * Of these, ssh_host_key must be readable only by root, whereas ssh_config
  * should be world-readable.
  */
- 
 #define _PATH_SERVER_CONFIG_FILE	SSHDIR "/sshd_config"
 #define _PATH_HOST_CONFIG_FILE		SSHDIR "/ssh_config"
 #define _PATH_HOST_KEY_FILE		SSHDIR "/ssh_host_key"
@@ -43,8 +42,6 @@
 #define _PATH_HOST_ED25519_KEY_FILE	SSHDIR "/ssh_host_ed25519_key"
 #define _PATH_HOST_RSA_KEY_FILE		SSHDIR "/ssh_host_rsa_key"
 #define _PATH_DH_MODULI			SSHDIR "/moduli"
-/* Backwards compatibility */
-#define _PATH_DH_PRIMES			SSHDIR "/primes"
 
 #ifndef _PATH_SSH_PROGRAM
 #define _PATH_SSH_PROGRAM		"/usr/bin/ssh"
@@ -139,8 +136,6 @@
 #ifndef _PATH_XAUTH
 #define _PATH_XAUTH			"/usr/X11R6/bin/xauth"
 #endif
-
-
 
 /* UNIX domain socket for X11 server; displaynum will replace %u */
 #ifndef _PATH_UNIX_X

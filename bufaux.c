@@ -257,4 +257,3 @@ buffer_put_bignum2_from_string(Buffer *buffer, const u_char *s, u_int l)
 		fatal("%s: %s", __func__, ssh_err(ret));
 }
 
-

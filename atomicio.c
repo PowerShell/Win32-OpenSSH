@@ -54,7 +54,7 @@ atomicio6(ssize_t (*f) (int, void *, size_t), int fd, void *_s, size_t n,
 {
 	char *s = _s;
 	size_t pos = 0;
-	int res;
+	ssize_t res;
 	struct pollfd pfd;
 
 #ifndef BROKEN_READ_COMPARISON

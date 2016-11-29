@@ -26,7 +26,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bcrypt_pbkdf.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bindresvport.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\blowfish.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bsd-arc4random.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bsd-asprintf.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bsd-closefrom.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bsd-cray.c" />
@@ -47,7 +46,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\fmt_scaled.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getcwd.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getgrouplist.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getopt.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getopt_long.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getrrsetbyname-ldns.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\inet_aton.c" />
@@ -73,7 +71,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strlcat.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strlcpy.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strmode.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strnlen.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strptime.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strsep.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strtoll.c" />
@@ -84,6 +81,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\vis.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\xcrypt.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\xmmap.c" />
+    <ClCompile Include="..\..\..\openbsd-compat\glob.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\base64.h" />

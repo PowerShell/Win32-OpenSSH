@@ -63,7 +63,7 @@ sigtstp_APCProc(
 	sigaddset(&pending_signals, W32_SIGTSTP);
 }
 
-static BOOL WINAPI
+BOOL WINAPI
 native_sig_handler(DWORD dwCtrlType)
 {
 	debug("Native Ctrl+C handler, CtrlType %d", dwCtrlType);

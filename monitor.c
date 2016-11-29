@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.150 2015/06/22 23:42:16 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.161 2016/07/22 03:39:13 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -27,15 +27,6 @@
 
 #include "includes.h"
 
-/*
- * We support only client side kerberos on Windows.
- */
-
-#ifdef WIN32_FIXME
-  #undef GSSAPI
-  #undef KRB5
-#endif
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include "openbsd-compat/sys-tree.h"
@@ -43,6 +34,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #ifdef HAVE_PATHS_H
 #include <paths.h>
 #endif
@@ -83,6 +75,7 @@
 #include "cipher.h"
 #include "kex.h"
 #include "dh.h"
+#include "auth-pam.h"
 #ifdef TARGET_OS_MAC	/* XXX Broken krb5 headers on Mac */
 #undef TARGET_OS_MAC
 #include "zlib.h"
@@ -111,7 +104,6 @@
 #include "monitor_fdpass.h"
 #include "compat.h"
 #include "ssh2.h"
-#include "roaming.h"
 #include "authfd.h"
 #include "match.h"
 #include "ssherr.h"
@@ -500,15 +492,10 @@ monitor_sync(struct monitor *pmonitor)
 static void *
 mm_zalloc(struct mm_master *mm, u_int ncount, u_int size)
 {
-	size_t len = (size_t) size * ncount;
-	void *address;
-
-	if (len == 0 || ncount > SIZE_MAX / size)
+	if (size == 0 || ncount == 0 || ncount > SIZE_MAX / size)
 		fatal("%s: mm_zalloc(%u, %u)", __func__, ncount, size);
 
-	address = mm_malloc(mm, len);
-
-	return (address);
+	return mm_malloc(mm, size * ncount);
 }
 
 static void
@@ -664,11 +651,8 @@ monitor_reset_key_state(void)
 int
 mm_answer_moduli(int sock, Buffer *m)
 {
-	struct sshdh *dh;
+	DH *dh;
 	int min, want, max;
-	struct sshbn  * dh_p = NULL;
-	struct sshbn  * dh_g = NULL;
-	int ret = 0;
 
 	min = buffer_get_int(m);
 	want = buffer_get_int(m);
@@ -684,25 +668,18 @@ mm_answer_moduli(int sock, Buffer *m)
 	buffer_clear(m);
 
 	dh = choose_dh(min, want, max);
-
-
 	if (dh == NULL) {
 		buffer_put_char(m, 0);
 		return (0);
 	} else {
-		if ((dh_p = sshdh_p(dh)) != NULL &&
-			(dh_g = sshdh_g(dh)) != NULL) {
+		/* Send first bignum */
+		buffer_put_char(m, 1);
+		buffer_put_bignum2(m, dh->p);
+		buffer_put_bignum2(m, dh->g);
 
-			/* Send first bignum */
-			buffer_put_char(m, 1);
-			sshbuf_put_bignum2_wrap(m, dh_p);
-			sshbuf_put_bignum2_wrap(m, dh_g);
-			mm_request_send(sock, MONITOR_ANS_MODULI, m);
-		}
-		sshdh_free(dh);
-		sshbn_free(dh_p);
-		sshbn_free(dh_g);
+		DH_free(dh);
 	}
+	mm_request_send(sock, MONITOR_ANS_MODULI, m);
 	return (0);
 }
 #endif
@@ -713,18 +690,22 @@ mm_answer_sign(int sock, Buffer *m)
 	struct ssh *ssh = active_state; 	/* XXX */
 	extern int auth_sock;			/* XXX move to state struct? */
 	struct sshkey *key;
-	struct sshbuf *sigbuf;
-	u_char *p;
-	u_char *signature;
-	size_t datlen, siglen;
-	int r, keyid, is_proof = 0;
+	struct sshbuf *sigbuf = NULL;
+	u_char *p = NULL, *signature = NULL;
+	char *alg = NULL;
+	size_t datlen, siglen, alglen;
+	int r, is_proof = 0;
+	u_int keyid;
 	const char proof_req[] = "hostkeys-prove-00@openssh.com";
 
 	debug3("%s", __func__);
 
 	if ((r = sshbuf_get_u32(m, &keyid)) != 0 ||
-	    (r = sshbuf_get_string(m, &p, &datlen)) != 0)
+	    (r = sshbuf_get_string(m, &p, &datlen)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &alg, &alglen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (keyid > INT_MAX)
+		fatal("%s: invalid key ID", __func__);
 
 	/*
 	 * Supported KEX types use SHA1 (20 bytes), SHA256 (32 bytes),
@@ -750,7 +731,7 @@ mm_answer_sign(int sock, Buffer *m)
 			fatal("%s: sshbuf_new", __func__);
 		if ((r = sshbuf_put_cstring(sigbuf, proof_req)) != 0 ||
 		    (r = sshbuf_put_string(sigbuf, session_id2,
-		    session_id2_len) != 0) ||
+		    session_id2_len)) != 0 ||
 		    (r = sshkey_puts(key, sigbuf)) != 0)
 			fatal("%s: couldn't prepare private key "
 			    "proof buffer: %s", __func__, ssh_err(r));
@@ -770,14 +751,14 @@ mm_answer_sign(int sock, Buffer *m)
 	}
 
 	if ((key = get_hostkey_by_index(keyid)) != NULL) {
-		if ((r = sshkey_sign(key, &signature, &siglen, p, datlen,
+		if ((r = sshkey_sign(key, &signature, &siglen, p, datlen, alg,
 		    datafellows)) != 0)
 			fatal("%s: sshkey_sign failed: %s",
 			    __func__, ssh_err(r));
 	} else if ((key = get_hostkey_public_by_index(keyid, ssh)) != NULL &&
 	    auth_sock > 0) {
 		if ((r = ssh_agent_sign(auth_sock, key, &signature, &siglen,
-		    p, datlen, datafellows)) != 0) {
+		    p, datlen, alg, datafellows)) != 0) {
 			fatal("%s: ssh_agent_sign failed: %s",
 			    __func__, ssh_err(r));
 		}
@@ -791,6 +772,7 @@ mm_answer_sign(int sock, Buffer *m)
 	if ((r = sshbuf_put_string(m, signature, siglen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
+	free(alg);
 	free(p);
 	free(signature);
 
@@ -943,6 +925,9 @@ mm_answer_authpassword(int sock, Buffer *m)
 
 	buffer_clear(m);
 	buffer_put_int(m, authenticated);
+#ifdef USE_PAM
+	buffer_put_int(m, sshpam_get_maxtries_reached());
+#endif
 
 	debug3("%s: sending result %d", __func__, authenticated);
 	mm_request_send(sock, MONITOR_ANS_AUTHPASSWORD, m);
@@ -994,7 +979,7 @@ mm_answer_bsdauthrespond(int sock, Buffer *m)
 	char *response;
 	int authok;
 
-	if (authctxt->as == 0)
+	if (authctxt->as == NULL)
 		fatal("%s: no bsd auth session", __func__);
 
 	response = buffer_get_string(m, NULL);
@@ -1063,7 +1048,8 @@ mm_answer_skeyrespond(int sock, Buffer *m)
 	debug3("%s: sending authenticated: %d", __func__, authok);
 	mm_request_send(sock, MONITOR_ANS_SKEYRESPOND, m);
 
-	auth_method = "skey";
+	auth_method = "keyboard-interactive";
+	auth_submethod = "skey";
 
 	return (authok != 0);
 }
@@ -1141,6 +1127,7 @@ mm_answer_pam_query(int sock, Buffer *m)
 	free(name);
 	buffer_put_cstring(m, info);
 	free(info);
+	buffer_put_int(m, sshpam_get_maxtries_reached());
 	buffer_put_int(m, num);
 	for (i = 0; i < num; ++i) {
 		buffer_put_cstring(m, prompts[i]);
@@ -1275,6 +1262,10 @@ mm_answer_keyallowed(int sock, Buffer *m)
 			break;
 		}
 	}
+
+	debug3("%s: key %p is %s",
+	    __func__, key, allowed ? "allowed" : "not allowed");
+
 	if (key != NULL)
 		key_free(key);
 
@@ -1296,9 +1287,6 @@ mm_answer_keyallowed(int sock, Buffer *m)
 		free(chost);
 	}
 
-	debug3("%s: key %p is %s",
-	    __func__, key, allowed ? "allowed" : "not allowed");
-
 	buffer_clear(m);
 	buffer_put_int(m, allowed);
 	buffer_put_int(m, forced_command != NULL);
@@ -1315,7 +1303,8 @@ static int
 monitor_valid_userblob(u_char *data, u_int datalen)
 {
 	Buffer b;
-	char *p, *userstyle;
+	u_char *p;
+	char *userstyle, *cp;
 	u_int len;
 	int fail = 0;
 
@@ -1340,26 +1329,26 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 	}
 	if (buffer_get_char(&b) != SSH2_MSG_USERAUTH_REQUEST)
 		fail++;
-	p = buffer_get_cstring(&b, NULL);
+	cp = buffer_get_cstring(&b, NULL);
 	xasprintf(&userstyle, "%s%s%s", authctxt->user,
 	    authctxt->style ? ":" : "",
 	    authctxt->style ? authctxt->style : "");
-	if (strcmp(userstyle, p) != 0) {
-		logit("wrong user name passed to monitor: expected %s != %.100s",
-		    userstyle, p);
+	if (strcmp(userstyle, cp) != 0) {
+		logit("wrong user name passed to monitor: "
+		    "expected %s != %.100s", userstyle, cp);
 		fail++;
 	}
 	free(userstyle);
-	free(p);
+	free(cp);
 	buffer_skip_string(&b);
 	if (datafellows & SSH_BUG_PKAUTH) {
 		if (!buffer_get_char(&b))
 			fail++;
 	} else {
-		p = buffer_get_cstring(&b, NULL);
-		if (strcmp("publickey", p) != 0)
+		cp = buffer_get_cstring(&b, NULL);
+		if (strcmp("publickey", cp) != 0)
 			fail++;
-		free(p);
+		free(cp);
 		if (!buffer_get_char(&b))
 			fail++;
 		buffer_skip_string(&b);
@@ -1472,7 +1461,7 @@ mm_answer_keyverify(int sock, Buffer *m)
 	    __func__, key, (verified == 1) ? "verified" : "unverified");
 
 	/* If auth was successful then record key to ensure it isn't reused */
-	if (verified == 1)
+	if (verified == 1 && key_blobtype == MM_USERKEY)
 		auth2_record_userkey(authctxt, key);
 	else
 		key_free(key);
@@ -1495,6 +1484,7 @@ mm_answer_keyverify(int sock, Buffer *m)
 static void
 mm_record_login(Session *s, struct passwd *pw)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	socklen_t fromlen;
 	struct sockaddr_storage from;
 
@@ -1516,7 +1506,7 @@ mm_record_login(Session *s, struct passwd *pw)
 	}
 	/* Record that there was a login on that tty from the remote host. */
 	record_login(s->pid, s->tty, pw->pw_name, pw->pw_uid,
-	    get_remote_name_or_ip(utmp_len, options.use_dns),
+	    session_get_remote_name_or_ip(ssh, utmp_len, options.use_dns),
 	    (struct sockaddr *)&from, fromlen);
 }
 
@@ -1879,11 +1869,14 @@ monitor_apply_keystate(struct monitor *pmonitor)
 	sshbuf_free(child_state);
 	child_state = NULL;
 
-	if ((kex = ssh->kex) != 0) {
+	if ((kex = ssh->kex) != NULL) {
 		/* XXX set callbacks */
 #ifdef WITH_OPENSSL
 		kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 		kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
+		kex->kex[KEX_DH_GRP14_SHA256] = kexdh_server;
+		kex->kex[KEX_DH_GRP16_SHA512] = kexdh_server;
+		kex->kex[KEX_DH_GRP18_SHA512] = kexdh_server;
 		kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 		kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 # ifdef OPENSSL_HAS_ECC

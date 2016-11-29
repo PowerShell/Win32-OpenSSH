@@ -200,8 +200,33 @@ char* w32_programdir() {
 
 }
 
-int daemon(int nochdir, int noclose)
+int 
+daemon(int nochdir, int noclose)
 {
         FreeConsole();
         return 0;
+}
+
+int w32_ioctl(int d, int request, ...) {
+        va_list valist;
+        va_start(valist, request);
+
+        switch (request){
+        case TIOCGWINSZ: {
+                struct winsize* wsize = va_arg(valist, struct winsize*);
+                CONSOLE_SCREEN_BUFFER_INFO c_info;
+                if (wsize == NULL || !GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &c_info)) {
+                        errno = EINVAL;
+                        return -1;
+                }
+                wsize->ws_col = c_info.dwSize.X - 5;
+                wsize->ws_row = c_info.dwSize.Y;
+                wsize->ws_xpixel = 640;
+                wsize->ws_ypixel = 480;
+                return 0;
+        }
+        default:
+                errno = ENOTSUP;
+                return -1;
+        }
 }

@@ -30,7 +30,6 @@
 static void
 copy_statfs_to_statvfs(struct statvfs *to, struct statfs *from)
 {
-
 	to->f_bsize = from->f_bsize;
 	to->f_frsize = from->f_bsize;	/* no exact equivalent */
 	to->f_blocks = from->f_blocks;

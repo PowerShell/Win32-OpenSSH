@@ -470,4 +470,3 @@ out:
 # endif	/* USE_GETGRSET */
 
 #endif /* _AIX */
-

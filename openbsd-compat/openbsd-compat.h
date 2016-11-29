@@ -1,4 +1,4 @@
-/* $Id: openbsd-compat.h,v 1.51 2010/10/07 10:25:29 djm Exp $ */
+/* $Id: openbsd-compat.h,v 1.62 2014/09/30 23:43:08 djm Exp $ */
 
 /*
  * Copyright (c) 1999-2003 Damien Miller.  All rights reserved.
@@ -36,10 +36,11 @@
 
 #include <sys/socket.h>
 
+#include <stddef.h>  /* for wchar_t */
+
 /* OpenBSD function replacements */
 #include "base64.h"
 #include "sigact.h"
-#include "glob.h"
 #include "readpassphrase.h"
 #include "vis.h"
 #include "getrrsetbyname.h"
@@ -244,20 +245,21 @@ long long strtonum(const char *, long long, long long, const char **);
 # define nl_langinfo(x)	""
 #endif
 
+#ifndef WINDOWS
 #ifndef HAVE_MBTOWC
 int mbtowc(wchar_t *, const char*, size_t);
 #endif
-
+#endif
 
 #if !defined(HAVE_VASPRINTF) || !defined(HAVE_VSNPRINTF)
 # include <stdarg.h>
 #endif
 
 /*
-* Some platforms unconditionally undefine va_copy() so we define VA_COPY()
-* instead.  This is known to be the case on at least some configurations of
-* AIX with the xlc compiler.
-*/
+ * Some platforms unconditionally undefine va_copy() so we define VA_COPY()
+ * instead.  This is known to be the case on at least some configurations of
+ * AIX with the xlc compiler.
+ */
 #ifndef VA_COPY
 # ifdef HAVE_VA_COPY
 #  define VA_COPY(dest, src) va_copy(dest, src)
@@ -269,7 +271,6 @@ int mbtowc(wchar_t *, const char*, size_t);
 #  endif
 # endif
 #endif
-
 
 #ifndef HAVE_VASPRINTF
 int vasprintf(char **, const char *, va_list);

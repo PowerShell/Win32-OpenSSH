@@ -37,21 +37,19 @@
 
 /* OPENBSD ORIGINAL: include/glob.h */
 
-// Undef GLOB_H for MinGW32 target
-#ifdef WIN32
-#undef HAVE_GLOB_H
-#endif
-
-
 #if !defined(HAVE_GLOB_H) || !defined(GLOB_HAS_ALTDIRFUNC) || \
     !defined(GLOB_HAS_GL_MATCHC) || !defined(GLOB_HAS_GL_STATV) || \
     !defined(HAVE_DECL_GLOB_NOMATCH) || HAVE_DECL_GLOB_NOMATCH == 0 || \
     defined(BROKEN_GLOB)
 
-#ifndef _GLOB_H_
-#define	_GLOB_H_
+#ifndef _COMPAT_GLOB_H_
+#define	_COMPAT_GLOB_H_
 
 #include <sys/stat.h>
+
+# define glob_t _ssh_compat_glob_t
+# define glob(a, b, c, d)  _ssh__compat_glob(a, b, c, d)
+# define globfree(a)  _ssh__compat_globfree(a)
 
 struct stat;
 typedef struct {

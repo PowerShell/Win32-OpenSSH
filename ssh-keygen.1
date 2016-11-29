@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ssh-keygen.1,v 1.127 2015/08/20 19:20:06 naddy Exp $
+.\"	$OpenBSD: ssh-keygen.1,v 1.133 2016/06/16 06:10:45 jmc Exp $
 .\"
 .\" Author: Tatu Ylonen <ylo@cs.hut.fi>
 .\" Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -35,7 +35,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: August 20 2015 $
+.Dd $Mdocdate: June 16 2016 $
 .Dt SSH-KEYGEN 1
 .Os
 .Sh NAME
@@ -141,8 +141,12 @@
 generates, manages and converts authentication keys for
 .Xr ssh 1 .
 .Nm
-can create RSA keys for use by SSH protocol version 1 and
-DSA, ECDSA, Ed25519 or RSA keys for use by SSH protocol version 2.
+can create keys for use by SSH protocol versions 1 and 2.
+Protocol 1 should not be used
+and is only offered to support legacy devices.
+It suffers from a number of cryptographic weaknesses
+and doesn't support many of the advanced features available for protocol 2.
+.Pp
 The type of key to be generated is specified with the
 .Fl t
 option.
@@ -203,7 +207,7 @@ There is no way to recover a lost passphrase.
 If the passphrase is lost or forgotten, a new key must be generated
 and the corresponding public key copied to other machines.
 .Pp
-For RSA1 keys,
+For RSA1 keys and keys stored in the newer OpenSSH format,
 there is also a comment field in the key file that is only for
 convenience to the user to help identify the key.
 The comment can tell what the key is for, or whatever is useful.
@@ -260,7 +264,8 @@ flag will be ignored.
 Provides a new comment.
 .It Fl c
 Requests changing the comment in the private and public key files.
-This operation is only supported for RSA1 keys.
+This operation is only supported for RSA1 keys and keys stored in the
+newer OpenSSH format.
 The program will prompt for the file containing the private keys, for
 the passphrase if the key has one, and for the new comment.
 .It Fl D Ar pkcs11
@@ -376,7 +381,7 @@ using the format described in the
 .Sx KEY REVOCATION LISTS
 section.
 .It Fl L
-Prints the contents of a certificate.
+Prints the contents of one or more certificates.
 .It Fl l
 Show fingerprint of specified public key file.
 Private RSA1 keys are also supported.
@@ -385,7 +390,8 @@ For RSA and DSA keys
 tries to find the matching public key file and prints its fingerprint.
 If combined with
 .Fl v ,
-an ASCII art representation of the key is supplied with the fingerprint.
+a visual ASCII art representation of the key is supplied with the
+fingerprint.
 .It Fl M Ar memory
 Specify the amount of memory to use (in megabytes) when generating
 candidate moduli for DH-GEX.
@@ -474,7 +480,7 @@ At present, no options are valid for host keys.
 .It Fl o
 Causes
 .Nm
-to save SSH protocol 2 private keys using the new OpenSSH format rather than
+to save private keys using the new OpenSSH format rather than
 the more compatible PEM format.
 The new format has increased resistance to brute-force password cracking
 but is not supported by versions of OpenSSH prior to 6.5.
@@ -781,7 +787,7 @@ It is also possible, given a KRL, to test whether it revokes a particular key
 (or keys).
 The
 .Fl Q
-flag will query an existing KRL, testing each key specified on the commandline.
+flag will query an existing KRL, testing each key specified on the command line.
 If any key listed on the command line has been revoked (or an error encountered)
 then
 .Nm

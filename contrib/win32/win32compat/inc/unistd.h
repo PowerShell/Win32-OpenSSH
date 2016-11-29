@@ -27,6 +27,10 @@
 #define getdtablesize() MAX_FDS
 #define gethostname w32_gethostname
 
+#define fsync(a) w32_fsync((a))
+#define ftruncate(a, b) w32_ftruncate((a), (b))
+#define realpath(a, b) w32_realpath((a),(b))
+
 int daemon(int nochdir, int noclose);
 
 #endif

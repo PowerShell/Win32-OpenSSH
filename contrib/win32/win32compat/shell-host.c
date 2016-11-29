@@ -38,7 +38,7 @@
 
 #define MAX_CONSOLE_COLUMNS 9999
 #define MAX_CONSOLE_ROWS 9999
-#define MAX_CMD_LEN 512
+#define MAX_CMD_LEN 8191 // msdn
 #define WM_APPEXIT WM_USER+1
 #define MAX_EXPECTED_BUFFER_SIZE 1024
 
@@ -82,6 +82,43 @@ typedef struct consoleEvent {
     void* prior;
     void* next;
 } consoleEvent;
+
+struct key_translation
+{
+    char incoming[5];
+    int vk;
+    char outgoing[1];
+} key_translation;
+
+struct key_translation keys[] = { 
+    { "\x1b",       VK_ESCAPE,  "\x1b" },
+    { "\r",         VK_RETURN,  "\r" },
+    { "\b",         VK_BACK,    "\b" },
+    { "\x7f",       VK_BACK,    "\x7f" },
+    { "\t",         VK_TAB,     "\t" },
+    { "\x1b[A",     VK_UP,       0 },
+    { "\x1b[B",     VK_DOWN,     0 },
+    { "\x1b[C",     VK_RIGHT,    0 },
+    { "\x1b[D",     VK_LEFT,     0 },
+    { "\x1b[1~",    VK_HOME,     0 },
+    { "\x1b[2~",    VK_INSERT,   0 },
+    { "\x1b[3~",    VK_DELETE,   0 },
+    { "\x1b[4~",    VK_END,      0 },
+    { "\x1b[5~",    VK_PRIOR,    0 },
+    { "\x1b[6~",    VK_NEXT,     0 },
+    { "\x1b[11~",   VK_F1,       0 },
+    { "\x1b[12~",   VK_F2,       0 },
+    { "\x1b[13~",   VK_F3,       0 },
+    { "\x1b[14~",   VK_F4,       0 },
+    { "\x1b[15~",   VK_F5,       0 },
+    { "\x1b[17~",   VK_F6,       0 },
+    { "\x1b[18~",   VK_F7,       0 },
+    { "\x1b[19~",   VK_F8,       0 },
+    { "\x1b[20~",   VK_F9,       0 },
+    { "\x1b[21~",   VK_F10,      0 },
+    { "\x1b[23~",   VK_F11,      0 },
+    { "\x1b[24~",   VK_F12,      0 }
+};
 
 consoleEvent* head = NULL;
 consoleEvent* tail = NULL;
@@ -163,6 +200,24 @@ void SendKeyStroke(HANDLE hInput, int keyStroke, char character)
 
     ir.Event.KeyEvent.bKeyDown = FALSE;
     WriteConsoleInputA(hInput, &ir, 1, &wr);
+}
+
+void ProcessIncomingKeys(char * ansikey) {
+    int nKey = 0;
+    int index = ARRAYSIZE(keys);
+
+    while (nKey < index) {
+        if (strcmp(ansikey, keys[nKey].incoming) == 0) {
+            SendKeyStroke(child_in, keys[nKey].vk, keys[nKey].outgoing[0]);
+            break;
+        }
+        else
+            nKey++;
+    }
+
+    if (nKey == index) {
+        SendKeyStroke(child_in, 0, ansikey[0]);
+    }
 }
 
 // VT output routines
@@ -825,6 +880,8 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
     /* process data from pipe_in and route appropriately */
     while (1) {
         char buf[128];
+        ZeroMemory(buf, 128);
+
         DWORD rd = 0, wr = 0, i = -1;
 
         GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, 128, &rd, NULL));
@@ -835,10 +892,10 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
 
             INPUT_RECORD ir;
 
-	    if (buf[i] == 3) {/*Ctrl+C - Raise Ctrl+C*/
-		    GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
-		    continue;
-	    }
+	        if (buf[i] == 3) {/*Ctrl+C - Raise Ctrl+C*/
+		        GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+		        continue;
+	        }
 
             if (bAnsi) {
                 ir.EventType = KEY_EVENT;
@@ -853,123 +910,10 @@ DWORD WINAPI ProcessPipes(LPVOID p) {
                 ir.Event.KeyEvent.bKeyDown = FALSE;
                 WriteConsoleInputA(child_in, &ir, 1, &wr);
             }
-            else
-            {
-                if (buf[i] == '\r')
-                {
-                    SendKeyStroke(child_in, VK_RETURN, buf[0]);
-                }
-                else if (buf[i] == '\b' || buf[i] == 127)
-                {
-                    buf[0] = 8;			
-                    SendKeyStroke(child_in, VK_BACK, buf[0]);
-                }
-                else if (buf[i] == '\t')
-                {
-                    SendKeyStroke(child_in, VK_TAB, buf[0]);
-                }
-                else if (buf[i] == '\x1b')
-                {
-                    switch (rd) {
-                    case 1:
-                        SendKeyStroke(child_in, VK_ESCAPE, buf[0]);
-                        break;
-                    case 3:
-                        switch (buf[i + 1])
-                        {
-                        case '[':
-                            switch (buf[i + 2])
-                            {
-                            case 'A':
-                                SendKeyStroke(child_in, VK_UP, 0);
-                                i = i + 2;
-                                break;
-                            case 'B':
-                                SendKeyStroke(child_in, VK_DOWN, 0);
-                                i = i + 2;
-                                break;
-                            case 'C':
-                                SendKeyStroke(child_in, VK_RIGHT, 0);
-                                i = i + 2;
-                                break;
-                            case 'D':
-                                SendKeyStroke(child_in, VK_LEFT, 0);
-                                i = i + 2;
-                                break;
-                            default:
-                                break;
-                            }
-                        default:
-                            break;
-                        }
-                        break;
-                    case 4:
-                        switch (buf[i + 1]) {
-                        case '[':
-                        {
-                            switch (buf[i + 2]) {
-                            case '2':
-                                switch (buf[i + 3]) {
-                                case '~':
-                                {
-                                    SendKeyStroke(child_in, VK_INSERT, 0);
-                                    i = i + 3;
-                                    break;
-                                }
-                                default:
-                                    break;
-                                }
-                                break;
-                            case '3':
-                                switch (buf[i + 3]) {
-                                case '~':
-                                {
-                                    SendKeyStroke(child_in, VK_DELETE, 0);
-                                    i = i + 3;
-                                    break;
-                                }
-                                default:
-                                    break;
-                                }
-                                break;
-                            default:
-                                break;
-                            }
-                        }
-                        default:
-                            break;
-                        }
-                    default:
-                        ir.EventType = KEY_EVENT;
-                        ir.Event.KeyEvent.bKeyDown = TRUE;
-                        ir.Event.KeyEvent.wRepeatCount = 1;
-                        ir.Event.KeyEvent.wVirtualKeyCode = 0;
-                        ir.Event.KeyEvent.wVirtualScanCode = 0;
-                        ir.Event.KeyEvent.uChar.AsciiChar = buf[i];
-                        ir.Event.KeyEvent.dwControlKeyState = 0;
-                        WriteConsoleInputA(child_in, &ir, 1, &wr);
-
-                        ir.Event.KeyEvent.bKeyDown = FALSE;
-                        WriteConsoleInputA(child_in, &ir, 1, &wr);
-
-                        break;
-                    }
-                }
-                else {
-                    ir.EventType = KEY_EVENT;
-                    ir.Event.KeyEvent.bKeyDown = TRUE;
-                    ir.Event.KeyEvent.wRepeatCount = 1;
-                    ir.Event.KeyEvent.wVirtualKeyCode = 0;
-                    ir.Event.KeyEvent.wVirtualScanCode = 0;
-                    ir.Event.KeyEvent.uChar.AsciiChar = buf[i];
-                    ir.Event.KeyEvent.dwControlKeyState = 0;
-                    WriteConsoleInputA(child_in, &ir, 1, &wr);
-
-                    ir.Event.KeyEvent.bKeyDown = FALSE;
-                    WriteConsoleInputA(child_in, &ir, 1, &wr);
-                }
+            else {
+                ProcessIncomingKeys(buf);
+                break;
             }
-
         }
     }
 
@@ -1060,7 +1004,7 @@ cleanup:
 int start_with_pty(int ac, wchar_t **av) {
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
-    wchar_t cmd[MAX_PATH];
+    wchar_t cmd[MAX_CMD_LEN];
     SECURITY_ATTRIBUTES sa;
     BOOL ret;
     DWORD dwThreadId;
@@ -1069,14 +1013,14 @@ int start_with_pty(int ac, wchar_t **av) {
     HANDLE hEventHook = NULL;
     HMODULE hm_kernel32 = NULL, hm_user32 = NULL;
 
-	if ((hm_kernel32 = LoadLibraryW(L"kernel32.dll")) == NULL ||
-		(hm_user32 = LoadLibraryW(L"user32.dll")) == NULL ||
-		(__SetCurrentConsoleFontEx = (__t_SetCurrentConsoleFontEx)GetProcAddress(hm_kernel32, "SetCurrentConsoleFontEx")) == NULL ||
-		(__UnhookWinEvent = (__t_UnhookWinEvent)GetProcAddress(hm_user32, "UnhookWinEvent")) == NULL ||
-		(__SetWinEventHook = (__t_SetWinEventHook)GetProcAddress(hm_user32, "SetWinEventHook")) == NULL) {
-		printf("cannot support a pseudo terminal. \n");
-		return -1;
-	}
+    if ((hm_kernel32 = LoadLibraryW(L"kernel32.dll")) == NULL ||
+        (hm_user32 = LoadLibraryW(L"user32.dll")) == NULL ||
+        (__SetCurrentConsoleFontEx = (__t_SetCurrentConsoleFontEx)GetProcAddress(hm_kernel32, "SetCurrentConsoleFontEx")) == NULL ||
+        (__UnhookWinEvent = (__t_UnhookWinEvent)GetProcAddress(hm_user32, "UnhookWinEvent")) == NULL ||
+        (__SetWinEventHook = (__t_SetWinEventHook)GetProcAddress(hm_user32, "SetWinEventHook")) == NULL) {
+        printf("cannot support a pseudo terminal. \n");
+        return -1;
+    }
 
     pipe_in  = GetStdHandle(STD_INPUT_HANDLE);
     pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -1089,6 +1033,10 @@ int start_with_pty(int ac, wchar_t **av) {
         return -1;
 
     cp = GetConsoleCP();
+
+    /* Windows PTY sends cursor positions in absolute coordinates starting from <0,0>
+     * We send a clear screen upfront to simplify client */
+    SendClearScreen(pipe_out);
 
     ZeroMemory(&inputSi, sizeof(STARTUPINFO));
     GetStartupInfo(&inputSi);
@@ -1198,7 +1146,7 @@ DWORD WINAPI MonitorChild_nopty(
 int start_withno_pty(int ac, wchar_t **av) {
         STARTUPINFO si;
         PROCESS_INFORMATION pi;
-        wchar_t cmd[MAX_PATH];
+        wchar_t cmd[MAX_CMD_LEN];
         SECURITY_ATTRIBUTES sa;
         BOOL ret;
 

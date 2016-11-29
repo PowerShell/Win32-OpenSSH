@@ -58,13 +58,13 @@ static int
 dangerous_locale(void) {
 
 #ifndef WINDOWS
-    char	*loc;
+	char	*loc;
 
 #ifdef HAVE_LANGINFO_H
 	loc = nl_langinfo(CODESET);
 #endif
 
-    return strcmp(loc, "US-ASCII") && strcmp(loc, "UTF-8");
+	return strcmp(loc, "US-ASCII") && strcmp(loc, "UTF-8");
 #else
     wchar_t loc[LOCALE_NAME_MAX_LENGTH];
 

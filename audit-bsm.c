@@ -35,7 +35,6 @@
 /* #pragma ident	"@(#)bsmaudit.c	1.1	01/09/17 SMI" */
 
 #include "includes.h"
-
 #if defined(USE_BSM_AUDIT)
 
 #include <sys/types.h>

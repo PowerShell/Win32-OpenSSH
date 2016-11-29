@@ -1,4 +1,4 @@
-/* $OpenBSD: progressmeter.c,v 1.41 2015/01/14 13:54:13 djm Exp $ */
+/* $OpenBSD: progressmeter.c,v 1.45 2016/06/30 05:17:05 dtucker Exp $ */
 /*
  * Copyright (c) 2003 Nils Nordman.  All rights reserved.
  *
@@ -63,8 +63,8 @@ void refresh_progress_meter(void);
 /* signal handler for updating the progress meter */
 static void update_progress_meter(int);
 
-static time_t start;		/* start progress */
-static time_t last_update;	/* last progress update */
+static double start;		/* start progress */
+static double last_update;	/* last progress update */
 static const char *file;	/* name of the file being transferred */
 static off_t start_pos;		/* initial position of transfer */
 static off_t end_pos;		/* ending position of transfer */
@@ -89,7 +89,7 @@ can_output(void)
     return (getpgrp() == tcgetpgrp(STDOUT_FILENO));
 #else
     DWORD dwProcessId = -1;
-    if (GetWindowThreadProcessId(GetStdHandle(STD_OUTPUT_HANDLE), &dwProcessId)) {
+    if (GetWindowThreadProcessId(STDOUT_FILENO, &dwProcessId)) {
         return(GetCurrentProcess() == dwProcessId);
     }
     else {
@@ -134,9 +134,8 @@ void
 refresh_progress_meter(void)
 {
 	char buf[MAX_WINSIZE + 1];
-	time_t now;
 	off_t transferred;
-	double elapsed;
+	double elapsed, now;
 	int percent;
 	off_t bytes_left;
 	int cur_speed;
@@ -146,7 +145,7 @@ refresh_progress_meter(void)
 
 	transferred = *counter - (cur_pos ? cur_pos : start_pos);
 	cur_pos = *counter;
-	now = monotime();
+	now = monotime_double();
 	bytes_left = end_pos - cur_pos;
 
 	if (bytes_left > 0)
@@ -186,10 +185,10 @@ refresh_progress_meter(void)
 	}
 
 	/* percent of transfer done */
-	if (end_pos != 0)
-		percent = ((float)cur_pos / end_pos) * 100;
-	else
+	if (end_pos == 0 || cur_pos == end_pos)
 		percent = 100;
+	else
+		percent = ((float)cur_pos / end_pos) * 100;
 	snprintf(buf + strlen(buf), win_size - strlen(buf),
 	    " %3d%% ", percent);
 
@@ -238,8 +237,8 @@ refresh_progress_meter(void)
 	}
 
 #ifdef WINDOWS
-    wchar_t* wtmp = utf8_to_utf16(buf);
-    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+	wchar_t* wtmp = utf8_to_utf16(buf);
+	WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
     free(wtmp);
 #else
 	atomicio(vwrite, STDOUT_FILENO, buf, win_size - 1);
@@ -270,7 +269,7 @@ update_progress_meter(int ignore)
 void
 start_progress_meter(const char *f, off_t filesize, off_t *ctr)
 {
-	start = last_update = monotime();
+	start = last_update = monotime_double();
 	file = f;
 	start_pos = *ctr;
 	end_pos = filesize;
@@ -282,7 +281,6 @@ start_progress_meter(const char *f, off_t filesize, off_t *ctr)
 	setscreensize();
 	if (can_output())
 		refresh_progress_meter();
-
 
 	signal(SIGALRM, update_progress_meter);
 	signal(SIGWINCH, sig_winch);
@@ -301,7 +299,11 @@ stop_progress_meter(void)
 	if (cur_pos != end_pos)
 		refresh_progress_meter();
 
-	atomicio(vwrite, STDOUT_FILENO, "\n", 1);
+#ifdef WINDOWS
+    WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L"\n", 1, 0, 0);
+#else
+    atomicio(vwrite, STDOUT_FILENO, "\n", 1);
+#endif
 }
 
 /*ARGSUSED*/
@@ -314,19 +316,16 @@ sig_winch(int sig)
 static void
 setscreensize(void)
 {
-#ifndef WINDOWS
-	struct winsize winsize;
+    struct winsize winsize;
 
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) != -1 &&
-	    winsize.ws_col != 0) {
-		if (winsize.ws_col > MAX_WINSIZE)
-			win_size = MAX_WINSIZE;
-		else
-			win_size = winsize.ws_col;
-	} else
-		win_size = DEFAULT_WINSIZE;
-	win_size += 1;					/* trailing \0 */
-#else
-    win_size = ConScreenSizeX() + 1;
-#endif
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) != -1 &&
+        winsize.ws_col != 0) {
+        if (winsize.ws_col > MAX_WINSIZE)
+            win_size = MAX_WINSIZE;
+        else
+            win_size = winsize.ws_col;
+    }
+    else
+        win_size = DEFAULT_WINSIZE;
+    win_size += 1;					/* trailing \0 */
 }

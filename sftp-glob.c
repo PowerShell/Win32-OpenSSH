@@ -22,12 +22,7 @@
 # include <sys/stat.h>
 #endif
 
-#ifdef WINDOWS
-#include "win32_dirent.h"
-#else
 #include <dirent.h>
-#endif
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdlib.h>

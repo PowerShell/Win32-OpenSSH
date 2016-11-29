@@ -48,6 +48,7 @@
 #define ANSI_BLINK				5
 #define ANSI_REVERSE			7
 #define ANSI_HIDDEN				8
+#define ANSI_NOUNDERSCORE       24
 #define ANSI_NOREVERSE			27
 
 #define ANSI_FOREGROUND_BLACK	30

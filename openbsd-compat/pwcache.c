@@ -110,13 +110,5 @@ group_from_gid(gid_t gid, int nogroup)
 		cp->name = strdup(gr ? gr->gr_name : nbuf);
 	}
 	return (cp->name);
-#else
-
-  /*
-   * Not implemented on Win32.
-   */
-   
-  return NULL;
-
 }
 #endif

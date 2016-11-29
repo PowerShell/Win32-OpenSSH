@@ -1,4 +1,4 @@
-/* 	$OpenBSD: test_sshkey.c,v 1.7 2015/08/05 05:27:33 djm Exp $ */
+/* 	$OpenBSD: test_sshkey.c,v 1.10 2016/05/02 09:52:00 djm Exp $ */
 /*
  * Regress test for sshkey.h key management API
  *
@@ -50,23 +50,10 @@ put_opt(struct sshbuf *b, const char *name, const char *value)
 	sshbuf_free(sect);
 }
 
-#ifdef WIN32_FIXME
-const char *
-test_data_file(const char *name)
-{
-	static char ret[PATH_MAX];
-	snprintf(ret, sizeof(ret), "c:/openssh/Win32-OpenSSH/regress/unittests/sshkey/testdata/%s", name);
-	if (access(ret, F_OK) != 0) {
-		fprintf(stderr, "Cannot access data file %s: %s\n",
-		    ret, strerror(errno));
-		exit(1);
-	}
-	return ret;
-}
-#endif
 static void
 build_cert(struct sshbuf *b, const struct sshkey *k, const char *type,
-    const struct sshkey *sign_key, const struct sshkey *ca_key)
+    const struct sshkey *sign_key, const struct sshkey *ca_key,
+    const char *sig_alg)
 {
 	struct sshbuf *ca_buf, *pk, *principals, *critopts, *exts;
 	u_char *sigblob;
@@ -113,7 +100,7 @@ build_cert(struct sshbuf *b, const struct sshkey *k, const char *type,
 	ASSERT_INT_EQ(sshbuf_put_string(b, NULL, 0), 0); /* reserved */
 	ASSERT_INT_EQ(sshbuf_put_stringb(b, ca_buf), 0); /* signature key */
 	ASSERT_INT_EQ(sshkey_sign(sign_key, &sigblob, &siglen,
-	    sshbuf_ptr(b), sshbuf_len(b), 0), 0);
+	    sshbuf_ptr(b), sshbuf_len(b), sig_alg, 0), 0);
 	ASSERT_INT_EQ(sshbuf_put_string(b, sigblob, siglen), 0); /* signature */
 
 	free(sigblob);
@@ -125,12 +112,13 @@ build_cert(struct sshbuf *b, const struct sshkey *k, const char *type,
 }
 
 static void
-signature_test(struct sshkey *k, struct sshkey *bad, const u_char *d, size_t l)
+signature_test(struct sshkey *k, struct sshkey *bad, const char *sig_alg,
+    const u_char *d, size_t l)
 {
 	size_t len;
 	u_char *sig;
 
-	ASSERT_INT_EQ(sshkey_sign(k, &sig, &len, d, l, 0), 0);
+	ASSERT_INT_EQ(sshkey_sign(k, &sig, &len, d, l, sig_alg, 0), 0);
 	ASSERT_SIZE_T_GT(len, 8);
 	ASSERT_PTR_NE(sig, NULL);
 	ASSERT_INT_EQ(sshkey_verify(k, sig, len, d, l, 0), 0);
@@ -157,7 +145,7 @@ banana(u_char *s, size_t l)
 }
 
 static void
-signature_tests(struct sshkey *k, struct sshkey *bad)
+signature_tests(struct sshkey *k, struct sshkey *bad, const char *sig_alg)
 {
 	u_char i, buf[2049];
 	size_t lens[] = {
@@ -169,7 +157,7 @@ signature_tests(struct sshkey *k, struct sshkey *bad)
 		test_subtest_info("%s key, banana length %zu",
 		    sshkey_type(k), lens[i]);
 		banana(buf, lens[i]);
-		signature_test(k, bad, buf, lens[i]);
+		signature_test(k, bad, sig_alg, buf, lens[i]);
 	}
 }
 
@@ -180,7 +168,7 @@ get_private(const char *n)
 	struct sshkey *ret;
 
 	b = load_file(n);
-	ASSERT_INT_EQ(sshkey_parse_private_fileblob(b, "", n, &ret, NULL), 0);
+	ASSERT_INT_EQ(sshkey_parse_private_fileblob(b, "", &ret, NULL), 0);
 	sshbuf_free(b);
 	return ret;
 }
@@ -205,6 +193,7 @@ sshkey_tests(void)
 	sshkey_free(k1);
 	TEST_DONE();
 
+#ifdef WITH_OPENSSL
 	TEST_START("new/free KEY_RSA1");
 	k1 = sshkey_new(KEY_RSA1);
 	ASSERT_PTR_NE(k1, NULL);
@@ -233,6 +222,7 @@ sshkey_tests(void)
 	ASSERT_PTR_EQ(k1->dsa->priv_key, NULL);
 	sshkey_free(k1);
 	TEST_DONE();
+#endif
 
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("new/free KEY_ECDSA");
@@ -252,6 +242,7 @@ sshkey_tests(void)
 	sshkey_free(k1);
 	TEST_DONE();
 
+#ifdef WITH_OPENSSL
 	TEST_START("new_private KEY_RSA");
 	k1 = sshkey_new_private(KEY_RSA);
 	ASSERT_PTR_NE(k1, NULL);
@@ -320,7 +311,7 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(kd->dsa->g, NULL);
 	ASSERT_PTR_NE(kd->dsa->priv_key, NULL);
 	TEST_DONE();
-
+#endif
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("generate KEY_ECDSA");
 	ASSERT_INT_EQ(sshkey_generate(KEY_ECDSA, 256, &ke), 0);
@@ -339,6 +330,7 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(kf->ed25519_sk, NULL);
 	TEST_DONE();
 
+#ifdef WITH_OPENSSL
 	TEST_START("demote KEY_RSA");
 	ASSERT_INT_EQ(sshkey_demote(kr, &k1), 0);
 	ASSERT_PTR_NE(k1, NULL);
@@ -369,6 +361,7 @@ sshkey_tests(void)
 	ASSERT_INT_EQ(sshkey_equal(kd, k1), 1);
 	sshkey_free(k1);
 	TEST_DONE();
+#endif
 
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("demote KEY_ECDSA");
@@ -436,7 +429,8 @@ sshkey_tests(void)
 #endif
 	sshkey_free(kf);
 
-	TEST_START("certify key");
+#ifndef WIN32_FIXME
+    TEST_START("certify key");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("ed25519_1.pub"),
 	    &k1, NULL), 0);
 	k2 = get_private("ed25519_2");
@@ -467,7 +461,7 @@ sshkey_tests(void)
 	put_opt(k1->cert->extensions, "permit-X11-forwarding", NULL);
 	put_opt(k1->cert->extensions, "permit-agent-forwarding", NULL);
 	ASSERT_INT_EQ(sshkey_from_private(k2, &k1->cert->signature_key), 0);
-	ASSERT_INT_EQ(sshkey_certify(k1, k2), 0);
+	ASSERT_INT_EQ(sshkey_certify(k1, k2, NULL), 0);
 	b = sshbuf_new();
 	ASSERT_PTR_NE(b, NULL);
 	ASSERT_INT_EQ(sshkey_putb(k1, b), 0);
@@ -478,12 +472,31 @@ sshkey_tests(void)
 	sshkey_free(k3);
 	sshbuf_reset(b);
 	TEST_DONE();
+#endif
 
 	TEST_START("sign and verify RSA");
 	k1 = get_private("rsa_1");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("rsa_2.pub"), &k2,
 	    NULL), 0);
-	signature_tests(k1, k2);
+	signature_tests(k1, k2, "ssh-rsa");
+	sshkey_free(k1);
+	sshkey_free(k2);
+	TEST_DONE();
+
+	TEST_START("sign and verify RSA-SHA256");
+	k1 = get_private("rsa_1");
+	ASSERT_INT_EQ(sshkey_load_public(test_data_file("rsa_2.pub"), &k2,
+	    NULL), 0);
+	signature_tests(k1, k2, "rsa-sha2-256");
+	sshkey_free(k1);
+	sshkey_free(k2);
+	TEST_DONE();
+
+	TEST_START("sign and verify RSA-SHA512");
+	k1 = get_private("rsa_1");
+	ASSERT_INT_EQ(sshkey_load_public(test_data_file("rsa_2.pub"), &k2,
+	    NULL), 0);
+	signature_tests(k1, k2, "rsa-sha2-512");
 	sshkey_free(k1);
 	sshkey_free(k2);
 	TEST_DONE();
@@ -492,10 +505,11 @@ sshkey_tests(void)
 	k1 = get_private("dsa_1");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("dsa_2.pub"), &k2,
 	    NULL), 0);
-	signature_tests(k1, k2);
+	signature_tests(k1, k2, NULL);
 	sshkey_free(k1);
 	sshkey_free(k2);
 	TEST_DONE();
+
 
 #ifdef OPENSSL_HAS_ECC
 #ifndef WIN32_FIXME
@@ -503,18 +517,16 @@ sshkey_tests(void)
 	k1 = get_private("ecdsa_1");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("ecdsa_2.pub"), &k2,
 	    NULL), 0);
-	signature_tests(k1, k2);
+	signature_tests(k1, k2, NULL);
 	sshkey_free(k1);
 	sshkey_free(k2);
 	TEST_DONE();
-#endif
-#endif
 
 	TEST_START("sign and verify ED25519");
 	k1 = get_private("ed25519_1");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("ed25519_2.pub"), &k2,
 	    NULL), 0);
-	signature_tests(k1, k2);
+	signature_tests(k1, k2, NULL);
 	sshkey_free(k1);
 	sshkey_free(k2);
 	TEST_DONE();
@@ -524,7 +536,7 @@ sshkey_tests(void)
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("rsa_1.pub"), &k2,
 	    NULL), 0);
 	k3 = get_private("rsa_1");
-	build_cert(b, k2, "ssh-rsa-cert-v01@openssh.com", k3, k1);
+	build_cert(b, k2, "ssh-rsa-cert-v01@openssh.com", k3, k1, NULL);
 	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(b), sshbuf_len(b), &k4),
 	    SSH_ERR_KEY_CERT_INVALID_SIGN_KEY);
 	ASSERT_PTR_EQ(k4, NULL);
@@ -533,5 +545,6 @@ sshkey_tests(void)
 	sshkey_free(k3);
 	sshbuf_free(b);
 	TEST_DONE();
-
+#endif
+#endif
 }

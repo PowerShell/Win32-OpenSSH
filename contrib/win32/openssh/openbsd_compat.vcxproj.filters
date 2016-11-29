@@ -33,9 +33,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\blowfish.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bsd-arc4random.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bsd-asprintf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -94,9 +91,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getgrouplist.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getopt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\getopt_long.c">
@@ -174,9 +168,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strmode.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strnlen.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strptime.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -205,6 +196,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\xmmap.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\openbsd-compat\glob.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

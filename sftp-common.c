@@ -473,7 +473,7 @@ BOOL ResolveLink(wchar_t * tLink, wchar_t *ret, DWORD * plen, DWORD Flags)
 	}
 	if (fileHandle == INVALID_HANDLE_VALUE)
 	{
-		swprintf_s(ret, *plen, L"%ls", tLink);
+		sprintf_s(ret, *plen, L"%ls", tLink);
 		return TRUE;
 	}
 
@@ -524,27 +524,27 @@ char * get_inside_path(char * opath, BOOL bResolve, BOOL bMustExist)
 	char * ipath;
 	char * temp_name;
 	wchar_t temp[1024];
-	DWORD templen = 1024;
-	WIN32_FILE_ATTRIBUTE_DATA  FileInfo;
+    DWORD templen = 1024;
+    WIN32_FILE_ATTRIBUTE_DATA  FileInfo;
 
-	wchar_t* opath_w = utf8_to_utf16(opath);
-	if (!GetFileAttributesExW(opath_w, GetFileExInfoStandard, &FileInfo) && bMustExist)
-	{
-		free(opath_w);
-		return NULL;
-	}
+    wchar_t* opath_w = utf8_to_utf16(opath);
+    if (!GetFileAttributesExW(opath_w, GetFileExInfoStandard, &FileInfo) && bMustExist)
+    {
+        free(opath_w);
+        return NULL;
+    }
 
-	if (bResolve)
-	{
-		ResolveLink(opath_w, temp, &templen, FileInfo.dwFileAttributes);
-		ipath = utf16_to_utf8(temp);
-	}
-	else
-	{
-		ipath = xstrdup(opath);
-	}
+    if (bResolve)
+    {
+        ResolveLink(opath_w, temp, &templen, FileInfo.dwFileAttributes);
+        ipath = utf16_to_utf8(temp);
+    }
+    else
+    {
+        ipath = xstrdup(opath);
+    }
 
-	free(opath_w);
+    free(opath_w);
 	return ipath;
 }
 

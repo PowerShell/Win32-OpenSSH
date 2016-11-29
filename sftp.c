@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp.c,v 1.171 2015/08/20 22:32:42 deraadt Exp $ */
+/* $OpenBSD: sftp.c,v 1.175 2016/07/22 03:47:36 djm Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -49,6 +49,7 @@ typedef void EditLine;
 #endif
 #include <limits.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -63,6 +64,7 @@ typedef void EditLine;
 #include "log.h"
 #include "pathnames.h"
 #include "misc.h"
+#include "utf8.h"
 
 #include "sftp.h"
 #include "ssherr.h"
@@ -73,10 +75,6 @@ typedef void EditLine;
 #define DEFAULT_COPY_BUFLEN	32768	/* Size of buffer for up/download */
 #define DEFAULT_NUM_REQUESTS	64	/* # concurrent outstanding requests */
 #define MAX_COMMAND_LINE 2048
-
-#ifdef WIN32_VS
-#include "win32_dirent.h"
-#endif
 
 /* File to read commands from */
 FILE* infile;
@@ -347,7 +345,7 @@ local_do_ls(const char *args)
 
 /* Strip one path (usually the pwd) from the start of another */
 static char *
-path_strip(char *path, char *strip)
+path_strip(const char *path, const char *strip)
 {
 	size_t len;
 
@@ -365,7 +363,7 @@ path_strip(char *path, char *strip)
 }
 
 static char *
-make_absolute(char *p, char *pwd)
+make_absolute(char *p, const char *pwd)
 {
 	char *abs_str;
 
@@ -563,7 +561,7 @@ parse_no_flags(const char *cmd, char **argv, int argc)
 }
 
 static int
-is_dir(char *path)
+is_dir(const char *path)
 {
 	struct stat sb;
 
@@ -575,7 +573,7 @@ is_dir(char *path)
 }
 
 static int
-remote_is_dir(struct sftp_conn *conn, char *path)
+remote_is_dir(struct sftp_conn *conn, const char *path)
 {
 	Attrib *a;
 
@@ -589,7 +587,7 @@ remote_is_dir(struct sftp_conn *conn, char *path)
 
 /* Check whether path returned from glob(..., GLOB_MARK, ...) is a directory */
 static int
-pathname_is_dir(char *pathname)
+pathname_is_dir(const char *pathname)
 {
 	size_t l = strlen(pathname);
 
@@ -597,8 +595,8 @@ pathname_is_dir(char *pathname)
 }
 
 static int
-process_get(struct sftp_conn *conn, char *src, char *dst, char *pwd,
-    int pflag, int rflag, int resume, int fflag)
+process_get(struct sftp_conn *conn, const char *src, const char *dst,
+    const char *pwd, int pflag, int rflag, int resume, int fflag)
 {
 	char *abs_src = NULL;
 	char *abs_dst = NULL;
@@ -709,8 +707,8 @@ out:
 }
 
 static int
-process_put(struct sftp_conn *conn, char *src, char *dst, char *pwd,
-    int pflag, int rflag, int resume, int fflag)
+process_put(struct sftp_conn *conn, const char *src, const char *dst,
+    const char *pwd, int pflag, int rflag, int resume, int fflag)
 {
 	char *tmp_dst = NULL;
 	char *abs_dst = NULL;
@@ -773,7 +771,7 @@ process_put(struct sftp_conn *conn, char *src, char *dst, char *pwd,
 		}
 		free(tmp);
 
-        resume |= global_aflag;
+                resume |= global_aflag;
 		if (!quiet && resume)
 #ifdef WINDOWS
         {
@@ -847,7 +845,8 @@ sdirent_comp(const void *aa, const void *bb)
 
 /* sftp ls.1 replacement for directories */
 static int
-do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
+do_ls_dir(struct sftp_conn *conn, const char *path,
+    const char *strip_path, int lflag)
 {
 	int n;
 	u_int c = 1, colspace = 0, columns = 1;
@@ -871,12 +870,9 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 		tmp = path_strip(path, strip_path);
 		m += strlen(tmp);
 		free(tmp);
-#ifdef WINDOWS
-        width = ConScreenSizeX();
-#else
+
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 			width = ws.ws_col;
-#endif
 		columns = width / (m + 2);
 		columns = MAX(columns, 1);
 		colspace = width / columns;
@@ -932,10 +928,10 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 		} 
         else {
 #ifdef WINDOWS
-            wchar_t* wtmp = utf8_to_utf16(fname);
-            // TODO: Deal with the sizing wprintf_s(L"%-*s", colspace, wtmp);
-            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), wtmp, wcslen(wtmp), 0, 0);
-            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), L" ", 1, 0, 0);
+			wchar_t buf[1024]; 
+			wchar_t* wtmp = utf8_to_utf16(fname);
+			swprintf(buf, 1024, L"%-*s", colspace, wtmp);
+			WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buf, wcslen(buf), 0, 0);
             free(wtmp);
 #else
             printf("%-*s", colspace, fname);
@@ -959,8 +955,8 @@ do_ls_dir(struct sftp_conn *conn, char *path, char *strip_path, int lflag)
 
 /* sftp ls.1 replacement which handles path globs */
 static int
-do_globbed_ls(struct sftp_conn *conn, char *path, char *strip_path,
-    int lflag)
+do_globbed_ls(struct sftp_conn *conn, const char *path,
+    const char *strip_path, int lflag)
 {
 	char *fname, *lname;
 	glob_t g;
@@ -998,12 +994,8 @@ do_globbed_ls(struct sftp_conn *conn, char *path, char *strip_path,
 		return err;
 	}
 	
-#ifdef WINDOWS
-    width = ConScreenSizeX();
-#else
 	if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 		width = ws.ws_col;
-#endif
 
 	if (!(lflag & LS_SHORT_VIEW)) {
 		/* Count entries for sort and find longest filename */
@@ -1063,7 +1055,7 @@ do_globbed_ls(struct sftp_conn *conn, char *path, char *strip_path,
 }
 
 static int
-do_df(struct sftp_conn *conn, char *path, int hflag, int iflag)
+do_df(struct sftp_conn *conn, const char *path, int hflag, int iflag)
 {
 	struct sftp_statvfs st;
 	char s_used[FMT_SCALED_STRSIZE];
@@ -1319,7 +1311,7 @@ makeargv(const char *arg, int *argcp, int sloppy, char *lastquote,
 
 static int
 parse_args(const char **cpp, int *ignore_errors, int *aflag,
-	  int *fflag, int *hflag, int *iflag, int *lflag, int *pflag, 
+	  int *fflag, int *hflag, int *iflag, int *lflag, int *pflag,
 	  int *rflag, int *sflag,
     unsigned long *n_arg, char **path1, char **path2)
 {
@@ -1511,7 +1503,7 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
     int err_abort)
 {
 	char *path1, *path2, *tmp;
-	int ignore_errors = 0, aflag = 0, fflag = 0, hflag = 0, 
+	int ignore_errors = 0, aflag = 0, fflag = 0, hflag = 0,
 	iflag = 0;
 	int lflag = 0, pflag = 0, rflag = 0, sflag = 0;
 	int cmdnum, i;
@@ -1522,7 +1514,6 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 	glob_t g;
 
 	path1 = path2 = NULL;
-
 	cmdnum = parse_args(&cmd, &ignore_errors, &aflag, &fflag, &hflag,
 	    &iflag, &lflag, &pflag, &rflag, &sflag, &n_arg, &path1, &path2);
 	if (ignore_errors != 0)
@@ -1853,7 +1844,7 @@ complete_display(char **list, u_int len)
 	for (y = 0; list[y]; y++) {
 		llen = strlen(list[y]);
 		tmp = llen > len ? list[y] + len : "";
-		printf("%-*s", colspace, tmp);
+		mprintf("%-*s", colspace, tmp);
 		if (m >= columns) {
 			printf("\n");
 			m = 1;
@@ -2316,7 +2307,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
             }
 #endif
 			if (!interactive) { /* Echo command */
-				printf("sftp> %s", cmd);
+				mprintf("sftp> %s", cmd);
 				if (strlen(cmd) > 0 &&
 				    cmd[strlen(cmd) - 1] != '\n')
 					printf("\n");
@@ -2414,7 +2405,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
 		* Assign sockets to StartupInfo.
 		*/
 
-		si.cb = sizeof(STARTUPINFO);
+		si.cb = sizeof(STARTUPINFOW);
 		si.hStdInput = sfd_to_handle(c_in);
 		si.hStdOutput = sfd_to_handle(c_out);
 		si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
@@ -2425,7 +2416,6 @@ connect_to_server(char *path, char **args, int *in, int *out)
 		/*
 		* Create child ssh process with given stdout/stdin.
 		*/
-
 		debug("Executing ssh client: \"%.500s\"...\n", fullCmd);
 
 		if (CreateProcessW(NULL, utf8_to_utf16(fullCmd), NULL, NULL, TRUE,
@@ -2514,16 +2504,10 @@ main(int argc, char **argv)
 	long long limit_kbps = 0;
 
 #ifdef WINDOWS
-    /*
-     * Initialize I/O wrappers.
-     */
-
-	w32posix_initialize();     
+    /*TODO - is this really needed ???*/
 	setvbuf(stdout, NULL, _IONBF, 0);
-
-    ConInit(STD_OUTPUT_HANDLE, TRUE);
-
  #endif
+
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 	setlocale(LC_CTYPE, "");

@@ -71,9 +71,19 @@ typedef int sigset_t;
 
 typedef unsigned short _mode_t;
 typedef _mode_t mode_t;
+typedef int ssize_t;
 /* TODO - investigate if it makes sense to make pid_t a DWORD_PTR. 
  * Double check usage of pid_t as int */
 typedef int pid_t;
 
 /* wait pid options */
 #define WNOHANG 1
+
+/*ioctl macros and structs*/
+#define TIOCGWINSZ 1
+struct winsize {
+        unsigned short ws_row;          /* rows, in characters */
+        unsigned short ws_col;          /* columns, in character */
+        unsigned short ws_xpixel;       /* horizontal size, pixels */
+        unsigned short ws_ypixel;       /* vertical size, pixels */
+};

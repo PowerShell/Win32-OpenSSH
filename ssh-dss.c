@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-dss.c,v 1.32 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: ssh-dss.c,v 1.35 2016/04/21 06:08:02 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -122,8 +122,7 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	explicit_bzero(digest, sizeof(digest));
 	if (sig != NULL)
 		DSA_SIG_free(sig);
-	if (b != NULL)
-		sshbuf_free(b);
+	sshbuf_free(b);
 	return ret;
 }
 
@@ -140,7 +139,8 @@ ssh_dss_verify(const struct sshkey *key,
 	char *ktype = NULL;
 
 	if (key == NULL || key->dsa == NULL ||
-	    sshkey_type_plain(key->type) != KEY_DSA)
+	    sshkey_type_plain(key->type) != KEY_DSA ||
+	    signature == NULL || signaturelen == 0)
 		return SSH_ERR_INVALID_ARGUMENT;
 	if (dlen == 0)
 		return SSH_ERR_INTERNAL_ERROR;
@@ -209,10 +209,8 @@ ssh_dss_verify(const struct sshkey *key,
 	explicit_bzero(digest, sizeof(digest));
 	if (sig != NULL)
 		DSA_SIG_free(sig);
-	if (b != NULL)
-		sshbuf_free(b);
-	if (ktype != NULL)
-		free(ktype);
+	sshbuf_free(b);
+	free(ktype);
 	if (sigblob != NULL) {
 		explicit_bzero(sigblob, len);
 		free(sigblob);

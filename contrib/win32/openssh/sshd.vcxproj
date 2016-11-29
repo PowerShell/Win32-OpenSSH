@@ -158,7 +158,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>Netapi32.lib;win32iocompat.lib;bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;Netapi32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -186,7 +186,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>Netapi32.lib;win32iocompat.lib;bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;win32compat.lib;libeay32.lib;Netapi32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -235,10 +235,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)monitor.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)monitor_mm.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)monitor_wrap.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)pam.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)platform.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)roaming_common.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)roaming_serv.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sandbox-capsicum.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sandbox-darwin.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sandbox-null.c" />
@@ -252,6 +249,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sshd.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshlogin.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshpty.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_sshd.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />

@@ -26,6 +26,8 @@
 
 #include "includes.h"
 
+#if defined(WITH_OPENSSL) && defined(OPENSSL_HAS_ECC)
+
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -70,8 +72,8 @@ kexecdh_client(struct ssh *ssh)
 	public_key = EC_KEY_get0_public_key(client_key);
 
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_INIT)) != 0 ||
-		(r = sshpkt_put_ec(ssh, public_key, group)) != 0 ||
-		(r = sshpkt_send(ssh)) != 0)
+	    (r = sshpkt_put_ec(ssh, public_key, group)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
 		goto out;
 	debug("sending SSH2_MSG_KEX_ECDH_INIT");
 
@@ -86,7 +88,7 @@ kexecdh_client(struct ssh *ssh)
 	debug("expecting SSH2_MSG_KEX_ECDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_ecdh_reply);
 	r = 0;
-out:
+ out:
 	if (client_key)
 		EC_KEY_free(client_key);
 	return r;
@@ -101,7 +103,6 @@ input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 	EC_POINT *server_public = NULL;
 	EC_KEY *client_key;
 	BIGNUM *shared_secret = NULL;
-	struct sshbn *xxx_shared_secret = NULL;
 	struct sshkey *server_host_key = NULL;
 	u_char *server_host_key_blob = NULL, *signature = NULL;
 	u_char *kbuf = NULL;
@@ -119,13 +120,13 @@ input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 
 	/* hostkey */
 	if ((r = sshpkt_get_string(ssh, &server_host_key_blob,
-		&sbloblen)) != 0 ||
-		(r = sshkey_from_blob(server_host_key_blob, sbloblen,
-			&server_host_key)) != 0)
+	    &sbloblen)) != 0 ||
+	    (r = sshkey_from_blob(server_host_key_blob, sbloblen,
+	    &server_host_key)) != 0)
 		goto out;
 	if (server_host_key->type != kex->hostkey_type ||
-		(kex->hostkey_type == KEY_ECDSA &&
-			server_host_key->ecdsa_nid != kex->hostkey_nid)) {
+	    (kex->hostkey_type == KEY_ECDSA &&
+	    server_host_key->ecdsa_nid != kex->hostkey_nid)) {
 		r = SSH_ERR_KEY_TYPE_MISMATCH;
 		goto out;
 	}
@@ -141,8 +142,8 @@ input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 		goto out;
 	}
 	if ((r = sshpkt_get_ec(ssh, server_public, group)) != 0 ||
-		(r = sshpkt_get_string(ssh, &signature, &slen)) != 0 ||
-		(r = sshpkt_get_end(ssh)) != 0)
+	    (r = sshpkt_get_string(ssh, &signature, &slen)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 		goto out;
 
 #ifdef DEBUG_KEXECDH
@@ -157,13 +158,13 @@ input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 
 	klen = (EC_GROUP_get_degree(group) + 7) / 8;
 	if ((kbuf = malloc(klen)) == NULL ||
-		(shared_secret = BN_new()) == NULL) {
+	    (shared_secret = BN_new()) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
 	if (ECDH_compute_key(kbuf, klen, server_public,
-		client_key, NULL) != (int)klen ||
-		BN_bin2bn(kbuf, klen, shared_secret) == NULL) {
+	    client_key, NULL) != (int)klen ||
+	    BN_bin2bn(kbuf, klen, shared_secret) == NULL) {
 		r = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
@@ -174,21 +175,21 @@ input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 	/* calc and verify H */
 	hashlen = sizeof(hash);
 	if ((r = kex_ecdh_hash(
-		kex->hash_alg,
-		group,
-		kex->client_version_string,
-		kex->server_version_string,
-		sshbuf_ptr(kex->my), sshbuf_len(kex->my),
-		sshbuf_ptr(kex->peer), sshbuf_len(kex->peer),
-		server_host_key_blob, sbloblen,
-		EC_KEY_get0_public_key(client_key),
-		server_public,
-		shared_secret,
-		hash, &hashlen)) != 0)
+	    kex->hash_alg,
+	    group,
+	    kex->client_version_string,
+	    kex->server_version_string,
+	    sshbuf_ptr(kex->my), sshbuf_len(kex->my),
+	    sshbuf_ptr(kex->peer), sshbuf_len(kex->peer),
+	    server_host_key_blob, sbloblen,
+	    EC_KEY_get0_public_key(client_key),
+	    server_public,
+	    shared_secret,
+	    hash, &hashlen)) != 0)
 		goto out;
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash,
-		hashlen, ssh->compat)) != 0)
+	    hashlen, ssh->compat)) != 0)
 		goto out;
 
 	/* save session id */
@@ -202,15 +203,9 @@ input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
-	/* XXX */
-	if ((xxx_shared_secret = sshbn_from_bignum(shared_secret)) == NULL) {
-		r = SSH_ERR_ALLOC_FAIL;
-		goto out;
-	}
-	if ((r = kex_derive_keys_bn(ssh, hash, hashlen,
-		xxx_shared_secret)) == 0)
+	if ((r = kex_derive_keys_bn(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
-out:
+ out:
 	explicit_bzero(hash, sizeof(hash));
 	if (kex->ec_client_key) {
 		EC_KEY_free(kex->ec_client_key);
@@ -224,9 +219,10 @@ out:
 	}
 	if (shared_secret)
 		BN_clear_free(shared_secret);
-	sshbn_free(xxx_shared_secret);
 	sshkey_free(server_host_key);
 	free(server_host_key_blob);
 	free(signature);
 	return r;
 }
+#endif /* defined(WITH_OPENSSL) && defined(OPENSSL_HAS_ECC) */
+

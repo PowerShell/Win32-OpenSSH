@@ -38,7 +38,7 @@ typedef unsigned char u_char;
 
 #ifndef __MINGW32__
 #define __attribute__(A)
-#ifndef define explicit_bzero
+#ifndef explicit_bzero
 #define explicit_bzero(p,l) memset((void *)(p),0,(size_t)(l))
 #endif
 #endif

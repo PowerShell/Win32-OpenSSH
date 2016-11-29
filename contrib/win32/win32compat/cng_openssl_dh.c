@@ -16,7 +16,7 @@
 #include "packet.h"
 #include "ssherr.h"
 #include <bcrypt.h>
-#include "crypto-wrap.h"
+#include <crypto-wrap.h>
 #include <VersionHelpers.h>
 
 

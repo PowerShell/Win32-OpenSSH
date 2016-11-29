@@ -310,11 +310,30 @@ unsigned char* ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd
 
                 unsigned char* pszCurrent = pszBuffer;
                 CurrentX = ConGetCursorX();
+                int nCharCount = 0;
 
                 while ((pszCurrent < pszBufferEnd) && (*pszCurrent != (unsigned char)27)
                     && (*pszCurrent > (unsigned char)15) && (*pszCurrent != (unsigned char)255)
-                    && (CurrentX++ < ScreenX))
-                    pszCurrent++;
+                    && (CurrentX++ < ScreenX)) {
+                    if (*pszCurrent > 127) {
+                        unsigned char nLead = *pszCurrent;
+                        nCharCount++;
+                        if ((nLead & 128) == 128) {
+                            pszCurrent++;
+                        }
+                        if ((nLead & 192) == 192) {
+                            pszCurrent++;
+                        }
+                        if ((nLead & 224) == 224) {
+                            pszCurrent++;
+                        }
+                        if ((nLead & 240) == 240) {
+                            pszCurrent++;
+                        }
+                    }
+                    else
+                        pszCurrent++;
+                }
 
                 if (fShiftOut)
                     memset(pszBuffer, '|', pszCurrent - pszBuffer);

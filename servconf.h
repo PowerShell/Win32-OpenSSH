@@ -198,8 +198,7 @@ typedef struct {
 	u_int	num_auth_methods;
 	char   *auth_methods[MAX_AUTH_METHODS];
 
-	int	fingerprint_hash;  
-  
+	int	fingerprint_hash;
 }       ServerOptions;
 
 /* Information about the incoming connection as used by Match */

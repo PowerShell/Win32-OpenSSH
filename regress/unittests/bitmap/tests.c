@@ -24,12 +24,6 @@
 
 #define NTESTS 131
 
-#ifdef WIN32_FIXME
-void fatal(const char *fmt,...) {/*stub*/}
-void logit(const char *fmt,...) {/*stub*/}
-void debug3(const char *fmt,...) {/*stub*/}
-#endif
-
 void
 tests(void)
 {

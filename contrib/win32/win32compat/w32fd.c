@@ -125,7 +125,7 @@ w32posix_initialize() {
 	if ((fd_table_initialize() != 0)
 		|| (socketio_initialize() != 0))
 		DebugBreak();
-	main_thread = OpenThread(THREAD_SET_CONTEXT, FALSE, GetCurrentThreadId());
+	main_thread = OpenThread(THREAD_SET_CONTEXT | SYNCHRONIZE, FALSE, GetCurrentThreadId());
         if ((main_thread == NULL) || (sw_initialize() != 0) || w32_programdir() == NULL) {
                 DebugBreak();
                 fatal("failed to initialize w32posix wrapper");
@@ -486,7 +486,11 @@ int
 w32_close(int fd) {
 	struct w32_io* pio;
 
-	CHECK_FD(fd);
+        if ((fd < 0) || (fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
+                errno = EBADF;
+                return -1;
+        }
+
 	pio = fd_table.w32_ios[fd];
 
 	debug("close - io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd,
@@ -860,4 +864,11 @@ w32_ftruncate(int fd, off_t length) {
         return -1;
 
     return 0;
+}
+
+
+int w32_fsync(int fd) {
+    CHECK_FD(fd);
+
+    return FlushFileBuffers(w32_fd_to_handle(fd));
 }

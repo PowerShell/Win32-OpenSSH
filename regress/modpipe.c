@@ -25,38 +25,10 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <errno.h>
-#include "openbsd-compat/getopt_long.c"
-
-static void err(int, const char *, ...) __attribute__((format(printf, 2, 3)));
-static void errx(int, const char *, ...) __attribute__((format(printf, 2, 3)));
-
-#ifdef WIN32_FIXME
-void fatal(const char *fmt,...) {/*stub*/}
+#ifdef HAVE_ERR_H
+# include <err.h>
 #endif
-static void
-err(int r, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	fprintf(stderr, "%s: ", strerror(errno));
-	vfprintf(stderr, fmt, args);
-	fputc('\n', stderr);
-	va_end(args);
-	exit(r);
-}
-
-static void
-errx(int r, const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	vfprintf(stderr, fmt, args);
-	fputc('\n', stderr);
-	va_end(args);
-	exit(r);
-}
+#include "openbsd-compat/getopt_long.c"
 
 static void
 usage(void)

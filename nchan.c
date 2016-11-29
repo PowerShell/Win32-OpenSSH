@@ -74,7 +74,6 @@
 /*
  * ACTIONS: should never update the channel states
  */
-
 static void	chan_send_ieof1(Channel *);
 static void	chan_send_oclose1(Channel *);
 static void	chan_send_close2(Channel *);
@@ -115,7 +114,6 @@ static void
 chan_rcvd_oclose1(Channel *c)
 {
 	debug2("channel %d: rcvd oclose", c->self);
-
 	switch (c->istate) {
 	case CHAN_INPUT_WAIT_OCLOSE:
 		chan_set_istate(c, CHAN_INPUT_CLOSED);
@@ -163,24 +161,8 @@ chan_ibuf_empty(Channel *c)
 	switch (c->istate) {
 	case CHAN_INPUT_WAIT_DRAIN:
 		if (compat20) {
-			if (!(c->flags & (CHAN_CLOSE_SENT | CHAN_LOCAL))) {
-				#ifdef WIN32_FIXME//N
-				// reset the other side if tty to be how it was before
-				if (c->isatty) {
-					char *inittermseq =
-						"\033[?7h" // end-of-line autowrap ON mode
-						"\033[20l"; // force NewLineMode off
-
-					buffer_append(&c->input, inittermseq, strlen(inittermseq));
-					int state = c->istate;
-					c->istate = CHAN_INPUT_WAIT_DRAIN;
-					channel_output_poll();
-					packet_write_poll(); // packet_write_wait();
-					c->istate = state;
-				}
-				#endif
+			if (!(c->flags & (CHAN_CLOSE_SENT|CHAN_LOCAL)))
 				chan_send_eof2(c);
-			}
 			chan_set_istate(c, CHAN_INPUT_CLOSED);
 		} else {
 			chan_send_ieof1(c);
