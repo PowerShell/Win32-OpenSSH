@@ -11,18 +11,15 @@
 #include <io.h>
 #include <fcntl.h>
 
-// Windows directory structure content
 struct dirent {
-	char *d_name ; // name of the directory entry
-	int  d_ino; // UNIX inode
-	//unsigned attrib ; // its attributes
+	int            d_ino;       /* Inode number */
+	char           d_name[256]; /* Null-terminated filename */
 };
 
 typedef struct DIR_ DIR;
 
-DIR * opendir(char *name);
+DIR * opendir(const char *name);
 int closedir(DIR *dirp);
 struct dirent *readdir(void *avp);
-char *basename(char *path);
 
 #endif

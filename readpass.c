@@ -47,25 +47,9 @@
 #include "ssh.h"
 #include "uidswap.h"
 
-#ifdef WIN32_FIXME
-
-  #include <conio.h>
-  #include <sys/socket.h>
-  
-  //extern int PassInputFd;
-  //extern int PassOutputFd;
-  //extern int PassErrorFd;
-
-#endif
-
 static char *
 ssh_askpass(char *askpass, const char *msg)
 {
-#ifndef WIN32_FIXME
-
-  /*
-   * Original openssh code.
-   */
 	pid_t pid, ret;
 	size_t len;
 	char *pass;
@@ -82,7 +66,14 @@ ssh_askpass(char *askpass, const char *msg)
 		return NULL;
 	}
 	osigchld = signal(SIGCHLD, SIG_DFL);
+#ifdef WINDOWS 
+	/* spawd child for Windows */
+	fcntl(p[0], F_SETFD, FD_CLOEXEC);
+	pid = spawn_child(askpass, p[1], p[1], STDERR_FILENO, 0);
+	if (pid < 0) {
+#else  /* !WINDOWS */
 	if ((pid = fork()) < 0) {
+#endif  /* !WINDOWS */
 		error("ssh_askpass: fork: %s", strerror(errno));
 		signal(SIGCHLD, osigchld);
 		return NULL;
@@ -123,117 +114,6 @@ ssh_askpass(char *askpass, const char *msg)
 	pass = xstrdup(buf);
 	explicit_bzero(buf, sizeof(buf));
 	return pass;
-#else
-
-  /*
-   * Win32 code.
-   */
-   
-  HANDLE g_hChildStd_OUT_Rd = NULL;
-  HANDLE g_hChildStd_OUT_Wr = NULL;
-
-  SECURITY_ATTRIBUTES saAttr; 
-  
-  PROCESS_INFORMATION piProcInfo; 
-  
-  STARTUPINFO siStartInfo;
-  
-  BOOL bSuccess = FALSE;
-  
-  DWORD dwRead; 
-  
-  CHAR buf[1024]; 
-  
-  int length = 8192;
-  
-  CHAR command[8192];
-  
-  char *pass = NULL;
-  
-  saAttr.nLength              = sizeof(SECURITY_ATTRIBUTES); 
-  saAttr.bInheritHandle       = TRUE; 
-  saAttr.lpSecurityDescriptor = NULL; 
-
-  if (!CreatePipe(&g_hChildStd_OUT_Rd, &g_hChildStd_OUT_Wr, &saAttr, 0))
-  {
-    DWORD dw = GetLastError();
- 
-    error("ssh_askpass: failed to create pipe: %d", (int) dw);
-    
-    return NULL;
-  }
-
-  if (!SetHandleInformation(g_hChildStd_OUT_Rd, HANDLE_FLAG_INHERIT, 0))
-  {
-    DWORD dw = GetLastError();
-    
-    error("ssh_askpass: failed to set pipe for inherit: %d", (int) dw);
-    
-    return NULL;
-  }
-
-  snprintf(command, length, "\"%s\" \"%s\"", askpass, msg);
-
-  ZeroMemory(&piProcInfo, sizeof(PROCESS_INFORMATION));
-  ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
-  
-  siStartInfo.cb         = sizeof(STARTUPINFO); 
-  siStartInfo.hStdOutput = g_hChildStd_OUT_Wr;
-  siStartInfo.dwFlags   |= STARTF_USESTDHANDLES;
-
-  bSuccess = CreateProcess(NULL, command, NULL, NULL, TRUE, 0,
-                               NULL, NULL, &siStartInfo, &piProcInfo);
-  
-  if (!bSuccess)
-  {
-    DWORD dw = GetLastError();
-
-    error("ssh_askpass: CreateProcess failed: %d", (int) dw);
-    
-    return NULL;
-  }
-  else 
-  {
-    CloseHandle(piProcInfo.hProcess);
-    CloseHandle(piProcInfo.hThread);
-  }
-    
-  if (!CloseHandle(g_hChildStd_OUT_Wr)) 
-  {
-    DWORD dw = GetLastError();
-
-    error("ssh_askpass: failed to close write end of pipe: %d", (int) dw);
-    
-    return NULL;
-  }
-
-  bSuccess = ReadFile(g_hChildStd_OUT_Rd, buf, 1024, &dwRead, NULL);
-  
-  if (!bSuccess)
-  {
-    DWORD dw = GetLastError();
-   
-    error("ssh_askpass: failed to read from child: %d", (int) dw);
-    
-    return NULL;
-  }  
-  
-  if (dwRead == 0)
-  {
-    error("ssh_askpass: read 0 bytes from child");
-    
-    return NULL;
-  }    
-
-  buf[strcspn(buf, "\r\n")] = '\0';
-
-  pass = xstrdup(buf);
-  
-  memset(buf, 0, sizeof(buf));
-  
-  return pass;
-  
-#endif
 }
 
 /*
@@ -246,11 +126,68 @@ char *
 read_passphrase(const char *prompt, int flags)
 {
 	
-#ifndef WIN32_FIXME
+#ifdef WINDOWS
+	/* TODO - do flags apply on Windows? */
+	char *askpass = NULL;
+	char *ret = NULL;
+	char buf[1024] = { 0 };
 
-  /*
-   * Original openssh code.
-   */
+	DWORD mode;
+	size_t len = 0;
+	int retr = 0;
+
+	if (getenv(SSH_ASKPASS_ENV)) {
+		askpass = getenv(SSH_ASKPASS_ENV);
+		if ((ret = ssh_askpass(askpass, prompt)) == NULL) 
+			return xstrdup("");
+		return ret;
+	}
+
+	/* prompt user */
+	wchar_t* wtmp = utf8_to_utf16(prompt);
+	_cputws(wtmp);
+	free(wtmp);
+
+	len = retr = 0;
+	int bufsize = sizeof(buf);
+
+	while (_kbhit())
+		_getch();
+
+	while (len < bufsize) {
+		buf[len] = (unsigned char)_getch();
+
+		if (buf[len] == '\r') {
+			if (_kbhit())
+				_getch(); // read linefeed if its there
+			break;
+		}
+		else if (buf[len] == '\n') {
+			break;
+}
+		else if (buf[len] == '\b') { // backspace
+			if (len > 0)
+				len--; // overwrite last character
+		}
+		else if (buf[len] == '\003') {
+			/* exit on Ctrl+C */
+			fatal("");
+		}
+		else {
+			len++; // keep reading in the loop
+		}
+	}
+
+	buf[len] = '\0'; // get rid of the cr/lf
+	_cputs("\n"); // show a newline as we do not echo password or the line
+
+	ret = xstrdup(buf);
+
+	memset(buf, 'x', sizeof(buf));
+
+	return ret;
+
+#else   /* !WINDOWS */
 
 	char *askpass = NULL, *ret, buf[1024];
 	int rppflags, use_askpass = 0, ttyfd;
@@ -299,87 +236,7 @@ read_passphrase(const char *prompt, int flags)
 	explicit_bzero(buf, sizeof(buf));
 	return ret;
 	
-
-  /*
-   * Win32 code.
-   */
-   
-#else
-
-  char *askpass  = NULL;
-  char *ret      = NULL;
-  char buf[1024] = {0};
-
-  DWORD mode;
-        
-  size_t len = 0;
-
-  int retr = 0;
-        
-  if (getenv(SSH_ASKPASS_ENV))
-  {
-    askpass = getenv(SSH_ASKPASS_ENV);
-    
-    if ((ret = ssh_askpass(askpass, prompt)) == NULL)
-    {
-      if (!(flags & RP_ALLOW_EOF))
-      {
-        return xstrdup("");
-      }
-    }
-   
-    return ret;                
-  }        
-
-  /*
-   * Show prompt for user.
-   */
-  _cputws(utf8_to_utf16(prompt));
-
-   len = retr = 0;
-  int bufsize = sizeof(buf);
-
-	while (_kbhit())
-		_getch();
-
-	while ( len < bufsize ) {
-
-	 	buf[len] = (unsigned char) _getch() ;
-
-
-		if ( buf[len] == '\r' ) {
-			if (_kbhit() )
-				_getch(); // read linefeed if its there
-			break;
-		}
-		else if ( buf[len] == '\n' ) {
-			break;
-		}
-		else if ( buf[len] == '\b' ) { // backspace
-			if (len > 0 )
-				len--; // overwrite last character
-		}
-		else if (buf[len] == '\003') {
-			/* exit on Ctrl+C */
-			fatal("");
-		}
-		else {
-
-			//_putch( (int) '*' ); // show a star in place of what is typed
-			len++; // keep reading in the loop
-		}
-	}
-
-	buf[len] = '\0' ; // get rid of the cr/lf
-	_cputs("\n"); // show a newline as we do not echo password or the line
-
-  ret = xstrdup(buf);
-
-  memset(buf, 'x', sizeof(buf));
-  
-  return ret;
-  
-#endif
+#endif  /* !WINDOWS */
 
 }
 

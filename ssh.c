@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.445 2016/07/17 04:20:16 djm Exp $ */
+/* $OpenBSD: ssh.c,v 1.448 2016/12/06 07:48:01 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -109,6 +109,7 @@
 #include "version.h"
 #include "ssherr.h"
 #include "myproposal.h"
+#include "utf8.h"
 
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"
@@ -212,10 +213,6 @@ static int ssh_session(void);
 static int ssh_session2(void);
 static void load_public_identity_files(void);
 static void main_sigchld_handler(int);
-
-/* from muxclient.c */
-void muxclient(const char *);
-void muxserver_listen(void);
 
 /* ~/ expand a list of paths. NB. assumes path[n] is heap-allocated. */
 static void
@@ -551,7 +548,6 @@ main(int ac, char **av)
 	 */
 	closefrom(STDERR_FILENO + 1);
 
-#ifndef WINDOWS
 	/*
 	 * Save the original real uid.  It will be needed later (uid-swapping
 	 * may clobber the real uid).
@@ -567,7 +563,6 @@ main(int ac, char **av)
 	 * has been made, as we may need to create the port several times).
 	 */
 	PRIV_END;
-#endif
 
 #ifdef HAVE_SETRLIMIT
 	/* If we are installed setuid root be careful to not drop core. */
@@ -595,7 +590,7 @@ main(int ac, char **av)
 	 */
 	umask(022);
 
-	setlocale(LC_CTYPE, "");
+	msetlocale();
 
 	/*
 	 * Initialize option structure to indicate that no values have been
@@ -610,339 +605,336 @@ main(int ac, char **av)
 	argv0 = av[0];
 
  again:
-    while ((opt = getopt(ac, av, "1246ab:c:e:fgi:kl:m:no:p:qstvx"
-        "ACD:E:F:GI:J:KL:MNO:PQ:R:S:TVw:W:XYy")) != -1) {
-        switch (opt) {
-        case '1':
-            options.protocol = SSH_PROTO_1;
-            break;
-        case '2':
-            options.protocol = SSH_PROTO_2;
-            break;
-        case '4':
-            options.address_family = AF_INET;
-            break;
-        case '6':
-            options.address_family = AF_INET6;
-            break;
-        case 'n':
-            stdin_null_flag = 1;
-            break;
-        case 'f':
-            fork_after_authentication_flag = 1;
-            stdin_null_flag = 1;
-            break;
-        case 'x':
-            options.forward_x11 = 0;
-            break;
-        case 'X':
-            options.forward_x11 = 1;
-            break;
-        case 'y':
-            use_syslog = 1;
-            break;
-        case 'E':
-            logfile = optarg;
-            break;
-        case 'G':
-            config_test = 1;
-            break;
-        case 'Y':
-            options.forward_x11 = 1;
-            options.forward_x11_trusted = 1;
-            break;
-        case 'g':
-            options.fwd_opts.gateway_ports = 1;
-            break;
-        case 'O':
-            if (options.stdio_forward_host != NULL)
-                fatal("Cannot specify multiplexing "
-                    "command with -W");
-            else if (muxclient_command != 0)
-                fatal("Multiplexing command already specified");
-            if (strcmp(optarg, "check") == 0)
-                muxclient_command = SSHMUX_COMMAND_ALIVE_CHECK;
-            else if (strcmp(optarg, "forward") == 0)
-                muxclient_command = SSHMUX_COMMAND_FORWARD;
-            else if (strcmp(optarg, "exit") == 0)
-                muxclient_command = SSHMUX_COMMAND_TERMINATE;
-            else if (strcmp(optarg, "stop") == 0)
-                muxclient_command = SSHMUX_COMMAND_STOP;
-            else if (strcmp(optarg, "cancel") == 0)
-                muxclient_command = SSHMUX_COMMAND_CANCEL_FWD;
-            else
-                fatal("Invalid multiplex command.");
-            break;
-        case 'P':	/* deprecated */
-            options.use_privileged_port = 0;
-            break;
-        case 'Q':
-            cp = NULL;
-            if (strcmp(optarg, "cipher") == 0)
-                cp = cipher_alg_list('\n', 0);
-            else if (strcmp(optarg, "cipher-auth") == 0)
-                cp = cipher_alg_list('\n', 1);
-            else if (strcmp(optarg, "mac") == 0)
-                cp = mac_alg_list('\n');
-            else if (strcmp(optarg, "kex") == 0)
-                cp = kex_alg_list('\n');
-            else if (strcmp(optarg, "key") == 0)
-                cp = key_alg_list(0, 0);
-            else if (strcmp(optarg, "key-cert") == 0)
-                cp = key_alg_list(1, 0);
-            else if (strcmp(optarg, "key-plain") == 0)
-                cp = key_alg_list(0, 1);
-            else if (strcmp(optarg, "protocol-version") == 0) {
+	while ((opt = getopt(ac, av, "1246ab:c:e:fgi:kl:m:no:p:qstvx"
+	    "ACD:E:F:GI:J:KL:MNO:PQ:R:S:TVw:W:XYy")) != -1) {
+		switch (opt) {
+		case '1':
+			options.protocol = SSH_PROTO_1;
+			break;
+		case '2':
+			options.protocol = SSH_PROTO_2;
+			break;
+		case '4':
+			options.address_family = AF_INET;
+			break;
+		case '6':
+			options.address_family = AF_INET6;
+			break;
+		case 'n':
+			stdin_null_flag = 1;
+			break;
+		case 'f':
+			fork_after_authentication_flag = 1;
+			stdin_null_flag = 1;
+			break;
+		case 'x':
+			options.forward_x11 = 0;
+			break;
+		case 'X':
+			options.forward_x11 = 1;
+			break;
+		case 'y':
+			use_syslog = 1;
+			break;
+		case 'E':
+			logfile = optarg;
+			break;
+		case 'G':
+			config_test = 1;
+			break;
+		case 'Y':
+			options.forward_x11 = 1;
+			options.forward_x11_trusted = 1;
+			break;
+		case 'g':
+			options.fwd_opts.gateway_ports = 1;
+			break;
+		case 'O':
+			if (options.stdio_forward_host != NULL)
+				fatal("Cannot specify multiplexing "
+				    "command with -W");
+			else if (muxclient_command != 0)
+				fatal("Multiplexing command already specified");
+			if (strcmp(optarg, "check") == 0)
+				muxclient_command = SSHMUX_COMMAND_ALIVE_CHECK;
+			else if (strcmp(optarg, "forward") == 0)
+				muxclient_command = SSHMUX_COMMAND_FORWARD;
+			else if (strcmp(optarg, "exit") == 0)
+				muxclient_command = SSHMUX_COMMAND_TERMINATE;
+			else if (strcmp(optarg, "stop") == 0)
+				muxclient_command = SSHMUX_COMMAND_STOP;
+			else if (strcmp(optarg, "cancel") == 0)
+				muxclient_command = SSHMUX_COMMAND_CANCEL_FWD;
+			else if (strcmp(optarg, "proxy") == 0)
+				muxclient_command = SSHMUX_COMMAND_PROXY;
+			else
+				fatal("Invalid multiplex command.");
+			break;
+		case 'P':	/* deprecated */
+			options.use_privileged_port = 0;
+			break;
+		case 'Q':
+			cp = NULL;
+			if (strcmp(optarg, "cipher") == 0)
+				cp = cipher_alg_list('\n', 0);
+			else if (strcmp(optarg, "cipher-auth") == 0)
+				cp = cipher_alg_list('\n', 1);
+			else if (strcmp(optarg, "mac") == 0)
+				cp = mac_alg_list('\n');
+			else if (strcmp(optarg, "kex") == 0)
+				cp = kex_alg_list('\n');
+			else if (strcmp(optarg, "key") == 0)
+				cp = sshkey_alg_list(0, 0, '\n');
+			else if (strcmp(optarg, "key-cert") == 0)
+				cp = sshkey_alg_list(1, 0, '\n');
+			else if (strcmp(optarg, "key-plain") == 0)
+				cp = sshkey_alg_list(0, 1, '\n');
+			else if (strcmp(optarg, "protocol-version") == 0) {
 #ifdef WITH_SSH1
-                cp = xstrdup("1\n2");
+				cp = xstrdup("1\n2");
 #else
-                cp = xstrdup("2");
+				cp = xstrdup("2");
 #endif
-            }
-            if (cp == NULL)
-                fatal("Unsupported query \"%s\"", optarg);
-            printf("%s\n", cp);
-            free(cp);
-            exit(0);
-            break;
-        case 'a':
-            options.forward_agent = 0;
-            break;
-        case 'A':
-            options.forward_agent = 1;
-            break;
-        case 'k':
-            options.gss_deleg_creds = 0;
-            break;
-        case 'K':
-            options.gss_authentication = 1;
-            options.gss_deleg_creds = 1;
-            break;
-        case 'i':
-            p = tilde_expand_filename(optarg, original_real_uid);
-            if (stat(p, &st) < 0) {
-                fprintf(stderr, "Warning: Identity file %s "
-                    "not accessible: %s.\n", p,
-                    strerror(errno));
-                break;
-            }
-            add_identity_file(&options, NULL, p, 1);
-            break;
-        case 'I':
+			}
+			if (cp == NULL)
+				fatal("Unsupported query \"%s\"", optarg);
+			printf("%s\n", cp);
+			free(cp);
+			exit(0);
+			break;
+		case 'a':
+			options.forward_agent = 0;
+			break;
+		case 'A':
+			options.forward_agent = 1;
+			break;
+		case 'k':
+			options.gss_deleg_creds = 0;
+			break;
+		case 'K':
+			options.gss_authentication = 1;
+			options.gss_deleg_creds = 1;
+			break;
+		case 'i':
+			p = tilde_expand_filename(optarg, original_real_uid);
+			if (stat(p, &st) < 0)
+				fprintf(stderr, "Warning: Identity file %s "
+				    "not accessible: %s.\n", p,
+				    strerror(errno));
+			else
+				add_identity_file(&options, NULL, p, 1);
+			free(p);
+			break;
+		case 'I':
 #ifdef ENABLE_PKCS11
-            free(options.pkcs11_provider);
-            options.pkcs11_provider = xstrdup(optarg);
+			free(options.pkcs11_provider);
+			options.pkcs11_provider = xstrdup(optarg);
 #else
-            fprintf(stderr, "no support for PKCS#11.\n");
+			fprintf(stderr, "no support for PKCS#11.\n");
 #endif
-            break;
-        case 'J':
-            if (options.jump_host != NULL)
-                fatal("Only a single -J option permitted");
-            if (options.proxy_command != NULL)
-                fatal("Cannot specify -J with ProxyCommand");
-            if (parse_jump(optarg, &options, 1) == -1)
-                fatal("Invalid -J argument");
-            options.proxy_command = xstrdup("none");
-            break;
-        case 't':
-            if (options.request_tty == REQUEST_TTY_YES)
-                options.request_tty = REQUEST_TTY_FORCE;
-            else
-                options.request_tty = REQUEST_TTY_YES;
-            break;
-        case 'v':
-            if (debug_flag == 0) {
-                debug_flag = 1;
-                options.log_level = SYSLOG_LEVEL_DEBUG1;
-            }
-            else {
-                if (options.log_level < SYSLOG_LEVEL_DEBUG3) {
-                    debug_flag++;
-                    options.log_level++;
-                }
-                break;
-        case 'V':
-            fprintf(stderr, "%s %s, %s\n",
-                SSH_RELEASE, __DATE__,
+			break;
+		case 'J':
+			if (options.jump_host != NULL)
+				fatal("Only a single -J option permitted");
+			if (options.proxy_command != NULL)
+				fatal("Cannot specify -J with ProxyCommand");
+			if (parse_jump(optarg, &options, 1) == -1)
+				fatal("Invalid -J argument");
+			options.proxy_command = xstrdup("none");
+			break;
+		case 't':
+			if (options.request_tty == REQUEST_TTY_YES)
+				options.request_tty = REQUEST_TTY_FORCE;
+			else
+				options.request_tty = REQUEST_TTY_YES;
+			break;
+		case 'v':
+			if (debug_flag == 0) {
+				debug_flag = 1;
+				options.log_level = SYSLOG_LEVEL_DEBUG1;
+			} else {
+				if (options.log_level < SYSLOG_LEVEL_DEBUG3) {
+					debug_flag++;
+					options.log_level++;
+				}
+			}
+			break;
+		case 'V':
+			fprintf(stderr, "%s, %s\n",
+			    SSH_RELEASE,
 #ifdef WITH_OPENSSL
-                SSLeay_version(SSLEAY_VERSION)
+			    SSLeay_version(SSLEAY_VERSION)
 #else
-                "without OpenSSL"
+			    "without OpenSSL"
 #endif
-            );
-            if (opt == 'V')
-                exit(0);
-            break;
-        case 'w':
-            if (options.tun_open == -1)
-                options.tun_open = SSH_TUNMODE_DEFAULT;
-            options.tun_local = a2tun(optarg, &options.tun_remote);
-            if (options.tun_local == SSH_TUNID_ERR) {
-                fprintf(stderr,
-                    "Bad tun device '%s'\n", optarg);
-                exit(255);
-            }
-            break;
-        case 'W':
-            if (options.stdio_forward_host != NULL)
-                fatal("stdio forward already specified");
-            if (muxclient_command != 0)
-                fatal("Cannot specify stdio forward with -O");
-            if (parse_forward(&fwd, optarg, 1, 0)) {
-                options.stdio_forward_host = fwd.listen_host;
-                options.stdio_forward_port = fwd.listen_port;
-                free(fwd.connect_host);
-            }
-            else {
-                fprintf(stderr,
-                    "Bad stdio forwarding specification '%s'\n",
-                    optarg);
-                exit(255);
-            }
-            options.request_tty = REQUEST_TTY_NO;
-            no_shell_flag = 1;
-            break;
-        case 'q':
-            options.log_level = SYSLOG_LEVEL_QUIET;
-            break;
-        case 'e':
-            if (optarg[0] == '^' && optarg[2] == 0 &&
-                (u_char)optarg[1] >= 64 &&
-                (u_char)optarg[1] < 128)
-                options.escape_char = (u_char)optarg[1] & 31;
-            else if (strlen(optarg) == 1)
-                options.escape_char = (u_char)optarg[0];
-            else if (strcmp(optarg, "none") == 0)
-                options.escape_char = SSH_ESCAPECHAR_NONE;
-            else {
-                fprintf(stderr, "Bad escape character '%s'.\n",
-                    optarg);
-                exit(255);
-            }
-            break;
-        case 'c':
-            if (ciphers_valid(*optarg == '+' ?
-                optarg + 1 : optarg)) {
-                /* SSH2 only */
-                free(options.ciphers);
-                options.ciphers = xstrdup(optarg);
-                options.cipher = SSH_CIPHER_INVALID;
-                break;
-            }
-            /* SSH1 only */
-            options.cipher = cipher_number(optarg);
-            if (options.cipher == -1) {
-                fprintf(stderr, "Unknown cipher type '%s'\n",
-                    optarg);
-                exit(255);
-            }
-            if (options.cipher == SSH_CIPHER_3DES)
-                options.ciphers = xstrdup("3des-cbc");
-            else if (options.cipher == SSH_CIPHER_BLOWFISH)
-                options.ciphers = xstrdup("blowfish-cbc");
-            else
-                options.ciphers = xstrdup(KEX_CLIENT_ENCRYPT);
-            break;
-        case 'm':
-            if (mac_valid(optarg)) {
-                free(options.macs);
-                options.macs = xstrdup(optarg);
-            }
-            else {
-                fprintf(stderr, "Unknown mac type '%s'\n",
-                    optarg);
-                exit(255);
-            }
-            break;
-        case 'M':
-            if (options.control_master == SSHCTL_MASTER_YES)
-                options.control_master = SSHCTL_MASTER_ASK;
-            else
-                options.control_master = SSHCTL_MASTER_YES;
-            break;
-        case 'p':
-            options.port = a2port(optarg);
-            if (options.port <= 0) {
-                fprintf(stderr, "Bad port '%s'\n", optarg);
-                exit(255);
-            }
-            break;
-        case 'l':
-            options.user = optarg;
-            break;
+			);
+			if (opt == 'V')
+				exit(0);
+			break;
+		case 'w':
+			if (options.tun_open == -1)
+				options.tun_open = SSH_TUNMODE_DEFAULT;
+			options.tun_local = a2tun(optarg, &options.tun_remote);
+			if (options.tun_local == SSH_TUNID_ERR) {
+				fprintf(stderr,
+				    "Bad tun device '%s'\n", optarg);
+				exit(255);
+			}
+			break;
+		case 'W':
+			if (options.stdio_forward_host != NULL)
+				fatal("stdio forward already specified");
+			if (muxclient_command != 0)
+				fatal("Cannot specify stdio forward with -O");
+			if (parse_forward(&fwd, optarg, 1, 0)) {
+				options.stdio_forward_host = fwd.listen_host;
+				options.stdio_forward_port = fwd.listen_port;
+				free(fwd.connect_host);
+			} else {
+				fprintf(stderr,
+				    "Bad stdio forwarding specification '%s'\n",
+				    optarg);
+				exit(255);
+			}
+			options.request_tty = REQUEST_TTY_NO;
+			no_shell_flag = 1;
+			break;
+		case 'q':
+			options.log_level = SYSLOG_LEVEL_QUIET;
+			break;
+		case 'e':
+			if (optarg[0] == '^' && optarg[2] == 0 &&
+			    (u_char) optarg[1] >= 64 &&
+			    (u_char) optarg[1] < 128)
+				options.escape_char = (u_char) optarg[1] & 31;
+			else if (strlen(optarg) == 1)
+				options.escape_char = (u_char) optarg[0];
+			else if (strcmp(optarg, "none") == 0)
+				options.escape_char = SSH_ESCAPECHAR_NONE;
+			else {
+				fprintf(stderr, "Bad escape character '%s'.\n",
+				    optarg);
+				exit(255);
+			}
+			break;
+		case 'c':
+			if (ciphers_valid(*optarg == '+' ?
+			    optarg + 1 : optarg)) {
+				/* SSH2 only */
+				free(options.ciphers);
+				options.ciphers = xstrdup(optarg);
+				options.cipher = SSH_CIPHER_INVALID;
+				break;
+			}
+			/* SSH1 only */
+			options.cipher = cipher_number(optarg);
+			if (options.cipher == -1) {
+				fprintf(stderr, "Unknown cipher type '%s'\n",
+				    optarg);
+				exit(255);
+			}
+			if (options.cipher == SSH_CIPHER_3DES)
+				options.ciphers = xstrdup("3des-cbc");
+			else if (options.cipher == SSH_CIPHER_BLOWFISH)
+				options.ciphers = xstrdup("blowfish-cbc");
+			else
+				options.ciphers = xstrdup(KEX_CLIENT_ENCRYPT);
+			break;
+		case 'm':
+			if (mac_valid(optarg)) {
+				free(options.macs);
+				options.macs = xstrdup(optarg);
+			} else {
+				fprintf(stderr, "Unknown mac type '%s'\n",
+				    optarg);
+				exit(255);
+			}
+			break;
+		case 'M':
+			if (options.control_master == SSHCTL_MASTER_YES)
+				options.control_master = SSHCTL_MASTER_ASK;
+			else
+				options.control_master = SSHCTL_MASTER_YES;
+			break;
+		case 'p':
+			options.port = a2port(optarg);
+			if (options.port <= 0) {
+				fprintf(stderr, "Bad port '%s'\n", optarg);
+				exit(255);
+			}
+			break;
+		case 'l':
+			options.user = optarg;
+			break;
 
-        case 'L':
-            if (parse_forward(&fwd, optarg, 0, 0))
-                add_local_forward(&options, &fwd);
-            else {
-                fprintf(stderr,
-                    "Bad local forwarding specification '%s'\n",
-                    optarg);
-                exit(255);
-            }
-            break;
+		case 'L':
+			if (parse_forward(&fwd, optarg, 0, 0))
+				add_local_forward(&options, &fwd);
+			else {
+				fprintf(stderr,
+				    "Bad local forwarding specification '%s'\n",
+				    optarg);
+				exit(255);
+			}
+			break;
 
-        case 'R':
-            if (parse_forward(&fwd, optarg, 0, 1)) {
-                add_remote_forward(&options, &fwd);
-            }
-            else {
-                fprintf(stderr,
-                    "Bad remote forwarding specification "
-                    "'%s'\n", optarg);
-                exit(255);
-            }
-            break;
+		case 'R':
+			if (parse_forward(&fwd, optarg, 0, 1)) {
+				add_remote_forward(&options, &fwd);
+			} else {
+				fprintf(stderr,
+				    "Bad remote forwarding specification "
+				    "'%s'\n", optarg);
+				exit(255);
+			}
+			break;
 
-        case 'D':
-            if (parse_forward(&fwd, optarg, 1, 0)) {
-                add_local_forward(&options, &fwd);
-            }
-            else {
-                fprintf(stderr,
-                    "Bad dynamic forwarding specification "
-                    "'%s'\n", optarg);
-                exit(255);
-            }
-            break;
+		case 'D':
+			if (parse_forward(&fwd, optarg, 1, 0)) {
+				add_local_forward(&options, &fwd);
+			} else {
+				fprintf(stderr,
+				    "Bad dynamic forwarding specification "
+				    "'%s'\n", optarg);
+				exit(255);
+			}
+			break;
 
-        case 'C':
-            options.compression = 1;
-            break;
-        case 'N':
-            no_shell_flag = 1;
-            options.request_tty = REQUEST_TTY_NO;
-            break;
-        case 'T':
-            options.request_tty = REQUEST_TTY_NO;
-            break;
-        case 'o':
-            line = xstrdup(optarg);
-            if (process_config_line(&options, pw,
-                host ? host : "", host ? host : "", line,
-                "command-line", 0, NULL, SSHCONF_USERCONF) != 0)
-                exit(255);
-            free(line);
-            break;
-        case 's':
-            subsystem_flag = 1;
-            break;
-        case 'S':
-            free(options.control_path);
-            options.control_path = xstrdup(optarg);
-            break;
-        case 'b':
-            options.bind_address = optarg;
-            break;
-        case 'F':
-            config = optarg;
-            break;
-        default:
-            usage();
-            }
-        }
-    }
+		case 'C':
+			options.compression = 1;
+			break;
+		case 'N':
+			no_shell_flag = 1;
+			options.request_tty = REQUEST_TTY_NO;
+			break;
+		case 'T':
+			options.request_tty = REQUEST_TTY_NO;
+			break;
+		case 'o':
+			line = xstrdup(optarg);
+			if (process_config_line(&options, pw,
+			    host ? host : "", host ? host : "", line,
+			    "command-line", 0, NULL, SSHCONF_USERCONF) != 0)
+				exit(255);
+			free(line);
+			break;
+		case 's':
+			subsystem_flag = 1;
+			break;
+		case 'S':
+			free(options.control_path);
+			options.control_path = xstrdup(optarg);
+			break;
+		case 'b':
+			options.bind_address = optarg;
+			break;
+		case 'F':
+			config = optarg;
+			break;
+		default:
+			usage();
+		}
+	}
 
 	ac -= optind;
 	av += optind;
@@ -1169,7 +1161,8 @@ main(int ac, char **av)
 		tty_flag = options.request_tty != REQUEST_TTY_NO;
 
 	/* Force no tty */
-	if (options.request_tty == REQUEST_TTY_NO || muxclient_command != 0)
+	if (options.request_tty == REQUEST_TTY_NO ||
+	    (muxclient_command && muxclient_command != SSHMUX_COMMAND_PROXY))
 		tty_flag = 0;
 	/* Do not allocate a tty if stdin is not a tty. */
 	if ((!isatty(fileno(stdin)) || stdin_null_flag) &&
@@ -1246,8 +1239,16 @@ main(int ac, char **av)
 
 	if (muxclient_command != 0 && options.control_path == NULL)
 		fatal("No ControlPath specified for \"-O\" command");
-	if (options.control_path != NULL)
-		muxclient(options.control_path);
+	if (options.control_path != NULL) {
+		int sock;
+		if ((sock = muxclient(options.control_path)) >= 0) {
+			packet_set_connection(sock, sock);
+			ssh = active_state; /* XXX */
+			enable_compat20();	/* XXX */
+			packet_set_mux();
+			goto skip_connect;
+		}
+	}
 
 	/*
 	 * If hostname canonicalisation was not enabled, then we may not
@@ -1386,8 +1387,7 @@ main(int ac, char **av)
 #endif
 		}
 	}
-
-        /* load options.identity_files */
+	/* load options.identity_files */
 	load_public_identity_files();
 
 	/* optionally set the SSH_AUTHSOCKET_ENV_NAME varibale */
@@ -1450,7 +1450,8 @@ main(int ac, char **av)
 		free(options.certificate_files[i]);
 		options.certificate_files[i] = NULL;
 	}
-	
+
+ skip_connect:
 	exit_status = compat20 ? ssh_session2() : ssh_session();
 	packet_close();
 
@@ -1466,8 +1467,15 @@ main(int ac, char **av)
 static void
 control_persist_detach(void)
 {
-#ifndef WINDOWS
-	pid_t pid;
+#ifdef WINDOWS
+	/* 
+	 * This needs some level of support for domain sockets in Windows 
+	 * Domain sockets (w/out ancillary data support) can easily be 
+	 * implemented using named pipes.
+	 */
+        fatal("ControlMaster is not supported in Windows yet");
+#else /* !WINDOWS */
+        pid_t pid;
 	int devnull, keep_stderr;
 
 	debug("%s: backgrounding master process", __func__);
@@ -1509,9 +1517,7 @@ control_persist_detach(void)
 	}
 	daemon(1, 1);
 	setproctitle("%s [mux]", options.control_path);
-#else
-	fatal("ControlMaster is not supported in Windows");
-#endif
+#endif /* !WINDOWS */
 }
 
 /* Do fork() after authentication. Used by "ssh -f" */
@@ -1746,14 +1752,10 @@ ssh_session(void)
 		cp = getenv("TERM");
 		if (!cp)
 			cp = "";
-#ifdef WIN32_FIXME
-        if (cp != NULL && _stricmp(cp, "passthru") == 0)
-            cp = "ansi";
-#endif
 		packet_put_cstring(cp);
 
 		/* Store window size in the packet. */
-                if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) < 0)
+		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) < 0)
 			memset(&ws, 0, sizeof(ws));
 		packet_put_int((u_int)ws.ws_row);
 		packet_put_int((u_int)ws.ws_col);
@@ -1907,18 +1909,8 @@ ssh_session2_setup(int id, int success, void *arg)
 	packet_set_interactive(interactive,
 	    options.ip_qos_interactive, options.ip_qos_bulk);
 
-#ifdef WIN32_FIXME
-    char *term = getenv("TERM");
-
-    if (term != NULL && _stricmp(term, "passthru") == 0)
-        term = "ansi";
-
-	client_session2_setup(id, tty_flag, subsystem_flag, term,
-	    NULL, fileno(stdin), &command, environ);
-#else
 	client_session2_setup(id, tty_flag, subsystem_flag, getenv("TERM"),
 	    NULL, fileno(stdin), &command, environ);
-#endif
 }
 
 /* open new channel for a session */
@@ -1979,7 +1971,8 @@ ssh_session2(void)
 	ssh_init_forwarding();
 
 	/* Start listening for multiplex clients */
-	muxserver_listen();
+	if (!packet_get_mux())
+		muxserver_listen();
 
  	/*
 	 * If we are in control persist mode and have a working mux listen
@@ -2144,8 +2137,9 @@ load_public_identity_files(void)
 			free(cp);
 			continue;
 		}
+		/* NB. leave filename pointing to private key */
+		identity_files[n_ids] = xstrdup(filename);
 		identity_keys[n_ids] = public;
-		identity_files[n_ids] = cp;
 		n_ids++;
 	}
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.259 2016/07/22 03:35:11 djm Exp $ */
+/* $OpenBSD: readconf.c,v 1.262 2016/10/25 04:08:13 jsg Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -312,7 +312,7 @@ add_local_forward(Options *options, const struct Forward *newfwd)
 	extern uid_t original_real_uid;
 	int i;
 
-	if (newfwd->listen_port < IPPORT_RESERVED && original_real_uid != 0 &&
+	if (!bind_permitted(newfwd->listen_port, original_real_uid) &&
 	    newfwd->listen_path == NULL)
 		fatal("Privileged ports can only be forwarded by root.");
 	/* Don't add duplicates */
@@ -469,12 +469,10 @@ default_ssh_port(void)
 static int
 execute_in_shell(const char *cmd)
 {
-	#ifdef WIN32_FIXME
-	// PRAGMA:TODO
-	logit("==>> execute_in_shell()");
+#ifdef WINDOWS
+	fatal("LocalCommand execution is not supported on Windows yet");
 	return 0;
-	#else
-	char *shell, *command_string;
+#else /* !WINDOWS */
 	pid_t pid;
 	int devnull, status;
 	extern uid_t original_real_uid;
@@ -532,7 +530,7 @@ execute_in_shell(const char *cmd)
 	}
 	debug3("command returned status %d", WEXITSTATUS(status));
 	return WEXITSTATUS(status);
-	#endif
+#endif /* !WINDOWS */
 }
 
 /*
@@ -864,7 +862,6 @@ process_config_line_depth(Options *options, struct passwd *pw, const char *host,
 	case oBadOption:
 		/* don't panic, but count bad options */
 		return -1;
-		/* NOTREACHED */
 	case oIgnoredUnknownOption:
 		debug("%s line %d: Ignored unknown option \"%s\"",
 		    filename, linenum, keyword);
@@ -1046,7 +1043,7 @@ parse_time:
 			if (*intptr >= SSH_MAX_IDENTITY_FILES)
 				fatal("%.200s line %d: Too many identity files specified (max %d).",
 				    filename, linenum, SSH_MAX_IDENTITY_FILES);
-                        add_identity_file(options, NULL,
+			add_identity_file(options, NULL,
 			    arg, flags & SSHCONF_USERCONF);
 		}
 		break;
@@ -1727,7 +1724,7 @@ read_config_file_depth(const char *filename, struct passwd *pw,
 		    (sb.st_mode & 022) != 0))
 			fatal("Bad owner or permissions on %s", filename);
 	}
-#endif
+#endif /* !WINDOWS */
 	debug("Reading configuration data %.200s", filename);
 
 	/*
@@ -1969,20 +1966,19 @@ fill_default_options(Options * options)
 	if (options->num_identity_files == 0) {
 		if (options->protocol & SSH_PROTO_1) {
 			add_identity_file(options, "~/",
-				_PATH_SSH_CLIENT_IDENTITY, 0);
+			    _PATH_SSH_CLIENT_IDENTITY, 0);
 		}
 		if (options->protocol & SSH_PROTO_2) {
 			add_identity_file(options, "~/",
-				_PATH_SSH_CLIENT_ID_RSA, 0);
-
+			    _PATH_SSH_CLIENT_ID_RSA, 0);
 			add_identity_file(options, "~/",
-				_PATH_SSH_CLIENT_ID_DSA, 0);
+			    _PATH_SSH_CLIENT_ID_DSA, 0);
 #ifdef OPENSSL_HAS_ECC
 			add_identity_file(options, "~/",
-				_PATH_SSH_CLIENT_ID_ECDSA, 0);
+			    _PATH_SSH_CLIENT_ID_ECDSA, 0);
 #endif
 			add_identity_file(options, "~/",
-				_PATH_SSH_CLIENT_ID_ED25519, 0);
+			    _PATH_SSH_CLIENT_ID_ED25519, 0);
 		}
 	}
 	if (options->escape_char == -1)

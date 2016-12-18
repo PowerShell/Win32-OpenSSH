@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
-#include <console.h>
+#include "console.h"
 #include <conio.h>
 
 #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING

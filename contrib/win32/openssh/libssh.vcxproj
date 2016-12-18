@@ -191,10 +191,10 @@
     <ClCompile Include="$(OpenSSH-Src-Path)crc32.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)deattack.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)dh.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)digest-libc.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)dispatch.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)dns.c" />
@@ -212,28 +212,28 @@
     <ClCompile Include="$(OpenSSH-Src-Path)kexc25519c.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)kexc25519s.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)kexdh.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kexdhc.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kexdhs.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kexecdh.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kexecdhc.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kexecdhs.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kexgex.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)kexgexc.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)key.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)krl.c" />
@@ -253,20 +253,20 @@
     <ClCompile Include="$(OpenSSH-Src-Path)readpass.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)rijndael.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)rsa.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)sc25519.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)smult_curve25519_ref.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-dss.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-ecdsa.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-ed25519.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-pkcs11.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-rsa.c">
-		<ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)sshbuf-getput-basic.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshbuf-getput-crypto.c" />
@@ -275,17 +275,17 @@
     <ClCompile Include="$(OpenSSH-Src-Path)ssherr.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshkey.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)ssh_api.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)ttymodes.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)uidswap.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)umac.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)uuencode.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)verify.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c" />
-    <ClCompile Include="..\..\..\platform-pledge.c" />
-    <ClCompile Include="..\..\..\platform-tracing.c" />
-    <ClCompile Include="..\..\..\platform.c" />
-    <ClCompile Include="..\..\..\sandbox-pledge.c" />
-    <ClCompile Include="..\..\..\utf8.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)platform-pledge.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)platform-tracing.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)platform.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-pledge.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)utf8.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c" />
+    <ClCompile Include="..\..\..\digest-openssl.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h" />

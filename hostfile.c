@@ -1,4 +1,4 @@
-/* $OpenBSD: hostfile.c,v 1.66 2015/05/04 06:10:48 djm Exp $ */
+/* $OpenBSD: hostfile.c,v 1.67 2016/09/17 18:00:27 tedu Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -123,14 +123,13 @@ host_hash(const char *host, const char *name_from_hostfile, u_int src_len)
 	u_char salt[256], result[256];
 	char uu_salt[512], uu_result[512];
 	static char encoded[1024];
-	u_int i, len;
+	u_int len;
 
 	len = ssh_digest_bytes(SSH_DIGEST_SHA1);
 
 	if (name_from_hostfile == NULL) {
 		/* Create new salt */
-		for (i = 0; i < len; i++)
-			salt[i] = arc4random();
+		arc4random_buf(salt, len);
 	} else {
 		/* Extract salt from known host entry */
 		if (extract_salt(name_from_hostfile, src_len, salt,
@@ -532,7 +531,11 @@ int
 hostfile_replace_entries(const char *filename, const char *host, const char *ip,
     struct sshkey **keys, size_t nkeys, int store_hash, int quiet, int hash_alg)
 {
-	#ifndef WIN32_FIXME//R
+#ifdef WINDOWS
+	error("replacing host file entries is not supported in Windows yet");
+	errno = ENOTSUP;
+	return -1;
+#else /* !WINDOWS */
 	int r, fd, oerrno = 0;
 	int loglevel = quiet ? SYSLOG_LEVEL_DEBUG1 : SYSLOG_LEVEL_VERBOSE;
 	struct host_delete_ctx ctx;
@@ -647,10 +650,7 @@ hostfile_replace_entries(const char *filename, const char *host, const char *ip,
 	if (r == SSH_ERR_SYSTEM_ERROR)
 		errno = oerrno;
 	return r;
-#else
-	error("replacing host file entries is not supported in Windows");
-	return 0;
-#endif
+#endif /* !WINDOWS */
 }
 
 static int

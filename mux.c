@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.60 2016/06/03 03:14:41 dtucker Exp $ */
+/* $OpenBSD: mux.c,v 1.63 2016/10/19 23:21:56 dtucker Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -79,6 +79,7 @@
 #include "key.h"
 #include "readconf.h"
 #include "clientloop.h"
+#include "ssherr.h"
 
 /* from ssh.c */
 extern int tty_flag;
@@ -144,6 +145,7 @@ struct mux_master_state {
 #define MUX_C_CLOSE_FWD		0x10000007
 #define MUX_C_NEW_STDIO_FWD	0x10000008
 #define MUX_C_STOP_LISTENING	0x10000009
+#define MUX_C_PROXY		0x1000000f
 #define MUX_S_OK		0x80000001
 #define MUX_S_PERMISSION_DENIED	0x80000002
 #define MUX_S_FAILURE		0x80000003
@@ -152,6 +154,7 @@ struct mux_master_state {
 #define MUX_S_SESSION_OPENED	0x80000006
 #define MUX_S_REMOTE_PORT	0x80000007
 #define MUX_S_TTY_ALLOC_FAIL	0x80000008
+#define MUX_S_PROXY		0x8000000f
 
 /* type codes for MUX_C_OPEN_FWD and MUX_C_CLOSE_FWD */
 #define MUX_FWD_LOCAL   1
@@ -169,6 +172,7 @@ static int process_mux_open_fwd(u_int, Channel *, Buffer *, Buffer *);
 static int process_mux_close_fwd(u_int, Channel *, Buffer *, Buffer *);
 static int process_mux_stdio_fwd(u_int, Channel *, Buffer *, Buffer *);
 static int process_mux_stop_listening(u_int, Channel *, Buffer *, Buffer *);
+static int process_mux_proxy(u_int, Channel *, Buffer *, Buffer *);
 
 static const struct {
 	u_int type;
@@ -182,6 +186,7 @@ static const struct {
 	{ MUX_C_CLOSE_FWD, process_mux_close_fwd },
 	{ MUX_C_NEW_STDIO_FWD, process_mux_stdio_fwd },
 	{ MUX_C_STOP_LISTENING, process_mux_stop_listening },
+	{ MUX_C_PROXY, process_mux_proxy },
 	{ 0, NULL }
 };
 
@@ -305,8 +310,6 @@ process_mux_master_hello(u_int rid, Channel *c, Buffer *m, Buffer *r)
 static int
 process_mux_new_session(u_int rid, Channel *c, Buffer *m, Buffer *r)
 {
-	
-#ifndef WIN32_FIXME
 	Channel *nc;
 	struct mux_session_confirm_ctx *cctx;
 	char *reserved, *cmd, *cp;
@@ -474,21 +477,11 @@ process_mux_new_session(u_int rid, Channel *c, Buffer *m, Buffer *r)
 
 	/* reply is deferred, sent by mux_session_confirm */
 	return 0;
-#else
-
-  /*
-   * Not implemented on Win32.
-   */
-
-  return -1;
-  
-#endif
 }
 
 static int
 process_mux_alive_check(u_int rid, Channel *c, Buffer *m, Buffer *r)
 {
-#ifndef WIN32_FIXME
 	debug2("%s: channel %d: alive check", __func__, c->self);
 
 	/* prepare reply */
@@ -497,17 +490,11 @@ process_mux_alive_check(u_int rid, Channel *c, Buffer *m, Buffer *r)
 	buffer_put_int(r, (u_int)getpid());
 
 	return 0;
-#else
-
-  return -1;
-
-#endif
 }
 
 static int
 process_mux_terminate(u_int rid, Channel *c, Buffer *m, Buffer *r)
 {
-#ifndef WIN32_FIXME
 	debug2("%s: channel %d: terminate request", __func__, c->self);
 
 	if (options.control_master == SSHCTL_MASTER_ASK ||
@@ -527,11 +514,6 @@ process_mux_terminate(u_int rid, Channel *c, Buffer *m, Buffer *r)
 	buffer_put_int(r, rid);
 	/* XXX exit happens too soon - message never makes it to client */
 	return 0;
-#else
-
-  return -1; 
-
-#endif
 }
 
 static char *
@@ -1133,6 +1115,18 @@ process_mux_stop_listening(u_int rid, Channel *c, Buffer *m, Buffer *r)
 	return 0;
 }
 
+static int
+process_mux_proxy(u_int rid, Channel *c, Buffer *m, Buffer *r)
+{
+	debug("%s: channel %d: proxy request", __func__, c->self);
+
+	c->mux_rcb = channel_proxy_downstream;
+	buffer_put_int(r, MUX_S_PROXY);
+	buffer_put_int(r, rid);
+
+	return 0;
+}
+
 /* Channel callbacks fired on read/write from mux slave fd */
 static int
 mux_master_read_cb(Channel *c)
@@ -1262,7 +1256,6 @@ mux_tty_alloc_failed(Channel *c)
 void
 muxserver_listen(void)
 {
-#ifndef WIN32_FIXME
 	mode_t old_umask;
 	char *orig_control_path = options.control_path;
 	char rbuf[16+1];
@@ -1341,7 +1334,6 @@ muxserver_listen(void)
 	mux_listener_channel->mux_rcb = mux_master_read_cb;
 	debug3("%s: mux listener channel %d fd %d", __func__,
 	    mux_listener_channel->self, mux_listener_channel->sock);
-#endif
 }
 
 /* Callback on open confirmation in mux master for a mux client session. */
@@ -1442,14 +1434,12 @@ control_client_sighandler(int signo)
 static void
 control_client_sigrelay(int signo)
 {
-#ifndef WIN32_FIXME
 	int save_errno = errno;
 
 	if (muxserver_pid > 1)
 		kill(muxserver_pid, signo);
 
 	errno = save_errno;
-#endif
 }
 
 static int
@@ -1846,10 +1836,7 @@ mux_client_request_session(int fd)
 	}
 
 	term = getenv("TERM");
-#ifdef WIN32_FIXME
-        if (term != NULL && _stricmp(term, "passthru") == 0)
-                term = "ansi";
-#endif
+
 	buffer_init(&m);
 	buffer_put_int(&m, MUX_C_NEW_SESSION);
 	buffer_put_int(&m, muxclient_request_id);
@@ -1987,6 +1974,41 @@ mux_client_request_session(int fd)
 		fprintf(stderr, "Shared connection to %s closed.\r\n", host);
 
 	exit(exitval);
+}
+
+static int
+mux_client_proxy(int fd)
+{
+	Buffer m;
+	char *e;
+	u_int type, rid;
+
+	buffer_init(&m);
+	buffer_put_int(&m, MUX_C_PROXY);
+	buffer_put_int(&m, muxclient_request_id);
+	if (mux_client_write_packet(fd, &m) != 0)
+		fatal("%s: write packet: %s", __func__, strerror(errno));
+
+	buffer_clear(&m);
+
+	/* Read their reply */
+	if (mux_client_read_packet(fd, &m) != 0) {
+		buffer_free(&m);
+		return 0;
+	}
+	type = buffer_get_int(&m);
+	if (type != MUX_S_PROXY) {
+		e = buffer_get_string(&m, NULL);
+		fatal("%s: master returned error: %s", __func__, e);
+	}
+	if ((rid = buffer_get_int(&m)) != muxclient_request_id)
+		fatal("%s: out of sequence reply: my id %u theirs %u",
+		    __func__, muxclient_request_id, rid);
+	buffer_free(&m);
+
+	debug3("%s: done", __func__);
+	muxclient_request_id++;
+	return 0;
 }
 
 static int
@@ -2135,7 +2157,7 @@ mux_client_request_stop_listening(int fd)
 }
 
 /* Multiplex client main loop. */
-void
+int
 muxclient(const char *path)
 {
 	struct sockaddr_un addr;
@@ -2158,7 +2180,7 @@ muxclient(const char *path)
 	case SSHCTL_MASTER_NO:
 		break;
 	default:
-		return;
+		return -1;
 	}
 
 	memset(&addr, '\0', sizeof(addr));
@@ -2168,7 +2190,8 @@ muxclient(const char *path)
 
 	if (strlcpy(addr.sun_path, path,
 	    sizeof(addr.sun_path)) >= sizeof(addr.sun_path))
-		fatal("ControlPath too long");
+		fatal("ControlPath too long ('%s' >= %u bytes)", path,
+		     (unsigned int)sizeof(addr.sun_path));
 
 	if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
 		fatal("%s socket(): %s", __func__, strerror(errno));
@@ -2193,14 +2216,14 @@ muxclient(const char *path)
 			    strerror(errno));
 		}
 		close(sock);
-		return;
+		return -1;
 	}
 	set_nonblock(sock);
 
 	if (mux_client_hello_exchange(sock) != 0) {
 		error("%s: master hello exchange failed", __func__);
 		close(sock);
-		return;
+		return -1;
 	}
 
 	switch (muxclient_command) {
@@ -2211,7 +2234,8 @@ muxclient(const char *path)
 		exit(0);
 	case SSHMUX_COMMAND_TERMINATE:
 		mux_client_request_terminate(sock);
-		fprintf(stderr, "Exit request sent.\r\n");
+		if (options.log_level != SYSLOG_LEVEL_QUIET)
+			fprintf(stderr, "Exit request sent.\r\n");
 		exit(0);
 	case SSHMUX_COMMAND_FORWARD:
 		if (mux_client_forwards(sock, 0) != 0)
@@ -2220,22 +2244,26 @@ muxclient(const char *path)
 	case SSHMUX_COMMAND_OPEN:
 		if (mux_client_forwards(sock, 0) != 0) {
 			error("%s: master forward request failed", __func__);
-			return;
+			return -1;
 		}
 		mux_client_request_session(sock);
-		return;
+		return -1;
 	case SSHMUX_COMMAND_STDIO_FWD:
 		mux_client_request_stdio_fwd(sock);
 		exit(0);
 	case SSHMUX_COMMAND_STOP:
 		mux_client_request_stop_listening(sock);
-		fprintf(stderr, "Stop listening request sent.\r\n");
+		if (options.log_level != SYSLOG_LEVEL_QUIET)
+			fprintf(stderr, "Stop listening request sent.\r\n");
 		exit(0);
 	case SSHMUX_COMMAND_CANCEL_FWD:
 		if (mux_client_forwards(sock, 1) != 0)
 			error("%s: master cancel forward request failed",
 			    __func__);
 		exit(0);
+	case SSHMUX_COMMAND_PROXY:
+		mux_client_proxy(sock);
+		return (sock);
 	default:
 		fatal("unrecognised muxclient_command %d", muxclient_command);
 	}

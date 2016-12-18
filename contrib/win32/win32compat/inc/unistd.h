@@ -29,8 +29,22 @@
 
 #define fsync(a) w32_fsync((a))
 #define ftruncate(a, b) w32_ftruncate((a), (b))
-#define realpath(a, b) w32_realpath((a),(b))
+
+#define symlink w32_symlink
+#define chown w32_chown
+#define unlink w32_unlink
+#define rmdir w32_rmdir
+#define chdir w32_chdir
+#define getcwd w32_getcwd
 
 int daemon(int nochdir, int noclose);
-
+char *crypt(const char *key, const char *salt);
+int link(const char *oldpath, const char *newpath);
+int w32_symlink(const char *target, const char *linkpath);
+int w32_chown(const char *pathname, unsigned int owner, unsigned int group);
+int w32_unlink(const char *path);
+int w32_rmdir(const char *pathname);
+int w32_chdir(const char *dirname);
+char *w32_getcwd(char *buffer, int maxlen);
+int readlink(const char *path, char *link, int linklen);
 #endif

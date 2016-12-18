@@ -3,6 +3,7 @@ $scriptdir = Split-Path $scriptpath
 
 $sshdpath = Join-Path $scriptdir "sshd.exe"
 $sshagentpath = Join-Path $scriptdir "ssh-agent.exe"
+$logsdir = Join-Path $scriptdir "logs"
 
 $ntrights = "ntrights.exe -u `"NT SERVICE\SSHD`" +r SeAssignPrimaryTokenPrivilege"
 
@@ -32,5 +33,11 @@ Push-Location
 cd $scriptdir
 cmd.exe /c $ntrights
 Pop-Location
+
+mkdir $logsdir > $null
+$sddl = "O:SYG:DUD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x12019f;;;S-1-5-80-3847866527-469524349-687026318-516638107-1125189541)"
+$acl = Get-Acl -Path $logsdir
+$acl.SetSecurityDescriptorSddlForm($sddl)
+Set-Acl -Path $logsdir -AclObject $acl
 Write-Host -ForegroundColor Green "sshd and ssh-agent services successfully installed"
 

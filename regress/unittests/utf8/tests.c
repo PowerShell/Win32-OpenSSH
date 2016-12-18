@@ -6,6 +6,8 @@
  * and placed in the public domain.
  */
 
+#include "includes.h"
+
 #include <locale.h>
 #include <string.h>
 

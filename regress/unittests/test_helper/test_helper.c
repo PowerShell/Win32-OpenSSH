@@ -171,7 +171,7 @@ main(int argc, char **argv)
 		printf(" %u tests ok\n", test_number);
 	return 0;
 }
-#ifndef WIN32_FIXME
+
 const char *
 test_data_file(const char *name)
 {
@@ -188,7 +188,6 @@ test_data_file(const char *name)
 	}
 	return ret;
 }
-#endif
 
 void
 test_info(char *s, size_t len)

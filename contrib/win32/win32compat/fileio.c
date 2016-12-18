@@ -253,11 +253,11 @@ struct w32_io*
 		return NULL;
 	}
 
-        if ((path_utf16 = utf8_to_utf16(path_utf8)) == NULL) {
-                errno = ENOMEM;
-                debug("utf8_to_utf16 failed - ERROR:%d", GetLastError());
-                return NULL;
-        }
+    if ((path_utf16 = utf8_to_utf16(path_utf8)) == NULL) {
+            errno = ENOMEM;
+            debug("utf8_to_utf16 failed - ERROR:%d", GetLastError());
+            return NULL;
+    }
         
 	if (createFile_flags_setup(flags, mode, &cf_flags) == -1)
 		return NULL;
@@ -269,10 +269,11 @@ struct w32_io*
 	if (handle == INVALID_HANDLE_VALUE) {
 		errno = errno_from_Win32LastError();
 		debug("open - CreateFile ERROR:%d", GetLastError());
-                free(path_utf16);
+        free(path_utf16);
 		return NULL;
 	}
-        free(path_utf16);
+
+    free(path_utf16);
 	pio = (struct w32_io*)malloc(sizeof(struct w32_io));
 	if (pio == NULL) {
 		CloseHandle(handle);
@@ -280,6 +281,7 @@ struct w32_io*
 		debug("open - ERROR:%d", errno);
 		return NULL;
 	}
+
 	memset(pio, 0, sizeof(struct w32_io));
 
 	if (flags & O_NONBLOCK)

@@ -37,6 +37,9 @@
 #include <time.h>
 #include <assert.h>
 #include <direct.h>
+#include <winioctl.h>
+#include "Shlwapi.h"
+#include <sys\utime.h>
 
 /* internal table that stores the fd to w32_io mapping*/
 struct w32fd_table {
@@ -226,19 +229,19 @@ w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 }
 
 int
-w32_setsockopt(int fd, int level, int optname, const char* optval, int optlen) {
+w32_setsockopt(int fd, int level, int optname, const void* optval, int optlen) {
 	
 	CHECK_FD(fd);
 	CHECK_SOCK_IO(fd_table.w32_ios[fd]);
-	return socketio_setsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
+	return socketio_setsockopt(fd_table.w32_ios[fd], level, optname, (const char*)optval, optlen);
 }
 
 int
-w32_getsockopt(int fd, int level, int optname, char* optval, int* optlen) {
+w32_getsockopt(int fd, int level, int optname, void* optval, int* optlen) {
 	
 	CHECK_FD(fd);
 	CHECK_SOCK_IO(fd_table.w32_ios[fd]);
-	return socketio_getsockopt(fd_table.w32_ios[fd], level, optname, optval, optlen);
+	return socketio_getsockopt(fd_table.w32_ios[fd], level, optname, (char*)optval, optlen);
 }
 
 int
@@ -340,11 +343,11 @@ w32_pipe(int *pfds) {
 	fd_table_set(pio[1], write_index);
 	pfds[0] = read_index;
 	pfds[1] = write_index;
-	debug("pipe - read end: handle:%p, io:%p, fd:%d", pio[0]->handle, pio[0], read_index);
-	debug("pipe - write end: handle:%p, io:%p, fd:%d", pio[1]->handle, pio[1], write_index);
+	debug("pipe - r-h:%d,io:%p,fd:%d  w-h:%d,io:%p,fd:%d", 
+	    pio[0]->handle, pio[0], read_index, pio[1]->handle, pio[1], write_index);
 	return 0;
 }
-
+char *realpath_win(const char *path, char resolved[MAX_PATH]);
 int
 w32_open(const char *pathname, int flags, ...) {
 	int min_index = fd_table_get_min_index();
@@ -354,20 +357,24 @@ w32_open(const char *pathname, int flags, ...) {
 	if (min_index == -1)
 		return -1;
 
-	pio = fileio_open(pathname, flags, 0);
+	// Skip the first '/' in the pathname
+	char resolvedPathName[MAX_PATH];
+	realpath_win(pathname, resolvedPathName);
+
+	pio = fileio_open(resolvedPathName, flags, 0);
 	if (pio == NULL)
 		return -1;
 
 	pio->type = NONSOCK_FD;
 	fd_table_set(pio, min_index);
 	debug("open - handle:%p, io:%p, fd:%d", pio->handle, pio, min_index);
-	debug3("open - path:%s", pathname);
+	debug3("open - path:%s", resolvedPathName);
 	return min_index;
 }
 
 int
 w32_read(int fd, void *dst, size_t max) {
-        CHECK_FD(fd);
+	CHECK_FD(fd);
 
 	if (fd_table.w32_ios[fd]->type == SOCK_FD)
 		return socketio_recv(fd_table.w32_ios[fd], dst, max, 0);
@@ -408,49 +415,10 @@ w32_fstat(int fd, struct w32_stat *buf) {
 	return fileio_fstat(fd_table.w32_ios[fd], (struct _stat64*)buf);
 }
 
-int
-w32_stat(const char *path, struct w32_stat *buf) {
-	return fileio_stat(path, (struct _stat64*)buf);
-}
-
 long 
 w32_lseek(int fd, long offset, int origin) {
 	CHECK_FD(fd);
 	return fileio_lseek(fd_table.w32_ios[fd], offset, origin);
-}
-
-int 
-w32_mkdir(const char *path_utf8, unsigned short mode) {
-    wchar_t *path_utf16 = utf8_to_utf16(path_utf8);
-    if (path_utf16 == NULL) {
-        errno = ENOMEM;
-        return -1;
-    }
-    return _wmkdir(path_utf16);
-}
-
-int w32_chdir(const char *dirname_utf8) {
-    wchar_t *dirname_utf16 = utf8_to_utf16(dirname_utf8);
-    if (dirname_utf16 == NULL) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    return _wchdir(dirname_utf16);
-}
-
-char *w32_getcwd(char *buffer, int maxlen) {
-    wchar_t wdirname[MAX_PATH];
-    char* putf8 = NULL;
-
-    wchar_t *wpwd = _wgetcwd(&wdirname[0], MAX_PATH);
-
-    if ((putf8 = utf16_to_utf8(&wdirname[0])) == NULL)
-            fatal("failed to convert input arguments");
-    strcpy(buffer, putf8);
-    free(putf8);
-
-    return buffer;
 }
 
 int
@@ -534,24 +502,33 @@ int
 w32_fcntl(int fd, int cmd, ... /* arg */) {
 	va_list valist;
 	va_start(valist, cmd);
+        int ret = 0;
 
 	CHECK_FD(fd);
 
 	switch (cmd) {
 	case F_GETFL:
-		return fd_table.w32_ios[fd]->fd_status_flags;
+		ret = fd_table.w32_ios[fd]->fd_status_flags;
+                break;
 	case F_SETFL:
 		fd_table.w32_ios[fd]->fd_status_flags = va_arg(valist, int);
-		return 0;
+		ret = 0;
+                break;
 	case F_GETFD:
-		return fd_table.w32_ios[fd]->fd_flags;		
+		ret = fd_table.w32_ios[fd]->fd_flags;		
+                break;
 	case F_SETFD:
-		return w32_io_process_fd_flags(fd_table.w32_ios[fd], va_arg(valist, int));		
+		ret =  w32_io_process_fd_flags(fd_table.w32_ios[fd], va_arg(valist, int));		
+                break;
 	default:
 		errno = EINVAL;
 		debug("fcntl - ERROR not supported cmd:%d", cmd);
-		return -1;
-	}
+		ret = -1;
+                break;
+        }
+
+        va_end(valist);
+        return ret;
 }
 
 #define SELECT_EVENT_LIMIT 32
@@ -805,7 +782,7 @@ w32_fd_to_handle(int fd) {
 	HANDLE h = fd_table.w32_ios[fd]->handle;
 	if (fd <= STDERR_FILENO)
 		h = GetStdHandle(fd_table.w32_ios[fd]->std_handle);
-	return fd_table.w32_ios[fd]->handle;
+	return h;
 }
 
 int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock) {
@@ -866,8 +843,8 @@ w32_ftruncate(int fd, off_t length) {
     return 0;
 }
 
-
-int w32_fsync(int fd) {
+int 
+w32_fsync(int fd) {
     CHECK_FD(fd);
 
     return FlushFileBuffers(w32_fd_to_handle(fd));

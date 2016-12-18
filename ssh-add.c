@@ -492,9 +492,12 @@ main(int argc, char **argv)
 	OpenSSL_add_all_algorithms();
 #endif
 
-	#ifndef WIN32_FIXME
+#ifdef WINDOWS
+	/* Min buffer size allowed in Windows is 2*/
+	setvbuf(stdout, NULL, _IOLBF, 2);
+#else
 	setvbuf(stdout, NULL, _IOLBF, 0);
-	#endif
+#endif
 
 	/* First, get a connection to the authentication agent. */
 	switch (r = ssh_get_authentication_socket(&agent_fd)) {

@@ -290,9 +290,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)clientloop.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)mux.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)readconf.c">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -89,11 +89,7 @@ void fe25519_freeze(fe25519 *r)
     m &= equal(r->v[i],255);
   m &= ge(r->v[0],237);
 
-#ifndef _WIN32
   m = -m;
-#else
-  m = (~m + 1u);
-#endif
 
   r->v[31] -= m&127;
   for(i=30;i>0;i--)
@@ -146,11 +142,7 @@ void fe25519_cmov(fe25519 *r, const fe25519 *x, unsigned char b)
 {
   int i;
   crypto_uint32 mask = b;
-#ifndef _WIN32
   mask = -mask;
-#else
-  mask = (~mask + 1u);
-#endif
   for(i=0;i<32;i++) r->v[i] ^= mask & (x->v[i] ^ r->v[i]);
 }
 

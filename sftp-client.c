@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-client.c,v 1.124 2016/05/25 23:48:45 schwarze Exp $ */
+/* $OpenBSD: sftp-client.c,v 1.125 2016/09/12 01:22:38 deraadt Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -22,7 +22,6 @@
 
 #include "includes.h"
 
-#include <sys/param.h>	/* MIN MAX */
 #include <sys/types.h>
 #ifdef HAVE_SYS_STATVFS_H
 #include <sys/statvfs.h>
@@ -58,54 +57,6 @@
 #include "sftp.h"
 #include "sftp-common.h"
 #include "sftp-client.h"
-
-#ifdef WIN32_FIXME
-  
-  int glob(const char *pattern, int flags, int (*errfunc)(const char *epath, int eerrno),
-               glob_t *pglob)
-  {
-    if (strchr(pattern, '*') || strchr(pattern, '?'))
-    {
-      error("Match pattern not implemented on Win32.\n");
-      
-      return -1;
-    }
-    else
-    {
-      pglob -> gl_pathc    = 2;
-      pglob -> gl_pathv    = malloc(2 * sizeof(char *));
-      pglob -> gl_pathv[0] = strdup(pattern);
-      pglob -> gl_pathv[1] = NULL;
-      pglob -> gl_offs     = 0;
-    }
-    
-    return 0;
-  }
-  
-  void globfree(glob_t *pglob)
-  {
-    if (pglob)
-    {
-      int i = 0;
-      
-      if (pglob -> gl_pathv)
-      {
-        for (i = 0; i < pglob -> gl_pathc; i++)
-        {
-          if (pglob -> gl_pathv[i])
-          {
-            free(pglob -> gl_pathv[i]);
-          }
-        }
-          
-        free(pglob -> gl_pathv);
-      }
-      
-      //free(pglob);
-    }
-  }
-
-#endif
 
 extern volatile sig_atomic_t interrupted;
 extern int showprogress;
@@ -510,7 +461,7 @@ do_init(int fd_in, int fd_out, u_int transfer_buflen, u_int num_requests,
 
 	/* Some filexfer v.0 servers don't support large packets */
 	if (ret->version == 0)
-		ret->transfer_buflen = MIN(ret->transfer_buflen, 20480);
+		ret->transfer_buflen = MINIMUM(ret->transfer_buflen, 20480);
 
 	ret->limit_kbps = limit_kbps;
 	if (ret->limit_kbps > 0) {
@@ -1399,7 +1350,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 				    req->offset, req->len, handle, handle_len);
 				/* Reduce the request size */
 				if (len < buflen)
-					buflen = MAX(MIN_READ_SIZE, len);
+					buflen = MAXIMUM(MIN_READ_SIZE, len);
 			}
 			if (max_req > 0) { /* max_req = 0 iff EOF received */
 				if (size > 0 && offset > size) {
@@ -1474,16 +1425,10 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 		}
 		if (fsync_flag) {
 			debug("syncing \"%s\"", local_path);
-#ifdef WINDOWS
-            if(FlushFileBuffers(local_fd))
-                error("Couldn't sync file \"%s\": %s",
-                    local_path, strerror(GetLastError()));
-#else
 			if (fsync(local_fd) == -1)
 				error("Couldn't sync file \"%s\": %s",
 				    local_path, strerror(errno));
-#endif
-        }
+                }
 	}
 	close(local_fd);
 	sshbuf_free(msg);

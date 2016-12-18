@@ -48,7 +48,6 @@
 
 #include <utf.h>
 
-static int use_privsep = -1;
 Buffer cfg;
 ServerOptions options;
 struct passwd *privsep_pw = NULL;

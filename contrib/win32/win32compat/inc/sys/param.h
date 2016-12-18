@@ -3,7 +3,7 @@
 
 typedef unsigned int uid_t;
 typedef unsigned int gid_t;
-typedef long off_t;
+typedef long long  off_t;
 typedef unsigned int dev_t;
 
 

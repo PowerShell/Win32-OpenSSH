@@ -2,7 +2,7 @@
 
 #covered -i -p -q -r -v -c -S -C
 #todo: -F, -l and -P should be tested over the network
-Describe "Tests for scp command" -Tags "Scenario" {
+Describe "Tests for scp command" -Tags "CI" {
     BeforeAll {        
         $fileName1 = "test.txt"
         $fileName2 = "test2.txt"
@@ -26,36 +26,36 @@ Describe "Tests for scp command" -Tags "Scenario" {
         $client.SetupClient($server)
         $server.SetupServer($client)
 
-        $testData = @(
+        $testData = @(            
             <# known issue 340
             @{
-                Title = 'Simple copy local file to local file';
-                Source = $SourceFilePath;                    
+                Title = 'Simple copy local file to local file'
+                Source = $SourceFilePath                   
                 Destination = $DestinationFilePath
             },#>
             @{
-                Title = 'Simple copy local file to remote file';
-                Source = $SourceFilePath;
+                Title = 'Simple copy local file to remote file'
+                Source = $SourceFilePath
                 Destination = "$($server.localAdminUserName)@$($server.MachineName):$DestinationFilePath"
             },
             @{
-                Title = 'Simple copy remote file to local file';
+                Title = 'Simple copy remote file to local file'
                 Source = "$($server.localAdminUserName)@$($server.MachineName):$SourceFilePath"
                 Destination = $DestinationFilePath                    
             },
             <# known issue 340
             @{
-                Title = 'Simple copy local file to local dir';
-                Source = $SourceFilePath;
+                Title = 'Simple copy local file to local dir'
+                Source = $SourceFilePath
                 Destination = $DestinationDir
             },#>
             @{
-                Title = 'simple copy local file to remote dir';          
-                Source = $SourceFilePath;
+                Title = 'simple copy local file to remote dir'         
+                Source = $SourceFilePath
                 Destination = "$($server.localAdminUserName)@$($server.MachineName):$DestinationDir"
             },
             @{
-                Title = 'simple copy remote file to local dir';
+                Title = 'simple copy remote file to local dir'
                 Source = "$($server.localAdminUserName)@$($server.MachineName):$SourceFilePath"
                 Destination = $DestinationDir
             }
@@ -63,18 +63,17 @@ Describe "Tests for scp command" -Tags "Scenario" {
 
         $testData1 = @(
             @{
-                Title = 'copy from local dir to remote dir';
-                Source = $sourceDir;
+                Title = 'copy from local dir to remote dir'
+                Source = $sourceDir
                 Destination = "$($server.localAdminUserName)@$($server.MachineName):$DestinationDir"
-            },
-            <# known issue 340
+            },            
             @{
-                Title = 'copy from local dir to local dir';
-                Source = $sourceDir;
+                Title = 'copy from local dir to local dir'
+                Source = $sourceDir
                 Destination = $DestinationDir
-            },#>
+            },
             @{
-                Title = 'copy from remote dir to local dir';            
+                Title = 'copy from remote dir to local dir'            
                 Source = "$($server.localAdminUserName)@$($server.MachineName):$sourceDir"
                 Destination = $DestinationDir
             }
@@ -104,7 +103,7 @@ Describe "Tests for scp command" -Tags "Scenario" {
     }#>
        
     #this context only run on windows
-    Context "Key is Secured in ssh-agenton server" {
+    Context "Key is Secured in ssh-agent on server" {
         BeforeAll {
             $Server.SecureHostKeys($server.PrivateHostKeyPaths)
             $identifyFile = $client.clientPrivateKeyPaths[0]
@@ -113,17 +112,16 @@ Describe "Tests for scp command" -Tags "Scenario" {
         AfterAll {
             $Server.CleanupHostKeys()
         }
-        #Known issue 368
-        <#It 'File Copy with -i option: <Title> ' -TestCases:$testData {
-            param([string]$Title, $Source, $Destination)
-
+        
+        It 'File Copy with -i option: <Title> ' -TestCases:$testData {
+            param([string]$Title, $Source, $Destination)                        
             .\scp -i $identifyFile $Source $Destination
             #validate file content. DestPath is the path to the file.
-            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0
-            $equal | Should Be $true
+            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0            
+            $equal | Should Be $true            
         }
 
-        <#It 'Directory recursive Copy with -ioption: <Title> ' -TestCases:$testData1 -skip:(!(Is-Windows)) {
+        <#It 'Directory recursive Copy with -i option: <Title> ' -TestCases:$testData1 {
             param([string]$Title, $Source, $Destination)               
 
             .\scp -r -i $identifyFile $Source $Destination
@@ -160,17 +158,17 @@ Describe "Tests for scp command" -Tags "Scenario" {
             $equal | Should Be $true
         }
 
-        It 'File Copy with -p -c -v option: <Title> ' -TestCases:$testData {
+        <#It 'File Copy with -p -c -v option: <Title> ' -TestCases:$testData {
             param([string]$Title, $Source, $Destination)
 
             .\scp -p -c aes128-ctr -C $Source $Destination                                   #Todo: add -v after it is supported.
             #validate file content. DestPath is the path to the file.
             $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0 #todo: add LastWriteTime in comparison when issue is fixed
             $equal | Should Be $true
-        }
+        }#>
 
-        #known issue 369
-        <#It 'Directory recursive Copy with -v option: <Title> ' -TestCases:$testData1 {
+        <# known issue 369
+        It 'Directory recursive Copy with -v option: <Title> ' -TestCases:$testData1 {
             param([string]$Title, $Source, $Destination)               
 
             .\scp -r -p $Source $Destination
@@ -182,8 +180,8 @@ Describe "Tests for scp command" -Tags "Scenario" {
             #$equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime).Length -eq 0
             #$equal | Should Be $true
         }#>
-    }    
-   <#Known issue 368
+    }
+   
    Context "Key based authentication with -i -C -q options. host keys are not secured on server" {
         BeforeAll {
             $identifyFile = $client.clientPrivateKeyPaths[0]
@@ -199,7 +197,7 @@ Describe "Tests for scp command" -Tags "Scenario" {
         }
 
 
-        It 'Directory recursive Copy with -i and -q options: <Title> ' -TestCases:$testData1 {
+        <#It 'Directory recursive Copy with -i and -q options: <Title> ' -TestCases:$testData1 {
             param([string]$Title, $Source, $Destination)               
 
             .\scp -i $identifyFile -r -q $Source $Destination
@@ -209,8 +207,8 @@ Describe "Tests for scp command" -Tags "Scenario" {
             #known issue 364
             #$equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
             #$equal | Should Be $true          
-        }
+        }#>
     }
-    #>
+    
 }   
 

@@ -80,7 +80,7 @@
 /* #undef BROKEN_SNPRINTF */
 
 /* tcgetattr with ICANON may hang */
-/* #undef BROKEN_TCGETATTR_ICANON */
+#define BROKEN_TCGETATTR_ICANON 1
 
 /* updwtmpx is broken (if present) */
 /* #undef BROKEN_UPDWTMPX */
@@ -218,8 +218,7 @@
 /* #undef HAVE_B64_PTON */
 
 /* Define if you have the basename function. */
-/* For Windows, this is defined in dirent.h, but that header is not included in sftp.c */
-/* #define HAVE_BASENAME */
+#define HAVE_BASENAME 1
 
 /* Define to 1 if you have the `bcopy' function. */
 /* #undef HAVE_BCOPY */
@@ -583,7 +582,7 @@
 /* #undef HAVE_LIBDL */
 
 /* Define to 1 if you have the <libgen.h> header file. */
-/* #undef HAVE_LIBGEN_H
+#define HAVE_LIBGEN_H 1
 
 /* Define if system has libiaf that supports set_id */
 /* #undef HAVE_LIBIAF */
@@ -859,7 +858,7 @@
 /* #undef HAVE_SETRLIMIT */
 
 /* Define to 1 if you have the `setsid' function. */
-/* #undef HAVE_SETSID */
+#define HAVE_SETSID 1
 
 /* Define to 1 if you have the `setutent' function. */
 /* #undef HAVE_SETUTENT */
@@ -1159,7 +1158,7 @@
 /* #undef HAVE_UTIL_H */
 
 /* Define to 1 if you have the `utimes' function. */
-/* #undef HAVE_UTIMES */
+#define HAVE_UTIMES 1
 
 /* Define to 1 if you have the <utime.h> header file. */
 /* #undef HAVE_UTIME_H */
@@ -1669,17 +1668,9 @@
 #define BROKEN_SYS_TERMIO_H
 
 
-// PRAGMA SYS PORT
 #define WITH_OPENSSL 1
-#define HAVE_KRB5_GET_ERROR_MESSAGE 1
-#define HAVE_KRB5_FREE_ERROR_MESSAGE 1
 #define HAVE_DECL_NFDBITS 0
 #define HAVE_DECL_HOWMANY 0
-#define HAVE_DES_CRYPT 1
-
-#define WIN32_ZLIB_NO 1
-#define USE_MSCNG 1
-
 #define HAVE_STRTOULL 1
 #define HAVE_USLEEP 1
 
@@ -1698,7 +1689,6 @@
 
 #define HAVE_EXPLICIT_BZERO
 
-#define WIN32_ZLIB_NO 1
 #define HAVE_MBTOWC 1
 
 #include <signal.h>
@@ -1711,9 +1701,6 @@
 
 /* disable inclusion of compatability defitnitions in CRT headers */
 #define __STDC__ 1
-// Use Pragma Systems Remote Console modules for shell sessions so that cmd/powershell fully
-// works remotely over SSH like they operate in a local machine
-//#define WIN32_PRAGMA_REMCON
 
 #define umac128_new umac_new
 #define umac128_update umac_update 

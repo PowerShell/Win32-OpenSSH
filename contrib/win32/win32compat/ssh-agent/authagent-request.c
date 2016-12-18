@@ -264,7 +264,7 @@ int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response
         if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
             ((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
             (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
-            (sshbuf_put_u32(response, dup_token) != 0)) {
+            (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)) {
                 debug("failed to duplicate user token");
                 goto done;
         }
@@ -330,7 +330,7 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
         if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
             ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
             (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
-            (sshbuf_put_u32(response, dup_token) != 0) ) {
+            (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0) ) {
                 debug("failed to authorize user");
                 goto done;
         }

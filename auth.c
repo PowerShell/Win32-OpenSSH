@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.115 2016/06/15 00:40:40 dtucker Exp $ */
+/* $OpenBSD: auth.c,v 1.118 2016/11/08 22:04:34 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -103,6 +103,7 @@ allowed_user(struct passwd * pw)
 	struct stat st;
 	const char *hostname = NULL, *ipaddr = NULL, *passwd = NULL;
 	u_int i;
+	int r;
 #ifdef USE_SHADOW
 	struct spwd *spw = NULL;
 #endif
@@ -173,7 +174,6 @@ allowed_user(struct passwd * pw)
 			free(shell);
 			return 0;
 		}
-#ifndef WIN32_FIXME//R
 		if (S_ISREG(st.st_mode) == 0 ||
 		    (st.st_mode & (S_IXOTH|S_IXUSR|S_IXGRP)) == 0) {
 			logit("User %.100s not allowed because shell %.100s "
@@ -181,7 +181,6 @@ allowed_user(struct passwd * pw)
 			free(shell);
 			return 0;
 		}
-#endif
 		free(shell);
 	}
 
@@ -194,8 +193,12 @@ allowed_user(struct passwd * pw)
 	/* Return false if user is listed in DenyUsers */
 	if (options.num_deny_users > 0) {
 		for (i = 0; i < options.num_deny_users; i++)
-			if (match_user(pw->pw_name, hostname, ipaddr,
-			    options.deny_users[i])) {
+			r = match_user(pw->pw_name, hostname, ipaddr,
+			    options.deny_users[i]);
+			if (r < 0) {
+				fatal("Invalid DenyUsers pattern \"%.100s\"",
+				    options.deny_users[i]);
+			} else if (r != 0) {
 				logit("User %.100s from %.100s not allowed "
 				    "because listed in DenyUsers",
 				    pw->pw_name, hostname);
@@ -204,10 +207,15 @@ allowed_user(struct passwd * pw)
 	}
 	/* Return false if AllowUsers isn't empty and user isn't listed there */
 	if (options.num_allow_users > 0) {
-		for (i = 0; i < options.num_allow_users; i++)
-			if (match_user(pw->pw_name, hostname, ipaddr,
-			    options.allow_users[i]))
+		for (i = 0; i < options.num_allow_users; i++) {
+			r = match_user(pw->pw_name, hostname, ipaddr,
+			    options.allow_users[i]);
+			if (r < 0) {
+				fatal("Invalid AllowUsers pattern \"%.100s\"",
+				    options.allow_users[i]);
+			} else if (r == 1)
 				break;
+		}
 		/* i < options.num_allow_users iff we break for loop */
 		if (i >= options.num_allow_users) {
 			logit("User %.100s from %.100s not allowed because "
@@ -300,7 +308,7 @@ auth_log(Authctxt *authctxt, int authenticated, int partial,
 	else
 		authmsg = authenticated ? "Accepted" : "Failed";
 
-	authlog("%s %s%s%s for %s%.100s from %.200s port %d %s%s%s",
+	authlog("%s %s%s%s for %s%.100s from %.200s port %d ssh2%s%s",
 	    authmsg,
 	    method,
 	    submethod != NULL ? "/" : "", submethod == NULL ? "" : submethod,
@@ -308,7 +316,6 @@ auth_log(Authctxt *authctxt, int authenticated, int partial,
 	    authctxt->user,
 	    ssh_remote_ipaddr(ssh),
 	    ssh_remote_port(ssh),
-	    compat20 ? "ssh2" : "ssh1",
 	    authctxt->info != NULL ? ": " : "",
 	    authctxt->info != NULL ? authctxt->info : "");
 	free(authctxt->info);
@@ -341,12 +348,11 @@ auth_maxtries_exceeded(Authctxt *authctxt)
 	struct ssh *ssh = active_state; /* XXX */
 
 	error("maximum authentication attempts exceeded for "
-	    "%s%.100s from %.200s port %d %s",
+	    "%s%.100s from %.200s port %d ssh2",
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
 	    ssh_remote_ipaddr(ssh),
-	    ssh_remote_port(ssh),
-	    compat20 ? "ssh2" : "ssh1");
+	    ssh_remote_port(ssh));
 	packet_disconnect("Too many authentication failures");
 	/* NOTREACHED */
 }
@@ -482,7 +488,10 @@ int
 auth_secure_path(const char *name, struct stat *stp, const char *pw_dir,
     uid_t uid, char *err, size_t errlen)
 {
-#ifndef WIN32_FIXME
+#ifdef WINDOWS
+	error("auth_secure_path should not be called in Windows");
+	return -1;
+#else /* !WINDOWS */
 	char buf[PATH_MAX], homedir[PATH_MAX];
 	char *cp;
 	int comparehome = 0;
@@ -535,9 +544,7 @@ auth_secure_path(const char *name, struct stat *stp, const char *pw_dir,
 			break;
 	}
 	return 0;
-#else
-  return 0;
-#endif 
+#endif  /* !WINDOWS */
 }
 
 /*
@@ -550,7 +557,6 @@ static int
 secure_filename(FILE *f, const char *file, struct passwd *pw,
     char *err, size_t errlen)
 {
-#ifndef WIN32_FIXME
 	struct stat st;
 
 	/* check the open file to avoid races */
@@ -560,9 +566,6 @@ secure_filename(FILE *f, const char *file, struct passwd *pw,
 		return -1;
 	}
 	return auth_secure_path(file, &st, pw->pw_dir, pw->pw_uid, err, errlen);
-#else
-  return 0;
-#endif 
 }
 
 static FILE *
@@ -574,16 +577,22 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 	int fd;
 	FILE *f;
 	
-#ifdef WIN32_FIXME
-	if ((f = fopen(file, "r")) == NULL)
-		return NULL;
-#else
+#ifdef WINDOWS
+        /* Windows POSIX adpater does not support fdopen() on open(file)*/
+        if ((f = fopen(file, "r")) == NULL) {
+                debug("Could not open %s '%s': %s", file_type, file,
+                        strerror(errno));
+                return NULL;
+        }
+        /* TODO check permissions  */
+#else  /* !WINDOWS */
 	if ((fd = open(file, O_RDONLY|O_NONBLOCK)) == -1) {
 		if (log_missing || errno != ENOENT)
 			debug("Could not open %s '%s': %s", file_type, file,
 			   strerror(errno));
 		return NULL;
 	}
+
 	if (fstat(fd, &st) < 0) {
 		close(fd);
 		return NULL;
@@ -595,12 +604,10 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 		return NULL;
 	}
 	unset_nonblock(fd);
-
 	if ((f = fdopen(fd, "r")) == NULL) {
 		close(fd);
 		return NULL;
 	}
-#endif
 	if (strict_modes &&
 	    secure_filename(f, file, pw, line, sizeof(line)) != 0) {
 		fclose(f);
@@ -608,7 +615,7 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 		auth_debug_add("Ignored %s: %s", file_type, line);
 		return NULL;
 	}
-
+#endif  /* !WINDOWS */
 	return f;
 }
 

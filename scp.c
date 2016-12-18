@@ -1,4 +1,4 @@
-/* $OpenBSD: scp.c,v 1.186 2016/05/25 23:48:45 schwarze Exp $ */
+/* $OpenBSD: scp.c,v 1.187 2016/09/12 01:22:38 deraadt Exp $ */
 /*
  * scp - secure remote copy.  This is basically patched BSD rcp which
  * uses ssh to do the data transfer (instead of using rcmd).
@@ -73,10 +73,7 @@
 
 #include "includes.h"
 
-#include <dirent.h>
-
 #include <sys/types.h>
-#include <sys/param.h>
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
@@ -94,7 +91,7 @@
 #include <sys/uio.h>
 
 #include <ctype.h>
-
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -199,16 +196,24 @@ do_local_cmd(arglist *a)
 		fprintf(stderr, "\n");
 	}
 #ifdef WINDOWS
-	// flatten the cmd into a long space separated string and execute using system(cmd) api
-	char cmdstr[2048] ;
-	cmdstr[0] = '\0' ;
-	for (i = 0; i < a->num; i++) {
-		strcat (cmdstr, a->list[i]);
-		strcat (cmdstr, " ");
+	/* flatten the cmd into a long space separated string and execute using system(cmd) api */
+	{
+		char* cmd;
+		size_t cmdlen = 0;
+		for (i = 0; i < a->num; i++)
+			cmdlen += strlen(a->list[i]) + 1;
+
+		cmd = xmalloc(cmdlen);
+		cmd[0] = '\0';
+		for (i = 0; i < a->num; i++) {
+			strcat(cmd, a->list[i]);
+			strcat(cmd, " ");
+		}
+		if (system(cmd))
+			return -1; 
+		return 0;
 	}
-	if (system(cmdstr))
-		return (-1); // failure executing
-	return (0); // success
+
 #else
 	if ((pid = fork()) == -1)
 		fatal("do_local_cmd: fork: %s", strerror(errno));
@@ -235,59 +240,6 @@ do_local_cmd(arglist *a)
 
 	return (0);
 #endif
-}
-
-static int pipe_counter = 1;
-/* create overlapped supported pipe */
-BOOL CreateOverlappedPipe(PHANDLE hReadPipe, PHANDLE hWritePipe, LPSECURITY_ATTRIBUTES sa, DWORD size) {
-	HANDLE read_handle = INVALID_HANDLE_VALUE, write_handle = INVALID_HANDLE_VALUE;
-	char pipe_name[MAX_PATH];
-
-	/* create name for named pipe */
-	if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\W32SCPPipe.%08x.%08x",
-		GetCurrentProcessId(), pipe_counter++)) {
-		debug("pipe - ERROR sprintf_s %d", errno);
-		goto error;
-	}
-
-	read_handle = CreateNamedPipeA(pipe_name,
-		PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
-		PIPE_TYPE_BYTE | PIPE_WAIT,
-		1,
-		4096,
-		4096,
-		0,
-		sa);
-	if (read_handle == INVALID_HANDLE_VALUE) {
-		debug("pipe - CreateNamedPipe() ERROR:%d", errno);
-		goto error;
-	}
-
-	/* connect to named pipe */
-	write_handle = CreateFileA(pipe_name,
-		GENERIC_WRITE,
-		0,
-		sa,
-		OPEN_EXISTING,
-		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-		NULL);
-	if (write_handle == INVALID_HANDLE_VALUE) {
-		debug("pipe - ERROR CreateFile() :%d", errno);
-		goto error;
-	}
-
-	*hReadPipe = read_handle;
-	*hWritePipe = write_handle;
-	return TRUE;
-
-error:
-	if (read_handle)
-		CloseHandle(read_handle);
-	if (write_handle)
-		CloseHandle(write_handle);
-
-	return FALSE;
-
 }
 
 /*
@@ -340,45 +292,32 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 	addargs(&args, "%s", cmd);
 
 	{
-		PROCESS_INFORMATION pi = { 0 };
-		STARTUPINFOW si = { 0 };
-		char* buf = xmalloc(1024);
-		/* TODO - check that 1024 buffer size is sufficient for resulting cmdline */
-		char* ptr = buf;
+		char* full_cmd;
+		size_t cmdlen = 0;
 		char** list = args.list;
-		*ptr = '\0';
+
+		cmdlen = 1; /* null term */
+		while (*list)
+			cmdlen += strlen(*list++) + 1;
+
+		full_cmd = xmalloc(cmdlen);
+		full_cmd[0] = '\0';
+		list = args.list;
 		while (*list) {
-			memcpy(ptr, *list, strlen(*list));
-			ptr += strlen(*list);
-			*ptr++ = ' ';
-			list++;
+			strcat(full_cmd, *list++);
+			strcat(full_cmd, " ");
 		}
-		*--ptr = '\0';
 
 		fcntl(pout[0], F_SETFD, FD_CLOEXEC);
 		fcntl(pin[1], F_SETFD, FD_CLOEXEC);
 
-		si.cb = sizeof(STARTUPINFOW);
-		si.hStdInput = sfd_to_handle(pin[0]);
-		si.hStdOutput = sfd_to_handle(pout[1]);
-		si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-		si.wShowWindow = SW_HIDE;
-		si.dwFlags = STARTF_USESTDHANDLES;
-		si.lpDesktop = NULL;
-		if (CreateProcessW(NULL, utf8_to_utf16(buf), NULL, NULL, TRUE,
-			NORMAL_PRIORITY_CLASS, NULL,
-			NULL, &si, &pi) == TRUE) {
-			do_cmd_pid = pi.dwProcessId;
-			CloseHandle(pi.hThread);
-			sw_add_child(pi.hProcess, pi.dwProcessId);
-		}
-		else
-			errno = GetLastError();
+		do_cmd_pid = spawn_child(full_cmd, pin[0], pout[1], STDERR_FILENO, 0);
+		free(full_cmd);
 	}
 
 
 #else
-        do_cmd_pid = fork();
+	do_cmd_pid = fork();
 #endif
 	if (do_cmd_pid == 0) {
 		/* Child. */
@@ -423,7 +362,6 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 int
 do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 {
-#ifndef WIN32_FIXME
 	pid_t pid;
 	int status;
 
@@ -434,7 +372,41 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 		    remuser ? remuser : "(unspecified)", cmd);
 
 	/* Fork a child to execute the command on the remote host using ssh. */
+#ifdef WINDOWS
+	replacearg(&args, 0, "%s", ssh_program);
+	if (remuser != NULL) {
+		addargs(&args, "-l");
+		addargs(&args, "%s", remuser);
+	}
+	addargs(&args, "--");
+	addargs(&args, "%s", host);
+	addargs(&args, "%s", cmd);
+
+	{
+		char* full_cmd;
+		size_t cmdlen = 0;
+		char** list = args.list;
+
+		cmdlen = strlen(w32_programdir()) + 2;
+		while (*list)
+			cmdlen += strlen(*list++) + 1;
+
+		full_cmd = xmalloc(cmdlen);
+		full_cmd[0] = '\0';
+		strcat(full_cmd, w32_programdir());
+		strcat(full_cmd, "\\");
+		list = args.list;
+		while (*list) {
+			strcat(full_cmd, *list++);
+			strcat(full_cmd, " ");
+		}
+
+		pid = spawn_child(full_cmd, fdin, fdout, STDERR_FILENO, 0);
+		free(full_cmd);
+}
+#else
 	pid = fork();
+#endif
 	if (pid == 0) {
 		dup2(fdin, 0);
 		dup2(fdout, 1);
@@ -457,7 +429,6 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 	while (waitpid(pid, &status, 0) == -1)
 		if (errno != EINTR)
 			fatal("do_cmd2: waitpid: %s", strerror(errno));
-#endif
 	return 0;
 }
 
@@ -500,10 +471,10 @@ main(int argc, char **argv)
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
-	setlocale(LC_CTYPE, "");
+	msetlocale();
 
 	/* Copy argv, because we modify it */
-	newargv = xcalloc(MAX(argc + 1, 1), sizeof(*newargv));
+	newargv = xcalloc(MAXIMUM(argc + 1, 1), sizeof(*newargv));
 	for (n = 0; n < argc; n++)
 		newargv[n] = xstrdup(argv[n]);
 	argv = newargv;
@@ -515,9 +486,9 @@ main(int argc, char **argv)
 	args.list = remote_remote_args.list = NULL;
 	addargs(&args, "%s", ssh_program);
 	addargs(&args, "-x");
-	addargs(&args, "\"-oForwardAgent no\"");
-	addargs(&args, "\"-oPermitLocalCommand no\"");
-	addargs(&args, "\"-oClearAllForwardings yes\"");
+	addargs(&args, "-oForwardAgent=no");
+	addargs(&args, "-oPermitLocalCommand=no");
+	addargs(&args, "-oClearAllForwardings=yes");
 
 	fflag = tflag = 0;
 	while ((ch = getopt(argc, argv, "dfl:prtvBCc:i:P:q12346S:o:F:")) != -1)
@@ -535,24 +506,24 @@ main(int argc, char **argv)
 			throughlocal = 1;
 			break;
 		case 'o':
-                case 'c':
+		case 'c':
 		case 'i':
 		case 'F':
 			addargs(&remote_remote_args, "-%c", ch);
 			addargs(&remote_remote_args, "%s", optarg);
 			addargs(&args, "-%c", ch);
 			addargs(&args, "%s", optarg);
-                        break;
+			break;
 		case 'P':
 			addargs(&remote_remote_args, "-p");
 			addargs(&remote_remote_args, "%s", optarg);
 			addargs(&args, "-p");
 			addargs(&args, "%s", optarg);
-                        break;
+			break;
 		case 'B':
-			addargs(&remote_remote_args, "\"-oBatchmode yes\"");
-			addargs(&args, "\"-oBatchmode yes\"");
-                        break;
+			addargs(&remote_remote_args, "-oBatchmode=yes");
+			addargs(&args, "-oBatchmode=yes");
+			break;
 		case 'l':
 			limit_kbps = strtonum(optarg, 1, 100 * 1024 * 1024,
 			    &errstr);
@@ -922,6 +893,7 @@ syserr:			run_err("%s: %s", name, strerror(errno));
 			goto next;
 		}
 #ifdef WINDOWS
+		/* account for both slashes on Windows */
 		{
 			char *lastf = NULL, *lastr = NULL;
 			if ((lastf = strrchr(name, '/')) == NULL && (lastr = strrchr(name, '\\')) == NULL)
@@ -935,10 +907,10 @@ syserr:			run_err("%s: %s", name, strerror(errno));
 			}
 		}
 #else
-        if ((last = strrchr(name, '/')) == NULL)
-            last = name;
-        else
-            ++last;
+		if ((last = strrchr(name, '/')) == NULL)
+			last = name;
+		else
+			++last;
 #endif
 		curfile = last;
 		if (pflag) {
@@ -1028,6 +1000,7 @@ rsource(char *name, struct stat *statp)
 	    (u_int) (statp->st_mode & FILEMODEMASK), 0, last);
 	if (verbose_mode)
 #ifdef WINDOWS
+		/* TODO - make fmprintf work for Windows  */
         {
             printf("Entering directory: ");
             wchar_t* wtmp = utf8_to_utf16(path);
@@ -1035,9 +1008,8 @@ rsource(char *name, struct stat *statp)
             free(wtmp);
         }
 #else
-        fmprintf(stderr, "Entering directory: %s", path);
+		fmprintf(stderr, "Entering directory: %s", path);
 #endif
-
 	(void) atomicio(vwrite, remout, path, strlen(path));
 	if (response() < 0) {
 		closedir(dirp);
@@ -1113,6 +1085,7 @@ sink(int argc, char **argv)
 		*cp = 0;
 		if (verbose_mode)
 #ifdef WINDOWS
+			/* TODO - make fmprintf work for Windows  */
             {
                 printf("Sink: ");
                 wchar_t* wtmp = utf8_to_utf16(buf);
@@ -1120,7 +1093,7 @@ sink(int argc, char **argv)
                 free(wtmp);
             }
 #else
-            fmprintf(stderr, "Sink: %s", buf);
+			fmprintf(stderr, "Sink: %s", buf);
 #endif
 		if (buf[0] == '\01' || buf[0] == '\02') {
 			if (iamremote == 0) {
@@ -1496,7 +1469,7 @@ allocbuf(BUF *bp, int fd, int blksize)
 		run_err("fstat: %s", strerror(errno));
 		return (0);
 	}
-	size = roundup(stb.st_blksize, blksize);
+	size = ROUNDUP(stb.st_blksize, blksize);
 	if (size == 0)
 		size = blksize;
 #else /* HAVE_STRUCT_STAT_ST_BLKSIZE */

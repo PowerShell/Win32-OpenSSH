@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.271 2016/01/14 22:56:56 markus Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.272 2016/09/12 01:22:38 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -15,7 +15,6 @@
 
 #include "includes.h"
 
-#include <sys/param.h>	/* roundup */
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -106,7 +105,16 @@ static int
 ssh_proxy_fdpass_connect(const char *host, u_short port,
     const char *proxy_command)
 {
-#ifndef WIN32_FIXME//R
+#ifdef WINDOWS
+        fatal("proxy fdpass connect is not supported in Windows");
+	/* 
+	 * Unix logic relies on passing in ancillary data over domain sockets 
+	 * This concept does not exist in Windows. 
+	 * Possible implementation in Windows could have proxy_command return 
+	 * connection handle through IPC means
+	 */
+        return 0;
+#else /* !WINDOWS */
 	char *command_string;
 	int sp[2], sock;
 	pid_t pid;
@@ -178,10 +186,7 @@ ssh_proxy_fdpass_connect(const char *host, u_short port,
 	packet_set_connection(sock, sock);
 
 	return 0;
-#else
-	fatal("proxy fdpass connect is not supported in Windows");
-	return 0;
-#endif
+#endif /* !WINDOWS */
 }
 
 /*
@@ -190,8 +195,10 @@ ssh_proxy_fdpass_connect(const char *host, u_short port,
 static int
 ssh_proxy_connect(const char *host, u_short port, const char *proxy_command)
 {
-#ifndef WIN32_FIXME//R
-
+#ifdef WINDOWS
+        fatal("Proxy connect is not supported in Windows yet");
+        return 0;
+#else /* !WINDOWS */
 	char *command_string;
 	int pin[2], pout[2];
 	pid_t pid;
@@ -261,10 +268,7 @@ ssh_proxy_connect(const char *host, u_short port, const char *proxy_command)
 
 	/* Indicate OK return */
 	return 0;
-#else
-	fatal("proxy connect is not supported in Windows");
-	return 0;
-#endif
+#endif /* !WINDOWS */
 }
 
 void
@@ -537,18 +541,8 @@ send_client_banner(int connection_out, int minor1)
 {
 	/* Send our own protocol version identification. */
 	if (compat20) {
-		#ifndef WIN32_FIXME
 		xasprintf(&client_version_string, "SSH-%d.%d-%.100s\r\n",
 		    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION);
-		#else
-		#ifdef WIN32_VS
-		xasprintf(&client_version_string, "SSH-%d.%d-%.100sp1 Microsoft_Win32_port_with_VS %s\r\n",
-		    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION, __DATE__ );
-		#else
-		xasprintf(&client_version_string, "SSH-%d.%d-%.100sp1 Microsoft_Win32_port %s\r\n",
-		    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION, __DATE__ );
-		#endif
-		#endif
 	} else {
 		xasprintf(&client_version_string, "SSH-%d.%d-%.100s\n",
 		    PROTOCOL_MAJOR_1, minor1, SSH_VERSION);
@@ -1424,7 +1418,7 @@ ssh_put_password(char *password)
 		packet_put_cstring(password);
 		return;
 	}
-	size = roundup(strlen(password) + 1, 32);
+	size = ROUNDUP(strlen(password) + 1, 32);
 	padded = xcalloc(1, size);
 	strlcpy(padded, password, size);
 	packet_put_string(padded, size);
@@ -1503,7 +1497,10 @@ warn_changed_key(Key *host_key)
 int
 ssh_local_cmd(const char *args)
 {
-#ifndef WIN32_FIXME
+#ifdef WINDOWS
+        fatal("executing local command is not supported in Windows yet");
+        return 0;
+#else /* !WINDOWS */
 	char *shell;
 	pid_t pid;
 	int status;
@@ -1536,10 +1533,7 @@ ssh_local_cmd(const char *args)
 		return (1);
 
 	return (WEXITSTATUS(status));
-#else  
-	fatal("executing local command is not supported in Windows");
-	return 0;
-#endif 
+#endif  /* !WINDOWS */
 }
 
 void

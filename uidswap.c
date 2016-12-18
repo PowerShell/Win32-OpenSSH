@@ -59,7 +59,6 @@ static int	saved_egroupslen = -1, user_groupslen = -1;
 void
 temporarily_use_uid(struct passwd *pw)
 {
-#ifndef WIN32_FIXME
 	/* Save the current euid, and egroups. */
 #ifdef SAVED_IDS_WORK_WITH_SETEUID
 	saved_euid = geteuid();
@@ -130,7 +129,6 @@ temporarily_use_uid(struct passwd *pw)
 	if (seteuid(pw->pw_uid) == -1)
 		fatal("seteuid %u: %.100s", (u_int)pw->pw_uid,
 		    strerror(errno));
-#endif
 }
 
 void
@@ -170,7 +168,6 @@ permanently_drop_suid(uid_t uid)
 void
 restore_uid(void)
 {
-#ifndef WIN32_FIXME
 	/* it's a no-op unless privileged */
 	if (!privileged) {
 		debug("restore_uid: (unprivileged)");
@@ -199,7 +196,6 @@ restore_uid(void)
 	if (setgroups(saved_egroupslen, saved_egroups) < 0)
 		fatal("setgroups: %.100s", strerror(errno));
 	temporarily_use_uid_effective = 0;
-#endif
 }
 
 /*

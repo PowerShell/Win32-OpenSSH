@@ -258,12 +258,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)ssh_api.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)ttymodes.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)uidswap.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)umac.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -276,22 +270,25 @@
     <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openssl-dh.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)platform-pledge.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\utf8.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)platform-tracing.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\platform-pledge.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)platform.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\sandbox-pledge.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)sandbox-pledge.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\platform.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)utf8.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\platform-tracing.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\digest-openssl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

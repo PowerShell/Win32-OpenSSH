@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-agent.c,v 1.213 2016/05/02 08:49:03 djm Exp $ */
+/* $OpenBSD: ssh-agent.c,v 1.215 2016/11/30 03:07:37 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -36,7 +36,6 @@
 
 #include "includes.h"
 
-#include <sys/param.h>	/* MIN MAX */
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/resource.h>
@@ -83,9 +82,14 @@
 #include "misc.h"
 #include "digest.h"
 #include "ssherr.h"
+#include "match.h"
 
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"
+#endif
+
+#ifndef DEFAULT_PKCS11_WHITELIST
+# define DEFAULT_PKCS11_WHITELIST "/usr/lib/*,/usr/local/lib/*"
 #endif
 
 typedef enum {
@@ -135,6 +139,9 @@ pid_t cleanup_pid = 0;
 char socket_name[PATH_MAX];
 char socket_dir[PATH_MAX];
 
+/* PKCS#11 path whitelist */
+static char *pkcs11_whitelist;
+
 /* locking */
 #define LOCK_SIZE	32
 #define LOCK_SALT_SIZE	16
@@ -149,291 +156,6 @@ extern char *__progname;
 static long lifetime = 0;
 
 static int fingerprint_hash = SSH_FP_HASH_DEFAULT;
-
-#ifdef WIN32_FIXME
-
-  #include <windows.h>
-  #include <tlhelp32.h>
-  
-  #undef   DEBUG
-  
-  #ifdef DEBUG
-    #define DBG_MSG(...) fprintf(stderr, __VA_ARGS__)
-  #else
-    #define DBG_MSG(...)
-  #endif
-
-  #define FAIL(X) if (X) goto fail
-  
-  /*
-   * This flag is setted for child processes only (fake fork).
-   */
-  
-  static int InsideChild = 0;
-  
-  /*
-   * Save args for forked child.
-   */
-   
-  static int ArgsCount = 0;
-
-  static char **ArgsVector = NULL;
-  
-  static int Socket = -1;
-
-  /*
-   * We create full path to directory, where socket files will be stored.
-   *
-   * buf     - buffer, where to store path. (OUT)
-   * bufSize - size of output buffer. (IN)
-   */
-   
-  void GetSocketDir(char *buf, int bufSize)
-  {
-    if (bufSize > 0 && buf)
-    {
-      buf[0] = 0;
-      
-      strncat(buf, getenv("HOMEDRIVE"), bufSize);
-      strncat(buf, getenv("HOMEPATH"), bufSize);
-      strncat(buf, "/.ssh", bufSize);
-    
-      /*
-       * Make sure does path already exist.
-       */
-     
-      CreateDirectory(buf, NULL);
-    }
-  }
-    
-  /*
-   * Iterate all socket files and delete if unused by anyone.
-   * This is workaround for bad scenarios like hardware failure
-   * or terminate ssh-agent by third-part process.
-   */
-   
-  int CleanUpSocketFiles()
-  {
-    int exitCode = -1;
-  
-    HANDLE hFind = INVALID_HANDLE_VALUE;
-
-    WIN32_FIND_DATA ffd;
-
-    char path[MAX_PATH] = {0};
-    char mask[MAX_PATH] = {0};
-  
-    int pathSize = 0;
-
-    /*
-     * Generate path, where socket files stored.
-     */
-   
-    sprintf(path, "%s%s\\.ssh\\", getenv("HOMEDRIVE"), getenv("HOMEPATH"));
-  
-    pathSize = strlen(path);
-  
-    sprintf(mask, "%sagent-*", path);
-
-    /*
-     * Find first socket file.
-     */
-  
-    hFind = FindFirstFile(mask, &ffd);
-  
-    FAIL(hFind == INVALID_HANDLE_VALUE);
-
-    /*
-     * Delete unused socket files.
-     */
-   
-    do
-    {
-      strcpy(path + pathSize, ffd.cFileName);
-      
-      if (DeleteFile(path))
-      {
-        DBG_MSG("Socket file [%s] deleted.\n", path);
-      }
-    } while (FindNextFile(hFind, &ffd));
-
-    FAIL(GetLastError() != ERROR_NO_MORE_FILES);
-  
-    /*
-     * Error handler.
-     */
-     
-    exitCode = 0;
-
-    fail:
-
-    FindClose(hFind);
-
-    if (exitCode)
-    {
-      DBG_MSG("ERROR. Cannot clean up socket files."
-                  " Error code is %u.\n", GetLastError());
-    }
-  
-    return exitCode;
-  }
-
-  /*
-   * Terminate process, used for kill forked child.
-   *
-   * pid    - ProcessId retrieved from CreateProcess (IN)
-   * unused - For compatibility with linux kill only.
-   *
-   * RETURNS: 0 if OK.
-   */
-   
-  static int kill(int pid, int unused)
-  {
-    int exitCode = -1;
-    
-    HANDLE hProcess = NULL;
-    
-    /*
-     * Send SIGINT first.
-     */
-     
-    if (GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pid) == FALSE)
-    {
-      DBG_MSG("WARNING. Cannot send exit signal to child [%u]. "
-                  "Error code is %u.\n", pid, (unsigned int) GetLastError());
-
-      /*
-       * Cannot send SIGINT, terminate.
-       */
-      
-      DBG_MSG("Opening child process [pid = %u]...\n");
-      
-      hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
-
-      FAIL(hProcess == NULL);
-
-      DBG_MSG("Terminating child process [pid = %u]...\n", pid);
-      
-      FAIL(TerminateProcess(hProcess, 0) == FALSE);
-      
-      CleanUpSocketFiles();
-    }
-    
-    exitCode = 0;
-  
-    fail:
-    
-    return exitCode;
-  }
-  
-  /*
-   * This is fake fork for Windows. It creates child ssh-agent
-   * process with '-f' flag for make difference between child
-   * and parent. 
-   *
-   * RETURNS: 0 if already inside children. (Do nothing in this case).
-   *          Pid of new, created process, elsewhere.
-   */
-
-  static int fork()
-  {
-    /*
-     * Already inside child. Do nothing, return 0 like POSIX fork() does.
-     */
-
-    if (InsideChild)
-    {
-      return 0;
-    }
-
-    /*
-     * Creates new child.
-     */
-     
-    else
-    {
-      STARTUPINFO si = {0};
-
-      PROCESS_INFORMATION pi = {0};
-  
-      char cmd[MAX_PATH + 64] = {0};
-      
-      int i = 0;
-      
-      /*
-       * Prepare command for run forked child. Copy args 
-       * from parrent.
-       */
-       
-      for (i = 0; i < ArgsCount; i++)
-      {
-        strncat(cmd, ArgsVector[i], sizeof(cmd));
-        strncat(cmd, " ", sizeof(cmd));
-      }
-      
-      /*
-       * Add '-f' to existing args to signal that is child process.
-       */
-       
-      strncat(cmd, "-f ", sizeof(cmd));
-      
-      /*
-       * Give name of socket file. Note that, parent doesn't create socket
-       * on Windows, but only generate name for it and pass it to child.
-       */
-      
-      strncat(cmd, "-a \"", sizeof(cmd));
-      strncat(cmd, socket_name, sizeof(cmd));
-      strncat(cmd, "\"", sizeof(cmd));
-      
-      /*
-       * Create child process.
-       */
-
-      si.cb = sizeof(STARTUPINFO);
-      
-      DBG_MSG("Creating child process [cmd = %s]...\n", cmd);
-      
-      FAIL(CreateProcess(NULL, cmd, NULL, NULL, TRUE, 
-                             NORMAL_PRIORITY_CLASS | CREATE_NEW_PROCESS_GROUP,
-                                 NULL, NULL, &si, &pi) == FALSE);
-  
-      DBG_MSG("Child created with PID = %u.\n", pi.dwProcessId);
-      
-      return pi.dwProcessId;
-    }
-  
-    /*
-     * Error handler.
-     */
-     
-    fail:
-  
-    DBG_MSG("ERROR. Cannot create child process. Exit code is %u.\n", 
-                (unsigned int) GetLastError());
-    
-    return -1;  
-  }
-  
-  /*
-   * This function handles SIGINT signal.
-   */
-
-  BOOL WINAPI CtrlHandlerRoutine(DWORD dwCtrlType)
-  {
-    DBG_MSG("Exit signal received...\n");
-
-    cleanup_exit(0);
-
-    /*
-     * For make compiler happy only.
-     */
-     
-    return TRUE;
-  }
- 
-#endif
-
 
 static void
 close_socket(SocketEntry *e)
@@ -824,7 +546,7 @@ reaper(void)
 				tab->nentries--;
 			} else
 				deadline = (deadline == 0) ? id->death :
-				    MIN(deadline, id->death);
+				    MINIMUM(deadline, id->death);
 		}
 	}
 	if (deadline == 0 || deadline <= now)
@@ -1023,7 +745,7 @@ no_identities(SocketEntry *e, u_int type)
 static void
 process_add_smartcard_key(SocketEntry *e)
 {
-	char *provider = NULL, *pin;
+	char *provider = NULL, *pin, canonical_provider[PATH_MAX];
 	int r, i, version, count = 0, success = 0, confirm = 0;
 	u_int seconds;
 	time_t death = 0;
@@ -1055,10 +777,21 @@ process_add_smartcard_key(SocketEntry *e)
 			goto send;
 		}
 	}
+	if (realpath(provider, canonical_provider) == NULL) {
+		verbose("failed PKCS#11 add of \"%.100s\": realpath: %s",
+		    provider, strerror(errno));
+		goto send;
+	}
+	if (match_pattern_list(canonical_provider, pkcs11_whitelist, 0) != 1) {
+		verbose("refusing PKCS#11 add of \"%.100s\": "
+		    "provider not whitelisted", canonical_provider);
+		goto send;
+	}
+	debug("%s: add %.100s", __func__, canonical_provider);
 	if (lifetime && !death)
 		death = monotime() + lifetime;
 
-	count = pkcs11_add_provider(provider, pin, &keys);
+	count = pkcs11_add_provider(canonical_provider, pin, &keys);
 	for (i = 0; i < count; i++) {
 		k = keys[i];
 		version = k->type == KEY_RSA1 ? 1 : 2;
@@ -1066,8 +799,8 @@ process_add_smartcard_key(SocketEntry *e)
 		if (lookup_identity(k, version) == NULL) {
 			id = xcalloc(1, sizeof(Identity));
 			id->key = k;
-			id->provider = xstrdup(provider);
-			id->comment = xstrdup(provider); /* XXX */
+			id->provider = xstrdup(canonical_provider);
+			id->comment = xstrdup(canonical_provider); /* XXX */
 			id->death = death;
 			id->confirm = confirm;
 			TAILQ_INSERT_TAIL(&tab->idlist, id, next);
@@ -1276,7 +1009,7 @@ prepare_select(fd_set **fdrp, fd_set **fdwp, int *fdl, u_int *nallocp,
 		switch (sockets[i].type) {
 		case AUTH_SOCKET:
 		case AUTH_CONNECTION:
-			n = MAX(n, sockets[i].fd);
+			n = MAXIMUM(n, sockets[i].fd);
 			break;
 		case AUTH_UNUSED:
 			break;
@@ -1315,7 +1048,7 @@ prepare_select(fd_set **fdrp, fd_set **fdwp, int *fdl, u_int *nallocp,
 	deadline = reaper();
 	if (parent_alive_interval != 0)
 		deadline = (deadline == 0) ? parent_alive_interval :
-		    MIN(deadline, parent_alive_interval);
+		    MINIMUM(deadline, parent_alive_interval);
 	if (deadline == 0) {
 		*tvpp = NULL;
 	} else {
@@ -1343,9 +1076,6 @@ after_select(fd_set *readset, fd_set *writeset)
 			break;
 		case AUTH_SOCKET:
 			if (FD_ISSET(sockets[i].fd, readset)) {
-		#ifdef WIN32_FIXME
-        sunaddr.sun_family = AF_UNIX;
-        #endif
 				slen = sizeof(sunaddr);
 				sock = accept(sockets[i].fd,
 				    (struct sockaddr *)&sunaddr, &slen);
@@ -1415,13 +1145,6 @@ after_select(fd_set *readset, fd_set *writeset)
 static void
 cleanup_socket(void)
 {
-  #ifdef WIN32_FIXME
-
-  close(Socket);
-  
-  CleanUpSocketFiles();
-  
-  #endif
 	if (cleanup_pid != 0 && getpid() != cleanup_pid)
 		return;
 	debug("%s: cleanup", __func__);
@@ -1452,7 +1175,6 @@ cleanup_handler(int sig)
 static void
 check_parent_exists(void)
 {
-#ifndef WIN32_FIXME
 	/*
 	 * If our parent has exited then getppid() will return (pid_t)1,
 	 * so testing for that should be safe.
@@ -1462,7 +1184,6 @@ check_parent_exists(void)
 		cleanup_socket();
 		_exit(2);
 	}
-#endif
 }
 
 static void
@@ -1470,7 +1191,7 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: ssh-agent [-c | -s] [-Dd] [-a bind_address] [-E fingerprint_hash]\n"
-	    "                 [-t life] [command [arg ...]]\n"
+	    "                 [-P pkcs11_whitelist] [-t life] [command [arg ...]]\n"
 	    "       ssh-agent [-c | -s] -k\n");
 	exit(1);
 }
@@ -1493,40 +1214,6 @@ main(int ac, char **av)
 	struct timeval *tvp = NULL;
 	size_t len;
 	mode_t prev_mask;
-  #ifdef WIN32_FIXME
-
-    /*
-     * Save oryginal arguments for forked child.
-     */
-
-    ArgsCount  = ac;
-    ArgsVector = av;
-    
-    int f_flag = 0;
-    
-    /*
-     * Random numbers needed to generate cokie.
-     */
-     
-    srand(time(0));
-
-    /*
-     * Handler for clean up socket file.
-     */
-     
-    SetConsoleCtrlHandler(CtrlHandlerRoutine, TRUE);
-    
-    /*
-     * Allocate stdio inside our wrapper function.
-     */
-     
-    allocate_standard_descriptor(STDIN_FILENO);
-    allocate_standard_descriptor(STDOUT_FILENO);
-    allocate_standard_descriptor(STDERR_FILENO);
-
-  #endif
-
-
 
 	ssh_malloc_init();	/* must be called before any mallocs */
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
@@ -1544,11 +1231,8 @@ main(int ac, char **av)
 
 	__progname = ssh_get_progname(av[0]);
 	seed_rng();
-#ifdef WIN32_FIXME
-	while ((ch = getopt(ac, av, "cDdksE:a:t:f")) != -1) {  // PRAGMA:TODO
-#else
-	while ((ch = getopt(ac, av, "cDdksE:a:t:")) != -1) {
-#endif
+
+	while ((ch = getopt(ac, av, "cDdksE:a:P:t:")) != -1) {
 		switch (ch) {
 		case 'E':
 			fingerprint_hash = ssh_digest_alg_by_name(optarg);
@@ -1562,6 +1246,11 @@ main(int ac, char **av)
 			break;
 		case 'k':
 			k_flag++;
+			break;
+		case 'P':
+			if (pkcs11_whitelist != NULL)
+				fatal("-P option already specified");
+			pkcs11_whitelist = xstrdup(optarg);
 			break;
 		case 's':
 			if (c_flag)
@@ -1587,24 +1276,6 @@ main(int ac, char **av)
 				usage();
 			}
 			break;
-    #ifdef WIN32_FIXME
-    
-    /*
-     * -f means forked process. Used to difference parent and childs.
-     */
-     
-    case 'f':
-    {
-      DBG_MSG("Hello from children [PID = %u]...\n", GetCurrentProcessId());
-      
-      InsideChild = 1;
-      
-      f_flag++;
-      
-      break;
-    }
-    
-    #endif
 		default:
 			usage();
 		}
@@ -1612,12 +1283,11 @@ main(int ac, char **av)
 	ac -= optind;
 	av += optind;
 
-	if (ac > 0 && (c_flag || k_flag || s_flag || d_flag || D_flag
-	 #ifdef WIN32_FIXME
-         || f_flag
-  #endif
-	))
+	if (ac > 0 && (c_flag || k_flag || s_flag || d_flag || D_flag))
 		usage();
+
+	if (pkcs11_whitelist == NULL)
+		pkcs11_whitelist = xstrdup(DEFAULT_PKCS11_WHITELIST);
 
 	if (ac == 0 && !c_flag && !s_flag) {
 		shell = getenv("SHELL");
@@ -1654,19 +1324,6 @@ main(int ac, char **av)
 	parent_pid = getpid();
 
 	if (agentsocket == NULL) {
-
-#ifdef WIN32_FIXME
-    
-    /*
-     * On Windows we store sockets in "$HOME/.ssh/".
-     */
-   
-     GetSocketDir(socket_dir, sizeof(socket_dir));
-  
-     snprintf(socket_name, sizeof socket_name, "%s/agent-%d.%d", 
-                  socket_dir, rand(), parent_pid);
-   
-#else 
 		/* Create private directory for agent socket */
 		mktemp_proto(socket_dir, sizeof(socket_dir));
 		if (mkdtemp(socket_dir) == NULL) {
@@ -1675,7 +1332,6 @@ main(int ac, char **av)
 		}
 		snprintf(socket_name, sizeof socket_name, "%s/agent.%ld", socket_dir,
 		    (long)parent_pid);
-#endif /* else WIN32_FIXME */
 	} else {
 		/* Try to use specified agent socket */
 		socket_dir[0] = '\0';
@@ -1686,36 +1342,14 @@ main(int ac, char **av)
 	 * Create socket early so it will exist before command gets run from
 	 * the parent.
 	 */
-#ifdef WIN32_FIXME
-
-  /*
-   * On Windows parent process only generate name for socket file. Socket
-   * is realy created in child process.
-   *
-   * d_flag means debug mode. In this case there is no child process, all
-   * work is done in parent, so we creates socket too.
-   */
- 
-  if (InsideChild || d_flag)
-  {
-  
-#endif /* !WIN32_FIXME */
 	prev_mask = umask(0177);
 	sock = unix_listener(socket_name, SSH_LISTEN_BACKLOG, 0);
-#ifdef WIN32_FIXME
-    
-  Socket = sock;
-  
-#endif /* !WIN32_FIXME */
 	if (sock < 0) {
 		/* XXX - unix_listener() calls error() not perror() */
 		*socket_name = '\0'; /* Don't unlink any existing file */
 		cleanup_exit(1);
 	}
 	umask(prev_mask);
-#ifdef WIN32_FIXME
-  }
-#endif
 
 	/*
 	 * Fork, and have the parent execute the command, if any, or present
@@ -1725,11 +1359,7 @@ main(int ac, char **av)
 		log_init(__progname,
 		    d_flag ? SYSLOG_LEVEL_DEBUG3 : SYSLOG_LEVEL_INFO,
 		    SYSLOG_FACILITY_AUTH, 1);
-	#ifdef WIN32_FIXME
-    format = c_flag ? "setenv %s %s;\n" : "set %s=%s\n";    
-#else
 		format = c_flag ? "setenv %s %s;\n" : "%s=%s; export %s;\n";
-#endif
 		printf(format, SSH_AUTHSOCKET_ENV_NAME, socket_name,
 		    SSH_AUTHSOCKET_ENV_NAME);
 		printf("echo Agent pid %ld;\n", (long)parent_pid);
@@ -1742,27 +1372,15 @@ main(int ac, char **av)
 		cleanup_exit(1);
 	}
 	if (pid != 0) {		/* Parent - execute the given command. */
-		#ifndef WIN32_FIXME
 		close(sock);
-		#endif
 		snprintf(pidstrbuf, sizeof pidstrbuf, "%ld", (long)pid);
 		if (ac == 0) {
-	#ifdef WIN32_FIXME
-      format = c_flag ? "setenv %s %s;\n" : "set %s=%s\n";
-#else
 			format = c_flag ? "setenv %s %s;\n" : "%s=%s; export %s;\n";
-#endif
-			
 			printf(format, SSH_AUTHSOCKET_ENV_NAME, socket_name,
 			    SSH_AUTHSOCKET_ENV_NAME);
 			printf(format, SSH_AGENTPID_ENV_NAME, pidstrbuf,
 			    SSH_AGENTPID_ENV_NAME);
 			printf("echo Agent pid %ld;\n", (long)pid);
-			#ifdef WIN32_FIXME
-			SetEnvironmentVariable(SSH_AUTHSOCKET_ENV_NAME, socket_name);
-			SetEnvironmentVariable(SSH_AGENTPID_ENV_NAME, pidstrbuf);
-			system("start cmd");
-			#endif
 			exit(0);
 		}
 		if (setenv(SSH_AUTHSOCKET_ENV_NAME, socket_name, 1) == -1 ||
@@ -1770,22 +1388,17 @@ main(int ac, char **av)
 			perror("setenv");
 			exit(1);
 		}
-#ifdef WIN32_FIXME
-   _execvp((const char *) av[0], (const char **) av);
-#else
 		execvp(av[0], av);
-#endif
 		perror(av[0]);
 		exit(1);
 	}
 	/* child */
 	log_init(__progname, SYSLOG_LEVEL_INFO, SYSLOG_FACILITY_AUTH, 0);
-#ifndef WIN32_FIXME
+
 	if (setsid() == -1) {
 		error("setsid: %s", strerror(errno));
 		cleanup_exit(1);
 	}
-#endif
 
 	(void)chdir("/");
 	if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
@@ -1817,15 +1430,13 @@ skip:
 	if (ac > 0)
 		parent_alive_interval = 10;
 	idtab_init();
-#ifndef WIN32_FIXME
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT, (d_flag | D_flag) ? cleanup_handler : SIG_IGN);
 	signal(SIGHUP, cleanup_handler);
 	signal(SIGTERM, cleanup_handler);
-#endif
 	nalloc = 0;
 
-	if (pledge("stdio cpath unix id proc exec", NULL) == -1)
+	if (pledge("stdio rpath cpath unix id proc exec", NULL) == -1)
 		fatal("%s: pledge: %s", __progname, strerror(errno));
 	platform_pledge_agent();
 

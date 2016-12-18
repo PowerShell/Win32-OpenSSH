@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.471 2016/08/03 04:23:55 dtucker Exp $ */
+/* $OpenBSD: sshd.c,v 1.480 2016/12/09 03:04:29 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -87,7 +87,6 @@
 
 #include "xmalloc.h"
 #include "ssh.h"
-#include "ssh1.h"
 #include "ssh2.h"
 #include "rsa.h"
 #include "sshpty.h"
@@ -115,7 +114,6 @@
 #include "dispatch.h"
 #include "channels.h"
 #include "session.h"
-#include "monitor_mm.h"
 #include "monitor.h"
 #ifdef GSSAPI
 #include "ssh-gss.h"
@@ -124,10 +122,6 @@
 #include "ssh-sandbox.h"
 #include "version.h"
 #include "ssherr.h"
-
-#ifndef O_NOCTTY
-#define O_NOCTTY	0
-#endif
 
 /* Re-exec fds */
 #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
@@ -169,7 +163,12 @@ int saved_argc;
 
 /* re-exec */
 int rexeced_flag = 0;
+#ifdef WINDOWS
+/* rexec is not supported in Windows */
+int rexec_flag = 0;
+#else
 int rexec_flag = 1;
+#endif
 int rexec_argc = 0;
 char **rexec_argv;
 
@@ -201,21 +200,11 @@ int have_agent = 0;
  * not very useful.  Currently, memory locking is not implemented.
  */
 struct {
-	Key	*server_key;		/* ephemeral server key */
-	Key	*ssh1_host_key;		/* ssh1 host key */
 	Key	**host_keys;		/* all private host keys */
 	Key	**host_pubkeys;		/* all public host keys */
 	Key	**host_certificates;	/* all public host certificates */
-	int	have_ssh1_key;
 	int	have_ssh2_key;
-	u_char	ssh1_cookie[SSH_SESSION_KEY_LENGTH];
 } sensitive_data;
-
-/*
- * Flag indicating whether the RSA server key needs to be regenerated.
- * Is set in the SIGALRM handler and cleared when the key is regenerated.
- */
-static volatile sig_atomic_t key_do_regen = 0;
 
 /* This is set to true when a signal is received. */
 static volatile sig_atomic_t received_sighup = 0;
@@ -236,7 +225,12 @@ int *startup_pipes = NULL;
 int startup_pipe;		/* in child */
 
 /* variables used for privilege separation */
+#ifdef WINDOWS
+/* Windows does not use Unix privilege separation model */
+int use_prevsep = 0;
+#else
 int use_privsep = -1;
+#endif
 struct monitor *pmonitor = NULL;
 int privsep_is_preauth = 1;
 
@@ -258,10 +252,6 @@ int is_child = 0;
 /* Prototypes for various functions defined later in this file. */
 void destroy_sensitive_data(void);
 void demote_sensitive_data(void);
-
-#ifdef WITH_SSH1
-static void do_ssh1_kex(void);
-#endif
 static void do_ssh2_kex(void);
 
 /*
@@ -277,8 +267,7 @@ static void do_ssh2_kex(void);
   {
     int exitCode = -1;
     
-    /* Windows */
-    #ifdef WINDOWS
+#ifdef WINDOWS
 
     char* dir = w32_programdir();
     if (strnlen(dir, pathSize) == pathSize) 
@@ -288,7 +277,7 @@ static void do_ssh2_kex(void);
         exitCode = 0;
     }
     
-    #endif
+#endif
     
     //
     // Linux.
@@ -367,6 +356,8 @@ static void
 sighup_restart(void)
 {
 	logit("Received SIGHUP; restarting.");
+	if (options.pid_file != NULL)
+		unlink(options.pid_file);
 	platform_pre_restart();
 	close_listen_socks();
 	close_startup_pipes();
@@ -432,73 +423,19 @@ grace_alarm_handler(int sig)
 	    ssh_remote_ipaddr(active_state), ssh_remote_port(active_state));
 }
 
-/*
- * Signal handler for the key regeneration alarm.  Note that this
- * alarm only occurs in the daemon waiting for connections, and it does not
- * do anything with the private key or random state before forking.
- * Thus there should be no concurrency control/asynchronous execution
- * problems.
- */
-static void
-generate_ephemeral_server_key(void)
-{
-	verbose("Generating %s%d bit RSA key.",
-	    sensitive_data.server_key ? "new " : "", options.server_key_bits);
-	if (sensitive_data.server_key != NULL)
-		key_free(sensitive_data.server_key);
-	sensitive_data.server_key = key_generate(KEY_RSA1,
-	    options.server_key_bits);
-	verbose("RSA key generation complete.");
-
-	arc4random_buf(sensitive_data.ssh1_cookie, SSH_SESSION_KEY_LENGTH);
-}
-
-/*ARGSUSED*/
-static void
-key_regeneration_alarm(int sig)
-{
-	int save_errno = errno;
-
-	signal(SIGALRM, SIG_DFL);
-	errno = save_errno;
-	key_do_regen = 1;
-}
-
 static void
 sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 {
 	u_int i;
-	int mismatch;
 	int remote_major, remote_minor;
-	int major, minor;
 	char *s, *newline = "\n";
 	char buf[256];			/* Must not be larger than remote_version. */
 	char remote_version[256];	/* Must be at least as big as buf. */
 
-	if ((options.protocol & SSH_PROTO_1) &&
-	    (options.protocol & SSH_PROTO_2)) {
-		major = PROTOCOL_MAJOR_1;
-		minor = 99;
-	} else if (options.protocol & SSH_PROTO_2) {
-		major = PROTOCOL_MAJOR_2;
-		minor = PROTOCOL_MINOR_2;
-		newline = "\r\n";
-	} else {
-		major = PROTOCOL_MAJOR_1;
-		minor = PROTOCOL_MINOR_1;
-	}
-
-	#ifndef WIN32_FIXME
 	xasprintf(&server_version_string, "SSH-%d.%d-%.100s%s%s%s",
-	    major, minor, SSH_VERSION,
+	    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION,
 	    *options.version_addendum == '\0' ? "" : " ",
 	    options.version_addendum, newline);
-	#else
-	xasprintf(&server_version_string, "SSH-%d.%d-%.100s%s%s%s",
-	    major, minor, SSH_RELEASE,
-	    *options.version_addendum == '\0' ? "" : " ",
-	    options.version_addendum, newline);
-	#endif
 
 	/* Send our protocol version identification. */
 	if (atomicio(vwrite, sock_out, server_version_string,
@@ -552,9 +489,7 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 	debug("Client protocol version %d.%d; client software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
-	#ifdef WIN32_FIXME
-	SetEnvironmentVariable("SSH_CLIENT_ID", remote_version);
-	#endif
+	ssh->compat = compat_datafellows(remote_version);
 
 	if ((ssh->compat & SSH_BUG_PROBE) != 0) {
 		logit("probed from %s port %d with %s.  Don't panic.",
@@ -577,42 +512,13 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 		    "refusing connection", remote_version);
 	}
 
-	mismatch = 0;
-	switch (remote_major) {
-	case 1:
-		if (remote_minor == 99) {
-			if (options.protocol & SSH_PROTO_2)
-				enable_compat20();
-			else
-				mismatch = 1;
-			break;
-		}
-		if (!(options.protocol & SSH_PROTO_1)) {
-			mismatch = 1;
-			break;
-		}
-		if (remote_minor < 3) {
-			packet_disconnect("Your ssh version is too old and "
-			    "is no longer supported.  Please install a newer version.");
-		} else if (remote_minor == 3) {
-			/* note that this disables agent-forwarding */
-			enable_compat13();
-		}
-		break;
-	case 2:
-		if (options.protocol & SSH_PROTO_2) {
-			enable_compat20();
-			break;
-		}
-		/* FALLTHROUGH */
-	default:
-		mismatch = 1;
-		break;
-	}
 	chop(server_version_string);
 	debug("Local version string %.200s", server_version_string);
 
-	if (mismatch) {
+	if (remote_major == 2 ||
+	    (remote_major == 1 && remote_minor == 99)) {
+		enable_compat20();
+	} else {
 		s = "Protocol major versions differ.\n";
 		(void) atomicio(vwrite, sock_out, s, strlen(s));
 		close(sock_in);
@@ -631,10 +537,6 @@ destroy_sensitive_data(void)
 {
 	int i;
 
-	if (sensitive_data.server_key) {
-		key_free(sensitive_data.server_key);
-		sensitive_data.server_key = NULL;
-	}
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if (sensitive_data.host_keys[i]) {
 			key_free(sensitive_data.host_keys[i]);
@@ -645,8 +547,6 @@ destroy_sensitive_data(void)
 			sensitive_data.host_certificates[i] = NULL;
 		}
 	}
-	sensitive_data.ssh1_host_key = NULL;
-	explicit_bzero(sensitive_data.ssh1_cookie, SSH_SESSION_KEY_LENGTH);
 }
 
 /* Demote private to public keys for network child */
@@ -656,31 +556,63 @@ demote_sensitive_data(void)
 	Key *tmp;
 	int i;
 
-	if (sensitive_data.server_key) {
-		tmp = key_demote(sensitive_data.server_key);
-		key_free(sensitive_data.server_key);
-		sensitive_data.server_key = tmp;
-	}
-
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if (sensitive_data.host_keys[i]) {
 			tmp = key_demote(sensitive_data.host_keys[i]);
 			key_free(sensitive_data.host_keys[i]);
 			sensitive_data.host_keys[i] = tmp;
-			if (tmp->type == KEY_RSA1)
-				sensitive_data.ssh1_host_key = tmp;
 		}
 		/* Certs do not need demotion */
 	}
-
-	/* We do not clear ssh1_host key and cookie.  XXX - Okay Niels? */
 }
 
 static void
+reseed_prngs(void)
+{
+	u_int32_t rnd[256];
+
+#ifdef WITH_OPENSSL
+	RAND_poll();
+#endif
+	arc4random_stir(); /* noop on recent arc4random() implementations */
+	arc4random_buf(rnd, sizeof(rnd)); /* let arc4random notice PID change */
+
+#ifdef WITH_OPENSSL
+	RAND_seed(rnd, sizeof(rnd));
+	/* give libcrypto a chance to notice the PID change */
+	if ((RAND_bytes((u_char *)rnd, 1)) != 1)
+		fatal("%s: RAND_bytes failed", __func__);
+#endif
+
+	explicit_bzero(rnd, sizeof(rnd));
+}
+
+#ifdef WINDOWS
+/* 
+ * No-OP defs for preauth routines for Windows 
+ * these should go away once the privilege separation 
+ * related is refactored to be invoked only when applicable 
+ */
+static void
+privsep_preauth_child(void) {
+        return;
+}
+
+static int
+privsep_preauth(Authctxt *authctxt) {
+        return 0;
+}
+
+static void
+privsep_postauth(Authctxt *authctxt) {
+        return;
+}
+
+#else
+/* Unix privilege separation routines */
+static void
 privsep_preauth_child(void)
 {
-#ifndef WIN32_FIXME
-	u_int32_t rnd[256];
 	gid_t gidset[1];
 
 	/* Enable challenge-response authentication for privilege separation */
@@ -692,14 +624,7 @@ privsep_preauth_child(void)
 		ssh_gssapi_prepare_supported_oids();
 #endif
 
-	arc4random_stir();
-	arc4random_buf(rnd, sizeof(rnd));
-#ifdef WITH_OPENSSL
-	RAND_seed(rnd, sizeof(rnd));
-	if ((RAND_bytes((u_char *)rnd, 1)) != 1)
-		fatal("%s: RAND_bytes failed", __func__);
-#endif
-	explicit_bzero(rnd, sizeof(rnd));
+	reseed_prngs();
 
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
@@ -720,13 +645,11 @@ privsep_preauth_child(void)
 		if (setgroups(1, gidset) < 0)
 			fatal("setgroups: %.100s", strerror(errno));
 		permanently_set_uid(privsep_pw);
-#endif
 }
 
 static int
 privsep_preauth(Authctxt *authctxt)
 {
-#ifndef WIN32_FIXME
 	int status, r;
 	pid_t pid;
 	struct ssh_sandbox *box = NULL;
@@ -756,9 +679,6 @@ privsep_preauth(Authctxt *authctxt)
 		if (box != NULL)
 			ssh_sandbox_parent_preauth(box, pid);
 		monitor_child_preauth(authctxt, pmonitor);
-
-		/* Sync memory */
-		monitor_sync(pmonitor);
 
 		/* Wait for the child's exit status */
 		while (waitpid(pid, &status, 0) < 0) {
@@ -794,27 +714,15 @@ privsep_preauth(Authctxt *authctxt)
 
 		return 0;
 	}
-#else
-
-  /*
-   * Not implemented on Win32.
-   */
-   
-  return 0;
-  
-#endif
 }
 
 static void
 privsep_postauth(Authctxt *authctxt)
 {
-#ifndef WIN32_FIXME
-	u_int32_t rnd[256];
-
 #ifdef DISABLE_FD_PASSING
 	if (1) {
 #else
-	if (authctxt->pw->pw_uid == 0 || options.use_login) {
+	if (authctxt->pw->pw_uid == 0) {
 #endif
 		/* File descriptor passing is broken or root login */
 		use_privsep = 0;
@@ -844,14 +752,7 @@ privsep_postauth(Authctxt *authctxt)
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
 
-	arc4random_stir();
-	arc4random_buf(rnd, sizeof(rnd));
-#ifdef WITH_OPENSSL
-	RAND_seed(rnd, sizeof(rnd));
-	if ((RAND_bytes((u_char *)rnd, 1)) != 1)
-		fatal("%s: RAND_bytes failed", __func__);
-#endif
-	explicit_bzero(rnd, sizeof(rnd));
+	reseed_prngs();
 
 	/* Drop privileges */
 	do_setusercontext(authctxt->pw);
@@ -865,8 +766,9 @@ privsep_postauth(Authctxt *authctxt)
 	 * this information is not part of the key state.
 	 */
 	packet_set_authenticated();
-#endif /* !WIN32_FIXME */
 }
+
+#endif 
 
 static char *
 list_hostkey_types(void)
@@ -882,7 +784,7 @@ list_hostkey_types(void)
 		key = sensitive_data.host_keys[i];
 		if (key == NULL)
 			key = sensitive_data.host_pubkeys[i];
-		if (key == NULL || key->type == KEY_RSA1)
+		if (key == NULL)
 			continue;
 		/* Check that the key is accepted in HostkeyAlgorithms */
 		if (match_pattern_list(sshkey_ssh_name(key),
@@ -1031,7 +933,7 @@ notify_hostkeys(struct ssh *ssh)
 	for (i = nkeys = 0; i < options.num_host_key_files; i++) {
 		key = get_hostkey_public_by_index(i, ssh);
 		if (key == NULL || key->type == KEY_UNSPEC ||
-		    key->type == KEY_RSA1 || sshkey_is_cert(key))
+		    sshkey_is_cert(key))
 			continue;
 		fp = sshkey_fingerprint(key, options.fingerprint_hash,
 		    SSH_FP_DEFAULT);
@@ -1097,10 +999,9 @@ usage(void)
 #endif
 	);
 	fprintf(stderr,
-"usage: sshd [-46DdeiqTt] [-b bits] [-C connection_spec] [-c host_cert_file]\n"
+"usage: sshd [-46DdeiqTt] [-C connection_spec] [-c host_cert_file]\n"
 "            [-E log_file] [-f config_file] [-g login_grace_time]\n"
-"            [-h host_key_file] [-k key_gen_time] [-o option] [-p port]\n"
-"            [-u len]\n"
+"            [-h host_key_file] [-o option] [-p port] [-u len]\n"
 	);
 	exit(1);
 }
@@ -1117,41 +1018,12 @@ send_rexec_state(int fd, struct sshbuf *conf)
 	/*
 	 * Protocol from reexec master to child:
 	 *	string	configuration
-	 *	u_int	ephemeral_key_follows
-	 *	bignum	e		(only if ephemeral_key_follows == 1)
-	 *	bignum	n			"
-	 *	bignum	d			"
-	 *	bignum	iqmp			"
-	 *	bignum	p			"
-	 *	bignum	q			"
 	 *	string rngseed		(only if OpenSSL is not self-seeded)
 	 */
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((r = sshbuf_put_stringb(m, conf)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-
-#ifdef WITH_SSH1
-	if (sensitive_data.server_key != NULL &&
-	    sensitive_data.server_key->type == KEY_RSA1) {
-		if ((r = sshbuf_put_u32(m, 1)) != 0 ||
-		    (r = sshbuf_put_bignum1(m,
-		    sensitive_data.server_key->rsa->e)) != 0 ||
-		    (r = sshbuf_put_bignum1(m,
-		    sensitive_data.server_key->rsa->n)) != 0 ||
-		    (r = sshbuf_put_bignum1(m,
-		    sensitive_data.server_key->rsa->d)) != 0 ||
-		    (r = sshbuf_put_bignum1(m,
-		    sensitive_data.server_key->rsa->iqmp)) != 0 ||
-		    (r = sshbuf_put_bignum1(m,
-		    sensitive_data.server_key->rsa->p)) != 0 ||
-		    (r = sshbuf_put_bignum1(m,
-		    sensitive_data.server_key->rsa->q)) != 0)
-			fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	} else
-#endif
-		if ((r = sshbuf_put_u32(m, 0)) != 0)
-			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 #if defined(WITH_OPENSSL) && !defined(OPENSSL_PRNG_ONLY)
 	rexec_send_rng_seed(m);
@@ -1185,24 +1057,6 @@ recv_rexec_state(int fd, Buffer *conf)
 	if (conf != NULL)
 		buffer_append(conf, cp, len);
 	free(cp);
-
-	if (buffer_get_int(&m)) {
-#ifdef WITH_SSH1
-		if (sensitive_data.server_key != NULL)
-			key_free(sensitive_data.server_key);
-		sensitive_data.server_key = key_new_private(KEY_RSA1);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->e);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->n);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->d);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->iqmp);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->p);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->q);
-		if (rsa_generate_additional_parameters(
-		    sensitive_data.server_key->rsa) != 0)
-			fatal("%s: rsa_generate_additional_parameters "
-			    "error", __func__);
-#endif
-	}
 
 #if defined(WITH_OPENSSL) && !defined(OPENSSL_PRNG_ONLY)
 	rexec_recv_rng_seed(&m);
@@ -1282,6 +1136,14 @@ server_listen(void)
 			close(listen_sock);
 			continue;
 		}
+#ifdef WINDOWS
+		/* disable inheritance on listener socket */
+		if (fcntl(listen_sock, F_SETFD, FD_CLOEXEC) != 0) {
+			error("F_SETFD  FD_CLOEXEC on listener socket %d failed with %d", listen_sock, errno);
+			close(listen_sock);
+			continue;
+		}
+#endif
 		/*
 		 * Set socket options.
 		 * Allow local port reuse in TIME_WAIT.
@@ -1293,15 +1155,6 @@ server_listen(void)
 		/* Only communicate in IPv6 over AF_INET6 sockets. */
 		if (ai->ai_family == AF_INET6)
 			sock_set_v6only(listen_sock);
-    #ifdef WIN32_FIXME
-
-    /*
-     * Forbid inheriting of listen socket.
-     */
-		fcntl(listen_sock, F_SETFD, FD_CLOEXEC);
-    
-  
-    #endif
 
 		debug("Bind to port %s on %s.", strport, ntop);
 
@@ -1336,7 +1189,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 {
 	fd_set *fdset;
 	int i, j, ret, maxfd;
-	int key_used = 0, startups = 0;
+	int startups = 0;
 	int startup_p[2] = { -1 , -1 };
 	struct sockaddr_storage from;
 	socklen_t fromlen;
@@ -1383,11 +1236,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				unlink(options.pid_file);
 			exit(received_sigterm == SIGTERM ? 0 : 255);
 		}
-		if (key_used && key_do_regen) {
-			generate_ephemeral_server_key();
-			key_used = 0;
-			key_do_regen = 0;
-		}
 		if (ret < 0)
 			continue;
 
@@ -1424,7 +1272,15 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				continue;
 			}
 			if (drop_connection(startups) == 1) {
-				debug("drop connection #%d", startups);
+				char *laddr = get_local_ipaddr(*newsock);
+				char *raddr = get_peer_ipaddr(*newsock);
+
+				verbose("drop connection #%d from [%s]:%d "
+				    "on [%s]:%d past MaxStartups", startups,
+				    raddr, get_peer_port(*newsock),
+				    laddr, get_local_port(*newsock));
+				free(laddr);
+				free(raddr);
 				close(*newsock);
 				continue;
 			}
@@ -1484,53 +1340,39 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			 * parent continues listening.
 			 */
 			platform_pre_fork();
-      #ifdef WIN32_FIXME
+#ifdef WINDOWS
+			/* 
+			* fork() repleacement for Windows -
+			* - Put accepted socket in a env varaibale
+			* - disable inheritance on listening socket and startup fds
+			* - Spawn child sshd.exe
+			*/
 			{
-				PROCESS_INFORMATION pi;
-				STARTUPINFO si;
-				BOOL b;
-				char path[MAX_PATH];
+				char* path_utf8 = utf16_to_utf8(GetCommandLineW());
+				char fd_handle[30];  /* large enough to hold pointer value in hex */
 
-				memset(&si, 0, sizeof(STARTUPINFO));
-
-				char remotesoc[64];
-                                snprintf(remotesoc, sizeof(remotesoc), "%p", sfd_to_handle(*newsock));
-                                SetEnvironmentVariable("SSHD_REMSOC", remotesoc);
-                                debug("Remote Handle %s", remotesoc);
-
-				si.cb = sizeof(STARTUPINFO);
-				si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-				si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-				si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-				si.wShowWindow = SW_HIDE;
-				si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
-
-				/*
-				 * Create the child process
-				 */
-				strncpy(path, GetCommandLineA(), MAX_PATH);
-				if (CreateProcess(NULL, path, NULL, NULL, TRUE,
-					CREATE_NEW_PROCESS_GROUP, NULL, NULL,
-					&si, &pi) == FALSE) {
-					debug("CreateProcess failure: %d", GetLastError());
-					exit(1);
-				}				
-
+				if (path_utf8 == NULL)
+					fatal("Failed to alloc memory");
+				
+				if (snprintf(fd_handle, sizeof(fd_handle), "%p", sfd_to_handle(*newsock)) == -1
+				    || SetEnvironmentVariable("SSHD_REMSOC", fd_handle) == FALSE
+				    || snprintf(fd_handle, sizeof(fd_handle), "%p", sfd_to_handle(startup_p[1])) == -1
+				    || SetEnvironmentVariable("SSHD_STARTUPSOC", fd_handle) == FALSE
+				    || fcntl(startup_p[0], F_SETFD, FD_CLOEXEC) == -1) {
+					error("unable to set the right environment for child, closing connection ");
+					close(*newsock);
+					/* close child end of startup pipe. parent end will automatically be cleaned up on next iteration*/
+					close(startup_p[1]);
+					continue;
+				}
+                
+				pid = spawn_child(path_utf8, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, CREATE_NEW_PROCESS_GROUP);
+				free(path_utf8);
 				close(*newsock);
-				close(startup_pipes[i]);
-				startup_pipes[i] = -1;
-				startups--;
-
-				sw_add_child(pi.hProcess, pi.dwProcessId);
-				CloseHandle(pi.hThread);
-				pid = pi.dwProcessId;
 			}
-			
-			if (pid == 0) {
 #else
 
 			if ((pid = fork()) == 0) {
-#endif /* else WIN32_FIXME */
 				/*
 				 * Child.  Close the listening and
 				 * max_startup sockets.  Start using
@@ -1553,7 +1395,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					close(config_s[0]);
 				break;
 			}
-
+#endif
 			/* Parent.  Stay in the loop. */
 			platform_post_fork_parent(pid);
 			if (pid < 0)
@@ -1568,19 +1410,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				close(config_s[0]);
 				close(config_s[1]);
 			}
-
-			/*
-			 * Mark that the key has been used (it
-			 * was "given" to the child).
-			 */
-			if ((options.protocol & SSH_PROTO_1) &&
-			    key_used == 0) {
-				/* Schedule server key regeneration alarm. */
-				signal(SIGALRM, key_regeneration_alarm);
-				alarm(options.key_regeneration_time);
-				key_used = 1;
-			}
-
 			close(*newsock);
 
 			/*
@@ -1654,7 +1483,7 @@ main(int ac, char **av)
 	struct ssh *ssh = NULL;
 	extern char *optarg;
 	extern int optind;
-	int r, opt, i, j, on = 1;
+	int r, opt, i, j, on = 1, already_daemon;
 	int sock_in = -1, sock_out = -1, newsock = -1;
 	const char *remote_ip;
 	int remote_port;
@@ -1670,16 +1499,6 @@ main(int ac, char **av)
 	struct connection_info *connection_info = get_connection_info(0, 0);
 
 	ssh_malloc_init();	/* must be called before any mallocs */
-#ifdef WIN32_FIXME
-
-    /*
-     * Setup exit signal handler for receiving signal, when 
-     * parent server is stopped.
-     */
-  
-    AllocConsole();
-
-#endif /* WIN32_FIXME */
 
 #ifdef HAVE_SECUREWARE
 	(void)set_auth_parameters(ac, av);
@@ -1700,10 +1519,8 @@ main(int ac, char **av)
 	av = saved_argv;
 #endif
 
-#ifndef WIN32_FIXME
 	if (geteuid() == 0 && setgroups(0, NULL) == -1)
 		debug("setgroups(): %.200s", strerror(errno));
-#endif
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
@@ -1743,7 +1560,7 @@ main(int ac, char **av)
 			no_daemon_flag = 1;
 			break;
 		case 'E':
-			logfile = xstrdup(optarg);
+			logfile = optarg;
 			/* FALLTHROUGH */
 		case 'e':
 			log_stderr = 1;
@@ -1765,8 +1582,7 @@ main(int ac, char **av)
 			options.log_level = SYSLOG_LEVEL_QUIET;
 			break;
 		case 'b':
-			options.server_key_bits = (int)strtonum(optarg, 256,
-			    32768, NULL);
+			/* protocol 1, ignored */
 			break;
 		case 'p':
 			options.ports_from_cmdline = 1;
@@ -1787,10 +1603,7 @@ main(int ac, char **av)
 			}
 			break;
 		case 'k':
-			if ((options.key_regeneration_time = convtime(optarg)) == -1) {
-				fprintf(stderr, "Invalid key regeneration interval.\n");
-				exit(1);
-			}
+			/* protocol 1, ignored */
 			break;
 		case 'h':
 			if (options.num_host_key_files >= MAX_HOSTKEYS) {
@@ -1831,76 +1644,14 @@ main(int ac, char **av)
 			break;
 		}
 	}
-	
-  #ifdef WIN32_FIXME
-
-    rexec_flag = 0;
-    use_privsep = 0;
-
-  #endif /* WIN32_FIXME */
-    
-  {
-    /*
-     * Use relative './sshd_config' or '../etc/sshd_config' path.
-     */
-    
-    struct stat s;
-     
-    #define PATH_SIZE PATH_MAX
-
-    char basePath[PATH_SIZE] = {0};
-    char path[PATH_SIZE]     = {0};
-    
-    /*
-     * Get path to current running module.
-     */
-
-    if (GetCurrentModulePath(basePath, PATH_SIZE) == 0)
-    {
-
-#ifdef WIN32_FIXME
-		chdir(basePath);
-#endif
-      /*
-       * Try './sshd_config' first.
-       */
-         
-      strncpy(path, basePath, PATH_SIZE);
-      strncat(path, "/sshd_config", PATH_SIZE);
-        
-      if (stat(path, &s) == 0)
-      {
-        config_file_name = path;
-      }
-      else
-      {
-        /*
-         * Try '../etc/sshd_config'.
-         */
-       
-        strncpy(path, basePath, PATH_SIZE);
-        strncat(path, "/../etc/sshd_config", PATH_SIZE);
-        
-        if (stat(path, &s) == 0)
-        {
-          config_file_name = path;
-        }         
-      }
-    }
-  
-    #undef PATH_SIZE
-  }
-
 	if (rexeced_flag || inetd_flag)
 		rexec_flag = 0;
 	if (!test_flag && (rexec_flag && (av[0] == NULL || *av[0] != '/')))
 		fatal("sshd re-exec requires execution with an absolute path");
-#ifndef WIN32_FIXME
 	if (rexeced_flag)
 		closefrom(REEXEC_MIN_FREE_FD);
 	else
 		closefrom(REEXEC_DEVCRYPTO_RESERVED_FD);
-#endif
 
 #ifdef WITH_OPENSSL
 	OpenSSL_add_all_algorithms();
@@ -1924,10 +1675,8 @@ main(int ac, char **av)
 	 * Unset KRB5CCNAME, otherwise the user's session may inherit it from
 	 * root's environment
 	 */
-#ifndef WIN32_FIXME
 	if (getenv("KRB5CCNAME") != NULL)
 		(void) unsetenv("KRB5CCNAME");
-#endif
 
 #ifdef _UNICOS
 	/* Cray can define user privs drop all privs now!
@@ -1936,9 +1685,6 @@ main(int ac, char **av)
 	drop_cray_privs();
 #endif
 
-	sensitive_data.server_key = NULL;
-	sensitive_data.ssh1_host_key = NULL;
-	sensitive_data.have_ssh1_key = 0;
 	sensitive_data.have_ssh2_key = 0;
 
 	/*
@@ -1991,9 +1737,6 @@ main(int ac, char **av)
 	 * and warns for trivial misconfigurations that could break login.
 	 */
 	if (options.num_auth_methods != 0) {
-		if ((options.protocol & SSH_PROTO_1))
-			fatal("AuthenticationMethods is not supported with "
-			    "SSH protocol 1");
 		for (n = 0; n < options.num_auth_methods; n++) {
 			if (auth2_methods_valid(options.auth_methods[n],
 			    1) == 0)
@@ -2020,10 +1763,6 @@ main(int ac, char **av)
 	    "without OpenSSL"
 #endif
 	);
-
-#ifdef WIN32_FIXME
-  logit("[Build " __DATE__ " " __TIME__ "]");
-#endif
 
 #ifndef WINDOWS
 	/* Store privilege separation user for later use if required. */
@@ -2070,8 +1809,7 @@ main(int ac, char **av)
 		sensitive_data.host_keys[i] = key;
 		sensitive_data.host_pubkeys[i] = pubkey;
 
-		if (key == NULL && pubkey != NULL && pubkey->type != KEY_RSA1 &&
-		    have_agent) {
+		if (key == NULL && pubkey != NULL && have_agent) {
 			debug("will rely on agent for hostkey %s",
 			    options.host_key_files[i]);
 			keytype = pubkey->type;
@@ -2086,10 +1824,6 @@ main(int ac, char **av)
 		}
 
 		switch (keytype) {
-		case KEY_RSA1:
-			sensitive_data.ssh1_host_key = key;
-			sensitive_data.have_ssh1_key = 1;
-			break;
 		case KEY_RSA:
 		case KEY_DSA:
 		case KEY_ECDSA:
@@ -2102,19 +1836,10 @@ main(int ac, char **av)
 		    SSH_FP_DEFAULT)) == NULL)
 			fatal("sshkey_fingerprint failed");
 		debug("%s host key #%d: %s %s",
-		    key ? "private" : "agent", i, keytype == KEY_RSA1 ?
-		    sshkey_type(pubkey) : sshkey_ssh_name(pubkey), fp);
+		    key ? "private" : "agent", i, sshkey_ssh_name(pubkey), fp);
 		free(fp);
 	}
-	if ((options.protocol & SSH_PROTO_1) && !sensitive_data.have_ssh1_key) {
-		logit("Disabling protocol version 1. Could not load host key");
-		options.protocol &= ~SSH_PROTO_1;
-	}
-	if ((options.protocol & SSH_PROTO_2) && !sensitive_data.have_ssh2_key) {
-		logit("Disabling protocol version 2. Could not load host key");
-		options.protocol &= ~SSH_PROTO_2;
-	}
-	if (!(options.protocol & (SSH_PROTO_1|SSH_PROTO_2))) {
+	if (!sensitive_data.have_ssh2_key) {
 		logit("sshd: no hostkeys available -- exiting.");
 		exit(1);
 	}
@@ -2162,33 +1887,6 @@ main(int ac, char **av)
 		    key_type(key));
 	}
 
-#ifdef WITH_SSH1
-	/* Check certain values for sanity. */
-	if (options.protocol & SSH_PROTO_1) {
-		if (options.server_key_bits < SSH_RSA_MINIMUM_MODULUS_SIZE ||
-		    options.server_key_bits > OPENSSL_RSA_MAX_MODULUS_BITS) {
-			fprintf(stderr, "Bad server key size.\n");
-			exit(1);
-		}
-		/*
-		 * Check that server and host key lengths differ sufficiently. This
-		 * is necessary to make double encryption work with rsaref. Oh, I
-		 * hate software patents. I dont know if this can go? Niels
-		 */
-		if (options.server_key_bits >
-		    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) -
-		    SSH_KEY_BITS_RESERVED && options.server_key_bits <
-		    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) +
-		    SSH_KEY_BITS_RESERVED) {
-			options.server_key_bits =
-			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) +
-			    SSH_KEY_BITS_RESERVED;
-			debug("Forcing server key to %d bits to make it differ from host key.",
-			    options.server_key_bits);
-		}
-	}
-#endif
-
 	if (use_privsep) {
 		struct stat st;
 
@@ -2197,7 +1895,6 @@ main(int ac, char **av)
 			fatal("Missing privilege separation directory: %s",
 			    _PATH_PRIVSEP_CHROOT_DIR);
 
-#ifndef WIN32_FIXME
 #ifdef HAVE_CYGWIN
 		if (check_ntsec(_PATH_PRIVSEP_CHROOT_DIR) &&
 		    (st.st_uid != getuid () ||
@@ -2207,7 +1904,6 @@ main(int ac, char **av)
 #endif
 			fatal("%s must be owned by root and not group or "
 			    "world-writable.", _PATH_PRIVSEP_CHROOT_DIR);
-#endif
 	}
 
 	if (test_flag > 1) {
@@ -2227,10 +1923,8 @@ main(int ac, char **av)
 	 * to create a file, and we can't control the code in every
 	 * module which might be used).
 	 */
-#ifndef WIN32_FIXME
 	if (setgroups(0, NULL) < 0)
 		debug("setgroups() failed: %.200s", strerror(errno));
-#endif
 
 	if (rexec_flag) {
 		rexec_argv = xcalloc(rexec_argc + 2, sizeof(char *));
@@ -2252,35 +1946,25 @@ main(int ac, char **av)
 	log_init(__progname, options.log_level, options.log_facility, log_stderr);
 
 	/*
-	 * If not in debugging mode, and not started from inetd, disconnect
-	 * from the controlling terminal, and fork.  The original process
-	 * exits.
+	 * If not in debugging mode, not started from inetd and not already
+	 * daemonized (eg re-exec via SIGHUP), disconnect from the controlling
+	 * terminal, and fork.  The original process exits.
 	 */
-	if (!(debug_flag || inetd_flag || no_daemon_flag)) {
-#ifdef TIOCNOTTY
-		int fd;
-#endif /* TIOCNOTTY */
+	already_daemon = daemonized();
+	if (!(debug_flag || inetd_flag || no_daemon_flag || already_daemon)) {
+
 		if (daemon(0, 0) < 0)
 			fatal("daemon() failed: %.200s", strerror(errno));
 
-		/* Disconnect from the controlling tty. */
-#ifdef TIOCNOTTY
-		fd = open(_PATH_TTY, O_RDWR | O_NOCTTY);
-		if (fd >= 0) {
-			(void) ioctl(fd, TIOCNOTTY, NULL);
-			close(fd);
-		}
-#endif /* TIOCNOTTY */
+		disconnect_controlling_tty();
 	}
 	/* Reinitialize the log (because of the fork above). */
 	log_init(__progname, options.log_level, options.log_facility, log_stderr);
 
 	/* Chdir to the root directory so that the current disk can be
 	   unmounted if desired. */
-	#ifndef WIN32_FIXME
 	if (chdir("/") == -1)
 		error("chdir(\"/\"): %s", strerror(errno));
-	#endif
 
 	/* ignore SIGPIPE */
 	signal(SIGPIPE, SIG_IGN);
@@ -2290,13 +1974,11 @@ main(int ac, char **av)
 		server_accept_inetd(&sock_in, &sock_out);
 	} else {
 		platform_pre_listen();
-#ifdef WIN32_FIXME
-        if (is_child == 0)
+#ifdef WINDOWS
+		/* For Windows child sshd, skip listener */
+		if (is_child == 0)
 #endif
 		server_listen();
-
-		if (options.protocol & SSH_PROTO_1)
-			generate_ephemeral_server_key();
 
 		signal(SIGHUP, sighup_handler);
 		signal(SIGCHLD, main_sigchld_handler);
@@ -2318,23 +2000,26 @@ main(int ac, char **av)
 				fclose(f);
 			}
 		}
-#ifdef WIN32_FIXME
-      
-      if (is_child) {      
+
+#ifdef WINDOWS
+      /* Windows - for sshd child, pick up the accepted socket*/
+      if (is_child) {
 		char *stopstring;
-		DWORD_PTR remotesochandle;
-		remotesochandle = strtol(getenv("SSHD_REMSOC"), &stopstring, 16);
-		debug("remote channel %d", remotesochandle);
+		DWORD_PTR handle;
 
-		sock_in = sock_out = newsock = w32_allocate_fd_for_handle((HANDLE)remotesochandle, TRUE);
-
-		// we have the socket handle, delete it for child processes we create like shell 
+		handle = strtol(getenv("SSHD_REMSOC"), &stopstring, 16);
 		SetEnvironmentVariable("SSHD_REMSOC", NULL);
-		SetHandleInformation((HANDLE)remotesochandle, HANDLE_FLAG_INHERIT, 0); // make the handle not to be inherited
+		debug("child socket: %d", handle);
+		sock_in = sock_out = newsock = w32_allocate_fd_for_handle((HANDLE)handle, TRUE);
+		fcntl(newsock, F_SETFD, FD_CLOEXEC);
 
-		startup_pipe = -1;
+		handle = strtol(getenv("SSHD_STARTUPSOC"), &stopstring, 16);
+		SetEnvironmentVariable("SSHD_STARTUPSOC", NULL);
+		debug("child startup_pipe: %d", handle); 
+		startup_pipe = w32_allocate_fd_for_handle((HANDLE)handle, FALSE);		
+		fcntl(startup_pipe, F_SETFD, FD_CLOEXEC);
       }
-	  else
+	  else /* Windows and Unix sshd parent */
 #endif
 
 		/* Accept a connection and return in a forked child */
@@ -2350,7 +2035,6 @@ main(int ac, char **av)
 	 * setlogin() affects the entire process group.  We don't
 	 * want the child to be able to affect the parent.
 	 */
-#ifndef WIN32_FIXME
 #if !defined(SSHD_ACQUIRES_CTTY)
 	/*
 	 * If setsid is called, on some platforms sshd will later acquire a
@@ -2360,10 +2044,8 @@ main(int ac, char **av)
 	if (!debug_flag && !inetd_flag && setsid() < 0)
 		error("setsid: %.100s", strerror(errno));
 #endif
-#endif
 
 	if (rexec_flag) {
-#ifndef WIN32_FIXME
 		int fd;
 
 		debug("rexec start in %d out %d newsock %d pipe %d sock %d",
@@ -2400,7 +2082,6 @@ main(int ac, char **av)
 		}
 		debug("rexec cleanup in %d out %d newsock %d pipe %d sock %d",
 		    sock_in, sock_out, newsock, startup_pipe, config_s[0]);
-#endif /* !WIN32_FIXME */
 	}
 
 	/* Executed child processes don't need these. */
@@ -2469,11 +2150,6 @@ main(int ac, char **av)
 		alarm(options.login_grace_time);
 
 	sshd_exchange_identification(ssh, sock_in, sock_out);
-
-	/* In inetd mode, generate ephemeral key only for proto 1 connections */
-	if (!compat20 && inetd_flag && sensitive_data.server_key == NULL)
-		generate_ephemeral_server_key();
-
 	packet_set_nonblocking();
 
 	/* allocate authentication context */
@@ -2491,7 +2167,7 @@ main(int ac, char **av)
 	if (use_privsep) {
 		if (privsep_preauth(authctxt) == 1)
 			goto authenticated;
-	} else if (compat20 && have_agent) {
+	} else if (have_agent) {
 		if ((r = ssh_get_authentication_socket(&auth_sock)) != 0) {
 			error("Unable to get agent socket: %s", ssh_err(r));
 			have_agent = 0;
@@ -2500,17 +2176,9 @@ main(int ac, char **av)
 
 	/* perform the key exchange */
 	/* authenticate user and start session */
-	if (compat20) {
-		do_ssh2_kex();
-		do_authentication2(authctxt);
-	} else {
-#ifdef WITH_SSH1
-		do_ssh1_kex();
-		do_authentication(authctxt);
-#else
-		fatal("ssh1 not supported");
-#endif
-	}
+	do_ssh2_kex();
+	do_authentication2(authctxt);
+
 	/*
 	 * If we use privilege separation, the unprivileged child transfers
 	 * the current keystate and exits
@@ -2538,13 +2206,11 @@ main(int ac, char **av)
 #endif
 
 #ifdef GSSAPI
-#ifndef WIN32_FIXME
 	if (options.gss_authentication) {
 		temporarily_use_uid(authctxt->pw);
 		ssh_gssapi_storecreds();
 		restore_uid();
 	}
-#endif
 #endif
 #ifdef USE_PAM
 	if (options.use_pam) {
@@ -2560,16 +2226,13 @@ main(int ac, char **av)
 	if (use_privsep) {
 		privsep_postauth(authctxt);
 		/* the monitor process [priv] will not return */
-		if (!compat20)
-			destroy_sensitive_data();
 	}
 
 	packet_set_timeout(options.client_alive_interval,
 	    options.client_alive_count_max);
 
 	/* Try to send all our hostkeys to the client */
-	if (compat20)
-		notify_hostkeys(active_state);
+	notify_hostkeys(active_state);
 
 	/* Start session. */
 	do_authenticated(authctxt);
@@ -2597,229 +2260,6 @@ main(int ac, char **av)
 
 	exit(0);
 }
-
-#ifdef WITH_SSH1
-/*
- * Decrypt session_key_int using our private server key and private host key
- * (key with larger modulus first).
- */
-int
-ssh1_session_key(BIGNUM *session_key_int)
-{
-	struct ssh *ssh = active_state; /* XXX */
-	int rsafail = 0;
-
-	if (BN_cmp(sensitive_data.server_key->rsa->n,
-	    sensitive_data.ssh1_host_key->rsa->n) > 0) {
-		/* Server key has bigger modulus. */
-		if (BN_num_bits(sensitive_data.server_key->rsa->n) <
-		    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) +
-		    SSH_KEY_BITS_RESERVED) {
-			fatal("do_connection: %s port %d: "
-			    "server_key %d < host_key %d + SSH_KEY_BITS_RESERVED %d",
-			    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
-			    BN_num_bits(sensitive_data.server_key->rsa->n),
-			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
-			    SSH_KEY_BITS_RESERVED);
-		}
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.server_key->rsa) != 0)
-			rsafail++;
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.ssh1_host_key->rsa) != 0)
-			rsafail++;
-	} else {
-		/* Host key has bigger modulus (or they are equal). */
-		if (BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) <
-		    BN_num_bits(sensitive_data.server_key->rsa->n) +
-		    SSH_KEY_BITS_RESERVED) {
-			fatal("do_connection: %s port %d: "
-			    "host_key %d < server_key %d + SSH_KEY_BITS_RESERVED %d",
-			    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
-			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
-			    BN_num_bits(sensitive_data.server_key->rsa->n),
-			    SSH_KEY_BITS_RESERVED);
-		}
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.ssh1_host_key->rsa) != 0)
-			rsafail++;
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.server_key->rsa) != 0)
-			rsafail++;
-	}
-	return (rsafail);
-}
-
-/*
- * SSH1 key exchange
- */
-static void
-do_ssh1_kex(void)
-{
-	struct ssh *ssh = active_state; /* XXX */
-	int i, len;
-	int rsafail = 0;
-	BIGNUM *session_key_int, *fake_key_int, *real_key_int;
-	u_char session_key[SSH_SESSION_KEY_LENGTH];
-	u_char fake_key_bytes[4096 / 8];
-	size_t fake_key_len;
-	u_char cookie[8];
-	u_int cipher_type, auth_mask, protocol_flags;
-
-	/*
-	 * Generate check bytes that the client must send back in the user
-	 * packet in order for it to be accepted; this is used to defy ip
-	 * spoofing attacks.  Note that this only works against somebody
-	 * doing IP spoofing from a remote machine; any machine on the local
-	 * network can still see outgoing packets and catch the random
-	 * cookie.  This only affects rhosts authentication, and this is one
-	 * of the reasons why it is inherently insecure.
-	 */
-	arc4random_buf(cookie, sizeof(cookie));
-
-	/*
-	 * Send our public key.  We include in the packet 64 bits of random
-	 * data that must be matched in the reply in order to prevent IP
-	 * spoofing.
-	 */
-	packet_start(SSH_SMSG_PUBLIC_KEY);
-	for (i = 0; i < 8; i++)
-		packet_put_char(cookie[i]);
-
-	/* Store our public server RSA key. */
-	packet_put_int(BN_num_bits(sensitive_data.server_key->rsa->n));
-	packet_put_bignum(sensitive_data.server_key->rsa->e);
-	packet_put_bignum(sensitive_data.server_key->rsa->n);
-
-	/* Store our public host RSA key. */
-	packet_put_int(BN_num_bits(sensitive_data.ssh1_host_key->rsa->n));
-	packet_put_bignum(sensitive_data.ssh1_host_key->rsa->e);
-	packet_put_bignum(sensitive_data.ssh1_host_key->rsa->n);
-
-	/* Put protocol flags. */
-	packet_put_int(SSH_PROTOFLAG_HOST_IN_FWD_OPEN);
-
-	/* Declare which ciphers we support. */
-	packet_put_int(cipher_mask_ssh1(0));
-
-	/* Declare supported authentication types. */
-	auth_mask = 0;
-	if (options.rhosts_rsa_authentication)
-		auth_mask |= 1 << SSH_AUTH_RHOSTS_RSA;
-	if (options.rsa_authentication)
-		auth_mask |= 1 << SSH_AUTH_RSA;
-	if (options.challenge_response_authentication == 1)
-		auth_mask |= 1 << SSH_AUTH_TIS;
-	if (options.password_authentication)
-		auth_mask |= 1 << SSH_AUTH_PASSWORD;
-	packet_put_int(auth_mask);
-
-	/* Send the packet and wait for it to be sent. */
-	packet_send();
-	packet_write_wait();
-
-	debug("Sent %d bit server key and %d bit host key.",
-	    BN_num_bits(sensitive_data.server_key->rsa->n),
-	    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n));
-
-	/* Read clients reply (cipher type and session key). */
-	packet_read_expect(SSH_CMSG_SESSION_KEY);
-
-	/* Get cipher type and check whether we accept this. */
-	cipher_type = packet_get_char();
-
-	if (!(cipher_mask_ssh1(0) & (1 << cipher_type)))
-		packet_disconnect("Warning: client selects unsupported cipher.");
-
-	/* Get check bytes from the packet.  These must match those we
-	   sent earlier with the public key packet. */
-	for (i = 0; i < 8; i++)
-		if (cookie[i] != packet_get_char())
-			packet_disconnect("IP Spoofing check bytes do not match.");
-
-	debug("Encryption type: %.200s", cipher_name(cipher_type));
-
-	/* Get the encrypted integer. */
-	if ((real_key_int = BN_new()) == NULL)
-		fatal("do_ssh1_kex: BN_new failed");
-	packet_get_bignum(real_key_int);
-
-	protocol_flags = packet_get_int();
-	packet_set_protocol_flags(protocol_flags);
-	packet_check_eom();
-
-	/* Setup a fake key in case RSA decryption fails */
-	if ((fake_key_int = BN_new()) == NULL)
-		fatal("do_ssh1_kex: BN_new failed");
-	fake_key_len = BN_num_bytes(real_key_int);
-	if (fake_key_len > sizeof(fake_key_bytes))
-		fake_key_len = sizeof(fake_key_bytes);
-	arc4random_buf(fake_key_bytes, fake_key_len);
-	if (BN_bin2bn(fake_key_bytes, fake_key_len, fake_key_int) == NULL)
-		fatal("do_ssh1_kex: BN_bin2bn failed");
-
-	/* Decrypt real_key_int using host/server keys */
-	rsafail = PRIVSEP(ssh1_session_key(real_key_int));
-	/* If decryption failed, use the fake key. Else, the real key. */
-	if (rsafail)
-		session_key_int = fake_key_int;
-	else
-		session_key_int = real_key_int;
-
-	/*
-	 * Extract session key from the decrypted integer.  The key is in the
-	 * least significant 256 bits of the integer; the first byte of the
-	 * key is in the highest bits.
-	 */
-	(void) BN_mask_bits(session_key_int, sizeof(session_key) * 8);
-	len = BN_num_bytes(session_key_int);
-	if (len < 0 || (u_int)len > sizeof(session_key)) {
-		error("%s: bad session key len from %s port %d: "
-		    "session_key_int %d > sizeof(session_key) %lu", __func__,
-		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
-		    len, (u_long)sizeof(session_key));
-		rsafail++;
-	} else {
-		explicit_bzero(session_key, sizeof(session_key));
-		BN_bn2bin(session_key_int,
-		    session_key + sizeof(session_key) - len);
-
-		derive_ssh1_session_id(
-		    sensitive_data.ssh1_host_key->rsa->n,
-		    sensitive_data.server_key->rsa->n,
-		    cookie, session_id);
-		/*
-		 * Xor the first 16 bytes of the session key with the
-		 * session id.
-		 */
-		for (i = 0; i < 16; i++)
-			session_key[i] ^= session_id[i];
-	}
-
-	/* Destroy the private and public keys. No longer. */
-	destroy_sensitive_data();
-
-	if (use_privsep)
-		mm_ssh1_session_id(session_id);
-
-	/* Destroy the decrypted integer.  It is no longer needed. */
-	BN_clear_free(real_key_int);
-	BN_clear_free(fake_key_int);
-
-	/* Set the session key.  From this on all communications will be encrypted. */
-	packet_set_encryption_key(session_key, SSH_SESSION_KEY_LENGTH, cipher_type);
-
-	/* Destroy our copy of the session key.  It is no longer needed. */
-	explicit_bzero(session_key, sizeof(session_key));
-
-	debug("Received session key; encryption turned on.");
-
-	/* Send an acknowledgment packet.  Note that this packet is sent encrypted. */
-	packet_start(SSH_SMSG_SUCCESS);
-	packet_send();
-	packet_write_wait();
-}
-#endif
 
 int
 sshd_hostkey_sign(Key *privkey, Key *pubkey, u_char **signature, size_t *slen,
@@ -2869,10 +2309,6 @@ do_ssh2_kex(void)
 	if (options.compression == COMP_NONE) {
 		myproposal[PROPOSAL_COMP_ALGS_CTOS] =
 		    myproposal[PROPOSAL_COMP_ALGS_STOC] = "none";
-	} else if (options.compression == COMP_DELAYED) {
-		myproposal[PROPOSAL_COMP_ALGS_CTOS] =
-		    myproposal[PROPOSAL_COMP_ALGS_STOC] =
-		    "none,zlib@openssh.com";
 	}
 
 	if (options.rekey_limit || options.rekey_interval)
@@ -2928,7 +2364,6 @@ cleanup_exit(int i)
 {
 	if (the_authctxt) {
 		do_cleanup(the_authctxt);
-#ifndef WIN32_FIXME
 		if (use_privsep && privsep_is_preauth &&
 		    pmonitor != NULL && pmonitor->m_pid > 1) {
 			debug("Killing privsep child %d", pmonitor->m_pid);
@@ -2937,7 +2372,6 @@ cleanup_exit(int i)
 				error("%s: kill(%d): %s", __func__,
 				    pmonitor->m_pid, strerror(errno));
 		}
-#endif
 	}
 #ifdef SSH_AUDIT_EVENTS
 	/* done after do_cleanup so it can cancel the PAM auth 'thread' */

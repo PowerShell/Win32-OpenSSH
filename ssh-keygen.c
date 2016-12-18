@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.290 2016/05/02 09:36:42 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.292 2016/09/12 03:29:16 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1037,10 +1037,11 @@ do_gen_all_hostkeys(struct passwd *pw)
 		sshkey_free(private);
 		strlcat(identity_file, ".pub", sizeof(identity_file));
 #ifdef WINDOWS
-                if ((f = fopen(identity_file, "w")) == NULL) {
-                        error("fopen %s failed: %s", identity_file, strerror(errno));
-                /* TODO - set permissions on file */
-#else
+		/* Windows POSIX adpater does not support fdopen() on open(file)*/
+		if ((f = fopen(identity_file, "w")) == NULL) {
+			error("fopen %s failed: %s", identity_file, strerror(errno));
+		/* TODO - set permissions on file */
+#else  /* !WINDOWS */
 		fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (fd == -1) {
 			error("Could not save your public key in %s",
@@ -1053,7 +1054,7 @@ do_gen_all_hostkeys(struct passwd *pw)
 		if (f == NULL) {
 			error("fdopen %s failed", identity_file);
 			close(fd);
-#endif
+#endif  /* !WINDOWS */
 			sshkey_free(public);
 			first = 0;
 			continue;
@@ -1193,15 +1194,9 @@ known_hosts_find_delete(struct hostkey_foreach_line *l, void *_ctx)
 static void
 do_known_hosts(struct passwd *pw, const char *name)
 {
-#ifdef WIN32_FIXME
-  
-  /*
-   * Not implemented on Win32 yet.
-   */
-   
-  fatal("Unimplemented");
-
-#else
+#ifdef WINDOWS
+        fatal("Updating known_hosts is not supported in Windows yet.");
+#else  /* !WINDOWS */
 	  
 	char *cp, tmp[PATH_MAX], old[PATH_MAX];
 	int r, fd, oerrno, inplace = 0;
@@ -1294,7 +1289,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 	}
 
 	exit (find_host && !ctx.found_key);
-#endif /* else WIN32_FIXME */
+#endif   /* !WINDOWS */
 }
 
 /*
@@ -1593,6 +1588,7 @@ load_pkcs11_key(char *path)
 	return private;
 #else
 	fatal("no pkcs11 support");
+	return NULL;
 #endif /* ENABLE_PKCS11 */
 }
 
@@ -2284,6 +2280,7 @@ main(int argc, char **argv)
 	extern int optind;
 	extern char *optarg;
 
+	ssh_malloc_init();	/* must be called before any mallocs */
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
@@ -2300,20 +2297,9 @@ main(int argc, char **argv)
 	pw = getpwuid(getuid());
 	if (!pw)
 		fatal("No user exists for uid %lu", (u_long)getuid());
-	if (gethostname(hostname, sizeof(hostname)) < 0) {
-#ifdef WIN32_FIXME
-    
-    DWORD local_len = sizeof(hostname);
-    
-    if (!GetComputerNameA(hostname, &local_len))
-    {
-  
-  #endif		
+	if (gethostname(hostname, sizeof(hostname)) < 0)
 		fatal("gethostname: %s", strerror(errno));
-	#ifdef WIN32_FIXME
-    }
-  #endif
-	}
+
 	/* Remaining characters: UYdw */
 	while ((opt = getopt(argc, argv, "ABHLQXceghiklopquvxy"
 	    "C:D:E:F:G:I:J:K:M:N:O:P:R:S:T:V:W:Z:"
@@ -2475,23 +2461,33 @@ main(int argc, char **argv)
 			break;
 #ifdef WITH_OPENSSL
 		/* Moduli generation/screening */
-		case 'W':
-			generator_wanted = (u_int32_t)strtonum(optarg, 1,
-			    UINT_MAX, &errstr);
-			if (errstr)
-				fatal("Desired generator has bad value: %s (%s)",
-					optarg, errstr);
-			break;
-		case 'M':
-			memory = (u_int32_t)strtonum(optarg, 1, UINT_MAX, &errstr);
-			if (errstr)
-				fatal("Memory limit is %s: %s", errstr, optarg);
-			break;
 		case 'G':
 			do_gen_candidates = 1;
 			if (strlcpy(out_file, optarg, sizeof(out_file)) >=
 			    sizeof(out_file))
 				fatal("Output filename too long");
+			break;
+		case 'J':
+			lines_to_process = strtoul(optarg, NULL, 10);
+			break;
+		case 'j':
+			start_lineno = strtoul(optarg, NULL, 10);
+			break;
+		case 'K':
+			if (strlen(optarg) >= PATH_MAX)
+				fatal("Checkpoint filename too long");
+			checkpoint = xstrdup(optarg);
+			break;
+		case 'M':
+			memory = (u_int32_t)strtonum(optarg, 1, UINT_MAX,
+			    &errstr);
+			if (errstr)
+				fatal("Memory limit is %s: %s", errstr, optarg);
+			break;
+		case 'S':
+			/* XXX - also compare length against bits */
+			if (BN_hex2bn(&start, optarg) == 0)
+				fatal("Invalid start point.");
 			break;
 		case 'T':
 			do_screen_candidates = 1;
@@ -2499,15 +2495,12 @@ main(int argc, char **argv)
 			    sizeof(out_file))
 				fatal("Output filename too long");
 			break;
-		case 'K':
-			if (strlen(optarg) >= PATH_MAX)
-				fatal("Checkpoint filename too long");
-			checkpoint = xstrdup(optarg);
-			break;
-		case 'S':
-			/* XXX - also compare length against bits */
-			if (BN_hex2bn(&start, optarg) == 0)
-				fatal("Invalid start point.");
+		case 'W':
+			generator_wanted = (u_int32_t)strtonum(optarg, 1,
+			    UINT_MAX, &errstr);
+			if (errstr != NULL)
+				fatal("Desired generator invalid: %s (%s)",
+				    optarg, errstr);
 			break;
 #endif /* WITH_OPENSSL */
 		case '?':
@@ -2673,15 +2666,7 @@ main(int argc, char **argv)
 				error("Could not create directory '%s': %s",
 				    dotsshdir, strerror(errno));
 			} else if (!quiet)
-#ifdef WIN32_FIXME
-      {
-        SetFileAttributes(dotsshdir, FILE_ATTRIBUTE_HIDDEN);
-        
-        printf("Created directory '%s'.\n", dotsshdir);
-      }
-#else
 				printf("Created directory '%s'.\n", dotsshdir);
-#endif
 		}
 	}
 	/* If the file already exists, ask the user to confirm. */
@@ -2752,16 +2737,17 @@ passphrase_again:
 
 	strlcat(identity_file, ".pub", sizeof(identity_file));
 #ifdef WINDOWS
-        if ((f = fopen(identity_file, "w")) == NULL)
-                fatal("fopen %s failed: %s", identity_file, strerror(errno));
-        /* TODO - set permissions on file */
-#else
+	/* Windows POSIX adpater does not support fdopen() on open(file)*/
+	if ((f = fopen(identity_file, "w")) == NULL)
+		fatal("fopen %s failed: %s", identity_file, strerror(errno));
+	/* TODO - set permissions on file */
+#else  /* !WINDOWS */
 	if ((fd = open(identity_file, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1)
 		fatal("Unable to save public key to %s: %s",
 		    identity_file, strerror(errno));
 	if ((f = fdopen(fd, "w")) == NULL)
 		fatal("fdopen %s failed: %s", identity_file, strerror(errno));
-#endif
+#endif  /* !WINDOWS */
 	if ((r = sshkey_write(public, f)) != 0)
 		error("write key failed: %s", ssh_err(r));
 	fprintf(f, " %s\n", comment);

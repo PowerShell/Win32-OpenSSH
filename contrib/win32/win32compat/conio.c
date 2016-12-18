@@ -39,7 +39,7 @@
 
 #include <windows.h>
 
-#include <console.h>
+#include "console.h"
 #include <conio.h>
 
 COORD	lastCursorLoc = { 0, 0 };

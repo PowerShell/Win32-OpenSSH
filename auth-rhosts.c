@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-rhosts.c,v 1.47 2016/03/07 19:02:43 djm Exp $ */
+/* $OpenBSD: auth-rhosts.c,v 1.48 2016/08/13 17:47:41 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -57,7 +57,6 @@ check_rhosts_file(const char *filename, const char *hostname,
 		  const char *ipaddr, const char *client_user,
 		  const char *server_user)
 {
-#ifndef WIN32_FIXME
 	FILE *f;
 #define RBUFLN 1024
 	char buf[RBUFLN];/* Must not be larger than host, user, dummy below. */
@@ -180,10 +179,6 @@ check_rhosts_file(const char *filename, const char *hostname,
 	/* Authentication using this file denied. */
 	fclose(f);
 	return 0;
-
-#else
-  return 1;
-#endif
 }
 
 /*
@@ -191,20 +186,8 @@ check_rhosts_file(const char *filename, const char *hostname,
  * true if authentication succeeds.  If ignore_rhosts is true, only
  * /etc/hosts.equiv will be considered (.rhosts and .shosts are ignored).
  */
-
 int
-auth_rhosts(struct passwd *pw, const char *client_user)
-{
-	struct ssh *ssh = active_state;	/* XXX */
-	const char *hostname, *ipaddr;
-
-	hostname = auth_get_canonical_hostname(ssh, options.use_dns);
-	ipaddr = ssh_remote_ipaddr(ssh);
-	return auth_rhosts2(pw, client_user, hostname, ipaddr);
-}
-
-static int
-auth_rhosts2_raw(struct passwd *pw, const char *client_user, const char *hostname,
+auth_rhosts2(struct passwd *pw, const char *client_user, const char *hostname,
     const char *ipaddr)
 {
 	char buf[1024];
@@ -338,11 +321,4 @@ auth_rhosts2_raw(struct passwd *pw, const char *client_user, const char *hostnam
 	/* Restore the privileged uid. */
 	restore_uid();
 	return 0;
-}
-
-int
-auth_rhosts2(struct passwd *pw, const char *client_user, const char *hostname,
-    const char *ipaddr)
-{
-       return auth_rhosts2_raw(pw, client_user, hostname, ipaddr);
 }

@@ -39,7 +39,7 @@
 #include <string.h>
 #include <windows.h>
 
-#include <ansiprsr.h>
+#include "ansiprsr.h"
 
 #define dwBuffer 4096
 

@@ -37,17 +37,36 @@
 #define SECURITY_WIN32
 #include <security.h>
 #include "inc\pwd.h"
+#include "inc\grp.h"
 #include "inc\utf.h"
 
 static struct passwd pw;
-static char* pw_shellpath = "ssh-shellhost.exe";
+static char* pw_shellpath = NULL;
+#define SHELL_HOST "\\ssh-shellhost.exe"
+
+char* w32_programdir();
 
 int
 initialize_pw() {
+        if (pw_shellpath == NULL) {
+                if ((pw_shellpath = malloc(strlen(w32_programdir()) + strlen(SHELL_HOST) + 1)) == NULL)
+                        fatal("initialize_pw - out of memory");
+                else {
+                        char* head = pw_shellpath;
+                        memcpy(head, w32_programdir(), strlen(w32_programdir()));
+                        head += strlen(w32_programdir());
+                        memcpy(head, SHELL_HOST, strlen(SHELL_HOST));
+                        head += strlen(SHELL_HOST);
+                        *head = '\0';
+                }
+        }
         if (pw.pw_shell != pw_shellpath) {
                 memset(&pw, 0, sizeof(pw));
                 pw.pw_shell = pw_shellpath;
                 pw.pw_passwd = "\0";
+                /* pw_uid = 0 for root on Unix and SSH code has specific restrictions for root 
+                 * that are not applicable in Windows */
+                pw.pw_uid = 1;
         }
         return 0;
 }
@@ -200,6 +219,16 @@ done:
         if (user_sid)
                 LocalFree(user_sid);
         return ret;
+}
+
+
+
+char *group_from_gid(gid_t gid, int nogroup) {
+	return "-";
+}
+
+char *user_from_uid(uid_t uid, int nouser) {
+	return "-";
 }
 
 

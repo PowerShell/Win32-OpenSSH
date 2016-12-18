@@ -1,4 +1,4 @@
-/* $OpenBSD: misc.c,v 1.105 2016/07/15 00:24:30 djm Exp $ */
+/* $OpenBSD: misc.c,v 1.107 2016/11/30 00:28:31 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2005,2006 Damien Miller.  All rights reserved.
@@ -432,34 +432,21 @@ char *
 colon(char *cp)
 {
 	int flag = 0;
-    int len = 0;
+	int len = 0;
 
 	if (*cp == ':')		/* Leading colon is part of file name. */
 		return NULL;
 
 #ifdef WINDOWS
-    for (; *cp; ++cp) {
-        len++;
+	/*
+	 * Account for Windows file names in the form x: or /x: 
+	 * Note: This may conflict with potential single charecter targets
+	 */
+	if ((*cp != '\0' && cp[1] == ':') ||
+	    (cp[0] == '/' && cp[1] != '\0' && cp[2] == ':'))
+		return NULL;
+#endif
 
-        if (*cp == '[')
-            flag = 1;
-
-        if (flag && *cp != ']')
-            continue;
-
-        if (*cp == ']')
-            flag = 0;
-
-        if (*cp == ':') {
-            if (len != 2) { // avoid x: format for drive letter in Windows
-                return (cp);
-            }
-        }
-        //	if ( (*cp == '/') || (*cp == '\\') )
-        //		return (0);
-    }
-    return NULL;
-#else
 	if (*cp == '[')
 		flag = 1;
 
@@ -474,7 +461,6 @@ colon(char *cp)
 			return NULL;
 	}
 	return NULL;
-#endif
 }
 
 /*
@@ -808,7 +794,10 @@ tun_open(int tun, int mode)
 void
 sanitise_stdfd(void)
 {
-#ifndef WIN32_FIXME
+#ifdef WINDOWS
+	/* nothing to do for Windows*/
+	return;
+#else /* !WINDOWS */
 	int nullfd, dupfd;
 
 	if ((nullfd = dupfd = open(_PATH_DEVNULL, O_RDWR)) == -1) {
@@ -827,7 +816,7 @@ sanitise_stdfd(void)
 	}
 	if (nullfd > STDERR_FILENO)
 		close(nullfd);
-#endif
+#endif /* !WINDOWS */
 }
 
 char *
@@ -1037,7 +1026,6 @@ bandwidth_limit_init(struct bwlimit *bw, u_int64_t kbps, size_t buflen)
 void
 bandwidth_limit(struct bwlimit *bw, size_t read_len)
 {
-#ifndef WIN32_FIXME
 	u_int64_t waitlen;
 	struct timespec ts, rm;
 
@@ -1085,7 +1073,6 @@ bandwidth_limit(struct bwlimit *bw, size_t read_len)
 
 	bw->lamt = 0;
 	gettimeofday(&bw->bwstart, NULL);
-#endif
 }
 
 /* Make a template filename for mk[sd]temp() */
@@ -1272,3 +1259,38 @@ forward_equals(const struct Forward *a, const struct Forward *b)
 	return 1;
 }
 
+/* returns 1 if bind to specified port by specified user is permitted */
+int
+bind_permitted(int port, uid_t uid)
+{
+	if (port < IPPORT_RESERVED && uid != 0)
+		return 0;
+	return 1;
+}
+
+/* returns 1 if process is already daemonized, 0 otherwise */
+#ifdef WINDOWS
+/* This should go away once sshd platform specific startup code is refactored */
+int 
+daemonized(void)
+{
+	return 1;
+}
+#else /* !WINDOWS */
+int
+daemonized(void)
+{
+	int fd;
+
+	if ((fd = open(_PATH_TTY, O_RDONLY | O_NOCTTY)) >= 0) {
+		close(fd);
+		return 0;	/* have controlling terminal */
+	}
+	if (getppid() != 1)
+		return 0;	/* parent is not init */
+	if (getsid(0) != getpid())
+		return 0;	/* not session leader */
+	debug3("already daemonized");
+	return 1;
+}
+#endif /* !WINDOWS */

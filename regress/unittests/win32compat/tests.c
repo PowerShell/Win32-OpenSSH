@@ -1,12 +1,13 @@
 /*
 * Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
 */
-
+/* disable inclusion of compatability defitnitions in CRT headers */
+#define __STDC__ 1
 #include <fcntl.h>
 #include <sys\types.h>
 #include <sys\stat.h>
-#include <io.h>
-#include "test_helper.h"
+//#include <io.h>
+#include "../test_helper/test_helper.h"
 
 extern void log_init(char *av0, int level, int facility, int on_stderr);
 

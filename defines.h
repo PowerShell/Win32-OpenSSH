@@ -25,9 +25,6 @@
 #ifndef _DEFINES_H
 #define _DEFINES_H
 
-/* $Id: defines.h,v 1.183 2014/09/02 19:33:26 djm Exp $ */
-
-
 /* Constants */
 
 #if defined(HAVE_DECL_SHUT_RD) && HAVE_DECL_SHUT_RD == 0
@@ -185,8 +182,6 @@ enum
 # define S_IRWXU			0000700	/* read, write, execute */
 # define S_IRWXG			0000070	/* read, write, execute */
 # define S_IRWXO			0000007	/* read, write, execute */
-# define S_ISUID            0x800 
-# define S_ISGID            0x400
 #endif /* S_IXUSR */
 
 #if !defined(MAP_ANON) && defined(MAP_ANONYMOUS)
@@ -789,6 +784,11 @@ struct winsize {
 # define CUSTOM_SYS_AUTH_PASSWD 1
 #endif
 
+#ifdef WINDOWS
+/* Windows has custom non-BSD logic for password auth */
+# define CUSTOM_SYS_AUTH_PASSWD 1
+#endif /* WINDOWS */
+
 #if defined(HAVE_LIBIAF) && defined(HAVE_SET_ID) && !defined(HAVE_SECUREWARE)
 # define CUSTOM_SYS_AUTH_PASSWD 1
 #endif
@@ -838,6 +838,13 @@ struct winsize {
 #endif
 
 /*
+ * We want functions in openbsd-compat, if enabled, to override system ones.
+ * We no-op out the weak symbol definition rather than remove it to reduce
+ * future sync problems.
+ */
+#define DEF_WEAK(x)
+
+/*
  * Platforms that have arc4random_uniform() and not arc4random_stir()
  * shouldn't need the latter.
  */
@@ -870,10 +877,6 @@ struct winsize {
     defined(HAVE_DECL_GLOB_NOMATCH) &&  HAVE_DECL_GLOB_NOMATCH != 0 && \
     !defined(BROKEN_GLOB)
 # define USE_SYSTEM_GLOB
-#endif
-
-#ifdef _WIN32
-# define CUSTOM_SYS_AUTH_PASSWD 1
 #endif
 
 #endif /* _DEFINES_H */

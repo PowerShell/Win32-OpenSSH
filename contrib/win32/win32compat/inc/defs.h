@@ -33,7 +33,7 @@
 #define FD_CLOEXEC 0x1
 
 /* signal related defs*/
-/* signal types */
+/* supported signal types */
 #define W32_SIGINT		0   
 #define W32_SIGSEGV		1	  
 
@@ -47,10 +47,17 @@
 #define W32_SIGTERM		8
 #define W32_SIGTTIN		9
 #define W32_SIGTTOU		10
-#define W32_SIGWINCH	11
+#define W32_SIGWINCH	        11
 
 #define W32_SIGMAX		12
-#define W32_SIGSTOP     13
+/* these signals are not supposed to be raised on Windows*/
+#define W32_SIGSTOP             13
+#define W32_SIGABRT             14
+#define W32_SIGFPE              15
+#define W32_SIGILL              16
+#define W32_SIGKILL             17
+#define W32_SIGUSR1             18
+#define W32_SIGUSR2             19
 
 /* singprocmask "how" codes*/
 #define SIG_BLOCK		0
@@ -87,3 +94,4 @@ struct winsize {
         unsigned short ws_xpixel;       /* horizontal size, pixels */
         unsigned short ws_ypixel;       /* vertical size, pixels */
 };
+

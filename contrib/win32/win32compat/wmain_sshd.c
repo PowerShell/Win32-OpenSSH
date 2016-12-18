@@ -30,7 +30,10 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/* disable inclusion of compatability defitnitions in CRT headers */
+#define __STDC__ 1
 #include <Windows.h>
+#include <wchar.h>
 #include "inc\utf.h"
 
 int main(int, char **);
@@ -94,6 +97,7 @@ static VOID WINAPI service_handler(DWORD dwControl)
 	ReportSvcStatus(service_status.dwCurrentState, NO_ERROR, 0);
 }
 
+char* w32_programdir();
 int sshd_main(int argc, wchar_t **wargv) {
 	char** argv = NULL;
 	int i;
@@ -108,6 +112,8 @@ int sshd_main(int argc, wchar_t **wargv) {
 	w32posix_initialize();
 	if (getenv("SSHD_REMSOC"))
 		is_child = 1;
+	/* change current directory to sshd.exe root */
+	_wchdir(utf8_to_utf16(w32_programdir()));
 	return main(argc, argv);
 }
 

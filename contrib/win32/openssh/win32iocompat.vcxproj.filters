@@ -12,6 +12,13 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32log.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\pwd.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32_dirent.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\no-ops.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32_zlib.c" />
+    <ClCompile Include="..\win32compat\ansiprsr.c" />
+    <ClCompile Include="..\win32compat\conio.c" />
+    <ClCompile Include="..\win32compat\console.c" />
+    <ClCompile Include="..\win32compat\tncon.c" />
+    <ClCompile Include="..\win32compat\tnnet.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -54,9 +61,6 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dlfcn.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\syslog.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h">
-      <Filter>inc</Filter>
-    </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\param.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
@@ -109,6 +113,10 @@
       <Filter>inc</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dirent.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\libgen.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">

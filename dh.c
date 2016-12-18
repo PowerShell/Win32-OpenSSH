@@ -1,4 +1,4 @@
-/* $OpenBSD: dh.c,v 1.60 2016/05/02 10:26:04 djm Exp $ */
+/* $OpenBSD: dh.c,v 1.61 2016/09/12 01:22:38 deraadt Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  *
@@ -25,7 +25,6 @@
 
 #include "includes.h"
 
-#include <sys/param.h>	/* MIN */
 
 #include <openssl/bn.h>
 #include <openssl/dh.h>
@@ -272,7 +271,7 @@ dh_gen_key(DH *dh, int need)
 	 * Pollard Rho, Big step/Little Step attacks are O(sqrt(n)),
 	 * so double requested need here.
 	 */
-	dh->length = MIN(need * 2, pbits - 1);
+	dh->length = MINIMUM(need * 2, pbits - 1);
 	if (DH_generate_key(dh) == 0 ||
 	    !dh_pub_is_valid(dh, dh->pub_key)) {
 		BN_clear_free(dh->priv_key);

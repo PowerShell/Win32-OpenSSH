@@ -2,20 +2,19 @@
 * Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
 */
 
+#include "includes.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include "test_helper.h"
+#include "../test_helper/test_helper.h"
 
 #define PORT "34912"  
 #define BACKLOG 2  
 #define SMALL_RECV_BUF_SIZE 128
 
-/* remove this later once right header is included*/
-#define O_NONBLOCK  0x0004
 
 #pragma warning(disable:4267)
 

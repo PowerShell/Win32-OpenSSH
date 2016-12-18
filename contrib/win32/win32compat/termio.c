@@ -1,7 +1,8 @@
 #include <Windows.h>
 #include "w32fd.h"
 #include "tncon.h"
-#include "inc/defs.h"
+#include "inc\defs.h"
+#include "inc\utf.h"
 
 #define TERM_IO_BUF_SIZE 2048
 
@@ -135,11 +136,12 @@ static DWORD WINAPI WriteThread(
          */ 
         GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwSavedAttributes);
         if (dwSavedAttributes & ENABLE_PROCESSED_INPUT) {
-                if (!WriteFile(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer,
-                        &write_status.transferred, NULL)) {
-                        write_status.error = GetLastError();
-                        debug("TermWrite thread - WriteFile failed %d, io:%p", GetLastError(), pio);
-                }
+		/* convert stream to utf16 and dump on console */
+		pio->write_details.buf[write_status.to_transfer] = '\0';
+		wchar_t* t = utf8_to_utf16(pio->write_details.buf);
+		WriteConsoleW(WINHANDLE(pio), t, wcslen(t), 0, 0);
+		free(t);
+		write_status.transferred = write_status.to_transfer;
         } else {
 
                 telProcessNetwork(pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
