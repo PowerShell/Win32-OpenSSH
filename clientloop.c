@@ -1273,6 +1273,7 @@ process_escapes(Channel *c, Buffer *bin, Buffer *bout, Buffer *berr,
 				}
 				continue;
 #endif /* !WINDOWS */
+
 			case '?':
 				print_escape_help(berr, escape_char, compat20,
 				    (c && c->ctl_chan != -1),

@@ -145,6 +145,8 @@ read_passphrase(const char *prompt, int flags)
 
 	/* prompt user */
 	wchar_t* wtmp = utf8_to_utf16(prompt);
+	if (wtmp == NULL)
+		fatal("unable to alloc memory");
 	_cputws(wtmp);
 	free(wtmp);
 
@@ -158,28 +160,28 @@ read_passphrase(const char *prompt, int flags)
 		buf[len] = (unsigned char)_getch();
 
 		if (buf[len] == '\r') {
-			if (_kbhit())
-				_getch(); // read linefeed if its there
+			if (_kbhit()) /* read linefeed if its there */
+				_getch();
 			break;
 		}
 		else if (buf[len] == '\n') {
 			break;
 }
-		else if (buf[len] == '\b') { // backspace
+		else if (buf[len] == '\b') { /* backspace */
 			if (len > 0)
-				len--; // overwrite last character
+				len--; /* overwrite last character */
 		}
 		else if (buf[len] == '\003') {
 			/* exit on Ctrl+C */
 			fatal("");
 		}
 		else {
-			len++; // keep reading in the loop
+			len++; /* keep reading in the loop */
 		}
 	}
 
-	buf[len] = '\0'; // get rid of the cr/lf
-	_cputs("\n"); // show a newline as we do not echo password or the line
+	buf[len] = '\0'; /* get rid of the cr/lf */
+	_cputs("\n"); /*show a newline as we do not echo password or the line */
 
 	ret = xstrdup(buf);
 
@@ -188,7 +190,6 @@ read_passphrase(const char *prompt, int flags)
 	return ret;
 
 #else   /* !WINDOWS */
-
 	char *askpass = NULL, *ret, buf[1024];
 	int rppflags, use_askpass = 0, ttyfd;
 
@@ -235,9 +236,7 @@ read_passphrase(const char *prompt, int flags)
 	ret = xstrdup(buf);
 	explicit_bzero(buf, sizeof(buf));
 	return ret;
-	
 #endif  /* !WINDOWS */
-
 }
 
 int

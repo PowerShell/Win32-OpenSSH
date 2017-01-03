@@ -11,6 +11,7 @@
 
 #include "inc\dirent.h"
 #include "inc\libgen.h"
+#include "misc_internal.h"
 
 
 struct DIR_ {
@@ -18,8 +19,6 @@ struct DIR_ {
 	struct _wfinddata_t c_file;
 	int first;
 };
-
-char * realpath_win(const char *path, char resolved[MAX_PATH]);
 
 /* Open a directory stream on NAME.
    Return a DIR stream on the directory, or NULL if it could not be opened.  */
@@ -32,11 +31,7 @@ DIR * opendir(const char *name)
 	wchar_t* wname = NULL;
 	int needed;
 	
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(name, resolvedPathName);
-
-	if ((wname = utf8_to_utf16(resolvedPathName)) == NULL) {
+	if ((wname = utf8_to_utf16(sanitized_path(name))) == NULL) {
 		errno = ENOMEM;
 		return NULL;
 	}

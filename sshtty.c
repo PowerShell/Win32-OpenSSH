@@ -74,9 +74,7 @@ void
 enter_raw_mode(int quiet) {
         ConInit(STD_OUTPUT_HANDLE, TRUE);
 }
-
 #else /* !WINDOWS */
-
 struct termios *
 get_saved_tio(void)
 {
@@ -124,7 +122,4 @@ enter_raw_mode(int quiet)
 	} else
 		_in_raw_mode = 1;
 }
-
 #endif /* !WINDOWS */
-
-

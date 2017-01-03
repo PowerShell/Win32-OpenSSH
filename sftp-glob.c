@@ -67,7 +67,6 @@ fudge_readdir(struct SFTP_OPENDIR *od)
 	/* Solaris needs sizeof(dirent) + path length (see below) */
 	static char buf[sizeof(struct dirent) + MAXPATHLEN];
 	struct dirent *ret = (struct dirent *)buf;
-
 #ifdef __GNU_LIBRARY__
 	static int inum = 1;
 #endif /* __GNU_LIBRARY__ */

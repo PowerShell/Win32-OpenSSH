@@ -245,10 +245,11 @@ userauth_pubkey(Authctxt *authctxt)
 		 * if a user is not allowed to login. is this an
 		 * issue? -markus
 		 */
-#ifndef WINDOWS
-		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 0)))  
-#endif  /* !WINDOWS */
+#ifdef WINDOWS /* key validation in done in agent for Windows */
 		{
+#else  /* !WINDOWS */
+		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 0))) {
+#endif  /* !WINDOWS */
 			packet_start(SSH2_MSG_USERAUTH_PK_OK);
 			packet_put_string(pkalg, alen);
 			packet_put_string(pkblob, blen);

@@ -40,6 +40,7 @@
 #include <winioctl.h>
 #include "Shlwapi.h"
 #include <sys\utime.h>
+#include "misc_internal.h"
 
 /* internal table that stores the fd to w32_io mapping*/
 struct w32fd_table {
@@ -347,7 +348,7 @@ w32_pipe(int *pfds) {
 	    pio[0]->handle, pio[0], read_index, pio[1]->handle, pio[1], write_index);
 	return 0;
 }
-char *realpath_win(const char *path, char resolved[MAX_PATH]);
+
 int
 w32_open(const char *pathname, int flags, ...) {
 	int min_index = fd_table_get_min_index();
@@ -357,18 +358,14 @@ w32_open(const char *pathname, int flags, ...) {
 	if (min_index == -1)
 		return -1;
 
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(pathname, resolvedPathName);
-
-	pio = fileio_open(resolvedPathName, flags, 0);
+	pio = fileio_open(sanitized_path(pathname), flags, 0);
 	if (pio == NULL)
 		return -1;
 
 	pio->type = NONSOCK_FD;
 	fd_table_set(pio, min_index);
 	debug("open - handle:%p, io:%p, fd:%d", pio->handle, pio, min_index);
-	debug3("open - path:%s", resolvedPathName);
+	debug3("open - path:%s", pathname);
 	return min_index;
 }
 

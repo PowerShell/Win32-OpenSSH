@@ -1475,7 +1475,7 @@ control_persist_detach(void)
 	 */
         fatal("ControlMaster is not supported in Windows yet");
 #else /* !WINDOWS */
-        pid_t pid;
+	pid_t pid;
 	int devnull, keep_stderr;
 
 	debug("%s: backgrounding master process", __func__);

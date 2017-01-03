@@ -432,7 +432,6 @@ char *
 colon(char *cp)
 {
 	int flag = 0;
-	int len = 0;
 
 	if (*cp == ':')		/* Leading colon is part of file name. */
 		return NULL;
@@ -627,6 +626,7 @@ tilde_expand_filename(const char *filename, uid_t uid)
 
 	if (xasprintf(&ret, "%s%s%s", pw->pw_dir, sep, filename) >= PATH_MAX)
 		fatal("tilde_expand_filename: Path too long");
+
 	return (ret);
 }
 

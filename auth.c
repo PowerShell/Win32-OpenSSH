@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.118 2016/11/08 22:04:34 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.119 2016/12/15 21:29:05 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -192,7 +192,7 @@ allowed_user(struct passwd * pw)
 
 	/* Return false if user is listed in DenyUsers */
 	if (options.num_deny_users > 0) {
-		for (i = 0; i < options.num_deny_users; i++)
+		for (i = 0; i < options.num_deny_users; i++) {
 			r = match_user(pw->pw_name, hostname, ipaddr,
 			    options.deny_users[i]);
 			if (r < 0) {
@@ -204,6 +204,7 @@ allowed_user(struct passwd * pw)
 				    pw->pw_name, hostname);
 				return 0;
 			}
+		}
 	}
 	/* Return false if AllowUsers isn't empty and user isn't listed there */
 	if (options.num_allow_users > 0) {
@@ -576,7 +577,7 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 	struct stat st;
 	int fd;
 	FILE *f;
-	
+
 #ifdef WINDOWS
         /* Windows POSIX adpater does not support fdopen() on open(file)*/
         if ((f = fopen(file, "r")) == NULL) {
@@ -616,6 +617,7 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 		return NULL;
 	}
 #endif  /* !WINDOWS */
+
 	return f;
 }
 

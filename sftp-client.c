@@ -1384,11 +1384,9 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 			    "server reordered requests", local_path);
 		}
 		debug("truncating at %llu", (unsigned long long)highwater);
-		#ifndef WIN32_VS
 		if (ftruncate(local_fd, highwater) == -1)
 			error("ftruncate \"%s\": %s", local_path,
 			    strerror(errno));
-		#endif
 	}
 	if (read_error) {
 		error("Couldn't read from remote file \"%s\" : %s",
@@ -1428,7 +1426,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 			if (fsync(local_fd) == -1)
 				error("Couldn't sync file \"%s\": %s",
 				    local_path, strerror(errno));
-                }
+		}
 	}
 	close(local_fd);
 	sshbuf_free(msg);

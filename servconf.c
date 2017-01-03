@@ -606,7 +606,7 @@ derelativise_path(const char *path)
 	expanded = tilde_expand_filename(path, getuid());
 #ifdef WINDOWS
         /* Windows absolute paths have a drive letter followed by :*/
-	if (expanded[1] == ':')
+	if (*expanded != '\0' && expanded[1] == ':')
 #else  /* !WINDOWS */
 	if (*expanded == '/')
 #endif  /* !WINDOWS */

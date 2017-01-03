@@ -231,32 +231,6 @@ char *user_from_uid(uid_t uid, int nouser) {
 	return "-";
 }
 
-
-/* TODO - this is moved from realpath.c in openbsdcompat. Review and finalize its position*/
-
-#include <Shlwapi.h>
-
-void backslashconvert(char *str)
-{
-	while (*str) {
-		if (*str == '/')
-			*str = '\\'; // convert forward slash to back slash
-		str++;
-	}
-
-}
-
-// convert back slash to forward slash
-void slashconvert(char *str)
-{
-	while (*str) {
-		if (*str == '\\')
-			*str = '/'; // convert back slash to forward slash
-		str++;
-	}
-}
-
-
 uid_t
 getuid(void) {
 	return 0;

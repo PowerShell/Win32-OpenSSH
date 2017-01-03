@@ -446,7 +446,6 @@ do_log(LogLevel level, const char *fmt, va_list args)
 	}
 	strnvis(fmtbuf, msgbuf, sizeof(fmtbuf),
 	    log_on_stderr ? LOG_STDERR_VIS : LOG_SYSLOG_VIS);
-
 	if (log_handler != NULL) {
 		/* Avoid recursion */
 		tmp_handler = log_handler;

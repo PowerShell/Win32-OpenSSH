@@ -164,11 +164,11 @@ int saved_argc;
 /* re-exec */
 int rexeced_flag = 0;
 #ifdef WINDOWS
-/* rexec is not supported in Windows */
+/* rexec is not applicable in Windows */
 int rexec_flag = 0;
-#else
+#else /* !WINDOWS */
 int rexec_flag = 1;
-#endif
+#endif /* !WINDOWS */
 int rexec_argc = 0;
 char **rexec_argv;
 
@@ -253,59 +253,6 @@ int is_child = 0;
 void destroy_sensitive_data(void);
 void demote_sensitive_data(void);
 static void do_ssh2_kex(void);
-
-/*
-   * Retrieve path to current running module.
-   *
-   * path     - buffer, where to store path (OUT).
-   * pathSize - size of path buffer in bytes (IN).
-   *
-   * RETURNS: 0 if OK.
-   */
-   
-  int GetCurrentModulePath(char *path, int pathSize)
-  {
-    int exitCode = -1;
-    
-#ifdef WINDOWS
-
-    char* dir = w32_programdir();
-    if (strnlen(dir, pathSize) == pathSize) 
-        error("program directory path size exceeded provided pathSize %d", pathSize);
-    else {
-        memcpy(path, dir, strnlen(dir, pathSize) + 1);
-        exitCode = 0;
-    }
-    
-#endif
-    
-    //
-    // Linux.
-    //
-    
-    #ifdef __linux__
-
-      if (readlink ("/proc/self/exe", path, pathSize) != -1)
-      {
-        dirname(path);
-
-        strcat(path, "/");
-       
-        exitCode = 0;
-      }
-    
-    #endif
-  
-    //
-    // MacOS.
-    //
-    
-    #ifdef __APPLE__
-    
-    #endif
-  
-    return exitCode;
-  }  
 
 /*
  * Close all listening sockets
@@ -591,7 +538,7 @@ reseed_prngs(void)
 /* 
  * No-OP defs for preauth routines for Windows 
  * these should go away once the privilege separation 
- * related is refactored to be invoked only when applicable 
+ * related code is refactored to be invoked only when applicable 
  */
 static void
 privsep_preauth_child(void) {
@@ -608,7 +555,7 @@ privsep_postauth(Authctxt *authctxt) {
         return;
 }
 
-#else
+#else /* !WINDOWS */
 /* Unix privilege separation routines */
 static void
 privsep_preauth_child(void)
@@ -645,6 +592,7 @@ privsep_preauth_child(void)
 		if (setgroups(1, gidset) < 0)
 			fatal("setgroups: %.100s", strerror(errno));
 		permanently_set_uid(privsep_pw);
+	}
 }
 
 static int
@@ -768,7 +716,7 @@ privsep_postauth(Authctxt *authctxt)
 	packet_set_authenticated();
 }
 
-#endif 
+#endif  /* !WINDOWS */
 
 static char *
 list_hostkey_types(void)
@@ -1143,7 +1091,7 @@ server_listen(void)
 			close(listen_sock);
 			continue;
 		}
-#endif
+#endif /* WINDOWS */
 		/*
 		 * Set socket options.
 		 * Allow local port reuse in TIME_WAIT.
@@ -1370,7 +1318,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				free(path_utf8);
 				close(*newsock);
 			}
-#else
+#else /* !WINDOWS */
 
 			if ((pid = fork()) == 0) {
 				/*
@@ -1395,7 +1343,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					close(config_s[0]);
 				break;
 			}
-#endif
+#endif /* !WINDOWS */
 			/* Parent.  Stay in the loop. */
 			platform_post_fork_parent(pid);
 			if (pid < 0)
@@ -1764,7 +1712,7 @@ main(int ac, char **av)
 #endif
 	);
 
-#ifndef WINDOWS
+#ifndef WINDOWS /* not applicable in Windows */
 	/* Store privilege separation user for later use if required. */
 	if ((privsep_pw = getpwnam(SSH_PRIVSEP_USER)) == NULL) {
 		if (use_privsep || options.kerberos_authentication)
@@ -1778,7 +1726,7 @@ main(int ac, char **av)
 		privsep_pw->pw_passwd = xstrdup("*");
 	}
 	endpwent();
-#endif
+#endif /* !WINDOWS */
 
 	/* load host keys */
 	sensitive_data.host_keys = xcalloc(options.num_host_key_files,
@@ -1796,7 +1744,7 @@ main(int ac, char **av)
 			error("Could not connect to agent \"%s\": %s",
 			    options.host_key_agent, ssh_err(r));
 	}
-#ifdef WIN32_FIXME
+#ifdef WINDOWS /* Windows version always needs and has agent running */
 	have_agent = 1;
 #endif
 	for (i = 0; i < options.num_host_key_files; i++) {
@@ -1977,7 +1925,7 @@ main(int ac, char **av)
 #ifdef WINDOWS
 		/* For Windows child sshd, skip listener */
 		if (is_child == 0)
-#endif
+#endif /* WINDOWS */
 		server_listen();
 
 		signal(SIGHUP, sighup_handler);
@@ -2020,7 +1968,7 @@ main(int ac, char **av)
 		fcntl(startup_pipe, F_SETFD, FD_CLOEXEC);
       }
 	  else /* Windows and Unix sshd parent */
-#endif
+#endif /* WINDOWS */
 
 		/* Accept a connection and return in a forked child */
 		server_accept_loop(&sock_in, &sock_out,

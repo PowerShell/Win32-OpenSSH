@@ -2049,6 +2049,7 @@ channel_post_mux_listener(Channel *c, fd_set *readset, fd_set *writeset)
 			c->notbefore = monotime() + 1;
 		return;
 	}
+
 #ifndef WINDOWS  /*TODO - implement user check for Windows*/
 	if (getpeereid(newsock, &euid, &egid) < 0) {
 		error("%s getpeereid failed: %s", __func__,

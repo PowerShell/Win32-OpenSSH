@@ -117,6 +117,7 @@
       <Filter>inc</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h" />
+    <ClInclude Include="..\win32compat\misc_internal.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">

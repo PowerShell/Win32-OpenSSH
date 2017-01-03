@@ -876,7 +876,7 @@
 /* #undef HAVE_SET_ID */
 
 /* Define to 1 if you have the `SHA256_Update' function. */
-#define HAVE_SHA256_UPDATE 1
+/* #undef HAVE_SHA256_UPDATE */
 
 /* Define to 1 if you have the <sha2.h> header file. */
 /* #undef HAVE_SHA2_H */

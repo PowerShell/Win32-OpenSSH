@@ -469,6 +469,7 @@ default_ssh_port(void)
 static int
 execute_in_shell(const char *cmd)
 {
+	char *shell;
 #ifdef WINDOWS
 	fatal("LocalCommand execution is not supported on Windows yet");
 	return 0;
@@ -1725,6 +1726,7 @@ read_config_file_depth(const char *filename, struct passwd *pw,
 			fatal("Bad owner or permissions on %s", filename);
 	}
 #endif /* !WINDOWS */
+
 	debug("Reading configuration data %.200s", filename);
 
 	/*

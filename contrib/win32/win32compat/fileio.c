@@ -199,9 +199,14 @@ createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 		return -1;
 	}
 
+	cf_flags->dwShareMode = 0;
+
 	switch (rwflags) {
 	case O_RDONLY:
 		cf_flags->dwDesiredAccess = GENERIC_READ;
+		/*todo: need to review to make sure all flags are correct*/
+		if (flags & O_NONBLOCK)
+			cf_flags->dwShareMode = FILE_SHARE_READ;			
 		break;
 	case O_WRONLY:
 		cf_flags->dwDesiredAccess = GENERIC_WRITE;
@@ -210,8 +215,6 @@ createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 		cf_flags->dwDesiredAccess = GENERIC_READ | GENERIC_WRITE;
 		break;
 	}
-
-	cf_flags->dwShareMode = 0;
 
 	cf_flags->securityAttributes.lpSecurityDescriptor = NULL;
 	cf_flags->securityAttributes.bInheritHandle = TRUE;
@@ -230,7 +233,7 @@ createFile_flags_setup(int flags, int mode, struct createFile_flags* cf_flags) {
 	if (c_s_flags & O_APPEND)
 		cf_flags->dwDesiredAccess = FILE_APPEND_DATA;
 
-	cf_flags->dwFlagsAndAttributes = FILE_FLAG_OVERLAPPED | SECURITY_IMPERSONATION;
+	cf_flags->dwFlagsAndAttributes = FILE_FLAG_OVERLAPPED | SECURITY_IMPERSONATION | FILE_FLAG_BACKUP_SEMANTICS;
 
 	/*TODO - map mode */
 

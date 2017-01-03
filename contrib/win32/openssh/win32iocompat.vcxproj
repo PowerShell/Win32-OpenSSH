@@ -155,11 +155,11 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32_dirent.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\no-ops.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32_zlib.c" />
-    <ClCompile Include="..\win32compat\ansiprsr.c" />
-    <ClCompile Include="..\win32compat\conio.c" />
-    <ClCompile Include="..\win32compat\console.c" />
-    <ClCompile Include="..\win32compat\tncon.c" />
-    <ClCompile Include="..\win32compat\tnnet.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ansiprsr.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\conio.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -198,6 +198,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\termios.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dirent.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\misc_internal.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

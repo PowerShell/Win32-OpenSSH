@@ -3,6 +3,7 @@ Set-StrictMode -Version Latest
 [string] $script:platform = $env:PROCESSOR_ARCHITECTURE
 [string] $script:vcPath = $null
 [System.IO.DirectoryInfo] $script:OpenSSHRoot = $null
+[System.IO.DirectoryInfo] $script:gitRoot = $null
 [bool] $script:Verbose = $false
 [string] $script:BuildLogFile = $null
 
@@ -268,6 +269,34 @@ function Start-SSHBootstrap
     }
 }
 
+function Clone-Win32OpenSSH
+{	
+    $win32OpenSSHPath = join-path $script:gitRoot "Win32-OpenSSH"
+    if (-not (Test-Path -Path $win32OpenSSHPath -PathType Container))
+    {
+        Write-BuildMsg -AsInfo -Message "clone repo Win32-OpenSSH"
+        Push-Location $gitRoot
+        git clone -q --recursive https://github.com/PowerShell/Win32-OpenSSH.git $win32OpenSSHPath
+        Pop-Location
+    }
+    Write-BuildMsg -AsInfo -Message "pull latest from repo Win32-OpenSSH"
+    Push-Location $win32OpenSSHPath
+	git fetch -q origin
+    git checkout -qf L1-Prod        
+    Pop-Location
+}
+
+function Copy-OpenSSLSDK
+{
+    $sourcePath  = Join-Path $script:gitRoot "Win32-OpenSSH\contrib\win32\openssh\OpenSSLSDK"
+    Write-BuildMsg -AsInfo -Message "copying $sourcePath"
+    Copy-Item -Container -Path $sourcePath -Destination $PSScriptRoot -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable e
+    if($e -ne $null)
+    {
+        Write-BuildMsg -AsError -ErrorAction Stop -Message "Copy OpenSSL from $sourcePath failed "
+    }
+}
+
 function Start-SSHBuild
 {
     [CmdletBinding(SupportsShouldProcess=$false)]    
@@ -286,6 +315,8 @@ function Start-SSHBuild
 
     # Get openssh-portable root    
     $script:OpenSSHRoot = Get-Item -Path $repositoryRoot.FullName
+	$script:gitRoot = split-path $script:OpenSSHRoot
+
 
     if($PSBoundParameters.ContainsKey("Verbose"))
     {
@@ -302,6 +333,9 @@ function Start-SSHBuild
     Write-BuildMsg -AsInfo -Message "Build Log: $($script:BuildLogFile)"
 
     Start-SSHBootstrap
+
+    Clone-Win32OpenSSH
+    Copy-OpenSSLSDK
     $msbuildCmd = "msbuild.exe"
     $solutionFile = Get-SolutionFile -root $repositoryRoot.FullName
     $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
@@ -380,4 +414,4 @@ function Get-RepositoryRoot
     throw new-object System.IO.DirectoryNotFoundException("Could not find the root of the GIT repository")
 }
 
-Export-ModuleMember -Function Start-SSHBuild, Get-RepositoryRoot, Get-BuildLogFile
+Export-ModuleMember -Function Start-SSHBuild, Get-RepositoryRoot, Get-BuildLogFile, Clone-Win32OpenSSH, Copy-OpenSSLSDK

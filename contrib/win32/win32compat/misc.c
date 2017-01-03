@@ -36,6 +36,7 @@
 #include "inc\sys\time.h"
 #include <time.h>
 #include <Shlwapi.h>
+#include "misc_internal.h"
 
 int usleep(unsigned int useconds)
 {
@@ -302,11 +303,25 @@ spawn_child(char* cmd, int in, int out, int err, DWORD flags) {
 	PROCESS_INFORMATION pi;
 	STARTUPINFOW si;
 	BOOL b;
-	char* abs_cmd;
+	char *abs_cmd, *t;
 	wchar_t * cmd_utf16;
+	int add_module_path = 0;
 
-	/* relative ? if so, add current module path to start */
-	if (!(cmd && cmd[0] != '\0' && (cmd[1] == ':' || cmd[0] == '\\' || cmd[0] == '.'))) {
+	/* should module path be added */
+	do{
+		if(!cmd)
+			break;
+		t = cmd;
+		if (*t == '\"')
+			t++;
+		if (t[0] == '\0' || t[0] == '\\' || t[0] == '.' || t[1] == ':')
+			break;
+		add_module_path = 1;
+		
+	} while (0);
+
+	/* add current module path to start if needed */
+	if (add_module_path) {
 		char* ctr;
 		abs_cmd = malloc(strlen(w32_programdir()) + 1 + strlen(cmd) + 1);
 		if (abs_cmd == NULL) {
@@ -478,8 +493,6 @@ w32_chown(const char *pathname, unsigned int owner, unsigned int group) {
 	return -1;
 }
 
-char *realpath_win(const char *path, char resolved[MAX_PATH]);
-
 int
 w32_utimes(const char *filename, struct timeval *tvp) {
 	struct utimbuf ub;
@@ -487,10 +500,7 @@ w32_utimes(const char *filename, struct timeval *tvp) {
 	ub.modtime = tvp[1].tv_sec;
 	int ret;
 
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(filename, resolvedPathName);
-	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(resolvedPathName);
+	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(sanitized_path(filename));
 	if (resolvedPathName_utf16 == NULL) {
 		errno = ENOMEM;
 		return -1;
@@ -517,16 +527,9 @@ link(const char *oldpath, const char *newpath) {
 
 int
 w32_rename(const char *old_name, const char *new_name) {
-	// Skip the first '/' in the pathname
-	char resolvedOldPathName[MAX_PATH];
-	realpath_win(old_name, resolvedOldPathName);
-
-	// Skip the first '/' in the pathname
-	char resolvedNewPathName[MAX_PATH];
-	realpath_win(new_name, resolvedNewPathName);
-
-	wchar_t *resolvedOldPathName_utf16 = utf8_to_utf16(resolvedOldPathName);
-	wchar_t *resolvedNewPathName_utf16 = utf8_to_utf16(resolvedNewPathName);
+	wchar_t *resolvedOldPathName_utf16 = utf8_to_utf16(sanitized_path(old_name));
+	wchar_t *resolvedNewPathName_utf16 = utf8_to_utf16(sanitized_path(new_name));
+	
 	if (NULL == resolvedOldPathName_utf16 || NULL == resolvedNewPathName_utf16) {
 		errno = ENOMEM;
 		return -1;
@@ -541,11 +544,8 @@ w32_rename(const char *old_name, const char *new_name) {
 
 int
 w32_unlink(const char *path) {
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(path, resolvedPathName);
-
-	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(resolvedPathName);
+	
+	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(sanitized_path(path));
 	if (NULL == resolvedPathName_utf16) {
 		errno = ENOMEM;
 		return -1;
@@ -559,11 +559,7 @@ w32_unlink(const char *path) {
 
 int
 w32_rmdir(const char *path) {
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(path, resolvedPathName);
-
-	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(resolvedPathName);
+	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(sanitized_path(path));
 	if (NULL == resolvedPathName_utf16) {
 		errno = ENOMEM;
 		return -1;
@@ -606,11 +602,8 @@ w32_getcwd(char *buffer, int maxlen) {
 
 int
 w32_mkdir(const char *path_utf8, unsigned short mode) {
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(path_utf8, resolvedPathName);
-
-	wchar_t *path_utf16 = utf8_to_utf16(resolvedPathName);
+	
+	wchar_t *path_utf16 = utf8_to_utf16(sanitized_path(path_utf8));
 	if (path_utf16 == NULL) {
 		errno = ENOMEM;
 		return -1;
@@ -621,83 +614,59 @@ w32_mkdir(const char *path_utf8, unsigned short mode) {
 	return returnStatus;
 }
 
-void
-getrnd(u_char *s, size_t len) {
-	HCRYPTPROV hProvider;
-	if (CryptAcquireContextW(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT) == FALSE ||
-	    CryptGenRandom(hProvider, len, s) == FALSE ||
-	    CryptReleaseContext(hProvider, 0) == FALSE)
-		DebugBreak();
-}
-
 int
 w32_stat(const char *path, struct w32_stat *buf) {
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(path, resolvedPathName);
-
-	return fileio_stat(resolvedPathName, (struct _stat64*)buf);
+	return fileio_stat(sanitized_path(path), (struct _stat64*)buf);
 }
 
 // if file is symbolic link, copy its link into "link" .
 int 
 readlink(const char *path, char *link, int linklen)
 {
-	// Skip the first '/' in the pathname
-	char resolvedPathName[MAX_PATH];
-	realpath_win(path, resolvedPathName);
-
-	strcpy_s(link, linklen, resolvedPathName);
+	strcpy_s(link, linklen, sanitized_path(path));
 	return 0;
 }
 
+// convert forward slash to back slash
+void
+convertToBackslash(char *str) {
+	while (*str) {
+		if (*str == '/')
+			*str = '\\';
+		str++;
+	}
+}
+
+// convert back slash to forward slash
+void 
+convertToForwardslash(char *str) {
+	while (*str) {
+		if (*str == '\\')
+			*str = '/';
+		str++;
+	}
+}
+
 /*
-* This method will expands all symbolic links and resolves references to /./,
-*  /../ and extra '/' characters in the null-terminated string named by
+* This method will resolves references to /./, /../ and extra '/' characters in the null-terminated string named by
 *  path to produce a canonicalized absolute pathname.
 */
 char *
-realpath(const char *path, char resolved[MAX_PATH])
-{
+realpath(const char *path, char resolved[MAX_PATH]) {
 	char tempPath[MAX_PATH];
-
-	if ((0 == strcmp(path, "./")) || (0 == strcmp(path, "."))) {
-		tempPath[0] = '/';
-		_getcwd(&tempPath[1], sizeof(tempPath) - 1);
-		slashconvert(tempPath);
-
-		strncpy(resolved, tempPath, strlen(tempPath) + 1);
-		return resolved;
-	}
-
-	if (path[0] != '/')
-		strlcpy(resolved, path, sizeof(tempPath));
+		
+	if (*path == '/' && *(path + 2) == ':')
+		strncpy(resolved, path + 1, strlen(path)); // skip the first '/'
 	else
-		strlcpy(resolved, path + 1, sizeof(tempPath));
+		strncpy(resolved, path, strlen(path) + 1);
 
-	backslashconvert(resolved);
-	PathCanonicalizeA(tempPath, resolved);
-	slashconvert(tempPath);
-
-	// Store terminating slash in 'X:/' on Windows.	
-	if (tempPath[1] == ':' && tempPath[2] == 0) {
-		tempPath[2] = '/';
-		tempPath[3] = 0;
-	}
+	if (_fullpath(tempPath, resolved, MAX_PATH) == NULL)
+		return NULL;
+	
+	convertToForwardslash(tempPath);
 
 	resolved[0] = '/'; // will be our first slash in /x:/users/test1 format
 	strncpy(resolved + 1, tempPath, sizeof(tempPath) - 1);
-	return resolved;
-}
-
-// like realpathWin32() but takes out the first slash so that windows systems can work on the actual file or directory
-char *
-realpath_win(const char *path, char resolved[MAX_PATH])
-{
-	char tempPath[MAX_PATH];
-	realpath(path, tempPath);
-
-	strncpy(resolved, &tempPath[1], sizeof(tempPath) - 1);
 	return resolved;
 }
 
@@ -737,8 +706,7 @@ typedef struct _REPARSE_DATA_BUFFER {
 } REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
 
 BOOL 
-ResolveLink(wchar_t * tLink, wchar_t *ret, DWORD * plen, DWORD Flags)
-{
+ResolveLink(wchar_t * tLink, wchar_t *ret, DWORD * plen, DWORD Flags) {
 	HANDLE   fileHandle;
 	BYTE     reparseBuffer[MAX_REPARSE_SIZE];
 	PBYTE    reparseData;

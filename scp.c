@@ -214,7 +214,7 @@ do_local_cmd(arglist *a)
 		return 0;
 	}
 
-#else
+#else /* !WINDOWS */
 	if ((pid = fork()) == -1)
 		fatal("do_local_cmd: fork: %s", strerror(errno));
 
@@ -239,7 +239,7 @@ do_local_cmd(arglist *a)
 		return (-1);
 
 	return (0);
-#endif
+#endif /* !WINDOWS */
 }
 
 /*
@@ -282,6 +282,7 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 
 	/* Fork a child to execute the command on the remote host using ssh. */
 #ifdef WINDOWS
+	/* generate command line and spawn_child */
 	replacearg(&args, 0, "%s", ssh_program);
 	if (remuser != NULL) {
 		addargs(&args, "-l");
@@ -314,11 +315,9 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 		do_cmd_pid = spawn_child(full_cmd, pin[0], pout[1], STDERR_FILENO, 0);
 		free(full_cmd);
 	}
-
-
-#else
+#else /* !WINDOWS */
 	do_cmd_pid = fork();
-#endif
+#endif /* !WINDOWS */
 	if (do_cmd_pid == 0) {
 		/* Child. */
 		close(pin[1]);
@@ -373,6 +372,7 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 
 	/* Fork a child to execute the command on the remote host using ssh. */
 #ifdef WINDOWS
+	/* generate command line and spawn_child */
 	replacearg(&args, 0, "%s", ssh_program);
 	if (remuser != NULL) {
 		addargs(&args, "-l");
@@ -403,10 +403,10 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 
 		pid = spawn_child(full_cmd, fdin, fdout, STDERR_FILENO, 0);
 		free(full_cmd);
-}
-#else
+	}
+#else /* !WINDOWS */
 	pid = fork();
-#endif
+#endif /* !WINDOWS */
 	if (pid == 0) {
 		dup2(fdin, 0);
 		dup2(fdout, 1);
@@ -591,6 +591,18 @@ main(int argc, char **argv)
 
 	remin = STDIN_FILENO;
 	remout = STDOUT_FILENO;
+
+#ifdef WINDOWS
+	/* 
+	 * To support both Windows and Unix style paths
+	 * convert '\\' to '/' in rest of arguments 
+	 */	
+	{		
+		int i;
+		for (i = 0; i < argc; i++) 
+			convertToForwardslash(argv[i]);
+	}
+#endif /* WINDOWS */
 
 	if (fflag) {
 		/* Follow "protocol", send data. */
@@ -807,6 +819,41 @@ tolocal(int argc, char **argv)
 	for (i = 0; i < argc - 1; i++) {
 		if (!(src = colon(argv[i]))) {	/* Local to local. */
 			freeargs(&alist);
+#ifdef WINDOWS
+#define _PATH_XCOPY "xcopy"
+#define _PATH_COPY "copy"
+			/* local to local on windows - need to use local native copy command */
+			struct stat stb;
+			int exists;
+			char *last;
+
+			exists = stat(argv[i], &stb) == 0;
+			/* convert '/' to '\\' 	*/
+			convertToBackslash(argv[i]);
+			convertToBackslash(argv[argc - 1]);
+			if (exists && (S_ISDIR(stb.st_mode))) {
+				addargs(&alist, "%s", _PATH_XCOPY);
+				if (iamrecursive)
+					addargs(&alist, "/S /E /H");
+				if (pflag)
+					addargs(&alist, "/K /X");
+				addargs(&alist, "/Y /F /I");				
+				addargs(&alist, "%s", argv[i]);				
+
+				if ((last = strrchr(argv[i], '\\')) == NULL)
+					last = argv[i];
+				else
+					++last;
+				
+				addargs(&alist, "%s%s%s", argv[argc - 1],
+					strcmp(argv[argc - 1], "\\") ? "\\" : "", last);
+			} else {
+				addargs(&alist, "%s", _PATH_COPY);
+				addargs(&alist, "/Y");				
+				addargs(&alist, "%s", argv[i]);
+				addargs(&alist, "%s", argv[argc - 1]);
+			}			
+#else  /* !WINDOWS */
 			addargs(&alist, "%s", _PATH_CP);
 			if (iamrecursive)
 				addargs(&alist, "-r");
@@ -815,6 +862,7 @@ tolocal(int argc, char **argv)
 			addargs(&alist, "--");
 			addargs(&alist, "%s", argv[i]);
 			addargs(&alist, "%s", argv[argc-1]);
+#endif /* !WINDOWS */
 			if (do_local_cmd(&alist))
 				++errs;
 			continue;
@@ -892,26 +940,10 @@ syserr:			run_err("%s: %s", name, strerror(errno));
 			run_err("%s: not a regular file", name);
 			goto next;
 		}
-#ifdef WINDOWS
-		/* account for both slashes on Windows */
-		{
-			char *lastf = NULL, *lastr = NULL;
-			if ((lastf = strrchr(name, '/')) == NULL && (lastr = strrchr(name, '\\')) == NULL)
-				last = name;
-			else {
-				if (lastf)
-					last = lastf;
-				if (lastr)
-					last = lastr;
-				++last;
-			}
-		}
-#else
 		if ((last = strrchr(name, '/')) == NULL)
 			last = name;
 		else
 			++last;
-#endif
 		curfile = last;
 		if (pflag) {
 			if (do_times(remout, verbose_mode, &stb) < 0)
@@ -1000,16 +1032,16 @@ rsource(char *name, struct stat *statp)
 	    (u_int) (statp->st_mode & FILEMODEMASK), 0, last);
 	if (verbose_mode)
 #ifdef WINDOWS
-		/* TODO - make fmprintf work for Windows  */
-        {
-            printf("Entering directory: ");
-            wchar_t* wtmp = utf8_to_utf16(path);
-            WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
-            free(wtmp);
-        }
-#else
+	/* TODO - make fmprintf work for Windows  */
+	{
+		printf("Entering directory: ");
+		wchar_t* wtmp = utf8_to_utf16(path);
+		WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+		free(wtmp);
+	}
+#else /* !WINDOWS */
 		fmprintf(stderr, "Entering directory: %s", path);
-#endif
+#endif /* !WINDOWS */
 	(void) atomicio(vwrite, remout, path, strlen(path));
 	if (response() < 0) {
 		closedir(dirp);
@@ -1085,16 +1117,17 @@ sink(int argc, char **argv)
 		*cp = 0;
 		if (verbose_mode)
 #ifdef WINDOWS
-			/* TODO - make fmprintf work for Windows  */
-            {
-                printf("Sink: ");
-                wchar_t* wtmp = utf8_to_utf16(buf);
-                WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
-                free(wtmp);
-            }
-#else
+		/* TODO - make fmprintf work for Windows  */
+		{
+			printf("Sink: ");
+			wchar_t* wtmp = utf8_to_utf16(buf);
+			WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
+			free(wtmp);
+		}
+#else /* !WINDOWS */
 			fmprintf(stderr, "Sink: %s", buf);
-#endif
+#endif /* !WINDOWS */
+
 		if (buf[0] == '\01' || buf[0] == '\02') {
 			if (iamremote == 0) {
 				(void) snmprintf(visbuf, sizeof(visbuf),
@@ -1496,3 +1529,4 @@ lostconn(int signo)
 	else
 		exit(1);
 }
+

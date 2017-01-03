@@ -194,7 +194,7 @@
       <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)digest-libc.c">
-      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==true">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)dispatch.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)dns.c" />
@@ -285,7 +285,9 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sandbox-pledge.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)utf8.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c" />
-    <ClCompile Include="..\..\..\digest-openssl.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)digest-openssl.c">
+      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h" />

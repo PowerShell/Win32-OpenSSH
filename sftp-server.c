@@ -688,7 +688,6 @@ process_open(u_int32_t id)
 	debug3("request %u: open flags %d", id, pflags);
 	flags = flags_from_portable(pflags);
 	mode = (a.flags & SSH2_FILEXFER_ATTR_PERMISSIONS) ? a.perm : 0666;
-
 	logit("open \"%s\" flags %s mode 0%o",
 	    name, string_from_portable(pflags), mode);
 	if (readonly &&
@@ -821,15 +820,13 @@ process_do_stat(u_int32_t id, int do_lstat)
 	struct stat st;
 	char *name;
 	int r, status = SSH2_FX_FAILURE;
-	
+
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	
-	r = do_lstat ? lstat(name, &st) : stat(name, &st);
 
 	debug3("request %u: %sstat", id, do_lstat ? "l" : "");
 	verbose("%sstat name \"%s\"", do_lstat ? "l" : "", name);
-
+	r = do_lstat ? lstat(name, &st) : stat(name, &st);
 	if (r < 0) {
 		status = errno_to_portable(errno);
 	} else {
@@ -899,9 +896,8 @@ process_setstat(u_int32_t id)
 	char *name;
 	int r, status = SSH2_FX_OK;
 
-	// sshbuf_get_cstring() is called twice.. is this correct?
 	if ((r = sshbuf_get_cstring(iqueue, &name, NULL)) != 0 ||
-		(r = decode_attrib(iqueue, &a)) != 0)
+	    (r = decode_attrib(iqueue, &a)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug("request %u: setstat name \"%s\"", id, name);
@@ -936,7 +932,6 @@ process_setstat(u_int32_t id)
 		if (r == -1)
 			status = errno_to_portable(errno);
 	}
-
 	send_status(id, status);
 	free(name);
 }
@@ -962,7 +957,6 @@ process_fsetstat(u_int32_t id)
 		if (a.flags & SSH2_FILEXFER_ATTR_SIZE) {
 			logit("set \"%s\" size %llu",
 			    name, (unsigned long long)a.size);
-
 			r = ftruncate(fd, a.size);
 			if (r == -1)
 				status = errno_to_portable(errno);
@@ -995,7 +989,6 @@ process_fsetstat(u_int32_t id)
 		if (a.flags & SSH2_FILEXFER_ATTR_UIDGID) {
 			logit("set \"%s\" owner %lu group %lu", name,
 			    (u_long)a.uid, (u_long)a.gid);
-
 #ifdef HAVE_FCHOWN
 			r = fchown(fd, a.uid, a.gid);
 #else
@@ -1018,11 +1011,9 @@ process_opendir(u_int32_t id)
 	if ((r = sshbuf_get_cstring(iqueue, &path, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	dirp = opendir(path);
-	
 	debug3("request %u: opendir", id);
 	logit("opendir \"%s\"", path);
-
+	dirp = opendir(path);
 	if (dirp == NULL) {
 		status = errno_to_portable(errno);
 	} else {
@@ -1064,7 +1055,6 @@ process_readdir(u_int32_t id)
 		int nstats = 10, count = 0, i;
 
 		stats = xcalloc(nstats, sizeof(Stat));
-
 		while ((dp = readdir(dirp)) != NULL) {
 			if (count >= nstats) {
 				nstats *= 2;
@@ -1078,7 +1068,7 @@ process_readdir(u_int32_t id)
 			stat_to_attrib(&st, &(stats[count].attrib));
 			stats[count].name = xstrdup(dp->d_name);
 			stats[count].long_name = ls_file(dp->d_name, &st, 0, 0);
-				count++;
+			count++;
 			/* send up to 100 entries in one message */
 			/* XXX check packet size instead */
 			if (count == 100)
@@ -1108,7 +1098,6 @@ process_remove(u_int32_t id)
 
 	debug3("request %u: remove", id);
 	logit("remove name \"%s\"", name);
-
 	r = unlink(name);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
@@ -1130,8 +1119,6 @@ process_mkdir(u_int32_t id)
 	    a.perm & 07777 : 0777;
 	debug3("request %u: mkdir", id);
 	logit("mkdir name \"%s\" mode 0%o", name, mode);
-
-
 	r = mkdir(name, mode);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
@@ -1149,7 +1136,6 @@ process_rmdir(u_int32_t id)
 
 	debug3("request %u: rmdir", id);
 	logit("rmdir name \"%s\"", name);
-
 	r = rmdir(name);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
@@ -1170,7 +1156,6 @@ process_realpath(u_int32_t id)
 		free(path);
 		path = xstrdup(".");
 	}
-
 	debug3("request %u: realpath", id);
 	verbose("realpath \"%s\"", path);
 	if (realpath(path, resolvedname) == NULL) {
@@ -1233,8 +1218,7 @@ process_rename(u_int32_t id)
 			unlink(newpath);
 		} else
 			status = SSH2_FX_OK;
-	} 
-	else if (stat(newpath, &sb) == -1) {
+	} else if (stat(newpath, &sb) == -1) {
 		if (rename(oldpath, newpath) == -1)
 			status = errno_to_portable(errno);
 		else
@@ -1257,7 +1241,6 @@ process_readlink(u_int32_t id)
 
 	debug3("request %u: readlink", id);
 	verbose("readlink \"%s\"", path);
-
 	if ((len = readlink(path, buf, sizeof(buf) - 1)) == -1)
 		send_status(id, errno_to_portable(errno));
 	else {
@@ -1275,7 +1258,7 @@ static void
 process_symlink(u_int32_t id)
 {
 	char *oldpath, *newpath;
-	int r, status= SSH2_FX_OP_UNSUPPORTED;
+	int r, status;
 
 	if ((r = sshbuf_get_cstring(iqueue, &oldpath, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(iqueue, &newpath, NULL)) != 0)
@@ -1283,12 +1266,10 @@ process_symlink(u_int32_t id)
 
 	debug3("request %u: symlink", id);
 	logit("symlink old \"%s\" new \"%s\"", oldpath, newpath);
-
 	/* this will fail if 'newpath' exists */
 	r = symlink(oldpath, newpath);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
 	send_status(id, status);
-
 	free(oldpath);
 	free(newpath);
 }
@@ -1317,7 +1298,6 @@ process_extended_statvfs(u_int32_t id)
 {
 	char *path;
 	struct statvfs st;
-	
 	int r;
 
 	if ((r = sshbuf_get_cstring(iqueue, &path, NULL)) != 0)
@@ -1346,19 +1326,17 @@ process_extended_fstatvfs(u_int32_t id)
 		send_status(id, SSH2_FX_FAILURE);
 		return;
 	}
-
-	if (statvfs(handle_to_name(handle), &st) != 0)
-		if (fstatvfs(fd, &st) != 0)
-			send_status(id, errno_to_portable(errno));
-		else
-			send_statvfs(id, &st);
+	if (fstatvfs(fd, &st) != 0)
+		send_status(id, errno_to_portable(errno));
+	else
+		send_statvfs(id, &st);
 }
 
 static void
 process_extended_hardlink(u_int32_t id)
 {
 	char *oldpath, *newpath;
-	int r, status = SSH2_FX_OP_UNSUPPORTED;
+	int r, status;
 
 	if ((r = sshbuf_get_cstring(iqueue, &oldpath, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(iqueue, &newpath, NULL)) != 0)
@@ -1366,10 +1344,8 @@ process_extended_hardlink(u_int32_t id)
 
 	debug3("request %u: hardlink", id);
 	logit("hardlink old \"%s\" new \"%s\"", oldpath, newpath);
-
 	r = link(oldpath, newpath);
 	status = (r == -1) ? errno_to_portable(errno) : SSH2_FX_OK;
-
 	send_status(id, status);
 	free(oldpath);
 	free(newpath);
@@ -1429,11 +1405,10 @@ process(void)
 	const u_char *cp;
 	int i, r;
 	u_int32_t id;
-	
+
 	buf_len = sshbuf_len(iqueue);
-	if (buf_len < 5) {
+	if (buf_len < 5)
 		return;		/* Incomplete message. */
-	}
 	cp = sshbuf_ptr(iqueue);
 	msg_len = get_u32(cp);
 	if (msg_len > SFTP_MAX_MSG_LENGTH) {
@@ -1441,9 +1416,8 @@ process(void)
 		    client_addr, pw->pw_name);
 		sftp_server_cleanup_exit(11);
 	}
-	if (buf_len < msg_len + 4) {
+	if (buf_len < msg_len + 4)
 		return;
-	}
 	if ((r = sshbuf_consume(iqueue, 4)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	buf_len -= 4;
@@ -1529,8 +1503,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 	int i, r, in, out, max, ch, skipargs = 0, log_stderr = 0;
 	ssize_t len, olen, set_size;
 	SyslogFacility log_facility = SYSLOG_FACILITY_AUTH;
-	
-	char *cp, *homedir = NULL, buf[4*4096];	
+	char *cp, *homedir = NULL, buf[4*4096];
 	long mask;
 
 	extern char *optarg;
@@ -1608,7 +1581,7 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 			sftp_server_usage();
 		}
 	}
-	
+
 	log_init(__progname, log_level, log_facility, log_stderr);
 
 	/*
@@ -1732,6 +1705,4 @@ sftp_server_main(int argc, char **argv, struct passwd *user_pw)
 			fatal("%s: sshbuf_check_reserve: %s",
 			    __func__, ssh_err(r));
 	}
-//#endif /* else WIN32 */
 }
-

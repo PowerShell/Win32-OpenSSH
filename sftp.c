@@ -73,7 +73,6 @@ typedef void EditLine;
 
 #define DEFAULT_COPY_BUFLEN	32768	/* Size of buffer for up/download */
 #define DEFAULT_NUM_REQUESTS	64	/* # concurrent outstanding requests */
-#define MAX_COMMAND_LINE 2048
 
 /* File to read commands from */
 FILE* infile;
@@ -295,6 +294,7 @@ help(void)
 
 #ifdef WINDOWS
 /* printf version to account for utf-8 input */
+/* TODO - merge this with vfmprint */
 static void printf_utf8(char *fmt,  ... ) {
         /* TODO - is 1024 sufficient */
         char buf[1024];
@@ -311,6 +311,8 @@ static void printf_utf8(char *fmt,  ... ) {
         free(wtmp);
 }
 
+/* override mprintf */
+#define mprintf(a,...)		printf_utf8((a), __VA_ARGS__)
 #define printf(a,...)		printf_utf8((a), __VA_ARGS__)
 #endif   /* WINDOWS */
 
@@ -324,7 +326,7 @@ local_do_shell(const char *args)
 		args = (char *)	getenv("ComSpec"); // get name of Windows cmd shell
 	}
 	system(args); // execute the shell or cmd given
-  #else
+  #else   /* !WINDOWS */
 	int status;
 	char *shell;
 	pid_t pid;
@@ -358,7 +360,7 @@ local_do_shell(const char *args)
 		error("Shell exited abnormally");
 	else if (WEXITSTATUS(status))
 		error("Shell exited with status %d", WEXITSTATUS(status));
- #endif
+ #endif   /* !WINDOWS */
 }
 
 static void
@@ -418,11 +420,7 @@ make_absolute(char *p, const char *pwd)
 	}
 
 	/* convert '\\' tp '/' */
-	s1 = p;
-	while ((s2 = strchr(s1, '\\')) != NULL) {
-		*s2 = '/';
-		s1 = s2 + 1;
-	}
+	convertToForwardslash(p);
 
 	/* Append "/" if needed to the absolute windows path */	
 	if (p && p[0] != '\0' && p[1] == ':') {
@@ -431,13 +429,14 @@ make_absolute(char *p, const char *pwd)
 		p = s1;
 	}
 
-#else
+#else /* !WINDOWS */
 	if (p && p[0] != '/') {
 		abs_str = path_append(pwd, p);
 		free(p);
 		return(abs_str);
-	}
-#endif
+	} else
+		return(p);
+#endif /* !WINDOWS */
 	return(p);
 
 }
@@ -672,7 +671,6 @@ process_get(struct sftp_conn *conn, const char *src, const char *dst,
 
 	abs_src = xstrdup(src);
 	abs_src = make_absolute(abs_src, pwd);
-
 	memset(&g, 0, sizeof(g));
 
 	debug3("Looking up %s", abs_src);
@@ -712,7 +710,7 @@ process_get(struct sftp_conn *conn, const char *src, const char *dst,
 			} else {
 				abs_dst = xstrdup(dst);
 			}
-		} else if (dst) {			
+		} else if (dst) {
 			abs_dst = path_append(dst, filename);
 		} else {
 			abs_dst = xstrdup(filename);
@@ -720,10 +718,12 @@ process_get(struct sftp_conn *conn, const char *src, const char *dst,
 		free(tmp);
 
 		resume |= global_aflag;
-                if (!quiet && resume)
-		        printf("Resuming %s to %s\n", g.gl_pathv[i], abs_dst);
-                else if (!quiet && !resume)
-                    printf("Fetching %s to %s\n", g.gl_pathv[i], abs_dst);
+		if (!quiet && resume)
+			mprintf("Resuming %s to %s\n",
+			    g.gl_pathv[i], abs_dst);
+		else if (!quiet && !resume)
+			mprintf("Fetching %s to %s\n",
+			    g.gl_pathv[i], abs_dst);
 		if (pathname_is_dir(g.gl_pathv[i]) && (rflag || global_rflag)) {
 			if (download_dir(conn, g.gl_pathv[i], abs_dst, NULL,
 			    pflag || global_pflag, 1, resume,
@@ -771,10 +771,8 @@ process_put(struct sftp_conn *conn, const char *src, const char *dst,
 	}
 
 	/* If we aren't fetching to pwd then stash this status for later */
-	if (tmp_dst != NULL) {		
+	if (tmp_dst != NULL)
 		dst_is_dir = remote_is_dir(conn, tmp_dst);
-	}
-		
 
 	/* If multiple matches, dst may be directory or unspecified */
 	if (g.gl_matchc > 1 && tmp_dst && !dst_is_dir) {
@@ -805,7 +803,7 @@ process_put(struct sftp_conn *conn, const char *src, const char *dst,
 				abs_dst = path_append(tmp_dst, filename);
 			else
 				abs_dst = xstrdup(tmp_dst);
-		} else if (tmp_dst) {			
+		} else if (tmp_dst) {
 			abs_dst = path_append(tmp_dst, filename);
 		} else {
 			abs_dst = make_absolute(xstrdup(filename), pwd);
@@ -814,10 +812,11 @@ process_put(struct sftp_conn *conn, const char *src, const char *dst,
 
                 resume |= global_aflag;
 		if (!quiet && resume)
-			printf("Resuming upload of %s to %s\n", g.gl_pathv[i], 
-				abs_dst);
+			mprintf("Resuming upload of %s to %s\n",
+			    g.gl_pathv[i], abs_dst);
 		else if (!quiet && !resume)
-			printf("Uploading %s to %s\n", g.gl_pathv[i], abs_dst);
+			mprintf("Uploading %s to %s\n",
+			    g.gl_pathv[i], abs_dst);
 		if (pathname_is_dir(g.gl_pathv[i]) && (rflag || global_rflag)) {
 			if (upload_dir(conn, g.gl_pathv[i], abs_dst,
 			    pflag || global_pflag, 1, resume,
@@ -887,6 +886,7 @@ do_ls_dir(struct sftp_conn *conn, const char *path,
 
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 			width = ws.ws_col;
+
 		columns = width / (m + 2);
 		columns = MAXIMUM(columns, 1);
 		colspace = width / columns;
@@ -919,24 +919,21 @@ do_ls_dir(struct sftp_conn *conn, const char *path,
 				attrib_to_stat(&d[n]->a, &sb);
 				lname = ls_file(fname, &sb, 1,
 				    (lflag & LS_SI_UNITS));
-                        printf("%s\n", lname);                
+				mprintf("%s\n", lname);
 				free(lname);
-            }
-            else {
-                printf("%s\n", d[n]->longname);
-            }
-		} 
-        else {
+			} else
+				mprintf("%s\n", d[n]->longname);
+		} else {
 #ifdef WINDOWS
-		/* cannot use printf_utf8 becuase of width specification */
-		/* printf_utf8 does not account for utf-16 based argument widths */
-		wchar_t buf[1024]; 
-		wchar_t* wtmp = utf8_to_utf16(fname);
-		swprintf(buf, 1024, L"%-*s", colspace, wtmp);
-		WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buf, wcslen(buf), 0, 0);
-		free(wtmp);
+			/* cannot use printf_utf8 becuase of width specification */
+			/* printf_utf8 does not account for utf-16 based argument widths */
+			wchar_t buf[1024]; 
+			wchar_t* wtmp = utf8_to_utf16(fname);
+			swprintf(buf, 1024, L"%-*s", colspace, wtmp);
+			WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buf, wcslen(buf), 0, 0);
+			free(wtmp);
 #else
-	        printf("%-*s", colspace, fname);
+			mprintf("%-*s", colspace, fname);
 #endif
 			if (c >= columns) {
 				printf("\n");
@@ -995,7 +992,7 @@ do_globbed_ls(struct sftp_conn *conn, const char *path,
 		globfree(&g);
 		return err;
 	}
-	
+
 	if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) != -1)
 		width = ws.ws_col;
 
@@ -1018,21 +1015,21 @@ do_globbed_ls(struct sftp_conn *conn, const char *path,
 			}
 			lname = ls_file(fname, g.gl_statv[i], 1,
 			    (lflag & LS_SI_UNITS));
-                        printf("%s\n", lname);
-                        free(lname);
+			mprintf("%s\n", lname);
+			free(lname);
 		} else {
 #ifdef WINDOWS
-            /* cannot use printf_utf8 becuase of width specification */
-            /* printf_utf8 does not account for utf-16 based argument widths */
-            wchar_t buf[1024];
-            wchar_t* wtmp = utf8_to_utf16(fname);
-            swprintf(buf, 1024, L"%-*s", colspace, wtmp);
-            WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buf, wcslen(buf), 0, 0);
-            free(wtmp);
+			/* cannot use printf_utf8 becuase of width specification */
+			/* printf_utf8 does not account for utf-16 based argument widths */
+			wchar_t buf[1024];
+			wchar_t* wtmp = utf8_to_utf16(fname);
+			swprintf(buf, 1024, L"%-*s", colspace, wtmp);
+			WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE), buf, wcslen(buf), 0, 0);
+			free(wtmp);
 #else
-            printf("%-*s", colspace, fname);
+			mprintf("%-*s", colspace, fname);
 #endif
-            if (c >= columns) {
+			if (c >= columns) {
 				printf("\n");
 				c = 1;
 			} else
@@ -1513,23 +1510,17 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 	path1 = path2 = NULL;
 #ifdef WINDOWS
 	/* 
-	 * convert '/' to '\' in Windows styled paths. 
+	 * convert '\\' to '/' in Windows styled paths. 
 	 * else they get treated as escape sequence in makeargv 
 	 */
-	{
-		char *s1 = cmd, *s2;
-		while ((s2 = strchr(s1, '\\')) != NULL) {
-			*s2 = '/';
-			s1 = s2 + 1;
-		}
-	}
+	convertToForwardslash(cmd);
 #endif
 	cmdnum = parse_args(&cmd, &ignore_errors, &aflag, &fflag, &hflag,
 	    &iflag, &lflag, &pflag, &rflag, &sflag, &n_arg, &path1, &path2);
 	if (ignore_errors != 0)
 		err_abort = 0;
 
-	memset(&g, 0, sizeof(g));	
+	memset(&g, 0, sizeof(g));
 
 	/* Perform command */
 	switch (cmdnum) {
@@ -1570,10 +1561,9 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 	case I_RM:
 		path1 = make_absolute(path1, *pwd);
 		remote_glob(conn, path1, GLOB_NOCHECK, NULL, &g);
-
-                for (i = 0; g.gl_pathv[i] && !interrupted; i++) {
-                        if (!quiet)
-                                printf("Removing %s\n", g.gl_pathv[i]);
+		for (i = 0; g.gl_pathv[i] && !interrupted; i++) {
+			if (!quiet)
+				mprintf("Removing %s\n", g.gl_pathv[i]);
 			err = do_rm(conn, g.gl_pathv[i]);
 			if (err != 0 && err_abort)
 				break;
@@ -1673,7 +1663,8 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 		remote_glob(conn, path1, GLOB_NOCHECK, NULL, &g);
 		for (i = 0; g.gl_pathv[i] && !interrupted; i++) {
 			if (!quiet)
-                                printf("Changing mode on %s\n", g.gl_pathv[i]);
+				mprintf("Changing mode on %s\n",
+				    g.gl_pathv[i]);
 			err = do_setstat(conn, g.gl_pathv[i], &a);
 			if (err != 0 && err_abort)
 				break;
@@ -1703,13 +1694,13 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 			aa->flags &= SSH2_FILEXFER_ATTR_UIDGID;
 			if (cmdnum == I_CHOWN) {
 				if (!quiet)
-                                        printf("Changing owner on %s\n",
-                                            g.gl_pathv[i]);
+					mprintf("Changing owner on %s\n",
+					    g.gl_pathv[i]);
 				aa->uid = n_arg;
 			} else {
 				if (!quiet)
-                                        printf("Changing group on %s\n",
-                                            g.gl_pathv[i]);
+					mprintf("Changing group on %s\n",
+					    g.gl_pathv[i]);
 				aa->gid = n_arg;
 			}
 			err = do_setstat(conn, g.gl_pathv[i], aa);
@@ -1718,7 +1709,7 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 		}
 		break;
 	case I_PWD:
-                printf("Remote working directory: %s\n", *pwd);
+		mprintf("Remote working directory: %s\n", *pwd);
 		break;
 	case I_LPWD:
 		if (!getcwd(path_buf, sizeof(path_buf))) {
@@ -1726,7 +1717,7 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 			err = -1;
 			break;
 		}
-                printf("Local working directory: %s\n", path_buf);
+		mprintf("Local working directory: %s\n", path_buf);
 		break;
 	case I_QUIT:
 		/* Processed below */
@@ -2129,7 +2120,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 {
 	char *remote_path;
 	char *dir = NULL;
-	char cmd[MAX_COMMAND_LINE];
+	char cmd[2048];
 	int err, interactive;
 	EditLine *el = NULL;
 #ifdef USE_LIBEDIT
@@ -2179,7 +2170,7 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 
 		if (remote_is_dir(conn, dir) && file2 == NULL) {
 			if (!quiet)
-                                printf("Changing to: %s\n", dir);
+				mprintf("Changing to: %s\n", dir);
 			snprintf(cmd, sizeof cmd, "cd \"%s\"", dir);
 			if (parse_dispatch_command(conn, cmd,
 			    &remote_path, 1) != 0) {
@@ -2205,13 +2196,13 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 	}
 
 #ifdef WINDOWS
-        /* Min buffer size allowed in Windows is 2*/
-        setvbuf(stdout, NULL, _IOLBF, 2);
-        setvbuf(infile, NULL, _IOLBF, 2);
-#else
-        setvbuf(stdout, NULL, _IOLBF, 0);
+	/* Min buffer size allowed in Windows is 2*/
+	setvbuf(stdout, NULL, _IOLBF, 2);
+	setvbuf(infile, NULL, _IOLBF, 2);
+#else   /* !WINDOWS */
+	setvbuf(stdout, NULL, _IOLBF, 0);
 	setvbuf(infile, NULL, _IOLBF, 0);
-#endif
+#endif   /* !WINDOWS */
 
 	interactive = !batchmode && isatty(STDIN_FILENO);
 	err = 0;
@@ -2222,35 +2213,32 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 
 		if (el == NULL) {
 #ifdef WINDOWS
-            if (interactive) {
-                wchar_t wcmd[MAX_COMMAND_LINE];
-                printf("sftp> ");
-                if (fgetws(wcmd, sizeof(cmd)/sizeof(wchar_t), infile) == NULL) {
-                    printf("\n");
-                    break;
-                }
-                else {
-                    char *pcmd = NULL;
-                    if ((pcmd = utf16_to_utf8(wcmd)) == NULL)
-                            fatal("failed to convert input arguments");
-                    strcpy(cmd, pcmd);
-                    free(pcmd);                    
-                }
-            }
-            else {
-                if (fgets(cmd, sizeof(cmd), infile) == NULL) {
-                    break;
-                }
-            }
-#else
-            if (interactive) {
-                printf("sftp> ");
-            if (fgets(cmd, sizeof(cmd), infile) == NULL) {
-                if (interactive)
-                    printf("\n");
-                break;
-            }
-#endif
+			/* fgets on Windows does not support Unicode input*/
+			if (interactive) {
+				wchar_t wcmd[2048];
+				printf("sftp> ");
+				if (fgetws(wcmd, sizeof(cmd)/sizeof(wchar_t), infile) == NULL) {
+					printf("\n");
+					break;
+				}
+				else {
+					char *pcmd = NULL;
+					if ((pcmd = utf16_to_utf8(wcmd)) == NULL)
+						fatal("failed to convert input arguments");
+					strcpy(cmd, pcmd);
+					free(pcmd);                    
+				}
+			} else if (fgets(cmd, sizeof(cmd), infile) == NULL) 
+				break;
+#else /* !WINDOWS */
+			if (interactive)
+				printf("sftp> ");
+			if (fgets(cmd, sizeof(cmd), infile) == NULL) {
+				if (interactive)
+					printf("\n");
+				break;
+			}
+#endif/* !WINDOWS */
 			if (!interactive) { /* Echo command */
 				mprintf("sftp> %s", cmd);
 				if (strlen(cmd) > 0 &&
@@ -2324,6 +2312,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
 #endif /* USE_PIPES */
 
 #ifdef WINDOWS
+	/* fork replacement on Windows */
 	{
 		size_t cmdlen = 0;
 		int i = 0;
@@ -2331,14 +2320,15 @@ connect_to_server(char *path, char **args, int *in, int *out)
 
 		cmdlen = strlen(path) + 1;
 		for (i = 1; args[i]; i++)
-			cmdlen += strlen(args[i]) + 1;
+			cmdlen += strlen(args[i]) + 1 + 2;
 
 		full_cmd = xmalloc(cmdlen);
 		full_cmd[0] = '\0';
 		strcat(full_cmd, path);
 		for (i = 1; args[i]; i++) 	{
-			strcat(full_cmd, " ");
+			strcat(full_cmd, " \"");
 			strcat(full_cmd, args[i]);
+			strcat(full_cmd, "\"");
 		}
 
 		/* disable inheritance on local pipe ends*/
@@ -2350,9 +2340,9 @@ connect_to_server(char *path, char **args, int *in, int *out)
  	}
 
 	if (sshpid == -1)
-#else
+#else /* !WINDOWS */
 	if ((sshpid = fork()) == -1)
-#endif
+#endif  /* !WINDOWS */
 		fatal("fork: %s", strerror(errno));
 	else if (sshpid == 0) {
 		if ((dup2(c_in, STDIN_FILENO) == -1) ||
@@ -2426,11 +2416,7 @@ main(int argc, char **argv)
 	size_t num_requests = DEFAULT_NUM_REQUESTS;
 	long long limit_kbps = 0;
 
-#ifdef WINDOWS
-    /*TODO - is this really needed ???*/
-	setvbuf(stdout, NULL, _IONBF, 0);
- #endif
-
+	ssh_malloc_init();	/* must be called before any mallocs */
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 	msetlocale();
@@ -2439,17 +2425,18 @@ main(int argc, char **argv)
 	memset(&args, '\0', sizeof(args));
 	args.list = NULL;
 	addargs(&args, "%s", ssh_program);
-
-	addargs(&args, "\"-oForwardX11 no\"");
-	addargs(&args, "\"-oForwardAgent no\"");
-	addargs(&args, "\"-oPermitLocalCommand no\"");
-	addargs(&args, "\"-oClearAllForwardings yes\"");
+	addargs(&args, "-oForwardX11 no");
+	addargs(&args, "-oForwardAgent no");
+	addargs(&args, "-oPermitLocalCommand no");
+	addargs(&args, "-oClearAllForwardings yes");
 
 	ll = SYSLOG_LEVEL_INFO;
+
 #ifdef WINDOWS
-    _setmode(_fileno(stdin), O_U16TEXT);
+	/* prepare for Unicode input */
+	_setmode(_fileno(stdin), O_U16TEXT);
 #endif
-    infile = stdin;
+	infile = stdin;
 
 	while ((ch = getopt(argc, argv,
 	    "1246afhpqrvCc:D:i:l:o:s:S:b:B:F:P:R:")) != -1) {
@@ -2475,8 +2462,8 @@ main(int argc, char **argv)
 			addargs(&args, "-%c", ch);
 			break;
 		case 'P':
-            addargs(&args, "\"-oPort %s\"", optarg);
-            break;
+			addargs(&args, "-oPort %s", optarg);
+			break;
 		case 'v':
 			if (debug_level < 3) {
 				addargs(&args, "-v");
@@ -2510,8 +2497,8 @@ main(int argc, char **argv)
 				fatal("%s (%s).", strerror(errno), optarg);
 			showprogress = 0;
 			quiet = batchmode = 1;
-            addargs(&args, "\"-obatchmode yes\"");
-            break;
+			addargs(&args, "-obatchmode yes");
+			break;
 		case 'f':
 			global_fflag = 1;
 			break;
@@ -2584,7 +2571,8 @@ main(int argc, char **argv)
 			fprintf(stderr, "Missing hostname\n");
 			usage();
 		}
-        addargs(&args, "\"-oProtocol %d\"", sshver);
+
+		addargs(&args, "-oProtocol %d", sshver);
 
 		/* no subsystem if the server-spec contains a '/' */
 		if (sftp_server == NULL || strchr(sftp_server, '/') == NULL)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tests.c,v 1.2 2016/05/30 12:05:56 schwarze Exp $ */
+/*	$OpenBSD: tests.c,v 1.3 2016/12/19 04:55:18 djm Exp $ */
 /*
  * Regress test for the utf8.h *mprintf() API
  *
@@ -69,7 +69,6 @@ tests(void)
 	TEST_DONE();
 
 	badarg();
-	one("null", NULL, 8, 6, 6, "(null)");
 	one("empty", "", 2, 0, 0, "");
 	one("ascii", "x", -2, -2, -2, "x");
 	one("newline", "a\nb", -2, -2, -2, "a\nb");
