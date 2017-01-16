@@ -37,6 +37,8 @@
 #include <time.h>
 #include <Shlwapi.h>
 #include "misc_internal.h"
+#include "inc\dlfcn.h"
+#include "inc\dirent.h"
 
 int usleep(unsigned int useconds)
 {
@@ -114,51 +116,6 @@ explicit_bzero(void *b, size_t len) {
 	SecureZeroMemory(b, len);
 }
 
-int statvfs(const char *path, struct statvfs *buf) {
-	DWORD sectorsPerCluster;
-	DWORD bytesPerSector;
-	DWORD freeClusters;
-	DWORD totalClusters;
-
-	if (GetDiskFreeSpace(path, &sectorsPerCluster, &bytesPerSector,
-		&freeClusters, &totalClusters) == TRUE)
-	{
-		debug3("path              : [%s]", path);
-		debug3("sectorsPerCluster : [%lu]", sectorsPerCluster);
-		debug3("bytesPerSector    : [%lu]", bytesPerSector);
-		debug3("bytesPerCluster   : [%lu]", sectorsPerCluster * bytesPerSector);
-		debug3("freeClusters      : [%lu]", freeClusters);
-		debug3("totalClusters     : [%lu]", totalClusters);
-
-		buf->f_bsize = sectorsPerCluster * bytesPerSector;
-		buf->f_frsize = sectorsPerCluster * bytesPerSector;
-		buf->f_blocks = totalClusters;
-		buf->f_bfree = freeClusters;
-		buf->f_bavail = freeClusters;
-		buf->f_files = -1;
-		buf->f_ffree = -1;
-		buf->f_favail = -1;
-		buf->f_fsid = 0;
-		buf->f_flag = 0;
-		buf->f_namemax = MAX_PATH - 1;
-
-		return 0;
-	}
-	else
-	{
-		debug3("ERROR: Cannot get free space for [%s]. Error code is : %d.\n",
-			path, GetLastError());
-
-		return -1;
-	}
-}
-
-int fstatvfs(int fd, struct statvfs *buf) {
-	errno = ENOTSUP;
-	return -1;
-}
-
-#include "inc\dlfcn.h"
 HMODULE dlopen(const char *filename, int flags) {
 	return LoadLibraryA(filename);
 }
@@ -178,7 +135,7 @@ FARPROC dlsym(HMODULE handle, const char *symbol) {
 */
 FILE*
 w32_fopen_utf8(const char *path, const char *mode) {
-	wchar_t wpath[MAX_PATH], wmode[5];
+	wchar_t wpath[PATH_MAX], wmode[5];
 	FILE* f;
 	char utf8_bom[] = { 0xEF,0xBB,0xBF };
 	char first3_bytes[3];
@@ -188,7 +145,7 @@ w32_fopen_utf8(const char *path, const char *mode) {
 		return NULL;
 	}
 
-	if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, MAX_PATH) == 0 ||
+	if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, PATH_MAX) == 0 ||
 		MultiByteToWideChar(CP_UTF8, 0, mode, -1, wmode, 5) == 0) {
 		errno = EFAULT;
 		debug("WideCharToMultiByte failed for %c - ERROR:%d", path, GetLastError());
@@ -480,10 +437,16 @@ strmode(mode_t mode, char *p)
 }
 
 int 
-w32_chmod(const char *pathname, mode_t mode) {
-    /* TODO - implement this */
-	errno = EOPNOTSUPP;
-    return -1;
+w32_chmod(const char *pathname, mode_t mode) {	
+	int ret;
+	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(sanitized_path(pathname));
+	if (resolvedPathName_utf16 == NULL) {
+		errno = ENOMEM;
+		return -1;
+	}
+	ret = _wchmod(resolvedPathName_utf16, mode);
+	free(resolvedPathName_utf16);
+	return ret;
 }
 
 int 
@@ -493,20 +456,55 @@ w32_chown(const char *pathname, unsigned int owner, unsigned int group) {
 	return -1;
 }
 
+static void
+unix_time_to_file_time(ULONG t, LPFILETIME pft) {
+	
+	ULONGLONG ull;
+	ull = UInt32x32To64(t, 10000000) + 116444736000000000;
+
+	pft->dwLowDateTime = (DWORD)ull;
+	pft->dwHighDateTime = (DWORD)(ull >> 32);
+}
+
+static int
+settimes(wchar_t * path, FILETIME *cretime, FILETIME *acttime, FILETIME *modtime) {
+	HANDLE handle;
+	handle = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_WRITE,
+		NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+
+	if (handle == INVALID_HANDLE_VALUE) {
+		/* TODO - convert Win32 error to errno */
+		errno = GetLastError();
+		debug("w32_settimes - CreateFileW ERROR:%d", errno);
+		return -1;
+	}
+
+	if (SetFileTime(handle, cretime, acttime, modtime) == 0) {
+		errno = GetLastError();
+		debug("w32_settimes - SetFileTime ERROR:%d", errno);
+		CloseHandle(handle);
+		return -1;
+	}
+
+	CloseHandle(handle);
+	return 0;
+}
+
 int
 w32_utimes(const char *filename, struct timeval *tvp) {
-	struct utimbuf ub;
-	ub.actime = tvp[0].tv_sec;
-	ub.modtime = tvp[1].tv_sec;
 	int ret;
-
+	FILETIME acttime, modtime;
 	wchar_t *resolvedPathName_utf16 = utf8_to_utf16(sanitized_path(filename));
 	if (resolvedPathName_utf16 == NULL) {
 		errno = ENOMEM;
 		return -1;
 	}
+	memset(&acttime, 0, sizeof(FILETIME));
+	memset(&modtime, 0, sizeof(FILETIME));
 
-	ret = _wutime(resolvedPathName_utf16, &ub);
+	unix_time_to_file_time((ULONG)tvp[0].tv_sec, &acttime);
+	unix_time_to_file_time((ULONG)tvp[1].tv_sec, &modtime);
+	ret = settimes(resolvedPathName_utf16, NULL, &acttime, &modtime);
 	free(resolvedPathName_utf16);
 	return ret;
 }
@@ -533,6 +531,28 @@ w32_rename(const char *old_name, const char *new_name) {
 	if (NULL == resolvedOldPathName_utf16 || NULL == resolvedNewPathName_utf16) {
 		errno = ENOMEM;
 		return -1;
+	}
+
+	/*
+	 * To be consistent with linux rename(),
+	 * 1) if the new_name is file, then delete it so that _wrename will succeed.
+	 * 2) if the new_name is directory and it is empty then delete it so that _wrename will succeed.
+	 */
+	struct _stat64 st;
+	if (fileio_stat(sanitized_path(new_name), &st) != -1) {
+		if(((st.st_mode & _S_IFMT) == _S_IFREG)) {
+			w32_unlink(new_name);
+		} else {
+			DIR *dirp = opendir(new_name);
+			if (NULL != dirp) {
+				struct dirent *dp = readdir(dirp);
+				closedir(dirp);
+
+				if (dp == NULL) {
+					w32_rmdir(new_name);
+				}
+			}
+		}
 	}
 
 	int returnStatus = _wrename(resolvedOldPathName_utf16, resolvedNewPathName_utf16);
@@ -587,10 +607,10 @@ w32_chdir(const char *dirname_utf8) {
 
 char *
 w32_getcwd(char *buffer, int maxlen) {
-	wchar_t wdirname[MAX_PATH];
+	wchar_t wdirname[PATH_MAX];
 	char* putf8 = NULL;
 
-	_wgetcwd(&wdirname[0], MAX_PATH);
+	_wgetcwd(&wdirname[0], PATH_MAX);
 
 	if ((putf8 = utf16_to_utf8(&wdirname[0])) == NULL)
 		fatal("failed to convert input arguments");
@@ -609,8 +629,17 @@ w32_mkdir(const char *path_utf8, unsigned short mode) {
 		return -1;
 	}
 	int returnStatus = _wmkdir(path_utf16);
+	if (returnStatus < 0) {
+		free(path_utf16);
+		return -1;
+	}
+	
+	mode_t curmask = _umask(0);
+	_umask(curmask);
+	
+	returnStatus = _wchmod(path_utf16, mode & ~curmask & (_S_IREAD | _S_IWRITE));
 	free(path_utf16);
-
+	
 	return returnStatus;
 }
 
@@ -648,19 +677,25 @@ convertToForwardslash(char *str) {
 }
 
 /*
-* This method will resolves references to /./, /../ and extra '/' characters in the null-terminated string named by
-*  path to produce a canonicalized absolute pathname.
-*/
+ * This method will resolves references to /./, /../ and extra '/' characters in the null-terminated string named by
+ *  path to produce a canonicalized absolute pathname.
+ */
 char *
-realpath(const char *path, char resolved[MAX_PATH]) {
-	char tempPath[MAX_PATH];
+realpath(const char *path, char resolved[PATH_MAX]) {
+	char tempPath[PATH_MAX];
 		
-	if (*path == '/' && *(path + 2) == ':')
+	if ((path[0] == '/') && path[1] && (path[2] == ':')) {
 		strncpy(resolved, path + 1, strlen(path)); // skip the first '/'
-	else
+	} else {
 		strncpy(resolved, path, strlen(path) + 1);
+	}	
 
-	if (_fullpath(tempPath, resolved, MAX_PATH) == NULL)
+	if ((resolved[0]) && (resolved[1] == ':') && (resolved[2] == '\0')) { // make "x:" as "x:\\"
+		resolved[2] = '\\';
+		resolved[3] = '\0';
+	}
+
+	if (_fullpath(tempPath, resolved, PATH_MAX) == NULL)
 		return NULL;
 	
 	convertToForwardslash(tempPath);
@@ -670,6 +705,27 @@ realpath(const char *path, char resolved[MAX_PATH]) {
 	return resolved;
 }
 
+char*
+sanitized_path(const char *path) {
+	static char newPath[PATH_MAX] = { '\0', };
+
+	if (path[0] == '/' && path[1]) {
+		if (path[2] == ':') {
+			if (path[3] == '\0') { // make "/x:" as "x:\\"
+				strncpy(newPath, path + 1, strlen(path) - 1);
+				newPath[2] = '\\';
+				newPath[3] = '\0';
+
+				return newPath;
+			} else {
+				return (char *)(path + 1); // skip the first "/"
+			}
+		}	
+	} 
+
+	return (char *)path;			
+}
+
 // Maximum reparse buffer info size. The max user defined reparse 
 // data is 16KB, plus there's a header. 
 #define MAX_REPARSE_SIZE	17000 
@@ -677,8 +733,7 @@ realpath(const char *path, char resolved[MAX_PATH]) {
 #define IO_REPARSE_TAG_MOUNT_POINT              (0xA0000003L)       // winnt ntifs 
 #define IO_REPARSE_TAG_HSM                      (0xC0000004L)       // winnt ntifs 
 #define IO_REPARSE_TAG_SIS                      (0x80000007L)       // winnt ntifs 
-#define REPARSE_MOUNTPOINT_HEADER_SIZE   8 
-
+#define REPARSE_MOUNTPOINT_HEADER_SIZE   8
 
 typedef struct _REPARSE_DATA_BUFFER {
 	ULONG  ReparseTag;
@@ -779,3 +834,106 @@ ResolveLink(wchar_t * tLink, wchar_t *ret, DWORD * plen, DWORD Flags) {
 	CloseHandle(fileHandle);
 	return TRUE;
 }
+
+int statvfs(const char *path, struct statvfs *buf) {
+	DWORD sectorsPerCluster;
+	DWORD bytesPerSector;
+	DWORD freeClusters;
+	DWORD totalClusters;
+
+	wchar_t* path_utf16 = utf8_to_utf16(sanitized_path(path));
+	if (GetDiskFreeSpaceW(path_utf16, &sectorsPerCluster, &bytesPerSector,
+		&freeClusters, &totalClusters) == TRUE)
+	{
+		debug3("path              : [%s]", path);
+		debug3("sectorsPerCluster : [%lu]", sectorsPerCluster);
+		debug3("bytesPerSector    : [%lu]", bytesPerSector);
+		debug3("bytesPerCluster   : [%lu]", sectorsPerCluster * bytesPerSector);
+		debug3("freeClusters      : [%lu]", freeClusters);
+		debug3("totalClusters     : [%lu]", totalClusters);
+
+		buf->f_bsize = sectorsPerCluster * bytesPerSector;
+		buf->f_frsize = sectorsPerCluster * bytesPerSector;
+		buf->f_blocks = totalClusters;
+		buf->f_bfree = freeClusters;
+		buf->f_bavail = freeClusters;
+		buf->f_files = -1;
+		buf->f_ffree = -1;
+		buf->f_favail = -1;
+		buf->f_fsid = 0;
+		buf->f_flag = 0;
+		buf->f_namemax = PATH_MAX - 1;
+
+		free(path_utf16);
+		return 0;
+	}
+	else
+	{
+		debug3("ERROR: Cannot get free space for [%s]. Error code is : %d.\n",
+			path, GetLastError());
+
+		free(path_utf16);
+		return -1;
+	}
+}
+
+int fstatvfs(int fd, struct statvfs *buf) {
+	errno = ENOTSUP;
+	return -1;
+}
+
+/* w32_strerror start */
+/* Windows CRT defines error string messages only till 43 in errno.h*/
+/* This is an extended list that defines messages for EADDRINUSE through EWOULDBLOCK*/
+char* _sys_errlist_ext[] = {
+	"Address already in use", // EADDRINUSE      100
+	"Address not available", // EADDRNOTAVAIL   101
+	"Address family not supported", // EAFNOSUPPORT    102
+	"Connection already in progress", // EALREADY        103
+	"Bad message", // EBADMSG         104
+	"Operation canceled", // ECANCELED       105
+	"Connection aborted", // ECONNABORTED    106
+	"Connection refused", // ECONNREFUSED    107
+	"Connection reset", // ECONNRESET      108
+	"Destination address required", // EDESTADDRREQ    109
+	"Host is unreachable", // EHOSTUNREACH    110
+	"Identifier removed", // EIDRM           111
+	"Operation in progress", // EINPROGRESS     112
+	"Socket is connected", // EISCONN         113
+	"Too many levels of symbolic links", // ELOOP           114
+	"Message too long", // EMSGSIZE        115
+	"Network is down", // ENETDOWN        116
+	"Connection aborted by network", // ENETRESET       117
+	"Network unreachable", // ENETUNREACH     118
+	"No buffer space available", // ENOBUFS         119
+	"No message is available on the STREAM head read queue", // ENODATA         120
+	"Link has been severed", // ENOLINK         121
+	"No message of the desired type", // ENOMSG          122
+	"Protocol not available", // ENOPROTOOPT     123
+	"No STREAM resources", // ENOSR           124
+	"Not a STREAM", // ENOSTR          125
+	"The socket is not connected", // ENOTCONN        126
+	"enotecoverable", // ENOTRECOVERABLE 127
+	"Not a socket", // ENOTSOCK        128
+	"Operation not supported", // ENOTSUP         129
+	"Operation not supported on socket", // EOPNOTSUPP      130
+	"eother", // EOTHER          131
+	"Value too large to be stored in data type", // EOVERFLOW       132
+	"eownerdead", // EOWNERDEAD      133
+	"Protocol error", // EPROTO          134
+	"Protocol not supported", // EPROTONOSUPPORT 135
+	"Protocol wrong type for socket", // EPROTOTYPE      136
+	"Timer expired", // ETIME           137
+	"Connection timed out", // ETIMEDOUT       138
+	"Text file busy", // ETXTBSY         139
+	"Operation would block" // EWOULDBLOCK     140
+};
+
+char *
+w32_strerror(int errnum) {
+	if (errnum >= EADDRINUSE  && errnum <= EWOULDBLOCK)
+		return _sys_errlist_ext[errnum - EADDRINUSE];
+	return strerror(errnum);
+}
+
+/* w32_strerror end */

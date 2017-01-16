@@ -112,8 +112,12 @@ int sshd_main(int argc, wchar_t **wargv) {
 	w32posix_initialize();
 	if (getenv("SSHD_REMSOC"))
 		is_child = 1;
+	
 	/* change current directory to sshd.exe root */
-	_wchdir(utf8_to_utf16(w32_programdir()));
+	wchar_t* path_utf16 = utf8_to_utf16(w32_programdir());
+	_wchdir(path_utf16);
+	free(path_utf16);
+
 	return main(argc, argv);
 }
 

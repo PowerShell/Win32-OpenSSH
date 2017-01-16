@@ -85,7 +85,7 @@ Class Machine
     [string] $ClientKeyDirectory
     [string] $knownHostOfCurrentUser    
     [string] $OpenSSHdir = $PSScriptRoot
-    [string] $ToolsPath = "$env:ProgramData\chocolatey\lib\sysinternals\tools"
+    [string] $ToolsPath = "$env:ProgramData\chocolatey\lib\sysinternals\tools"    
 
     Machine() {
         $this.Platform = Set-Platform        
@@ -106,13 +106,13 @@ Class Machine
     }    
 
     [void] InitializeClient() {
-        $this.ClientKeyDirectory = join-path ($env:USERPROFILE) ".ssh"
+        $this.ClientKeyDirectory = join-path $PSScriptRoot "clientkeys"
         if(-not (Test-path $this.ClientKeyDirectory -PathType Container))
         {
             New-Item -Path $this.ClientKeyDirectory -ItemType Directory -Force -ErrorAction silentlycontinue
         }
 
-        Remove-Item -Path "$($this.ClientKeyDirectory)\*" -Force -ea silentlycontinue
+        Remove-Item -Path "$($this.ClientKeyDirectory)\*" -Force -ea silentlycontinue        
 
         $this.knownHostOfCurrentUser = join-path ($env:USERPROFILE) ".ssh/known_hosts"
 
@@ -131,8 +131,7 @@ Class Machine
             $this.clientPrivateKeyPaths += $keyPath
             $this.clientPublicKeyPaths += "$keyPath.pub"
             $str = ".\ssh-keygen -t $key -P """" -f $keyPath"
-            $this.RunCmd($str)
-            
+            $this.RunCmd($str)            
         }
     }
 
@@ -211,16 +210,27 @@ Class Machine
         }        
     }
 
-    [void] CleanupServer() {        
-        Remove-Item -Path $this.localAdminAuthorizedKeyPath -Force -ea silentlycontinue
+    [void] CleanupServer() {
+        $sshPath = split-path $this.localAdminAuthorizedKeyPath -Parent
+        if(Test-Path $sshPath -PathType Container )
+        {
+            Remove-item -path $sshPath -force -Recurse
+        }
+
         if ( $this.Platform -eq [PlatformType]::Windows )
         {
             $this.CleanupLocalAccountTokenFilterPolicy()
         }
     }
 
-    [void] CleanupClient() {
-        Remove-Item -Path "$this.clientKeyPath\*" -Force -ea silentlycontinue
+    [void] CleanupClient() {                
+        Remove-item -path $($this.ClientKeyDirectory) -force -Recurse -ea silentlycontinue
+        $sshPath = split-path $this.knownHostOfCurrentUser -Parent
+        if(Test-Path $sshPath -PathType Container )
+        {
+            Remove-item -path $sshPath -force -Recurse
+        }
+        $this.CleanupPasswordSetting()
     }
 
     [void] RunCmd($Str) {        
@@ -245,6 +255,19 @@ Class Machine
         } else {    
             #Todo add local user and add it to administrators group on linux
             #Todo: get $localUserprofilePath    
+        }
+    }
+
+    [void] AddPasswordSetting([string] $pass) {
+        if ($this.Platform -eq [PlatformType]::Windows) {        
+            $env:SSH_ASKPASS="$($env:ComSpec) /c echo $pass"
+        }
+    }
+
+    [void] CleanupPasswordSetting() {
+        if ($this.Platform -eq [PlatformType]::Windows -and (Test-Path env:SSH_ASKPASS))
+        {
+            remove-item "env:SSH_ASKPASS" -ErrorAction SilentlyContinue
         }
     }
 
@@ -308,6 +331,7 @@ Class Machine
 	    $shell_app = $null
     }
 
+    #this does not work when "using module"; works fine when import the module
     [void] DownloadPStools()
      {
         $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')

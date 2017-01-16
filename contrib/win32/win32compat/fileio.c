@@ -37,6 +37,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include "inc\utf.h"
+#include "misc_internal.h"
 
 /* internal read buffer size */
 #define READ_BUFFER_SIZE 100*1024
@@ -76,7 +77,7 @@ int
 fileio_pipe(struct w32_io* pio[2]) {
 	HANDLE read_handle = INVALID_HANDLE_VALUE, write_handle = INVALID_HANDLE_VALUE;
 	struct w32_io *pio_read = NULL, *pio_write = NULL;
-	char pipe_name[MAX_PATH];
+	char pipe_name[PATH_MAX];
 	SECURITY_ATTRIBUTES sec_attributes;
 
 	if (pio == NULL) {
@@ -86,7 +87,7 @@ fileio_pipe(struct w32_io* pio[2]) {
 	}
 
 	/* create name for named pipe */
-	if (-1 == sprintf_s(pipe_name, MAX_PATH, "\\\\.\\Pipe\\W32PosixPipe.%08x.%08x",
+	if (-1 == sprintf_s(pipe_name, PATH_MAX, "\\\\.\\Pipe\\W32PosixPipe.%08x.%08x",
 		GetCurrentProcessId(), pipe_counter++)) {
 		errno = EOTHER;
 		debug("pipe - ERROR sprintf_s %d", errno);
@@ -564,15 +565,15 @@ fileio_fstat(struct w32_io* pio, struct _stat64 *buf) {
 
 int
 fileio_stat(const char *path, struct _stat64 *buf) {
-    wchar_t wpath[MAX_PATH];
-    wchar_t* wtmp = NULL;
+	wchar_t wpath[PATH_MAX];
+	wchar_t* wtmp = NULL;
 
-    if ((wtmp = utf8_to_utf16(path)) == NULL)
-        fatal("failed to covert input arguments");
-    wcscpy(&wpath[0], wtmp);
-    free(wtmp);
+	if ((wtmp = utf8_to_utf16(path)) == NULL)
+		fatal("failed to covert input arguments");
+	wcscpy(&wpath[0], wtmp);
+	free(wtmp);
 
-    return _wstat64(wpath, buf);
+	return _wstat64(wpath, buf);
 }
 
 long
@@ -597,8 +598,6 @@ fileio_fdopen(struct w32_io* pio, const char *mode) {
 	debug2("fdopen - io:%p", pio);
 
 	/* logic below doesn't work with overlapped file HANDLES */
-	errno = ENOTSUP;
-	return NULL;
 
 	if (mode[1] == '\0') {
 		switch (*mode) {

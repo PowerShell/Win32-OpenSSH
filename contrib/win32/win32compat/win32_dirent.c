@@ -27,7 +27,7 @@ DIR * opendir(const char *name)
 	struct _wfinddata_t c_file;
 	intptr_t hFile;
 	DIR *pdir;
-	wchar_t searchstr[MAX_PATH];
+	wchar_t searchstr[PATH_MAX];
 	wchar_t* wname = NULL;
 	int needed;
 	
@@ -37,7 +37,7 @@ DIR * opendir(const char *name)
 	}
 
 	// add *.* for Windows _findfirst() search pattern
-	swprintf_s(searchstr, MAX_PATH, L"%s\\*.*", wname);
+	swprintf_s(searchstr, PATH_MAX, L"%s\\*.*", wname);
 	free(wname);
 
 	if ((hFile = _wfindfirst(searchstr, &c_file)) == -1L) 
@@ -77,7 +77,7 @@ int closedir(DIR *dirp)
    by a later readdir call on the same DIR stream.  */
 struct dirent *readdir(void *avp)
 {
-	struct dirent *pdirentry;
+	static struct dirent pdirentry;
 	struct _wfinddata_t c_file;
 	DIR *dirp = (DIR *)avp;
 	char *tmp = NULL;
@@ -92,19 +92,18 @@ struct dirent *readdir(void *avp)
 			
 		if (wcscmp(c_file.name, L".") == 0 || wcscmp(c_file.name, L"..") == 0 )
 			continue;
-		    
-		if ((pdirentry = malloc(sizeof(struct dirent))) == NULL ||
-		    (tmp = utf16_to_utf8(c_file.name)) == NULL) {
+
+		if ((tmp = utf16_to_utf8(c_file.name)) == NULL) {
 			errno = ENOMEM;
 			return NULL;
 		}
 
-		strncpy(pdirentry->d_name, tmp, strlen(tmp) + 1);
+		strncpy(pdirentry.d_name, tmp, strlen(tmp) + 1);
 		free(tmp);
 
-		pdirentry->d_ino = 1; // a fictious one like UNIX to say it is nonzero
-		return pdirentry ;
-        }
+		pdirentry.d_ino = 1; // a fictious one like UNIX to say it is nonzero
+		return &pdirentry ;
+    }
 }
 
 // return last part of a path. The last path being a filename.
@@ -123,4 +122,3 @@ char *basename(char *path)
 	
 	return path; // path does not have a slash
 }
-// end of dirent functions in Windows

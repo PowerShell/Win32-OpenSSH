@@ -87,15 +87,15 @@ int GetCurrentModulePath(wchar_t *path, int pathSize)
 }
 
 int load_config() {
-	wchar_t basePath[MAX_PATH] = { 0 };
-	wchar_t path[MAX_PATH] = { 0 };
+	wchar_t basePath[PATH_MAX] = { 0 };
+	wchar_t path[PATH_MAX] = { 0 };
         
 	/* TODO - account for UNICODE paths*/
-        if (GetCurrentModulePath(basePath, MAX_PATH) == -1)
+        if (GetCurrentModulePath(basePath, PATH_MAX) == -1)
                 return -1;
 
-	wcsncpy(path, basePath, MAX_PATH);
-        wcsncat(path, L"/sshd_config", MAX_PATH);
+	wcsncpy(path, basePath, PATH_MAX);
+        wcsncat(path, L"/sshd_config", PATH_MAX);
 	
         if ((config_file_name = utf16_to_utf8(path)) == NULL)
                 return -1;

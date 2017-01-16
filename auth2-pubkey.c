@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.60 2016/11/30 02:57:40 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.61 2016/12/30 22:08:02 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -783,6 +783,9 @@ match_principals_command(struct passwd *user_pw, const struct sshkey *key)
 
 	ok = process_principals(f, NULL, pw, cert);
 
+	fclose(f);
+	f = NULL;
+
 	if (exited_cleanly(pid, "AuthorizedPrincipalsCommand", command) != 0)
 		goto out;
 
@@ -1105,6 +1108,9 @@ user_key_command_allowed2(struct passwd *user_pw, Key *key)
 	temporarily_use_uid(pw);
 
 	ok = check_authkeys_file(f, options.authorized_keys_command, key, pw);
+
+	fclose(f);
+	f = NULL;
 
 	if (exited_cleanly(pid, "AuthorizedKeysCommand", command) != 0)
 		goto out;

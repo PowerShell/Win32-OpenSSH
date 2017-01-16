@@ -258,7 +258,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_all_events - 1)) {
 			//woken up by event signalled
 			/* is this due to a child process going down*/
-			if (children.num_children && ((ret - WAIT_OBJECT_0) < children.num_children)) {
+			if (live_children && ((ret - WAIT_OBJECT_0) < live_children)) {
 				sigaddset(&pending_signals, W32_SIGCHLD);
 				sw_child_to_zombie(ret - WAIT_OBJECT_0);
 			}

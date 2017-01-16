@@ -31,6 +31,7 @@
 #include "agent.h"
 #include <sddl.h>
 #include <UserEnv.h>
+#include "..\misc_internal.h"
 #define BUFSIZE 5 * 1024
 
 static HANDLE ioc_port = NULL;
@@ -179,15 +180,15 @@ agent_listen_loop() {
 			}
 			else {
 				/* spawn a child to take care of this*/
-				wchar_t path[MAX_PATH], module_path[MAX_PATH];
+				wchar_t path[PATH_MAX], module_path[PATH_MAX];
 				PROCESS_INFORMATION pi;
 				STARTUPINFOW si;
 
 				si.cb = sizeof(STARTUPINFOW);
 				memset(&si, 0, sizeof(STARTUPINFOW));
-				GetModuleFileNameW(NULL, module_path, MAX_PATH);
+				GetModuleFileNameW(NULL, module_path, PATH_MAX);
 				SetHandleInformation(con, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-				if ((swprintf_s(path, MAX_PATH, L"%s %d", module_path, (int)(intptr_t)con) == -1 ) ||
+				if ((swprintf_s(path, PATH_MAX, L"%s %d", module_path, (int)(intptr_t)con) == -1 ) ||
 				    (CreateProcessW(NULL, path, NULL, NULL, TRUE,
 					DETACHED_PROCESS, NULL, NULL,
 					&si, &pi) == FALSE)) {

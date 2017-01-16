@@ -320,12 +320,16 @@ static void
 local_do_shell(const char *args)
 {
   #ifdef WINDOWS
-        /* execute via system call in Windows*/
-	if (!*args) {
-                /* TODO - support unicode ComSpec */
+    /* execute via system call in Windows*/
+	if (!*args) {        
 		args = (char *)	getenv("ComSpec"); // get name of Windows cmd shell
+	} else {
+		convertToBackslash((char *) args);
 	}
-	system(args); // execute the shell or cmd given
+	
+	wchar_t* path_utf16 = utf8_to_utf16(args);
+	_wsystem(path_utf16); // execute the shell or cmd given
+	free(path_utf16);
   #else   /* !WINDOWS */
 	int status;
 	char *shell;
@@ -1513,7 +1517,7 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 	 * convert '\\' to '/' in Windows styled paths. 
 	 * else they get treated as escape sequence in makeargv 
 	 */
-	convertToForwardslash(cmd);
+	convertToForwardslash((char *)cmd);
 #endif
 	cmdnum = parse_args(&cmd, &ignore_errors, &aflag, &fflag, &hflag,
 	    &iflag, &lflag, &pflag, &rflag, &sflag, &n_arg, &path1, &path2);
@@ -2334,7 +2338,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
 		/* disable inheritance on local pipe ends*/
 		fcntl(pout[1], F_SETFD, FD_CLOEXEC);
 		fcntl(pin[0], F_SETFD, FD_CLOEXEC);
-		
+
 		sshpid = spawn_child(full_cmd, c_in, c_out, STDERR_FILENO, 0);
 		free(full_cmd);
  	}

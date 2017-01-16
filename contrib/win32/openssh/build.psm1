@@ -133,15 +133,14 @@ function Write-BuildMsg
     Verifies all tools and dependencies required for building Open SSH are installed on the machine.
 #>
 function Start-SSHBootstrap
-{
+{    
+    [bool] $silent = -not $script:Verbose
+
     Set-StrictMode -Version Latest
-    Write-BuildMsg -AsInfo -Message "Checking tools and dependencies"
+    Write-BuildMsg -AsInfo -Message "Checking tools and dependencies" -Silent:$silent
 
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')
-    $newMachineEnvironmentPath = $machinePath
-
-    # NOTE: Unless -Verbose is specified, most informational output will only go to the log file.
-    [bool] $silent = -not $script:Verbose
+    $newMachineEnvironmentPath = $machinePath    
 
     # Install chocolatey
     $chocolateyPath = "$env:AllUsersProfile\chocolatey\bin"
@@ -151,18 +150,18 @@ function Start-SSHBootstrap
     }
     else
     {
-        Write-BuildMsg -AsInfo -Message "Chocolatey not present. Installing chocolatey."
+        Write-BuildMsg -AsInfo -Message "Chocolatey not present. Installing chocolatey." -Silent:$silent
         Invoke-Expression ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))
 
         if (-not ($machinePath.ToLower().Contains($chocolateyPath.ToLower())))
         {
-            Write-BuildMsg -AsVerbose -Message "Adding $chocolateyPath to Path environment variable"
+            Write-BuildMsg -AsVerbose -Message "Adding $chocolateyPath to Path environment variable" -Silent:$silent
             $newMachineEnvironmentPath += ";$chocolateyPath"
             $env:Path += ";$chocolateyPath"
         }
         else
         {
-            Write-BuildMsg -AsVerbose -Message "$chocolateyPath already present in Path environment variable"
+            Write-BuildMsg -AsVerbose -Message "$chocolateyPath already present in Path environment variable" -Silent:$silent
         }
     }
 
@@ -170,7 +169,7 @@ function Start-SSHBootstrap
     $gitCmdPath = "$env:ProgramFiles\git\cmd"
     if (-not ($machinePath.ToLower().Contains($gitCmdPath.ToLower())))
     {
-        Write-BuildMsg -AsVerbose -Message "Adding $gitCmdPath to Path environment variable"
+        Write-BuildMsg -AsVerbose -Message "Adding $gitCmdPath to Path environment variable" -Silent:$silent
         $newMachineEnvironmentPath = "$gitCmdPath;$newMachineEnvironmentPath"
     }
     else
@@ -186,7 +185,7 @@ function Start-SSHBootstrap
 
     if (-not ($machinePath.ToLower().Contains($nativeMSBuildPath.ToLower())))
     {
-        Write-BuildMsg -AsVerbose -Message "Adding $nativeMSBuildPath to Path environment variable"
+        Write-BuildMsg -AsVerbose -Message "Adding $nativeMSBuildPath to Path environment variable" -Silent:$silent
         $newMachineEnvironmentPath += ";$nativeMSBuildPath"
         $env:Path += ";$nativeMSBuildPath"
     }
@@ -207,8 +206,8 @@ function Start-SSHBootstrap
 
     if (-not (Test-Path -Path $nasmPath -PathType Container))
     {
-        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName."        
-        choco install $packageName -y --force  --execution-timeout 10000 
+        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName." -Silent:$silent
+        choco install $packageName -y --force --limitoutput --execution-timeout 10000 
     }
     else
     {
@@ -221,9 +220,9 @@ function Start-SSHBootstrap
 
     if ($null -eq $VSPackageInstalled)
     {
-        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName." 
+        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName."  -Silent:$silent
         $adminFilePath = "$script:OpenSSHRoot\contrib\win32\openssh\VSWithBuildTools.xml"
-        choco install $packageName -packageParameters "--AdminFile $adminFilePath" -y --force  --execution-timeout 10000
+        choco install $packageName -packageParameters "--AdminFile $adminFilePath" -y --force --limitoutput --execution-timeout 10000
     }
     else
     {
@@ -236,8 +235,8 @@ function Start-SSHBootstrap
 
     if (-not (Test-Path -Path $sdkPath))
     {
-        Write-BuildMsg -AsInfo  -Message "Windows 8.1 SDK not present. Installing $packageName."
-        choco install $packageName -y --force
+        Write-BuildMsg -AsInfo  -Message "Windows 8.1 SDK not present. Installing $packageName." -Silent:$silent
+        choco install $packageName -y --limitoutput --force
     }
     else
     {
@@ -262,7 +261,7 @@ function Start-SSHBootstrap
     $item = Get-Item(Join-Path -Path $env:VS140COMNTOOLS -ChildPath '../../vc')
 
     $script:vcPath = $item.FullName
-    Write-BuildMsg -AsVerbose -Message "vcPath: $script:vcPath"
+    Write-BuildMsg -AsVerbose -Message "vcPath: $script:vcPath" -Silent:$silent
     if ((Test-Path -Path "$script:vcPath\vcvarsall.bat") -eq $false)
     {
         Write-BuildMsg -AsError -ErrorAction Stop -Message "Could not find Visual Studio vcvarsall.bat at" + $script:vcPath
@@ -270,16 +269,18 @@ function Start-SSHBootstrap
 }
 
 function Clone-Win32OpenSSH
-{	
+{    
+    [bool] $silent = -not $script:Verbose
+
     $win32OpenSSHPath = join-path $script:gitRoot "Win32-OpenSSH"
     if (-not (Test-Path -Path $win32OpenSSHPath -PathType Container))
     {
-        Write-BuildMsg -AsInfo -Message "clone repo Win32-OpenSSH"
+        Write-BuildMsg -AsInfo -Message "clone repo Win32-OpenSSH" -Silent:$silent
         Push-Location $gitRoot
         git clone -q --recursive https://github.com/PowerShell/Win32-OpenSSH.git $win32OpenSSHPath
         Pop-Location
     }
-    Write-BuildMsg -AsInfo -Message "pull latest from repo Win32-OpenSSH"
+    Write-BuildMsg -AsInfo -Message "pull latest from repo Win32-OpenSSH" -Silent:$silent
     Push-Location $win32OpenSSHPath
 	git fetch -q origin
     git checkout -qf L1-Prod        
@@ -287,9 +288,11 @@ function Clone-Win32OpenSSH
 }
 
 function Copy-OpenSSLSDK
-{
+{    
+    [bool] $silent = -not $script:Verbose
+
     $sourcePath  = Join-Path $script:gitRoot "Win32-OpenSSH\contrib\win32\openssh\OpenSSLSDK"
-    Write-BuildMsg -AsInfo -Message "copying $sourcePath"
+    Write-BuildMsg -AsInfo -Message "copying $sourcePath" -Silent:$silent
     Copy-Item -Container -Path $sourcePath -Destination $PSScriptRoot -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable e
     if($e -ne $null)
     {
@@ -306,7 +309,7 @@ function Start-SSHBuild
         [string]$NativeHostArch = "x64",
 
         [ValidateSet('Debug', 'Release', '')]
-        [string]$Configuration = "Debug"
+        [string]$Configuration = "Release"
     )
     Set-StrictMode -Version Latest
     $script:BuildLogFile = $null
@@ -321,16 +324,16 @@ function Start-SSHBuild
     if($PSBoundParameters.ContainsKey("Verbose"))
     {
         $script:Verbose =  ($PSBoundParameters['Verbose']).IsPresent
-    }    
+    }
+    [bool] $silent = -not $script:Verbose
 
     $script:BuildLogFile = Get-BuildLogFile -root $repositoryRoot.FullName -Configuration $Configuration -NativeHostArch $NativeHostArch
     if (Test-Path -Path $script:BuildLogFile)
     {
         Remove-Item -Path $script:BuildLogFile
     }
-
-    Write-BuildMsg -AsInfo -Message "Starting Open SSH build."
-    Write-BuildMsg -AsInfo -Message "Build Log: $($script:BuildLogFile)"
+    
+    Write-BuildMsg -AsInfo -Message "Starting Open SSH build; Build Log: $($script:BuildLogFile)"
 
     Start-SSHBootstrap
 
@@ -338,20 +341,19 @@ function Start-SSHBuild
     Copy-OpenSSLSDK
     $msbuildCmd = "msbuild.exe"
     $solutionFile = Get-SolutionFile -root $repositoryRoot.FullName
-    $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
+    $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
+    #$cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
 
-    Write-Information -MessageData $msbuildCmd
-    Write-Information -MessageData $cmdMsg    
     
     & $msbuildCmd $cmdMsg
     $errorCode = $LASTEXITCODE
 
     if ($errorCode -ne 0)
     {
-        Write-BuildMsg -AsError -ErrorAction Stop -Message "Build failed for OpenSSH.`nExitCode: $error"
-    }
+        Write-BuildMsg -AsError -ErrorAction Stop -Message "Build failed for OpenSSH.`nExitCode: $error."
+    }    
 
-    Write-BuildMsg -AsVerbose -Message "Finished Open SSH build."
+    Write-BuildMsg -AsInfo -Message "SSH build passed."
 }
 
 function Get-BuildLogFile
@@ -366,10 +368,10 @@ function Get-BuildLogFile
         [string]$NativeHostArch = "x64",
                 
         [ValidateSet('Debug', 'Release', '')]
-        [string]$Configuration = "Debug"
+        [string]$Configuration = "Release"
         
     )    
-    return Join-Path -Path $root -ChildPath "contrib\win32\openssh\OpenSSH$($Configuration)$($NativeHostArch).log"    
+    return Join-Path -Path $root -ChildPath "contrib\win32\openssh\OpenSSH$($Configuration)$($NativeHostArch).log"
 }
 
 function Get-SolutionFile
@@ -414,4 +416,4 @@ function Get-RepositoryRoot
     throw new-object System.IO.DirectoryNotFoundException("Could not find the root of the GIT repository")
 }
 
-Export-ModuleMember -Function Start-SSHBuild, Get-RepositoryRoot, Get-BuildLogFile, Clone-Win32OpenSSH, Copy-OpenSSLSDK
+Export-ModuleMember -Function Start-SSHBuild, Get-RepositoryRoot, Get-BuildLogFile, Clone-Win32OpenSSH, Copy-OpenSSLSDK, Write-BuildMsg

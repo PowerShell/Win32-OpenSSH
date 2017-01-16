@@ -101,7 +101,7 @@ sw_remove_child_at_index(DWORD index) {
 
 int
 sw_child_to_zombie(DWORD index) {
-	DWORD last_non_zombie, last_child, zombie_pid;
+	DWORD last_non_zombie, zombie_pid;
 	HANDLE zombie_handle;
 
 	debug("zombie'ing child at index %d, %d zombies of %d", index,
@@ -112,17 +112,17 @@ sw_child_to_zombie(DWORD index) {
 		return -1;
 	}
 
-	zombie_pid = children.process_id[index];
-	zombie_handle = children.handles[index];
 	last_non_zombie = children.num_children - children.num_zombies - 1;
-	last_child = children.num_children - 1;
-
-	children.handles[index] = children.handles[last_non_zombie];
-	children.process_id[index] = children.process_id[last_non_zombie];
-
-	children.handles[last_non_zombie] = children.handles[index];
-	children.process_id[last_non_zombie] = children.process_id[index];
-
+	
+	if (last_non_zombie != index) {
+		/* swap */
+		zombie_pid = children.process_id[index];
+		zombie_handle = children.handles[index];
+		children.handles[index] = children.handles[last_non_zombie];
+		children.process_id[index] = children.process_id[last_non_zombie];
+		children.handles[last_non_zombie] = zombie_handle;
+		children.process_id[last_non_zombie] = zombie_pid;
+	}
 	children.num_zombies++;
 	return 0;
 }
@@ -185,10 +185,13 @@ int waitpid(int pid, int *status, int options) {
 			return -1;
 		}
 
-		process = children.handles[index];
-		ret = WaitForSingleObject(process, INFINITE);
-		if (ret != WAIT_OBJECT_0)
-			DebugBreak();//fatal
+		/* wait if process is still alive */
+		if (index < children.num_children - children.num_zombies) {
+			process = children.handles[index];
+			ret = WaitForSingleObject(process, INFINITE);
+			if (ret != WAIT_OBJECT_0)
+				DebugBreak();//fatal
+		}
 
 		ret_id = children.process_id[index];
 		GetExitCodeProcess(process, &exit_code);
@@ -200,6 +203,15 @@ int waitpid(int pid, int *status, int options) {
 	}
 
 	/* pid = -1*/
+	/* are there any existing zombies */
+	if (children.num_zombies) {
+		/* return one of them */
+		ret_id = children.process_id[children.num_children - 1];
+		sw_remove_child_at_index(children.num_children - 1);
+		return ret_id;
+	}
+	
+	/* all children are alive. wait for one of them to exit */
 	timeout = INFINITE;
 	if (options & WNOHANG)
 		timeout = 0;

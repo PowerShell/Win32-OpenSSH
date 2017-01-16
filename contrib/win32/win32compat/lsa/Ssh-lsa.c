@@ -38,6 +38,7 @@
 #include <NTSecPkg.h>
 #include <ntstatus.h>
 #include <stdio.h>
+#include "..\misc_internal.h"
 
 #define Unsigned  unsigned
 #define Char char
@@ -264,7 +265,7 @@ LsaApLogonUser(PLSA_CLIENT_REQUEST request, SECURITY_LOGON_TYPE logonType,
 	UNICODE_STRING *flatName = NULL;
 	UCHAR *userAuth = NULL;
 	ULONG userAuthSize;
-	wchar_t homeDir[MAX_PATH];
+	wchar_t homeDir[PATH_MAX];
 	TOKEN_SOURCE tokenSource;
 
 	HANDLE token = NULL;
@@ -292,9 +293,9 @@ LsaApLogonUser(PLSA_CLIENT_REQUEST request, SECURITY_LOGON_TYPE logonType,
 		*authority, &token, logonId,
 		*accountName, subStat));
 
-	NTFAIL(LsaApi.AllocateClientBuffer(request, MAX_PATH * sizeof(wchar_t), profile));
-	*profileSize = MAX_PATH;
-	NTFAIL(LsaApi.CopyToClientBuffer(request, MAX_PATH * sizeof(wchar_t),
+	NTFAIL(LsaApi.AllocateClientBuffer(request, PATH_MAX * sizeof(wchar_t), profile));
+	*profileSize = PATH_MAX;
+	NTFAIL(LsaApi.CopyToClientBuffer(request, PATH_MAX * sizeof(wchar_t),
 		*profile, homeDir));
 
 	PLSA_TOKEN_INFORMATION_V1 outTokenInfo;

@@ -135,5 +135,28 @@ Describe "Tests for ssh command" -Tags "CI" {
            #validate file content.           
            Get-Content $filePath | Should be $server.MachineName           
         }
-    }    
+    }
+    Context "password authentication" {
+        BeforeAll {
+            $client.AddPasswordSetting($server.localAdminPassword)
+            Remove-Item -Path $filePath -Force -ea silentlycontinue
+        }
+
+        AfterAll {
+            $client.CleanupPasswordSetting()
+        }
+
+        AfterEach {
+            Remove-Item -Path $filePath -Force -ea silentlycontinue
+        }
+
+        It '<Title>' -TestCases:$testData {
+            param([string]$Title, $LogonStr, $Options)
+           
+           $str = ".\ssh $($Options) $($LogonStr) hostname > $filePath"
+           $client.RunCmd($str)
+           #validate file content.           
+           Get-Content $filePath | Should be $server.MachineName           
+        }
+    }
 }

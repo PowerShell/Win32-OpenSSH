@@ -98,31 +98,30 @@ Describe "Tests for scp command" -Tags "CI" {
         It 'SCP usage' {
             #TODO: usage output does not redirect to file
         }
-    }#>
-       
-    #this context only run on windows
+    }#>       
+    
     Context "Key is Secured in ssh-agent on server" {
         BeforeAll {
             $Server.SecureHostKeys($server.PrivateHostKeyPaths)
-            $identifyFile = $client.clientPrivateKeyPaths[0]
+            $privateKeyFile = $client.clientPrivateKeyPaths[0]            
         }
 
         AfterAll {
             $Server.CleanupHostKeys()
         }
         
-        It 'File Copy with -i option: <Title> ' -TestCases:$testData {
+        It 'File copy with -i option and private key: <Title> ' -TestCases:$testData {
             param([string]$Title, $Source, $Destination)                        
-            .\scp -i $identifyFile $Source $Destination
+            .\scp -i $privateKeyFile $Source $Destination
             #validate file content. DestPath is the path to the file.
             $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0            
             $equal | Should Be $true            
-        }
+        }        
 
-        It 'Directory recursive Copy with -i option: <Title> ' -TestCases:$testData1 {
+        It 'Directory recursive copy with -i option and private key: <Title> ' -TestCases:$testData1 {
             param([string]$Title, $Source, $Destination)               
 
-            .\scp -r -i $identifyFile $Source $Destination
+            .\scp -r -i $privateKeyFile $Source $Destination
             
             $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
             $equal | Should Be $true
@@ -130,10 +129,9 @@ Describe "Tests for scp command" -Tags "CI" {
             
             $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
             $equal | Should Be $true
-        }
+        }        
     }
-
-    #this context only run on windows
+    
     Context "Single signon with keys -p -v -c option Secured in ssh-agent" {
         BeforeAll {        
             $Server.SecureHostKeys($server.PrivateHostKeyPaths)
@@ -149,27 +147,27 @@ Describe "Tests for scp command" -Tags "CI" {
             .\ssh-add.exe -D
         }        
 
-        It 'File Copy with -S option (positive)' {
+        It 'File copy with -S option (positive)' {
             .\scp -S .\ssh.exe $SourceFilePath "$($server.localAdminUserName)@$($server.MachineName):$DestinationFilePath"
             #validate file content. DestPath is the path to the file.
             $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0
             $equal | Should Be $true
         }
 
-        It 'File Copy with -p -c -v option: <Title> ' -TestCases:$testData {
+        It 'File copy with -p -c -v option: <Title> ' -TestCases:$testData {
             param([string]$Title, $Source, $Destination)
 
-            .\scp -p -c aes128-ctr -v  -C $Source $Destination
+            .\scp -p -c aes128-ctr -v -C $Source $Destination
             #validate file content. DestPath is the path to the file.
             $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
             $equal | Should Be $true            
         }
                 
-        It 'Directory recursive Copy with -r -p -v option: <Title> ' -TestCases:$testData1 {
+        It 'Directory recursive copy with -r -p -v option: <Title> ' -TestCases:$testData1 {
             param([string]$Title, $Source, $Destination)
             .\scp -r -p -c aes128-ctr -v $Source $Destination
             
-            $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
+            $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
             $equal | Should Be $true            
                         
             $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
@@ -177,12 +175,12 @@ Describe "Tests for scp command" -Tags "CI" {
         }
     }
    
-   Context "Key based authentication with -i -C -q options. host keys are not secured on server" {
+   Context "Private key authentication with -i -C -q options. host keys are not secured on server" {
         BeforeAll {
             $identifyFile = $client.clientPrivateKeyPaths[0]
         }
         
-        It 'File Copy with -i -C -q options: <Title> ' -TestCases:$testData{
+        It 'File copy with -i -C -q options: <Title> ' -TestCases:$testData{
             param([string]$Title, $Source, $Destination)
 
             .\scp -i $identifyFile -C -q $Source $Destination
@@ -191,16 +189,45 @@ Describe "Tests for scp command" -Tags "CI" {
             $equal | Should Be $true
         }
 
-
-        It 'Directory recursive Copy with -i and -q options: <Title> ' -TestCases:$testData1 {
+        It 'Directory recursive copy with -i -C -r and -q options: <Title> ' -TestCases:$testData1 {
             param([string]$Title, $Source, $Destination)               
 
-            .\scp -i $identifyFile -r -q $Source $Destination
+            .\scp -i $identifyFile -C -r -q $Source $Destination
             $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
             $equal | Should Be $true
                         
             $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
             $equal | Should Be $true          
         }
-    }    
+    }
+
+    Context "Password authentication" {
+        BeforeAll {
+            $client.AddPasswordSetting($server.localAdminPassword)
+        }
+
+        AfterAll {
+            $client.CleanupPasswordSetting()
+        }
+        
+        It 'File copy with -p options: <Title> ' -TestCases:$testData {
+            param([string]$Title, $Source, $Destination)
+
+            .\scp -p $Source $Destination            
+            #validate file content. DestPath is the path to the file.
+            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
+            $equal | Should Be $true
+        }
+
+        It 'Directory recursive copy with -p and -v options: <Title> ' -TestCases:$testData1 {
+            param([string]$Title, $Source, $Destination)               
+
+            .\scp -r -p $Source $Destination            
+            $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
+            $equal | Should Be $true
+                        
+            $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
+            $equal | Should Be $true          
+        }
+    }
 }   

@@ -10,10 +10,11 @@
 #include <direct.h>
 #include <io.h>
 #include <fcntl.h>
+#include "..\misc_internal.h"
 
 struct dirent {
 	int            d_ino;       /* Inode number */
-	char           d_name[256]; /* Null-terminated filename */
+	char           d_name[PATH_MAX]; /* Null-terminated filename */
 };
 
 typedef struct DIR_ DIR;

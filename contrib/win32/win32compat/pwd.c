@@ -39,6 +39,7 @@
 #include "inc\pwd.h"
 #include "inc\grp.h"
 #include "inc\utf.h"
+#include "misc_internal.h"
 
 static struct passwd pw;
 static char* pw_shellpath = NULL;
@@ -87,9 +88,9 @@ get_passwd(const char *user_utf8, LPWSTR user_sid) {
         char *uname_utf8 = NULL, *pw_home_utf8 = NULL;
         LPBYTE user_info = NULL;
         LPWSTR user_sid_local = NULL;
-        wchar_t reg_path[MAX_PATH], profile_home[MAX_PATH];
+        wchar_t reg_path[PATH_MAX], profile_home[PATH_MAX];
         HKEY reg_key = 0;
-        int tmp_len = MAX_PATH;
+        int tmp_len = PATH_MAX;
         PDOMAIN_CONTROLLER_INFOW pdc = NULL;
 
         errno = 0;
@@ -141,10 +142,10 @@ get_passwd(const char *user_utf8, LPWSTR user_sid) {
             user_sid = user_sid_local;
         }
 
-        if (swprintf(reg_path, MAX_PATH, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", user_sid) == MAX_PATH ||
+        if (swprintf(reg_path, PATH_MAX, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", user_sid) == PATH_MAX ||
                 RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
                 RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, (LPBYTE)profile_home, &tmp_len) != 0)
-                GetWindowsDirectoryW(profile_home, MAX_PATH);
+                GetWindowsDirectoryW(profile_home, PATH_MAX);
 
         if ((uname_utf8 = _strdup(user_utf8)) == NULL ||
                 (pw_home_utf8 = utf16_to_utf8(profile_home)) == NULL) {

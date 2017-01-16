@@ -11,12 +11,17 @@ int sw_kill(int pid, int sig);
 /* child processes */
 #define MAX_CHILDREN 50
 struct _children {
+	/* 
+	 * array of handles and process_ids. 
+	 * intial (num_children - num_zombies) are alive 
+	 * rest are zombies 
+	 */
 	HANDLE handles[MAX_CHILDREN];
 	DWORD process_id[MAX_CHILDREN];
 	/* total children */
 	DWORD num_children;
 	/* #zombies */
-	/* (num_chileren - zombies) are live children */
+	/* (num_children - zombies) are live children */
 	DWORD num_zombies;
 };
 

@@ -35,6 +35,7 @@
 #include <Strsafe.h>
 #include <stdio.h>
 #include <io.h>
+#include "misc_internal.h"
 
 #define MAX_CONSOLE_COLUMNS 9999
 #define MAX_CONSOLE_ROWS 9999
@@ -136,6 +137,7 @@ HANDLE pipe_in = INVALID_HANDLE_VALUE;
 HANDLE pipe_out = INVALID_HANDLE_VALUE;
 HANDLE pipe_err = INVALID_HANDLE_VALUE;
 HANDLE child = INVALID_HANDLE_VALUE;
+DWORD child_exit_code = 0;
 HANDLE hConsoleBuffer = INVALID_HANDLE_VALUE;
 
 HANDLE monitor_thread = INVALID_HANDLE_VALUE;
@@ -497,6 +499,7 @@ void SizeWindow(HANDLE hInput) {
 
 DWORD WINAPI MonitorChild(_In_ LPVOID lpParameter) {
     WaitForSingleObject(child, INFINITE);
+    GetExitCodeProcess(child, &child_exit_code);
     PostThreadMessage(hostThreadId, WM_APPEXIT, 0, 0);
     return 0;
 }
@@ -1066,15 +1069,15 @@ int start_with_pty(int ac, wchar_t **av) {
     /*TODO - pick this up from system32*/
     cmd[0] = L'\0';
     if (ac)
-	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L"cmd.exe"));
+	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L"cmd.exe"));
 
     ac--;
     av++;
     if (ac)
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" /c"));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" /c"));
     while (ac) {
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" "));
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, *av));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" "));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, *av));
         ac--;
         av++;
     }
@@ -1088,8 +1091,7 @@ int start_with_pty(int ac, wchar_t **av) {
     Sleep(20);
     while (!AttachConsole(pi.dwProcessId))
     {
-        DWORD exit_code;
-        if (GetExitCodeProcess(pi.hProcess, &exit_code) && exit_code != STILL_ACTIVE)
+        if (GetExitCodeProcess(pi.hProcess, &child_exit_code) && child_exit_code != STILL_ACTIVE)
                 break;
         Sleep(100);
     }
@@ -1129,7 +1131,7 @@ cleanup:
 
     FreeConsole();
 
-    return 0;
+    return child_exit_code;
 }
 
 HANDLE child_pipe_read;
@@ -1138,6 +1140,7 @@ DWORD WINAPI MonitorChild_nopty(
         _In_ LPVOID lpParameter
         ) {
         WaitForSingleObject(child, INFINITE);
+	GetExitCodeProcess(child, &child_exit_code);
         CloseHandle(pipe_in);
         //printf("XXXX CHILD PROCESS DEAD XXXXX");
         return 0;
@@ -1180,14 +1183,14 @@ int start_withno_pty(int ac, wchar_t **av) {
 
         /*TODO - pick this up from system32*/
         cmd[0] = L'\0';
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L"cmd.exe"));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L"cmd.exe"));
         ac -= 2;
         av += 2;
         if (ac)
-                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" /c"));
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" /c"));
         while (ac) {
-                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, L" "));
-                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_PATH, *av));
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" "));
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, *av));
                 ac--;
                 av++;
         }
@@ -1282,7 +1285,7 @@ cleanup:
                 TerminateProcess(child, 0);
         if (monitor_thread != INVALID_HANDLE_VALUE)
                 WaitForSingleObject(monitor_thread, INFINITE);
-        return 0;        
+        return child_exit_code;        
 }
 
 int wmain(int ac, wchar_t **av) {
