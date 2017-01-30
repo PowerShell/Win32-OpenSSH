@@ -151,7 +151,7 @@ function Start-SSHBootstrap
     else
     {
         Write-BuildMsg -AsInfo -Message "Chocolatey not present. Installing chocolatey." -Silent:$silent
-        Invoke-Expression ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))
+        Invoke-Expression ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1')) 2>&1 >> $script:BuildLogFile
 
         if (-not ($machinePath.ToLower().Contains($chocolateyPath.ToLower())))
         {
@@ -207,7 +207,7 @@ function Start-SSHBootstrap
     if (-not (Test-Path -Path $nasmPath -PathType Container))
     {
         Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName." -Silent:$silent
-        choco install $packageName -y --force --limitoutput --execution-timeout 10000 
+        choco install $packageName -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
     }
     else
     {
@@ -220,9 +220,9 @@ function Start-SSHBootstrap
 
     if ($null -eq $VSPackageInstalled)
     {
-        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName."  -Silent:$silent
+        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName."
         $adminFilePath = "$script:OpenSSHRoot\contrib\win32\openssh\VSWithBuildTools.xml"
-        choco install $packageName -packageParameters "--AdminFile $adminFilePath" -y --force --limitoutput --execution-timeout 10000
+        choco install $packageName -packageParameters "--AdminFile $adminFilePath" -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
     }
     else
     {
@@ -235,8 +235,8 @@ function Start-SSHBootstrap
 
     if (-not (Test-Path -Path $sdkPath))
     {
-        Write-BuildMsg -AsInfo  -Message "Windows 8.1 SDK not present. Installing $packageName." -Silent:$silent
-        choco install $packageName -y --limitoutput --force
+        Write-BuildMsg -AsInfo  -Message "Windows 8.1 SDK not present. Installing $packageName."
+        choco install $packageName -y --limitoutput --force 2>&1 >> $script:BuildLogFile
     }
     else
     {
@@ -330,7 +330,7 @@ function Start-SSHBuild
     $script:BuildLogFile = Get-BuildLogFile -root $repositoryRoot.FullName -Configuration $Configuration -NativeHostArch $NativeHostArch
     if (Test-Path -Path $script:BuildLogFile)
     {
-        Remove-Item -Path $script:BuildLogFile
+        Remove-Item -Path $script:BuildLogFile -force
     }
     
     Write-BuildMsg -AsInfo -Message "Starting Open SSH build; Build Log: $($script:BuildLogFile)"
@@ -341,10 +341,8 @@ function Start-SSHBuild
     Copy-OpenSSLSDK
     $msbuildCmd = "msbuild.exe"
     $solutionFile = Get-SolutionFile -root $repositoryRoot.FullName
-    $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
-    #$cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
+    $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/m", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
 
-    
     & $msbuildCmd $cmdMsg
     $errorCode = $LASTEXITCODE
 
@@ -353,7 +351,7 @@ function Start-SSHBuild
         Write-BuildMsg -AsError -ErrorAction Stop -Message "Build failed for OpenSSH.`nExitCode: $error."
     }    
 
-    Write-BuildMsg -AsInfo -Message "SSH build passed."
+    Write-BuildMsg -AsInfo -Message "SSH build passed." -Silent:$silent
 }
 
 function Get-BuildLogFile

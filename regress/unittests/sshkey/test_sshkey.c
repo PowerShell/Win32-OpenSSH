@@ -429,8 +429,7 @@ sshkey_tests(void)
 #endif
 	sshkey_free(kf);
 
-#ifndef WIN32_FIXME
-    TEST_START("certify key");
+	TEST_START("certify key");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("ed25519_1.pub"),
 	    &k1, NULL), 0);
 	k2 = get_private("ed25519_2");
@@ -472,7 +471,6 @@ sshkey_tests(void)
 	sshkey_free(k3);
 	sshbuf_reset(b);
 	TEST_DONE();
-#endif
 
 	TEST_START("sign and verify RSA");
 	k1 = get_private("rsa_1");
@@ -512,7 +510,6 @@ sshkey_tests(void)
 
 
 #ifdef OPENSSL_HAS_ECC
-#ifndef WIN32_FIXME
 	TEST_START("sign and verify ECDSA");
 	k1 = get_private("ecdsa_1");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("ecdsa_2.pub"), &k2,
@@ -545,6 +542,5 @@ sshkey_tests(void)
 	sshkey_free(k3);
 	sshbuf_free(b);
 	TEST_DONE();
-#endif
 #endif
 }

@@ -57,14 +57,7 @@ size_t telProcessNetwork(char *buf, size_t len, unsigned char **respbuf, size_t 
     unsigned char* pszHead = NULL;
     unsigned char* pszTail = NULL;
 
-    char *term = NULL;
-
     if (len == 0)
-        return len;
-
-    term = getenv("TERM");
-
-    if (term != NULL && _stricmp(term, "passthru") == 0)
         return len;
 
     // Transform a single carriage return into a single linefeed before

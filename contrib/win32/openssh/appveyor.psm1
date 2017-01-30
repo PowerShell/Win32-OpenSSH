@@ -1,8 +1,9 @@
 ﻿$ErrorActionPreference = 'Stop'
-Import-Module $PSScriptRoot\build.psm1
+Import-Module $PSScriptRoot\build.psm1 -Force -DisableNameChecking
 $repoRoot = Get-RepositoryRoot
-$script:logFile = join-path $repoRoot.FullName "appveyorlog.log"
-
+$script:logFile = join-path $repoRoot.FullName "appveyor.log"
+$script:messageFile = join-path $repoRoot.FullName "BuildMessage.log"
+$testfailed = $false
 
 <#
     Called by Write-BuildMsg to write to the build log, if it exists. 
@@ -23,6 +24,28 @@ function Write-Log
 }
 
 # Sets a build variable
+Function Write-BuildMessage
+{
+    param(
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string] $Message,
+        $Category,
+        [string]  $Details)
+
+    if($env:AppVeyor)
+    {
+        Add-AppveyorMessage @PSBoundParameters
+    }
+
+    # write it to the log file, if present.
+    if (-not ([string]::IsNullOrEmpty($script:messageFile)))
+    {
+        Add-Content -Path $script:messageFile -Value "$Category--$Message"
+    }
+}
+
+# Sets a build variable
 Function Set-BuildVariable
 {
     param(
@@ -35,13 +58,17 @@ Function Set-BuildVariable
         $Value
     )
 
-    if($env:AppVeyor)
+    if($env:AppVeyor -and (Get-Command Set-AppveyorBuildVariable -ErrorAction Ignore) -ne $null)
     {
         Set-AppveyorBuildVariable @PSBoundParameters
     }
-    else 
+    elseif($env:AppVeyor)
     {
-        Set-Item env:/$name -Value $Value
+        appveyor SetVariable -Name $Name -Value $Value
+    } 
+    else
+    {
+        Set-Item env:$Name -Value $Value
     }
 }
 
@@ -71,7 +98,6 @@ function Invoke-AppVeyorFull
         Invoke-AppVeyorBuild
         Install-OpenSSH
         Install-TestDependencies
-        & "$env:ProgramFiles\PowerShell\6.0.0.12\powershell.exe" -Command {Import-Module $($repoRoot.FullName)\contrib\win32\openssh\AppVeyor.psm1;Run-OpenSSHTests -uploadResults}
         Run-OpenSSHTests
         Publish-Artifact
     }
@@ -85,9 +111,11 @@ function Invoke-AppVeyorFull
 
 # Implements the AppVeyor 'build_script' step
 function Invoke-AppVeyorBuild
-{  
+{
+      Set-BuildVariable TestPassed True
       Start-SSHBuild -Configuration Release -NativeHostArch x64
       Start-SSHBuild -Configuration Debug -NativeHostArch x86
+      Write-BuildMessage -Message "OpenSSH binaries build success!" -Category Information
 }
 
 <#
@@ -193,6 +221,7 @@ function Download-PSCoreMSI
 
     if ($v)
     {
+        Write-BuildMessage -Message "Failed to download PSCore MSI package from $url" -Category Error
         throw "Failed to download PSCore MSI package from $url"
     }
     else
@@ -216,14 +245,37 @@ function Install-TestDependencies
     if (-not ($isModuleAvailable))
     {      
       Write-Log -Message "Installing Pester..." 
-      choco install Pester -y --force --limitoutput
+      choco install Pester -y --force --limitoutput 2>&1 >> $script:logFile
     }
 
     if ( -not (Test-Path "$env:ProgramData\chocolatey\lib\sysinternals\tools" ) ) {        
         Write-Log -Message "sysinternals not present. Installing sysinternals."
-        choco install sysinternals -y --force --limitoutput        
-    }  
+        choco install sysinternals -y --force --limitoutput 2>&1 >> $script:logFile
+    }
+    <#if ( (-not (Test-Path "${env:ProgramFiles(x86)}\Windows Kits\8.1\Debuggers\" )) -and (-not (Test-Path "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\" ))) {        
+        Write-Log -Message "debugger not present. Installing windbg."
+        choco install windbg --force  --limitoutput -y 2>&1 >> $script:logFile
+    }#>
     Install-PSCoreFromGithub
+    $psCorePath = GetLocalPSCorePath
+    Set-BuildVariable -Name psPath -Value $psCorePath
+    Write-BuildMessage -Message "All testDependencies installed!" -Category Information
+}
+
+<#
+    .Synopsis
+    Get the path to the installed powershell score
+#>
+function GetLocalPSCorePath {
+    $psPath = Get-ChildItem "$env:ProgramFiles\PowerShell\*\powershell.exe" -Recurse -ErrorAction SilentlyContinue
+    if($psPath.Count -eq 0)
+    {
+        ""
+    }
+    else
+    {
+        $psPath[-1].FullName		
+    }
 }
 <#
     .Synopsis
@@ -246,7 +298,7 @@ function Install-OpenSSH
     Build-Win32OpenSSHPackage @PSBoundParameters
 
     Push-Location $OpenSSHDir 
-    &( "$OpenSSHDir\install-sshd.ps1")
+    & ( "$OpenSSHDir\install-sshd.ps1") 
     .\ssh-keygen.exe -A
     Start-Service ssh-agent
     &( "$OpenSSHDir\install-sshlsa.ps1")
@@ -256,6 +308,7 @@ function Install-OpenSSH
     Start-Service sshd
 
     Pop-Location
+	Write-BuildMessage -Message "OpenSSH installed!" -Category Information
 }
 
 <#
@@ -337,20 +390,28 @@ function Build-Win32OpenSSHPackage
     {
         $RealConfiguration = $Configuration
     }
-    
 
     [System.IO.DirectoryInfo] $repositoryRoot = Get-RepositoryRoot
     $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "bin\$folderName\$RealConfiguration"
     Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHDir -Include *.exe,*.dll -Exclude *unittest*.* -Force -ErrorAction Stop
     $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "contrib\win32\openssh"
-    Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHDir -Include *.ps1,sshd_config -Exclude AnalyzeCodeDiff.ps1 -Force -ErrorAction Stop    
-    
+    Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHDir -Include *.ps1,sshd_config -Exclude AnalyzeCodeDiff.ps1 -Force -ErrorAction Stop
+        
     $packageName = "rktools.2003"
     $rktoolsPath = "${env:ProgramFiles(x86)}\Windows Resource Kits\Tools\ntrights.exe"
     if (-not (Test-Path -Path $rktoolsPath))
     {        
         Write-Log -Message "$packageName not present. Installing $packageName."
-        choco install $packageName -y --force
+        choco install $packageName -y --force 2>&1 >> $script:logFile
+        if (-not (Test-Path -Path $rktoolsPath))
+        {
+            choco install $packageName -y --force 2>&1 >> $script:logFile
+            if (-not (Test-Path -Path $rktoolsPath))
+            {
+                Write-BuildMessage "Installation dependencies: failed to download $packageName. try again please." -Category Error
+                throw "failed to download $packageName"
+            }
+        }
     }
 
     Copy-Item -Path $rktoolsPath -Destination $OpenSSHDir -Force -ErrorAction Stop
@@ -439,7 +500,37 @@ function Deploy-OpenSSHTests
     Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHTestDir -Include *.ps1,*.psm1 -Force -ErrorAction Stop
 
     $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "bin\$folderName\$RealConfiguration"    
-    Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHTestDir -Exclude ssh-agent.exe, sshd.exe -Force -ErrorAction Stop    
+    Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHTestDir -Exclude ssh-agent.exe, sshd.exe -Force -ErrorAction Stop
+
+
+    $sshdConfigFile = "$OpenSSHTestDir\sshd_config"
+    if (-not (Test-Path -Path $sshdConfigFile -PathType Leaf))
+    {
+        Write-BuildMessage "Installation dependencies: $OpenSSHTestDir\sshd_config is missing in the folder" -Category Error
+        throw "$OpenSSHTestDir\sshd_config is missing in the folder"
+    }
+
+    if ($env:DebugMode)
+    {
+        $strToReplace = "#LogLevel INFO"
+        (Get-Content $sshdConfigFile).Replace($strToReplace,"LogLevel Debug3") | Set-Content $sshdConfigFile
+    }
+    if(-not ($env:psPath))
+    {
+        $psCorePath = GetLocalPSCorePath
+        Set-BuildVariable -Name psPath -Value $psCorePath
+    }    
+
+    $strToReplace = "Subsystem	sftp	sftp-server.exe"
+    if($env:psPath)
+    {
+        $strNewsubSystem = @"
+Subsystem	sftp	sftp-server.exe
+Subsystem	powershell	$env:psPath
+"@
+    }
+
+    (Get-Content $sshdConfigFile).Replace($strToReplace, $strNewsubSystem) | Set-Content $sshdConfigFile
 }
 
 
@@ -491,7 +582,7 @@ function Add-Artifact
     (
         [ValidateNotNull()]
         [System.Collections.ArrayList] $artifacts,
-        [string] $FileToAdd = "$env:SystemDrive\Win32OpenSSH*.zip"
+        [string] $FileToAdd
     )    
     
     $files = Get-ChildItem -Path $FileToAdd -ErrorAction Ignore
@@ -499,11 +590,11 @@ function Add-Artifact
     {        
         $files | % {
             $null = $artifacts.Add($_.FullName)             
-         }        
+         }
     }
     else
     {
-        Write-Warning "Skip publishing package artifacts. $FileToAdd does not exist"
+        Write-Log -Message "Skip publishing package artifacts. $FileToAdd does not exist"
     }
 }
 
@@ -513,7 +604,7 @@ function Add-Artifact
 #>
 function Publish-Artifact
 {
-    Write-Output "Publishing project artifacts"
+    Write-Host -ForegroundColor Yellow "Publishing project artifacts"
     [System.Collections.ArrayList] $artifacts = [System.Collections.ArrayList]::new()
     
     $packageFolder = $env:SystemDrive
@@ -524,14 +615,17 @@ function Publish-Artifact
 
     Add-Artifact  -artifacts $artifacts -FileToAdd "$packageFolder\Win32OpenSSH*.zip"
     Add-Artifact  -artifacts $artifacts -FileToAdd "$env:SystemDrive\OpenSSH\UnitTestResults.txt"
-    Add-Artifact  -artifacts $artifacts -FileToAdd "$script:logFile"
+    Add-Artifact  -artifacts $artifacts -FileToAdd "$env:SystemDrive\OpenSSH\TestError.txt"
 
     # Get the build.log file for each build configuration        
     Add-BuildLog -artifacts $artifacts -buildLog (Get-BuildLogFile -root $repoRoot.FullName)
 
+    Add-Artifact  -artifacts $artifacts -FileToAdd "$script:logFile"
+    Add-Artifact  -artifacts $artifacts -FileToAdd "$script:messageFile"
+
     foreach ($artifact in $artifacts)
     {
-        Write-Output "Publishing $artifact as Appveyor artifact"
+        Write-Log -Message "Publishing $artifact as Appveyor artifact"
         # NOTE: attempt to publish subsequent artifacts even if the current one fails
         Push-AppveyorArtifact $artifact -ErrorAction "Continue"
     }
@@ -543,15 +637,41 @@ function Publish-Artifact
 #>
 function Run-OpenSSHPesterTest
 {
-    param($testRoot, $outputXml) 
+    param($testRoot = "$env:SystemDrive\OpenSSH", 
+        $outputXml = "$env:SystemDrive\OpenSSH\TestResults.xml")
      
    # Discover all CI tests and run them.
     Push-Location $testRoot
     Write-Log -Message "Running OpenSSH Pester tests..."    
-    $testFolders = Get-ChildItem *.tests.ps1 -Recurse | ForEach-Object{ Split-Path $_.FullName} | Sort-Object -Unique 
-   
+    $testFolders = Get-ChildItem *.tests.ps1 -Recurse | ForEach-Object{ Split-Path $_.FullName} | Sort-Object -Unique
     Invoke-Pester $testFolders -OutputFormat NUnitXml -OutputFile $outputXml -Tag 'CI'
     Pop-Location
+}
+
+function Check-PesterTestResult
+{
+    param($outputXml = "$env:SystemDrive\OpenSSH\TestResults.xml")
+    if (-not (Test-Path $outputXml))
+    {
+        Write-Warning "$($xml.'test-results'.failures) tests in regress\pesterTests failed"
+        Write-BuildMessage -Message "Test result file $outputXml not found after tests." -Category Error
+        Set-BuildVariable TestPassed False
+    }
+    $xml = [xml](Get-Content -raw $outputXml)
+    if ([int]$xml.'test-results'.failures -gt 0) 
+    {
+        $errorMessage = "$($xml.'test-results'.failures) tests in regress\pesterTests failed. Detail test log is at TestResults.xml."
+        Write-Warning $errorMessage
+        Write-BuildMessage -Message $errorMessage -Category Error
+        Set-BuildVariable TestPassed False
+    }
+
+    # Writing out warning when the $Error.Count is non-zero. Tests Should clean $Error after success.
+    if ($Error.Count -gt 0) 
+    {
+        Write-BuildMessage -Message "Tests Should clean $Error after success." -Category Warning
+        $Error| Out-File "$testInstallFolder\TestError.txt" -Append
+    }
 }
 
 <#
@@ -560,37 +680,39 @@ function Run-OpenSSHPesterTest
 #>
 function Run-OpenSSHUnitTest
 {
-    param($testRoot, $unitTestOutputFile)
+    param($testRoot = "$env:SystemDrive\OpenSSH",
+         $unitTestOutputFile = "$env:SystemDrive\OpenSSH\UnitTestResults.txt")
      
    # Discover all CI tests and run them.
-    Push-Location $testRoot    
+    Push-Location $testRoot
     Write-Log -Message "Running OpenSSH unit tests..."
     if (Test-Path $unitTestOutputFile)    
     {
         Remove-Item -Path $unitTestOutputFile -Force -ErrorAction SilentlyContinue
     }
 
-    $unitTestFiles = Get-ChildItem -Path "$testRoot\unittest*.exe"
-    $testFailed = $false
+    $unitTestFiles = Get-ChildItem -Path "$testRoot\unittest*.exe" -Exclude unittest-kex.exe
+    $testfailed = $false
     if ($unitTestFiles -ne $null)
     {        
         $unitTestFiles | % {
-            Write-Log -Message "Running OpenSSH unit $($_.FullName)..."            
+            Write-Output "Running OpenSSH unit $($_.FullName)..."
             & $_.FullName >> $unitTestOutputFile
             $errorCode = $LASTEXITCODE
             if ($errorCode -ne 0)
             {
-                $testFailed = $true
-                Write-Log -Message "$($_.FullName) test failed for OpenSSH.`nExitCode: $error"                
+                $testfailed = $true
+                $errorMessage = "$($_.FullName) test failed for OpenSSH.`nExitCode: $errorCode. Detail test log is at UnitTestResults.txt."
+                Write-Warning $errorMessage
+                Write-BuildMessage -Message $errorMessage -Category Error
+                Set-BuildVariable TestPassed False
             }
-        }        
-
-        if($testFailed)
+        }
+        if(-not $testfailed)
         {
-            throw "SSH unit tests failed" 
+            Write-BuildMessage -Message "All Unit tests passed!" -Category Information
         }
     }
-    
     Pop-Location
 }
 
@@ -602,17 +724,9 @@ function Run-OpenSSHUnitTest
       The name of the xml file to write pester results.
       The default value is '.\testResults.xml'
 
-      .Parameter uploadResults
-      Uploads the tests results.      
-
       .Example
       .\RunTests.ps1 
       Runs the tests and creates the default 'testResults.xml'
-
-      .Example
-      .\RunTests.ps1 -uploadResults
-      Runs the tests and creates teh default 'testResults.xml' and uploads it to appveyor.
-
   #>
 function Run-OpenSSHTests
 {  
@@ -621,39 +735,47 @@ function Run-OpenSSHTests
   (    
       [string] $testResultsFile = "$env:SystemDrive\OpenSSH\TestResults.xml",
       [string] $unitTestResultsFile = "$env:SystemDrive\OpenSSH\UnitTestResults.txt",
-      [string] $testInstallFolder = "$env:SystemDrive\OpenSSH"      
+      [string] $testInstallFolder = "$env:SystemDrive\OpenSSH"
   )  
 
   Deploy-OpenSSHTests -OpenSSHTestDir $testInstallFolder
-
+  Run-OpenSSHUnitTest -testRoot $testInstallFolder -unitTestOutputFile $unitTestResultsFile
   # Run all pester tests.
   Run-OpenSSHPesterTest -testRoot $testInstallFolder -outputXml $testResultsFile
-
-  $xml = [xml](Get-Content -raw $testResultsFile) 
-  if ([int]$xml.'test-results'.failures -gt 0) 
-  { 
-     throw "$($xml.'test-results'.failures) tests in regress\pesterTests failed" 
-  }
-
-  # Writing out warning when the $Error.Count is non-zero. Tests Should clean $Error after success.
-  if ($Error.Count -gt 0) 
-  { 
-      $Error| Out-File "$env:SystemDrive\OpenSSH\TestError.txt" -Append
-  }
-  
-  Run-OpenSSHUnitTest -testRoot $testInstallFolder -unitTestOutputFile $unitTestResultsFile
 }
 
 function Upload-OpenSSHTestResults
 {  
-  [CmdletBinding()]
-  param
-  (    
-      [string] $testResultsFile = "$env:SystemDrive\OpenSSH\TestResults.xml"
-  )
+    [CmdletBinding()]
+    param
+    (    
+        [string] $testResultsFile = "$env:SystemDrive\OpenSSH\TestResults.xml"
+    )
   
-  if ($env:APPVEYOR_JOB_ID)
-  {
-      (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $testResultsFile))      
-  } 
+    if ($env:APPVEYOR_JOB_ID)
+    {
+        $resultFile = Resolve-Path $testResultsFile -ErrorAction Ignore
+        if($resultFile)
+        {
+            (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($env:APPVEYOR_JOB_ID)", $resultFile)
+             Write-BuildMessage -Message "Test results uploaded!" -Category Information
+        }
+    }
+
+    if ($env:DebugMode)
+    {
+        Remove-Item $env:DebugMode
+    }
+    
+    if($env:TestPassed -ieq 'True')
+    {
+        Write-BuildMessage -Message "The checkin validation success!"
+    }
+    else
+    {
+        Write-BuildMessage -Message "The checkin validation failed!" -Category Error
+        throw "The checkin validation failed!"
+    }
 }
+
+Export-ModuleMember -Function Set-BuildVariable, Invoke-AppVeyorBuild, Install-OpenSSH, Install-TestDependencies, GetLocalPSCorePath, Upload-OpenSSHTestResults, Run-OpenSSHTests, Publish-Artifact, Start-SSHBuild, Deploy-OpenSSHTests, Run-OpenSSHUnitTest,Run-OpenSSHPesterTest,Check-PesterTestResult

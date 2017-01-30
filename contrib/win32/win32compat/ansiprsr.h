@@ -37,12 +37,10 @@
 #define __ANSIPRSR_H
 
 #define TERM_ANSI 0
-#define TERM_VT52 1
 
 unsigned char * ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char **respbuf, size_t *resplen);
 unsigned char * GetNextChar(unsigned char * pszBuffer, unsigned char *pszBufferEnd);
 unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char **respbuf, size_t *resplen);
-unsigned char * ParseVT52(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char **respbuf, size_t *resplen);
 
 #define true TRUE
 #define false FALSE

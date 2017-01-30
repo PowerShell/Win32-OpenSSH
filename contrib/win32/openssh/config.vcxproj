@@ -2,7 +2,7 @@
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="paths.targets" />
   <PropertyGroup>
-  <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>  
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -112,7 +112,7 @@
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Win32-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>copy /Y $(SolutionDir)config.h.vs $(OpenSSH-Src-Path)\config.h</Command>
+      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Setup config.h in openssh source path for visual studio</Message>
@@ -136,7 +136,7 @@
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-x64-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>copy /Y $(SolutionDir)config.h.vs $(OpenSSH-Src-Path)\config.h</Command>
+      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Setup config.h in openssh source path for visual studio</Message>
@@ -164,7 +164,7 @@
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Win32-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>copy /Y $(SolutionDir)config.h.vs $(OpenSSH-Src-Path)\config.h</Command>
+      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Setup config.h in openssh source path for visual studio</Message>
@@ -192,7 +192,7 @@
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-x64-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>copy /Y $(SolutionDir)config.h.vs $(OpenSSH-Src-Path)\config.h</Command>
+      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Setup config.h in openssh source path for visual studio</Message>

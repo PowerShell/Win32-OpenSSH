@@ -56,6 +56,8 @@ extern int ScreenY;
 extern int ScrollTop;
 extern int ScrollBottom;
 
+extern BOOL bAnsiParsing;
+
 // end of imports from outside module 
 
 bool	gbVTAppMode		= false;
@@ -67,7 +69,7 @@ static int	AutoWrap = 1;
 
 BOOL	bAtEOLN = FALSE;
 
-static int term_mode;
+static int term_mode = TERM_ANSI;
 
 // ParseANSI globals - these need to be here, because sometimes blocks are sent
 // in mid ANSI sequence
@@ -176,13 +178,9 @@ unsigned char* ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd
 			unsigned char * pszCurrent = pszBuffer+1;
 			unsigned char * pszNewCurrent = pszCurrent;
 
-			if (term_mode == TERM_ANSI)
+			if (term_mode == TERM_ANSI && bAnsiParsing)
 			{
 				pszNewCurrent = ParseANSI(pszCurrent, pszBufferEnd, respbuf, resplen);
-			}
-			else if (term_mode == TERM_VT52)
-			{
-				pszNewCurrent = ParseVT52(pszCurrent, pszBufferEnd, respbuf, resplen);
 			}
 
 			if (pszCurrent == pszNewCurrent) // Pointer didn't move inside Parse function
@@ -293,10 +291,6 @@ unsigned char* ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd
 					if (term_mode == TERM_ANSI)
 					{
 						pszNewCurrent = ParseANSI(pszCurrent, pszBufferEnd, respbuf, resplen);
-					}
-					else if (term_mode == TERM_VT52)
-					{
-						pszNewCurrent = ParseVT52(pszCurrent, pszBufferEnd, respbuf, resplen);
 					}
 				}
 				if (pszNewCurrent > pszCurrent)
@@ -426,11 +420,6 @@ void ConSetExtendedMode(int iFunction, BOOL bEnable)
 			ConDisplayCursor(bEnable);
 			break;
 
-	}
-
-	if ((iFunction == 2) && (bEnable))
-	{
-		term_mode = TERM_VT52;
 	}
 }
 
@@ -892,109 +881,4 @@ unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEn
 	}
 	else
 		return pszBuffer;
-}
-
-unsigned char * ParseVT52(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char **respbuf, size_t *resplen)
-{
-	unsigned char *	pszCurrent = pszBuffer;
-	int		iLine;
-	int		iColumn;
-
-	switch ((unsigned char) *pszCurrent) 
-	{
-		case 'A':  // Cursor Up
-			ConMoveCursorPosition(0, -1);
-			pszCurrent++;
-				bAtEOLN = FALSE;
-			break;
-
-		case 'B': // Cursor Down
-			ConMoveCursorPosition(0, 1);
-			pszCurrent++;
-				bAtEOLN = FALSE;
-			break;
-
-		case 'C':  // Cursor Right
-			ConMoveCursorPosition(1, 0);
-			pszCurrent++;
-			break;
-
-		case 'D':  // Cursor Left
-			ConMoveCursorPosition(-1, 0);
-			pszCurrent++;
-				bAtEOLN = FALSE;
-			break;
-
-		case 'F':  // Special Graphics Character Set
-		case 'G':  // ASCII Character Set
-			pszCurrent++;
-			break;
-
-		case 'H':  // Cursor Home
-			ConSetCursorPosition(1, 1);
-			pszCurrent++;
-				bAtEOLN = FALSE;
-			break;
-		case 'I':  // Reverse Line Feed
-			pszCurrent++;
-			break;
-
-		case 'J':  // Erase to End of Screen
-			ConClearEOScreen();
-			pszCurrent++;
-			break;
-
-		case 'K':  // Erase to End of Line
-			ConClearEOLine();
-			pszCurrent++;
-			break;
-
-		case 'Y':  // Direct Cursor Addressing
-			pszCurrent = GetNextChar(pszCurrent, pszBufferEnd);
-			if (pszCurrent != NULL)
-			{
-				iLine = *pszCurrent - 31;
-
-				pszCurrent = GetNextChar(pszCurrent, pszBufferEnd);
-				if (pszCurrent != NULL)
-				{
-						iColumn = *pszCurrent - 31;
-						ConSetCursorPosition(iLine,iColumn);
-						pszCurrent++;
-				}
-				else 
-					pszCurrent = pszBuffer;
-			}
-			else
-				pszCurrent = pszBuffer;
-			break;
-
-		case 'Z':  // Identify
-            *respbuf = VT52_TERMINAL_ID;
-            if (resplen != NULL)
-            {
-                *resplen = 3;
-            }
-			pszCurrent++;
-			break;
-
-		case '=':  // Enter Alt Keypad mode
-		case '>':  // Exit Alt Keypad mode
-		case '1':  // Graphics processor on
-		case '2':  // Graphics processor off
-			pszCurrent++;
-			break;
-
-		case '<':  // Enter ANSI mode
-			term_mode = TERM_ANSI;
-			pszCurrent++;
-			break;
-
-		default:
-			pszCurrent++;
-            break;
-	}
-
-	return pszCurrent;
-	
 }

@@ -45,8 +45,6 @@ static struct passwd pw;
 static char* pw_shellpath = NULL;
 #define SHELL_HOST "\\ssh-shellhost.exe"
 
-char* w32_programdir();
-
 int
 initialize_pw() {
         if (pw_shellpath == NULL) {
@@ -120,25 +118,35 @@ get_passwd(const char *user_utf8, LPWSTR user_sid) {
         }
 
         if (user_sid == NULL) {
-            if (NetUserGetInfo(udom_utf16, uname_utf16, 23, &user_info) != NERR_Success) {
-                if (DsGetDcNameW(NULL, udom_utf16, NULL, NULL, DS_DIRECTORY_SERVICE_PREFERRED, &pdc) == ERROR_SUCCESS) {
-                    if (NetUserGetInfo(pdc->DomainControllerName, uname_utf16, 23, &user_info) != NERR_Success ||
-                        ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid_local) == FALSE) {
-                        errno = ENOMEM; //??
-                        goto done;
-                    } 
-                }
-                else {
+            NET_API_STATUS status;
+            if ((status = NetUserGetInfo(udom_utf16, uname_utf16, 23, &user_info)) != NERR_Success) {
+                debug("NetUserGetInfo() failed with error: %d \n", status);
+
+                DWORD dsStatus;
+                if ((dsStatus = DsGetDcNameW(NULL, udom_utf16, NULL, NULL, DS_DIRECTORY_SERVICE_PREFERRED, &pdc)) == ERROR_SUCCESS) {
+                    if ((status = NetUserGetInfo(pdc->DomainControllerName, uname_utf16, 23, &user_info)) != NERR_Success) {
+                        debug("NetUserGetInfo() with domainController failed with error: %d \n", status);
+
+                        if (ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid_local) == FALSE) {
+							error("ConvertSidToStringSidW() failed with error: %d\n", GetLastError());
+
+                            errno = ENOMEM; //??
+                            goto done;
+                        }
+                    }
+                } else {
+					error("DsGetDcNameW() failed with error: %d \n", dsStatus);
                     errno = ENOMEM; //??
                     goto done;
                 }
-            }
-            else {
+            } else {
                 if (ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid_local) == FALSE) {
+					error("NetUserGetInfo() Succeded but ConvertSidToStringSidW() failed with error: %d\n", GetLastError());
                     errno = ENOMEM; //??
                     goto done;
                 }
             }
+
             user_sid = user_sid_local;
         }
 

@@ -8,7 +8,6 @@
 
 #include <Windows.h>
 #include <stdio.h>
-#include "inc\defs.h"
 
 enum w32_io_type {
 	UNKNOWN_FD = 0,

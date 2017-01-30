@@ -29,6 +29,7 @@
 */
 
 #include "signal_internal.h"
+#include "inc\signal.h"
 
 struct _timer_info timer_info;
 extern sigset_t pending_signals;
@@ -43,7 +44,7 @@ sigalrm_APC(
 }
 
 unsigned int
-sw_alarm(unsigned int sec) {
+w32_alarm(unsigned int sec) {
 	LARGE_INTEGER due;
 	ULONGLONG sec_passed;
 	int ret = 0;

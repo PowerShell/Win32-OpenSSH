@@ -29,7 +29,13 @@
 * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#include "inc\w32posix.h"
+#include "inc\sys\socket.h"
+#include "inc\sys\select.h"
+#include "inc\sys\uio.h"
+#include "inc\sys\types.h"
+#include "inc\unistd.h"
+#include "inc\fcntl.h"
+
 #include "w32fd.h"
 #include "signal_internal.h"
 #include <stdarg.h>
@@ -803,30 +809,6 @@ int w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock) {
 	return min_index;
 }
 
-
-unsigned int 
-w32_alarm(unsigned int seconds) {
-	return sw_alarm(seconds);;
-}
-sighandler_t 
-w32_signal(int signum, sighandler_t handler) {
-	return sw_signal(signum, handler);
-}
-
-int 
-w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
-	return sw_sigprocmask(how, set, oldset);
-}
-
-int 
-w32_raise(int sig) {
-	return sw_raise(sig);
-}
-
-int 
-w32_kill(int pid, int sig) {
-	return sw_kill(pid, sig);
-}
 
 int 
 w32_ftruncate(int fd, off_t length) {

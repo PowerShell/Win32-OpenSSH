@@ -112,7 +112,7 @@ AuthorizedKeysFile	.ssh/authorized_keys
 #Banner none
 
 # override default of no subsystems
-Subsystem	sftp	C:/Program Files/OpenSSH/sftp-server.exe
+Subsystem	sftp	sftp-server.exe
 
 # Example of overriding settings on a per-user basis
 #Match User anoncvs

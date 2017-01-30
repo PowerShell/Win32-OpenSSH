@@ -108,10 +108,18 @@ ssh_get_authentication_socket(int *fdp)
 			RegCloseKey(agent_root);
 		}
 
-		h = CreateFileW(SSH_AGENT_PIPE_NAME, GENERIC_READ | GENERIC_WRITE, 0,
-		    NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL); 
-		if (h == INVALID_HANDLE_VALUE)
+		do {
+			h = CreateFileW(SSH_AGENT_PIPE_NAME, GENERIC_READ | GENERIC_WRITE, 0,
+			    NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL); 
+			if (h != INVALID_HANDLE_VALUE || GetLastError() != ERROR_PIPE_BUSY)
+				break;
+			Sleep(100);
+		} while(1);
+
+		if (h == INVALID_HANDLE_VALUE) {
+			debug("ssh_get_authentication_socket - CreateFileW failed error %d", GetLastError());
 			return SSH_ERR_AGENT_NOT_PRESENT;
+		}
 
 		/*
 		 * ensure that connected server pid matches published pid. this provides service side

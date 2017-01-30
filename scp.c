@@ -387,14 +387,12 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 		size_t cmdlen = 0;
 		char** list = args.list;
 
-		cmdlen = strlen(w32_programdir()) + 2;
+		cmdlen = 1; /* null term */
 		while (*list)
 			cmdlen += strlen(*list++) + 1;
 
 		full_cmd = xmalloc(cmdlen);
 		full_cmd[0] = '\0';
-		strcat(full_cmd, w32_programdir());
-		strcat(full_cmd, "\\");
 		list = args.list;
 		while (*list) {
 			strcat(full_cmd, *list++);

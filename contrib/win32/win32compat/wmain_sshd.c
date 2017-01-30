@@ -35,9 +35,9 @@
 #include <Windows.h>
 #include <wchar.h>
 #include "inc\utf.h"
+#include "misc_internal.h"
 
 int main(int, char **);
-void w32posix_initialize();
 extern HANDLE main_thread;
 extern int is_child;
 
@@ -97,10 +97,9 @@ static VOID WINAPI service_handler(DWORD dwControl)
 	ReportSvcStatus(service_status.dwCurrentState, NO_ERROR, 0);
 }
 
-char* w32_programdir();
 int sshd_main(int argc, wchar_t **wargv) {
 	char** argv = NULL;
-	int i;
+	int i, r;
 
 	if (argc) {
 		if ((argv = malloc(argc * sizeof(char*))) == NULL)
@@ -118,7 +117,9 @@ int sshd_main(int argc, wchar_t **wargv) {
 	_wchdir(path_utf16);
 	free(path_utf16);
 
-	return main(argc, argv);
+	r =  main(argc, argv);
+	w32posix_done();
+	return r;
 }
 
 int wmain(int argc, wchar_t **wargv) {

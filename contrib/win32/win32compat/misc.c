@@ -30,8 +30,7 @@
 
 #include <Windows.h>
 #include <stdio.h>
-#include "inc\defs.h"
-#include "sys\stat.h"
+#include "inc\sys\stat.h"
 #include "inc\sys\statvfs.h"
 #include "inc\sys\time.h"
 #include <time.h>
@@ -39,6 +38,10 @@
 #include "misc_internal.h"
 #include "inc\dlfcn.h"
 #include "inc\dirent.h"
+#include "inc\sys\types.h"
+#include "inc\sys\ioctl.h"
+#include "inc\fcntl.h"
+#include "signal_internal.h"
 
 int usleep(unsigned int useconds)
 {
@@ -254,7 +257,6 @@ int w32_ioctl(int d, int request, ...) {
         }
 }
 
-HANDLE w32_fd_to_handle(int fd);
 int 
 spawn_child(char* cmd, int in, int out, int err, DWORD flags) {
 	PROCESS_INFORMATION pi;
@@ -314,7 +316,7 @@ spawn_child(char* cmd, int in, int out, int err, DWORD flags) {
 	b = CreateProcessW(NULL, cmd_utf16, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi);
 
 	if (b) {
-		if (sw_add_child(pi.hProcess, pi.dwProcessId) == -1) {
+		if (register_child(pi.hProcess, pi.dwProcessId) == -1) {
 			TerminateProcess(pi.hProcess, 0);
 			CloseHandle(pi.hProcess);
 			pi.dwProcessId = -1;

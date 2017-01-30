@@ -387,7 +387,7 @@ socket_nonblocking_io_tests()
 void 
 socket_select_tests() {
 	int s, r;
-	int num_bytes = 1024 * 700; //700KB
+	int num_bytes = 1024 * 1024 * 2; //2 MB
 	int bytes_sent = 0;
 	int bytes_received = 0;
 	int seed = 326;
@@ -613,12 +613,10 @@ socket_typical_ssh_payload_tests() {
 void 
 socket_tests()
 {
-	w32posix_initialize();
 	socket_fd_tests();
 	socket_blocking_io_tests();
 	socket_nonblocking_io_tests();
 	socket_select_tests();
 	socket_typical_ssh_payload_tests();
-	w32posix_done();
 }
 

@@ -195,7 +195,7 @@ kex_tests(void)
 #ifdef OPENSSL_HAS_ECC
 	do_kex("ecdh-sha2-nistp256");
 	do_kex("ecdh-sha2-nistp384");
-#ifndef WIN32_FIXME
+#ifdef OPENSSL_HAS_NISTP521
 	do_kex("ecdh-sha2-nistp521");
 #endif
 #endif

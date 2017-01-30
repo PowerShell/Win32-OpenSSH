@@ -57,6 +57,8 @@ int ScrollBottom;
 int LastCursorX;
 int LastCursorY;
 
+BOOL bAnsiParsing = FALSE;
+
 char *pSavedScreen = NULL;
 static COORD ZeroCoord = {0,0};
 COORD SavedScreenSize = {0,0};
@@ -72,6 +74,7 @@ typedef struct _SCREEN_RECORD{
 }SCREEN_RECORD,*PSCREEN_RECORD;
 
 PSCREEN_RECORD pSavedScreenRec = NULL;
+int in_raw_mode = 0;
 
 /* ************************************************************ */
 /* Function: ConInit         									*/
@@ -82,6 +85,7 @@ int ConInit( DWORD OutputHandle, BOOL fSmartInit )
     OSVERSIONINFO os;
     DWORD dwAttributes = 0;
     DWORD dwRet = 0;
+    BOOL bRet = FALSE;
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     static bool bFirstConInit = true;
 
@@ -91,13 +95,13 @@ int ConInit( DWORD OutputHandle, BOOL fSmartInit )
     hOutputConsole = GetStdHandle(OutputHandle);
     if (hOutputConsole == INVALID_HANDLE_VALUE) {
         dwRet = GetLastError();
-        printf("GetStdHandle failed with %d\n", dwRet);
+        printf("GetStdHandle on OutputHandle failed with %d\n", dwRet);
         return dwRet;
     }
 
     if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwSavedAttributes)) {
         dwRet = GetLastError();
-        printf("GetConsoleMode failed with %d\n", GetLastError());
+        printf("GetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
         return dwRet;
     }
 
@@ -106,12 +110,23 @@ int ConInit( DWORD OutputHandle, BOOL fSmartInit )
             ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT);
     dwAttributes |= ENABLE_WINDOW_INPUT;
 
-    char *term = getenv("TERM");
+    if (!SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwAttributes)) { // Windows NT
+        dwRet = GetLastError();
+        printf("SetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
+        return dwRet;
+    }
 
-    if (term != NULL && (_stricmp(term, "ansi") == 0 || _stricmp(term, "passthru") == 0))
-        dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    if (!GetConsoleMode(hOutputConsole, &dwAttributes)) {
+        dwRet = GetLastError();
+        printf("GetConsoleMode on hOutputConsole failed with %d\n", dwRet);
+        return dwRet;
+    }
 
-    SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwAttributes); // Windows NT
+    dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+    if (!SetConsoleMode(hOutputConsole, dwAttributes)) { // Windows NT
+        bAnsiParsing = TRUE;
+    }
 
     ConSetScreenX();
     ConSetScreenY();
@@ -121,6 +136,7 @@ int ConInit( DWORD OutputHandle, BOOL fSmartInit )
     if (GetConsoleScreenBufferInfo(hOutputConsole, &csbi))
         SavedViewRect = csbi.srWindow;
 
+	in_raw_mode = 1;
     return 0;
 }
 
@@ -133,6 +149,7 @@ int ConUnInit( void )
 {
     CONSOLE_SCREEN_BUFFER_INFO ConsoleInfo;
 
+	in_raw_mode = 0;
     if ( hOutputConsole == NULL )
         return 0;
 

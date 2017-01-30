@@ -1,10 +1,11 @@
 #include <Windows.h>
 #include "w32fd.h"
 #include "tncon.h"
-#include "inc\defs.h"
 #include "inc\utf.h"
 
 #define TERM_IO_BUF_SIZE 2048
+
+extern int in_raw_mode;
 
 struct io_status {
 	DWORD to_transfer;
@@ -27,27 +28,6 @@ static VOID CALLBACK ReadAPCProc(
 	WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);
 	CloseHandle(pio->read_overlapped.hEvent);
 	pio->read_overlapped.hEvent = 0;
-}
-
-static DWORD WINAPI ReadThread(
-	_In_ LPVOID lpParameter
-	) {
-	struct w32_io* pio = (struct w32_io*)lpParameter;
-	debug3("TermRead thread, io:%p", pio);
-	memset(&read_status, 0, sizeof(read_status));
-	if (!ReadFile(WINHANDLE(pio), pio->read_details.buf, 
-		pio->read_details.buf_size, &read_status.transferred, NULL)) {
-		read_status.error = GetLastError();
-		debug("TermRead thread - ReadFile failed %d, io:%p", GetLastError(), pio);
-	}
-
-	if (0 == QueueUserAPC(ReadAPCProc, main_thread, (ULONG_PTR)pio)) {
-		debug("TermRead thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
-		pio->read_details.pending = FALSE;
-		pio->read_details.error = GetLastError();
-		DebugBreak();
-	}
-	return 0;
 }
 
 static DWORD WINAPI ReadConsoleThread(
@@ -129,25 +109,19 @@ static DWORD WINAPI WriteThread(
         DWORD dwSavedAttributes = ENABLE_PROCESSED_INPUT;
 	debug3("TermWrite thread, io:%p", pio);
 	
-        /* decide to call parsing engine or directly write to console
-         * doing the following trick to decide -
-         * if console in handle is set to process Ctrl+C, then it is likely
-         * serving a PTY enabled session 
-         */ 
-        GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwSavedAttributes);
-        if (dwSavedAttributes & ENABLE_PROCESSED_INPUT) {
+    if (in_raw_mode == 0) {
 		/* convert stream to utf16 and dump on console */
 		pio->write_details.buf[write_status.to_transfer] = '\0';
 		wchar_t* t = utf8_to_utf16(pio->write_details.buf);
 		WriteConsoleW(WINHANDLE(pio), t, wcslen(t), 0, 0);
 		free(t);
 		write_status.transferred = write_status.to_transfer;
-        } else {
-
-                telProcessNetwork(pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
-                /*TODO - respbuf is not null in some cases, this needs to be returned back via read stream*/
-                write_status.transferred = write_status.to_transfer;
-        }
+    } else {
+        /* console mode */
+        telProcessNetwork(pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
+        /*TODO - respbuf is not null in some cases, this needs to be returned back via read stream*/
+        write_status.transferred = write_status.to_transfer;
+    }
 
 	if (0 == QueueUserAPC(WriteAPCProc, main_thread, (ULONG_PTR)pio)) {
 		debug("TermWrite thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);

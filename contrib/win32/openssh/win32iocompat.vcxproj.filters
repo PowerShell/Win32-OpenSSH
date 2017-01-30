@@ -14,11 +14,10 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32_dirent.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\no-ops.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\win32_zlib.c" />
-    <ClCompile Include="..\win32compat\ansiprsr.c" />
-    <ClCompile Include="..\win32compat\conio.c" />
-    <ClCompile Include="..\win32compat\console.c" />
-    <ClCompile Include="..\win32compat\tncon.c" />
-    <ClCompile Include="..\win32compat\tnnet.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ansiprsr.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -34,9 +33,6 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\time.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\defs.h">
-      <Filter>inc</Filter>
-    </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\fcntl.h">
       <Filter>inc</Filter>
     </ClInclude>
@@ -44,9 +40,6 @@
       <Filter>inc</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\unistd.h">
-      <Filter>inc</Filter>
-    </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\w32posix.h">
       <Filter>inc</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\poll.h">
@@ -58,8 +51,6 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\statvfs.h">
       <Filter>inc\sys</Filter>
     </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dlfcn.h" />
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\syslog.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\param.h">
       <Filter>inc\sys</Filter>
@@ -112,12 +103,40 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\termios.h">
       <Filter>inc</Filter>
     </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dirent.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\libgen.h">
       <Filter>inc</Filter>
     </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h" />
-    <ClInclude Include="..\win32compat\misc_internal.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\misc_internal.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\stdio.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\string.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\pwd.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dirent.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\dlfcn.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\types.h">
+      <Filter>inc\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\strings.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\syslog.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\stdlib.h">
+      <Filter>inc</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\ctype.h">
+      <Filter>inc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">

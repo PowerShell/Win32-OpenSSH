@@ -30,8 +30,21 @@
 
 #include "w32fd.h"
 #include <errno.h>
-#include <signal.h>
 #include "signal_internal.h"
+#include "inc\signal.h"
+#undef signal
+#undef raise
+#undef SIGINT
+#undef SIGILL
+#undef SIGPFE
+#undef SIGSEGV
+#undef SIGTERM
+#undef SIGFPE
+#undef SIGABRT
+#undef SIG_DFL
+#undef SIG_IGN
+#undef SIG_ERR
+#include <signal.h>
 
 /* pending signals to be processed */
 sigset_t pending_signals;
@@ -106,14 +119,14 @@ sw_init_signal_handler_table() {
 
 	SetConsoleCtrlHandler(native_sig_handler, TRUE);
 	sigemptyset(&pending_signals);
-	/* this automatically sets all to SIG_DFL (0)*/
+	/* this automatically sets all to W32_SIG_DFL (0)*/
 	memset(sig_handlers, 0, sizeof(sig_handlers));
 }
 
 extern struct _children children;
 
 sighandler_t 
-sw_signal(int signum, sighandler_t handler) {
+w32_signal(int signum, sighandler_t handler) {
 	sighandler_t prev;
 
 	debug2("signal() sig:%d, handler:%p", signum, handler);
@@ -128,7 +141,7 @@ sw_signal(int signum, sighandler_t handler) {
 }
 
 int 
-sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
+w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
 	/* this is only used by sshd to block SIGCHLD while doing waitpid() */
 	/* our implementation of waidpid() is never interrupted, so no need to implement this for now*/
 	debug3("sigprocmask() how:%d");
@@ -138,7 +151,7 @@ sw_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
 
 
 int 
-sw_raise(int sig) {
+w32_raise(int sig) {
 	debug("raise sig:%d", sig);
 	if (sig == W32_SIGSEGV)
 		return raise(SIGSEGV); /* raise native exception handler*/
@@ -196,7 +209,7 @@ sw_process_pending_signals() {
 	for (i = 0; i < (sizeof(exp) / sizeof(exp[0])); i++) {
 		if (sigismember(&pending_tmp, exp[i])) {
 			if (sig_handlers[exp[i]] != W32_SIG_IGN) {
-				sw_raise(exp[i]);
+				w32_raise(exp[i]);
 				/* dont error EINTR for SIG_ALRM, */
 				/* sftp client is not expecting it */
 				if (exp[i] != W32_SIGALRM)

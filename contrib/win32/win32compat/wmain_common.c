@@ -32,14 +32,14 @@
 
 #include <Windows.h>
 #include "inc\utf.h"
+#include "misc_internal.h"
 
 int main(int, char **);
-void w32posix_initialize();
 
 int
 wmain(int argc, wchar_t **wargv) {
         char** argv = NULL;
-        int i;
+        int i,r;
 
         if (argc) {
                 if ((argv = malloc(argc * sizeof(char*))) == NULL)
@@ -49,5 +49,7 @@ wmain(int argc, wchar_t **wargv) {
         }
 
         w32posix_initialize();
-        return main(argc, argv);
+        r = main(argc, argv);
+		w32posix_done();
+		return r;
 }

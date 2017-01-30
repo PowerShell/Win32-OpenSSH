@@ -95,7 +95,7 @@ struct key_translation keys[] = {
     { "\x1b",       VK_ESCAPE,  "\x1b" },
     { "\r",         VK_RETURN,  "\r" },
     { "\b",         VK_BACK,    "\b" },
-    { "\x7f",       VK_BACK,    "\x7f" },
+    { "\x7f",       VK_BACK,    "\b" },
     { "\t",         VK_TAB,     "\t" },
     { "\x1b[A",     VK_UP,       0 },
     { "\x1b[B",     VK_DOWN,     0 },
@@ -1069,15 +1069,15 @@ int start_with_pty(int ac, wchar_t **av) {
     /*TODO - pick this up from system32*/
     cmd[0] = L'\0';
     if (ac)
-	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L"cmd.exe"));
+	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L"cmd.exe"));
 
     ac--;
     av++;
     if (ac)
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" /c"));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" /c"));
     while (ac) {
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" "));
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, *av));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" "));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, *av));
         ac--;
         av++;
     }
@@ -1183,14 +1183,14 @@ int start_withno_pty(int ac, wchar_t **av) {
 
         /*TODO - pick this up from system32*/
         cmd[0] = L'\0';
-        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L"cmd.exe"));
+        GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L"cmd.exe"));
         ac -= 2;
         av += 2;
         if (ac)
-                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" /c"));
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" /c"));
         while (ac) {
-                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, L" "));
-                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, PATH_MAX, *av));
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" "));
+                GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, *av));
                 ac--;
                 av++;
         }

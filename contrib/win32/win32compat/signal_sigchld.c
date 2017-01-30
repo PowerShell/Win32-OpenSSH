@@ -29,11 +29,12 @@
 */
 
 #include "signal_internal.h"
+#include "inc\sys\wait.h"
 
 struct _children children;
 
 int
-sw_add_child(HANDLE child, DWORD pid) {
+register_child(HANDLE child, DWORD pid) {
 	DWORD first_zombie_index;
 
 	debug("Register child %p pid %d, %d zombies of %d", child, pid,
@@ -128,10 +129,10 @@ sw_child_to_zombie(DWORD index) {
 }
 
 int
-sw_kill(int pid, int sig) {
+w32_kill(int pid, int sig) {
 	int child_index, i;
 	if (pid == GetCurrentProcessId())
-		return sw_raise(sig);
+		return w32_raise(sig);
 
 	/*  for child processes - only SIGTERM supported*/
 	child_index = -1;
@@ -207,6 +208,9 @@ int waitpid(int pid, int *status, int options) {
 	if (children.num_zombies) {
 		/* return one of them */
 		ret_id = children.process_id[children.num_children - 1];
+		GetExitCodeProcess(children.handles[children.num_children - 1], &exit_code);
+		if (status)
+			*status = exit_code;
 		sw_remove_child_at_index(children.num_children - 1);
 		return ret_id;
 	}

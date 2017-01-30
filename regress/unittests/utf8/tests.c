@@ -59,12 +59,14 @@ tests(void)
 {
 	char	*loc;
 
+#ifdef WINDOWS
+	TEST_START("not applicable to Windows yet");
+	TEST_DONE();
+	return;
+#endif
+
 	TEST_START("utf8_setlocale");	    
-#ifdef WIN32_FIXME
-    loc = setlocale(LC_CTYPE, "English");
-#else
     loc = setlocale(LC_CTYPE, "en_US.UTF-8");
-#endif    
 	ASSERT_PTR_NE(loc, NULL);
 	TEST_DONE();
 
@@ -74,20 +76,14 @@ tests(void)
 	one("newline", "a\nb", -2, -2, -2, "a\nb");
 	one("cr", "a\rb", -2, -2, -2, "a\rb");
 	one("tab", "a\tb", -2, -2, -2, "a\tb");
-#ifndef WIN32_FIXME
 	one("esc", "\033x", -2, -2, -2, "\\033x");
 	one("inv_badbyte", "\377x", -2, -2, -2, "\\377x");
 	one("inv_nocont", "\341x", -2, -2, -2, "\\341x");
 	one("inv_nolead", "a\200b", -2, -2, -2, "a\\200b");
-#endif
 	one("sz_ascii", "1234567890123456", -2, -2, 16, "123456789012345");
-#ifndef WIN32_FIXME
 	one("sz_esc", "123456789012\033", -2, -2, 16, "123456789012");
-#endif
 	one("width_ascii", "123", 2, 2, -1, "12");
 	one("width_double", "a\343\201\201", 2, 1, -1, "a");
-#ifndef WIN32_FIXME
 	one("double_fit", "a\343\201\201", 3, 3, 4, "a\343\201\201");
 	one("double_spc", "a\343\201\201", 4, 3, 4, "a\343\201\201");
-#endif
 }

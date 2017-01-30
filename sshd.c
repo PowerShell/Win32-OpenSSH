@@ -1302,9 +1302,9 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				if (path_utf8 == NULL)
 					fatal("Failed to alloc memory");
 				
-				if (snprintf(fd_handle, sizeof(fd_handle), "%p", sfd_to_handle(*newsock)) == -1
+				if (snprintf(fd_handle, sizeof(fd_handle), "%p", w32_fd_to_handle(*newsock)) == -1
 				    || SetEnvironmentVariable("SSHD_REMSOC", fd_handle) == FALSE
-				    || snprintf(fd_handle, sizeof(fd_handle), "%p", sfd_to_handle(startup_p[1])) == -1
+				    || snprintf(fd_handle, sizeof(fd_handle), "%p", w32_fd_to_handle(startup_p[1])) == -1
 				    || SetEnvironmentVariable("SSHD_STARTUPSOC", fd_handle) == FALSE
 				    || fcntl(startup_p[0], F_SETFD, FD_CLOEXEC) == -1) {
 					error("unable to set the right environment for child, closing connection ");

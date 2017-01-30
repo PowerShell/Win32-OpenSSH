@@ -288,7 +288,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\digest-openssl.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)digest-openssl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

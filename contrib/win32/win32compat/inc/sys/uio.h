@@ -1,7 +1,7 @@
-#ifndef COMPAT_UIO_H
-#define COMPAT_UIO_H 1
+#pragma once
 
-
-/* Compatibility header to avoid #ifdefs on Win32 */
-
-#endif
+struct iovec
+{
+	void *iov_base;
+	size_t iov_len;
+};

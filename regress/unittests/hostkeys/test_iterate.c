@@ -62,9 +62,7 @@ check(struct hostkey_foreach_line *l, void *_ctx)
 	test_subtest_info("entry %zu/%zu, file line %ld",
 	    ctx->i + 1, ctx->nexpected, l->linenum);
 	for (;;) {
-#ifndef WIN32_FIXME
-		//ASSERT_SIZE_T_LT(ctx->i, ctx->nexpected);
-#endif
+		ASSERT_SIZE_T_LT(ctx->i, ctx->nexpected);
 		expected = ctx->expected + ctx->i++;
 		/* If we are matching host/IP then skip entries that don't */
 		if (!matching)
@@ -114,7 +112,6 @@ check(struct hostkey_foreach_line *l, void *_ctx)
 	UPDATE_MATCH_STATUS(match_ipv6);
 
 	ASSERT_PTR_NE(l->path, NULL); /* Don't care about path */
-#ifndef WIN32_FIXME
 	ASSERT_LONG_LONG_EQ(l->linenum, expected->l.linenum);
 	ASSERT_U_INT_EQ(l->status, expected_status);
 	ASSERT_U_INT_EQ(l->match, expected_match);
@@ -140,7 +137,6 @@ check(struct hostkey_foreach_line *l, void *_ctx)
 	}
 	if (parse_key && !(l->comment == NULL && expected->l.comment == NULL))
 		ASSERT_STRING_EQ(l->comment, expected->l.comment);
-#endif
 	return 0;
 }
 
@@ -285,7 +281,7 @@ struct expected expected_full[] = {
 		NULL,	/* filled at runtime */
 		"DSA #2",
 	} },
-#ifndef WIN32_FIXME	
+#ifdef OPENSSL_HAS_NISTP521
 	{ "ecdsa_2.pub" , -1, -1, HKF_MATCH_HOST, 0, HKF_MATCH_IP, HKF_MATCH_IP, -1, {
 		NULL,
 		10,
@@ -812,7 +808,6 @@ struct expected expected_full[] = {
 		NULL,	/* filled at runtime */
 		"ECDSA #4",
 	} },
-#ifndef WIN32_FIXME	
 	{ "dsa_4.pub" , -1, -1, HKF_MATCH_HOST, HKF_MATCH_HOST, 0, 0, -1, {
 		NULL,
 		50,
@@ -826,7 +821,6 @@ struct expected expected_full[] = {
 		NULL,	/* filled at runtime */
 		"DSA #4",
 	} },
-#endif
 	{ NULL, -1, -1, 0, 0, 0, 0, -1, {
 		NULL,
 		51,

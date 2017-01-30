@@ -10,7 +10,7 @@
 #ifndef COMPAT_PWD_H
 #define COMPAT_PWD_H 1
 
-#include "sys\param.h"
+#include "sys\types.h"
 
 struct passwd {
         char	*pw_name;	/* user's login name */

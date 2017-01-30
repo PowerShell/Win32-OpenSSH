@@ -939,7 +939,7 @@
 /* #undef HAVE_STRICT_MKSTEMP */
 
 /* Define to 1 if you have the <strings.h> header file. */
-/* #undef HAVE_STRINGS_H 
+#define HAVE_STRINGS_H 1
 
 /* Define to 1 if you have the <string.h> header file. */
 #define HAVE_STRING_H 1
@@ -1332,6 +1332,7 @@
 
 /* libcrypto includes complete ECC support */
 #define OPENSSL_HAS_ECC 1
+#define OPENSSL_HAS_NISTP521 1
 
 /* libcrypto is missing AES 192 and 256 bit functions */
 /* #undef OPENSSL_LOBOTOMISED_AES */
@@ -1580,7 +1581,6 @@
 #define WIN32_LEAN_AND_MEAN 1
 #define _CRT_SECURE_NO_DEPRECATE 1
 #define _CRT_NONSTDC_NO_DEPRECATE 1
-#define WIN32_FIXME 1
 #define WINDOWS 1
 
 /* Define if you must implement a startup_needs function for your platform */

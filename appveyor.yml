@@ -1,4 +1,4 @@
-version: 0.0.6.0.{build}
+version: 0.0.8.0.{build}
 image: Visual Studio 2015
 
 branches:
@@ -11,33 +11,34 @@ init:
 
 build_script:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppVeyor.psm1 -WarningAction SilentlyContinue
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppVeyor.psm1 -DisableNameChecking
       Invoke-AppVeyorBuild
 
 after_build:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppVeyor.psm1 -WarningAction SilentlyContinue
       Install-OpenSSH
   - ps: Write-Verbose "Restart computer ..."
-  - ps: Restart-Computer -ComputerName localhost -Force
+  - ps: Restart-Computer -Force
   - ps: Start-Sleep -s 5 # Needs to be proceeded with -ps: as it's interpreted by AppVeyor
-  - ps: Write-Verbose "Restart computer completed"
+  - ps: Write-Verbose "Restart computer completed!"
 
 before_test:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppVeyor.psm1 -WarningAction SilentlyContinue
-      Install-TestDependencies 
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppVeyor.psm1 -DisableNameChecking
+      Install-TestDependencies
+      Deploy-OpenSSHTests
 
 test_script:
   - cmd: |
-      "%ProgramFiles%\PowerShell\6.0.0.14\powershell.exe" -Command "Import-Module \"%APPVEYOR_BUILD_FOLDER%\contrib\win32\openssh\AppVeyor.psm1\" -WarningAction SilentlyContinue;Run-OpenSSHTests"
+       "%ProgramFiles%\PowerShell\6.0.0.14\powershell.exe" -Command "Import-Module \"%APPVEYOR_BUILD_FOLDER%\contrib\win32\openssh\AppVeyor.psm1\" -DisableNameChecking;Run-OpenSSHPesterTest"
+  - ps: |
+      Check-PesterTestResult
+      Run-OpenSSHUnitTest
 
 after_test:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppVeyor.psm1 -WarningAction SilentlyContinue
       Upload-OpenSSHTestResults
       
 on_finish:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppVeyor.psm1 -WarningAction SilentlyContinue
       Publish-Artifact

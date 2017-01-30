@@ -136,7 +136,7 @@ sshkey_file_tests(void)
 	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
 	sshkey_free(k2);
 	TEST_DONE();
-#ifndef WIN32_FIXME
+	
 	TEST_START("parse RSA from new-format w/ passphrase");
 	buf = load_file("rsa_n_pw");
 	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf,
@@ -146,7 +146,7 @@ sshkey_file_tests(void)
 	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
 	sshkey_free(k2);
 	TEST_DONE();
-#endif
+	
 	TEST_START("load RSA from public");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("rsa_1.pub"), &k2,
 	    NULL), 0);
@@ -228,7 +228,6 @@ sshkey_file_tests(void)
 	sshkey_free(k2);
 	TEST_DONE();
 
-#ifndef WIN32_FIXME
 	TEST_START("parse DSA from new-format w/ passphrase");
 	buf = load_file("dsa_n_pw");
 	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf,
@@ -238,7 +237,7 @@ sshkey_file_tests(void)
 	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
 	sshkey_free(k2);
 	TEST_DONE();
-#endif
+
 	TEST_START("load DSA from public");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("dsa_1.pub"), &k2,
 	    NULL), 0);
@@ -327,7 +326,7 @@ sshkey_file_tests(void)
 	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
 	sshkey_free(k2);
 	TEST_DONE();
-#ifndef WIN32_FIXME
+
 	TEST_START("parse ECDSA from new-format w/ passphrase");
 	buf = load_file("ecdsa_n_pw");
 	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf,
@@ -337,7 +336,7 @@ sshkey_file_tests(void)
 	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
 	sshkey_free(k2);
 	TEST_DONE();
-#endif
+
 	TEST_START("load ECDSA from public");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("ecdsa_1.pub"), &k2,
 	    NULL), 0);
@@ -384,7 +383,7 @@ sshkey_file_tests(void)
 
 	sshkey_free(k1);
 #endif /* OPENSSL_HAS_ECC */
-#ifndef WIN32_FIXME
+
 	TEST_START("parse Ed25519 from private");
 	buf = load_file("ed25519_1");
 	ASSERT_INT_EQ(sshkey_parse_private_fileblob(buf, "", &k1, NULL), 0);
@@ -451,5 +450,5 @@ sshkey_file_tests(void)
 	sshkey_free(k1);
 
 	sshbuf_free(pw);
-#endif
+
 }
