@@ -26,10 +26,6 @@
 #include <string.h>
 #include <errno.h>
 
-#ifdef WIN32_FIXME
-void debug3(const char *fmt,...) {/*stub*/}
-#endif
-void
 static void
 usage(void)
 {

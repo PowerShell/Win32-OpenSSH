@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.127 2016/10/10 19:28:48 markus Exp $ */
+/* $OpenBSD: kex.c,v 1.128 2017/02/03 23:01:19 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -211,7 +211,8 @@ kex_names_cat(const char *a, const char *b)
 /*
  * Assemble a list of algorithms from a default list and a string from a
  * configuration file. The user-provided string may begin with '+' to
- * indicate that it should be appended to the default.
+ * indicate that it should be appended to the default or '-' that the
+ * specified names should be removed.
  */
 int
 kex_assemble_names(const char *def, char **list)
@@ -222,14 +223,18 @@ kex_assemble_names(const char *def, char **list)
 		*list = strdup(def);
 		return 0;
 	}
-	if (**list != '+') {
-		return 0;
+	if (**list == '+') {
+		if ((ret = kex_names_cat(def, *list + 1)) == NULL)
+			return SSH_ERR_ALLOC_FAIL;
+		free(*list);
+		*list = ret;
+	} else if (**list == '-') {
+		if ((ret = match_filter_list(def, *list + 1)) == NULL)
+			return SSH_ERR_ALLOC_FAIL;
+		free(*list);
+		*list = ret;
 	}
 
-	if ((ret = kex_names_cat(def, *list + 1)) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-	free(*list);
-	*list = ret;
 	return 0;
 }
 

@@ -1,10 +1,11 @@
 /*
  * Author: Microsoft Corp.
  *
- * Copyright (c) 2015 Microsoft Corp.
+ * Copyright (c) 2017 Microsoft Corp.
  * All rights reserved
  *
- * Microsoft openssh win32 port
+ * This file is responsible for terminal emulation related network calls to 
+ * invoke ANSI parsing engine.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,61 +28,52 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* tnnet.c
- * 
- * Contains terminal emulation related network calls to invoke ANSI parsing engine
- *
- */
- 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
 #include <windows.h>
-
 #include "ansiprsr.h"
 
 #define dwBuffer 4096
 
-// Server will always be returning a sequence of ANSI control characters which the client
-// protocol can either passthru directly to the console or transform based on an output terminal
-// type. We're not using termcap so we're only supporting the ANSI (vt100) sequences that
-// are hardcoded in the server and will be transformed to Windows Console commands.
-
-size_t telProcessNetwork(char *buf, size_t len, unsigned char **respbuf, size_t *resplen)
+/*
+ * Server will always be returning a sequence of ANSI control characters which the client
+ * protocol can either passthru directly to the console or transform based on an output terminal
+ * type. We're not using termcap so we're only supporting the ANSI (vt100) sequences that
+ * are hardcoded in the server and will be transformed to Windows Console commands.
+ */
+size_t 
+telProcessNetwork(char *buf, size_t len, unsigned char **respbuf, size_t *resplen)
 {
 	unsigned char szBuffer[dwBuffer + 8];
-
 	unsigned char* pszNewHead = NULL;
+	unsigned char* pszHead = NULL;
+	unsigned char* pszTail = NULL;
 
-    unsigned char* pszHead = NULL;
-    unsigned char* pszTail = NULL;
+	if (len == 0)
+		return len;
 
-    if (len == 0)
-        return len;
-
-    // Transform a single carriage return into a single linefeed before
-    // continuing.
+	/* Transform a single carriage return into a single linefeed before continuing */
 	if ((len == 1) && (buf[0] == 13))
 		buf[0] = 10;
 
 	pszTail = (unsigned char *)buf;
 	pszHead = (unsigned char *)buf;
-
 	pszTail += len;
-
 	pszNewHead = pszHead;
 
-    // Loop through the network buffer transforming characters as necessary.
-    // The buffer will be empty after the transformation
-    // process since the buffer will contain only commands that are handled by the console API.
+	/*
+	 * Loop through the network buffer transforming characters as necessary.
+	 * The buffer will be empty after the transformation
+	 * process since the buffer will contain only commands that are handled by the console API.
+	 */
 	do {
 		pszHead = pszNewHead;
 		pszNewHead = ParseBuffer(pszHead, pszTail, respbuf, resplen);
 
 	} while ((pszNewHead != pszHead) && (pszNewHead < pszTail) && (resplen == NULL || (resplen != NULL && *resplen == 0)));
-
-    len = 0;
-
+	len = 0;
 	return len;
 }

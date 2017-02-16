@@ -57,7 +57,10 @@ int ConUnInit(void);
 
 struct termios term_settings;
 
-/* TODO - clean this up for Windows, ConInit should return previous terminal settings that need to be stored in term_settings*/
+/* 
+ * TODO - clean this up for Windows, ConInit should return previous terminal
+ * settings that need to be stored in term_settings
+ */
 
 struct termios *
         get_saved_tio(void) {

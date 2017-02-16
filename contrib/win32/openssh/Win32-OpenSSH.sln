@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssh", "ssh.vcxproj", "{74E69D5E-A1EF-46EA-9173-19A412774104}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -68,6 +68,7 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssh-shellhost", "ssh-shellhost.vcxproj", "{C0AE8A30-E4FA-49CE-A2B5-0C072C77EC64}"
 	ProjectSection(ProjectDependencies) = postProject
 		{8F9D3B74-8D33-448E-9762-26E8DCC6B2F4} = {8F9D3B74-8D33-448E-9762-26E8DCC6B2F4}
+		{DD483F7D-C553-4740-BC1A-903805AD0174} = {DD483F7D-C553-4740-BC1A-903805AD0174}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ssh-agent", "ssh-agent.vcxproj", "{F6644EC5-D6B6-42A1-828C-75E2977470E0}"

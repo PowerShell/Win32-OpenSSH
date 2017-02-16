@@ -38,7 +38,10 @@ cd $scriptdir
 cmd.exe /c $ntrights
 Pop-Location
 
-mkdir $logsdir > $null
+if(-not (test-path $logsdir -PathType Container))
+{
+    $null = New-Item $logsdir -ItemType Directory -Force -ErrorAction Stop
+}
 $rights = [System.Security.AccessControl.FileSystemRights]"Read, Write"
 $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($account, $rights, "ContainerInherit,ObjectInherit", "None", "Allow")
 $acl = Get-Acl -Path $logsdir

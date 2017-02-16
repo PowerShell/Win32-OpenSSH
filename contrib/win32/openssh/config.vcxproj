@@ -201,4 +201,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="BeforeClean">
+    <Delete Files="$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h" />
+  </Target>
 </Project>

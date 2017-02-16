@@ -13,13 +13,14 @@
 #include "sys\types.h"
 
 struct passwd {
-        char	*pw_name;	/* user's login name */
-        char	*pw_passwd;	/* password? */
+	char	*pw_name;	/* user's login name */
+	char	*pw_passwd;	/* password? */
 	char	*pw_gecos;	/* ??? */
 	uid_t	pw_uid;		/* numerical user ID */
 	gid_t	pw_gid;		/* numerical group ID */
 	char	*pw_dir;	/* initial working directory */
 	char	*pw_shell;	/* path to shell */
+	char	*pw_sid;	/* sid of user */
 };
 
 /*start - declarations not applicable in Windows */

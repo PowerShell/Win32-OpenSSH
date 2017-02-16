@@ -52,8 +52,10 @@ typedef int sigset_t;
 #define W32_SIG_IGN		((sighandler_t)1)
 
 sighandler_t w32_signal(int signum, sighandler_t handler);
-#define signal(a,b)	w32_signal((a), (b))
-#define mysignal(a,b)	w32_signal((a), (b))
+//#define signal(a,b)	w32_signal((a), (b))
+//#define mysignal(a,b)	w32_signal((a), (b))
+sighandler_t mysignal(int signum, sighandler_t handler);
+
 
 int w32_raise(int sig);
 #define raise(a)	w32_raise(a)

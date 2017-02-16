@@ -167,9 +167,6 @@ done:
 	return r;
 }
 
-/* TODO - move this to common header*/
-#define SSH_AGENT_AUTHENTICATE			100
-
 static int
 process_request(struct agent_connection* con) {
 	int r = -1;
@@ -179,7 +176,7 @@ process_request(struct agent_connection* con) {
 		if ((con->client_process = get_con_client_type(con->connection)) == -1)
 			goto done;
 
-	
+	//Sleep(30 * 1000);
 	request = sshbuf_from(con->io_buf.buf, con->io_buf.num_bytes);
 	response = sshbuf_new();
 	if ((request == NULL) || (response == NULL))

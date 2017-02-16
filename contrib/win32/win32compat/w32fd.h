@@ -1,7 +1,33 @@
 /*
- * Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
- *
- * Definitions for Win32 wrapper functions with POSIX like signatures
+* Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
+*
+* Definitions for Win32 wrapper functions with POSIX like signatures
+*
+* Copyright (c) 2015 Microsoft Corp.
+* All rights reserved
+*
+* Microsoft openssh win32 port
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions
+* are met:
+*
+* 1. Redistributions of source code must retain the above copyright
+* notice, this list of conditions and the following disclaimer.
+* 2. Redistributions in binary form must reproduce the above copyright
+* notice, this list of conditions and the following disclaimer in the
+* documentation and/or other materials provided with the distribution.
+*
+* THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+* IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+* OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+* IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+* NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+* THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+* THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #pragma once
@@ -17,7 +43,7 @@ enum w32_io_type {
 };
 
 enum w32_io_sock_state {
-	SOCK_INITIALIZED = 0,		
+	SOCK_INITIALIZED = 0,
 	SOCK_LISTENING = 1,	/*listen called on socket*/
 	SOCK_ACCEPTED = 2,	/*socket returned from accept()*/
 	SOCK_CONNECTING = 3,	/*connect called on socket, connect is in progress*/
@@ -25,41 +51,35 @@ enum w32_io_sock_state {
 };
 
 /*
-* This structure encapsulates the state info needed to map a File Descriptor 
+* This structure encapsulates the state info needed to map a File Descriptor
 * to Win32 Handle
 */
 struct w32_io {
 	OVERLAPPED read_overlapped;
 	OVERLAPPED write_overlapped;
 	struct {
-		/*internal read buffer*/
-		char *buf;
+		char *buf; /*internal read buffer*/
 		DWORD buf_size;
-		/*bytes in internal buffer remaining to be read by application*/
-		DWORD remaining;
-		/*bytes in internal buffer already read by application*/
-		DWORD completed; 
+		DWORD remaining; /*bytes in internal buffer remaining to be read by application*/
+		DWORD completed; /*bytes in internal buffer already read by application*/
 		BOOL pending;	 /*waiting on a read operation to complete*/
 		DWORD error;	 /*error reported on async read or accept completion*/
 	}read_details;
 	struct {
-		/*internal write buffer*/
-		char *buf;
+		char *buf; /*internal write buffer*/
 		DWORD buf_size;
-		/*bytes in internal buffer remaining to be written to network*/
-		DWORD remaining;
-		/*bytes in internal buffer already written to network*/
-		DWORD completed; 
+		DWORD remaining; /*bytes in internal buffer remaining to be written to network*/
+		DWORD completed; /*bytes in internal buffer already written to network*/
 		BOOL pending;	 /*waiting on a write operation to complete*/
 		DWORD error;	 /*error reported on async write or connect completion*/
 	}write_details;
-	
+
 	/*index at which this object is stored in fd_table*/
-	int table_index;		
+	int table_index;
 	enum w32_io_type type;		/*hanldle type*/
 	DWORD fd_flags;			/*fd flags from POSIX*/
 	DWORD fd_status_flags;		/*fd status flags from POSIX*/
-	
+
 	/*underlying w32 handle*/
 	union {
 		SOCKET sock;
@@ -89,10 +109,8 @@ BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd);
 void socketio_on_select(struct w32_io* pio, BOOL rd);
 struct w32_io* socketio_socket(int domain, int type, int protocol);
 struct w32_io* socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen);
-int socketio_setsockopt(struct w32_io* pio, int level, int optname, 
-	const char* optval, int optlen);
-int socketio_getsockopt(struct w32_io* pio, int level, int optname, 
-	char* optval, int* optlen);
+int socketio_setsockopt(struct w32_io* pio, int level, int optname, const char* optval, int optlen);
+int socketio_getsockopt(struct w32_io* pio, int level, int optname, char* optval, int* optlen);
 int socketio_getsockname(struct w32_io* pio, struct sockaddr* name, int* namelen);
 int socketio_getpeername(struct w32_io* pio, struct sockaddr* name, int* namelen);
 int socketio_listen(struct w32_io* pio, int backlog);
@@ -145,16 +163,16 @@ int termio_close(struct w32_io* pio);
 /* If O_CREAT and O_EXCL are set, open() shall fail if the file exists */
 /* #define O_EXCL      0x400   */
 /* #define O_BINARY    0x8000   //Gives raw data (while O_TEXT normalises line endings */
-// open modes
+/* open modes */
 #ifndef  S_IRUSR
-#define S_IRUSR     00400   //user has read permission 
-#endif // ! S_IRUSR
+#define S_IRUSR     00400   /* user has read permission */
+#endif /* ! S_IRUSR */
 #ifndef S_IWUSR
-#define S_IWUSR     00200   //user has write permission 
+#define S_IWUSR     00200   /* user has write permission */ 
 #endif
 #ifndef S_IRGRP
-#define S_IRGRP     00040   //group has read permission 
+#define S_IRGRP     00040   /* group has read permission  */
 #endif
 #ifndef S_IROTH
-#define S_IROTH     00004   //others have read permission
+#define S_IROTH     00004   /* others have read permission */
 #endif

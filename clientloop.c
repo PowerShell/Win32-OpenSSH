@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.289 2016/09/30 09:19:13 markus Exp $ */
+/* $OpenBSD: clientloop.c,v 1.290 2017/01/29 21:35:23 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -991,7 +991,7 @@ process_cmdline(void)
 			    CHANNEL_CANCEL_PORT_STATIC,
 			    &options.fwd_opts) > 0;
 		if (!ok) {
-			logit("Unkown port forwarding.");
+			logit("Unknown port forwarding.");
 			goto out;
 		}
 		logit("Canceled forwarding.");

@@ -1,4 +1,4 @@
-/* $OpenBSD: utf8.c,v 1.3 2016/05/30 12:57:21 schwarze Exp $ */
+/* $OpenBSD: utf8.c,v 1.4 2017/02/02 10:54:25 jsg Exp $ */
 /*
  * Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
  *
@@ -122,6 +122,7 @@ vasnmprintf(char **str, size_t maxsz, int *wp, const char *fmt, va_list ap)
 	sz = strlen(src) + 1;
 	if ((dst = malloc(sz)) == NULL) {
 		free(src);
+		ret = -1;
 		goto fail;
 	}
 

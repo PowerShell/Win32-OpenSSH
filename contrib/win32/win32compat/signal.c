@@ -28,10 +28,11 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "w32fd.h"
 #include <errno.h>
+#include "w32fd.h"
 #include "signal_internal.h"
 #include "inc\signal.h"
+
 #undef signal
 #undef raise
 #undef SIGINT
@@ -48,30 +49,27 @@
 
 /* pending signals to be processed */
 sigset_t pending_signals;
-
 /* signal handler table*/
 sighandler_t sig_handlers[W32_SIGMAX];
+extern struct _children children;
 
-static VOID CALLBACK 
-sigint_APCProc(
-	_In_ ULONG_PTR dwParam
-	) {
+static VOID CALLBACK
+sigint_APCProc(_In_ ULONG_PTR dwParam)
+{
 	debug3("SIGINT APCProc()");
 	sigaddset(&pending_signals, W32_SIGINT);
 }
 
 static VOID CALLBACK
-sigterm_APCProc(
-	_In_ ULONG_PTR dwParam
-	) {
+sigterm_APCProc(_In_ ULONG_PTR dwParam)
+{
 	debug3("SIGTERM APCProc()");
 	sigaddset(&pending_signals, W32_SIGTERM);
 }
 
 static VOID CALLBACK
-sigtstp_APCProc(
-	_In_ ULONG_PTR dwParam
-	) {
+sigtstp_APCProc(_In_ ULONG_PTR dwParam)
+{
 	debug3("SIGTSTP APCProc()");
 	sigaddset(&pending_signals, W32_SIGTSTP);
 }
@@ -100,48 +98,50 @@ native_sig_handler(DWORD dwCtrlType)
 }
 
 static VOID CALLBACK
-sigwinch_APCProc(
-	_In_ ULONG_PTR dwParam
-	) {
+sigwinch_APCProc(_In_ ULONG_PTR dwParam)
+{
 	debug3("SIGTERM APCProc()");
 	sigaddset(&pending_signals, W32_SIGWINCH);
 }
 
-
 void
-queue_terminal_window_change_event() {
+queue_terminal_window_change_event()
+{
 	QueueUserAPC(sigwinch_APCProc, main_thread, (ULONG_PTR)NULL);
 }
 
-void 
-sw_init_signal_handler_table() {
-	int i;
-
+void
+sw_init_signal_handler_table()
+{
 	SetConsoleCtrlHandler(native_sig_handler, TRUE);
 	sigemptyset(&pending_signals);
 	/* this automatically sets all to W32_SIG_DFL (0)*/
 	memset(sig_handlers, 0, sizeof(sig_handlers));
 }
 
-extern struct _children children;
+sighandler_t
+mysignal(int signum, sighandler_t handler) {
+	return w32_signal(signum, handler);
+}
 
-sighandler_t 
-w32_signal(int signum, sighandler_t handler) {
+sighandler_t
+w32_signal(int signum, sighandler_t handler)
+{
 	sighandler_t prev;
-
 	debug2("signal() sig:%d, handler:%p", signum, handler);
 	if (signum >= W32_SIGMAX) {
 		errno = EINVAL;
 		return W32_SIG_ERR;
 	}
 
-	prev = sig_handlers[signum]; 
+	prev = sig_handlers[signum];
 	sig_handlers[signum] = handler;
 	return prev;
 }
 
-int 
-w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
+int
+w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
 	/* this is only used by sshd to block SIGCHLD while doing waitpid() */
 	/* our implementation of waidpid() is never interrupted, so no need to implement this for now*/
 	debug3("sigprocmask() how:%d");
@@ -150,8 +150,9 @@ w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset) {
 
 
 
-int 
-w32_raise(int sig) {
+int
+w32_raise(int sig)
+{
 	debug("raise sig:%d", sig);
 	if (sig == W32_SIGSEGV)
 		return raise(SIGSEGV); /* raise native exception handler*/
@@ -170,7 +171,7 @@ w32_raise(int sig) {
 	/* if set to ignore, nothing to do */
 	if (sig_handlers[sig] == W32_SIG_IGN)
 		return 0;
-		
+
 	/* execute any default handlers */
 	switch (sig) {
 	case W32_SIGCHLD:
@@ -184,8 +185,9 @@ w32_raise(int sig) {
 }
 
 /* processes pending signals, return -1 and errno=EINTR if any are processed*/
-static int 
-sw_process_pending_signals() {
+static int
+sw_process_pending_signals()
+{
 	sigset_t pending_tmp = pending_signals;
 	BOOL sig_int = FALSE; /* has any signal actually interrupted */
 
@@ -195,7 +197,7 @@ sw_process_pending_signals() {
 	/* check for expected signals*/
 	for (i = 0; i < (sizeof(exp) / sizeof(exp[0])); i++)
 		sigdelset(&pending_tmp, exp[i]);
-	if (pending_tmp) { 
+	if (pending_tmp) {
 		/* unexpected signals queued up */
 		debug("process_signals() - ERROR unexpected signals in queue: %d", pending_tmp);
 		errno = ENOTSUP;
@@ -219,7 +221,7 @@ sw_process_pending_signals() {
 			sigdelset(&pending_tmp, exp[i]);
 		}
 	}
-		
+
 
 	/* by now all pending signals should have been taken care of*/
 	if (pending_tmp)
@@ -235,17 +237,17 @@ sw_process_pending_signals() {
 }
 
 /*
- * Main wait routine used by all blocking calls. 
- * It wakes up on 
+ * Main wait routine used by all blocking calls.
+ * It wakes up on
  * - any signals (errno = EINTR )
- * - any of the supplied events set 
- * - any APCs caused by IO completions 
- * - time out 
+ * - any of the supplied events set
+ * - any APCs caused by IO completions
+ * - time out
  * - Returns 0 on IO completion and timeout, -1 on rest
- *  if milli_seconds is 0, this function returns 0, its called with 0 
+ *  if milli_seconds is 0, this function returns 0, its called with 0
  *  to execute any scheduled APCs
 */
-int 
+int
 wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 {
 	HANDLE all_events[MAXIMUM_WAIT_OBJECTS];
@@ -266,55 +268,49 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	debug3("wait() on %d events and %d children", num_events, live_children);
 	/* TODO - implement signal catching and handling */
 	if (num_all_events) {
-		DWORD ret = WaitForMultipleObjectsEx(num_all_events, all_events, FALSE,
-		    milli_seconds, TRUE);
+		DWORD ret = WaitForMultipleObjectsEx(num_all_events, all_events, FALSE, milli_seconds, TRUE);
 		if ((ret >= WAIT_OBJECT_0) && (ret <= WAIT_OBJECT_0 + num_all_events - 1)) {
-			//woken up by event signalled
-			/* is this due to a child process going down*/
+			/* woken up by event signalled
+			 * is this due to a child process going down
+			 */
 			if (live_children && ((ret - WAIT_OBJECT_0) < live_children)) {
 				sigaddset(&pending_signals, W32_SIGCHLD);
 				sw_child_to_zombie(ret - WAIT_OBJECT_0);
 			}
-		}
-		else if (ret == WAIT_IO_COMPLETION) {
+		} else if (ret == WAIT_IO_COMPLETION) {
 			/* APC processed due to IO or signal*/
-		}
-		else if (ret == WAIT_TIMEOUT) {
+		} else if (ret == WAIT_TIMEOUT) {
 			/* timed out */
 			return 0;
-		}
-		/* some other error*/
-		else { 
+		} else { /* some other error*/
 			errno = EOTHER;
 			debug("ERROR: unxpected wait end: %d", ret);
 			return -1;
 		}
-	}
-	else {
+	} else {
 		DWORD ret = SleepEx(milli_seconds, TRUE);
 		if (ret == WAIT_IO_COMPLETION) {
 			/* APC processed due to IO or signal*/
-		}
-		else if (ret == 0) {
+		} else if (ret == 0) {
 			/* timed out */
 			return 0;
-		}
-		else { //some other error
+		} else { /* some other error */
 			errno = EOTHER;
 			debug("ERROR: unxpected SleepEx error: %d", ret);
 			return -1;
 		}
 	}
 
-	if (pending_signals) {
+	if (pending_signals)
 		return sw_process_pending_signals();
-	}
+	
 	return 0;
 }
 
 
 int
-sw_initialize() {
+sw_initialize()
+{
 	memset(&children, 0, sizeof(children));
 	sw_init_signal_handler_table();
 	if (sw_init_timer() != 0)

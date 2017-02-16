@@ -193,7 +193,6 @@ sshkey_tests(void)
 	sshkey_free(k1);
 	TEST_DONE();
 
-#ifdef WITH_OPENSSL
 	TEST_START("new/free KEY_RSA1");
 	k1 = sshkey_new(KEY_RSA1);
 	ASSERT_PTR_NE(k1, NULL);
@@ -222,7 +221,6 @@ sshkey_tests(void)
 	ASSERT_PTR_EQ(k1->dsa->priv_key, NULL);
 	sshkey_free(k1);
 	TEST_DONE();
-#endif
 
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("new/free KEY_ECDSA");
@@ -242,7 +240,6 @@ sshkey_tests(void)
 	sshkey_free(k1);
 	TEST_DONE();
 
-#ifdef WITH_OPENSSL
 	TEST_START("new_private KEY_RSA");
 	k1 = sshkey_new_private(KEY_RSA);
 	ASSERT_PTR_NE(k1, NULL);
@@ -311,7 +308,7 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(kd->dsa->g, NULL);
 	ASSERT_PTR_NE(kd->dsa->priv_key, NULL);
 	TEST_DONE();
-#endif
+
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("generate KEY_ECDSA");
 	ASSERT_INT_EQ(sshkey_generate(KEY_ECDSA, 256, &ke), 0);
@@ -330,7 +327,6 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(kf->ed25519_sk, NULL);
 	TEST_DONE();
 
-#ifdef WITH_OPENSSL
 	TEST_START("demote KEY_RSA");
 	ASSERT_INT_EQ(sshkey_demote(kr, &k1), 0);
 	ASSERT_PTR_NE(k1, NULL);
@@ -361,7 +357,6 @@ sshkey_tests(void)
 	ASSERT_INT_EQ(sshkey_equal(kd, k1), 1);
 	sshkey_free(k1);
 	TEST_DONE();
-#endif
 
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("demote KEY_ECDSA");
@@ -508,7 +503,6 @@ sshkey_tests(void)
 	sshkey_free(k2);
 	TEST_DONE();
 
-
 #ifdef OPENSSL_HAS_ECC
 	TEST_START("sign and verify ECDSA");
 	k1 = get_private("ecdsa_1");
@@ -518,6 +512,7 @@ sshkey_tests(void)
 	sshkey_free(k1);
 	sshkey_free(k2);
 	TEST_DONE();
+#endif
 
 	TEST_START("sign and verify ED25519");
 	k1 = get_private("ed25519_1");
@@ -542,5 +537,5 @@ sshkey_tests(void)
 	sshkey_free(k3);
 	sshbuf_free(b);
 	TEST_DONE();
-#endif
+
 }

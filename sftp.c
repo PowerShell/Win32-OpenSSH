@@ -2216,8 +2216,10 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 	setvbuf(stdout, NULL, _IOLBF, 2);
 	
 	/* We do this only in interactive mode as we are unable to read files with UTF8 BOM */
-	if(interactive)
+	if (interactive) {
 		setvbuf(infile, NULL, _IOLBF, 2);
+		_setmode(_fileno(stdin), O_U16TEXT); /* prepare for Unicode input */
+	}
 #else   /* !WINDOWS */
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	setvbuf(infile, NULL, _IOLBF, 0);
@@ -2449,11 +2451,6 @@ main(int argc, char **argv)
 	addargs(&args, "-oClearAllForwardings yes");
 
 	ll = SYSLOG_LEVEL_INFO;
-
-#ifdef WINDOWS
-	/* prepare for Unicode input */
-	_setmode(_fileno(stdin), O_U16TEXT);
-#endif
 	infile = stdin;
 
 	while ((ch = getopt(argc, argv,

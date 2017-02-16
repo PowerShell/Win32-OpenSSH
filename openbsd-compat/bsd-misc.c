@@ -211,7 +211,11 @@ tcsendbreak(int fd, int duration)
 }
 #endif /* HAVE_TCSENDBREAK */
 
-#ifdef HAVE_SIGACTION /* Moved out of function definition */
+/* 
+ * This is not a BSD routine. Why is this here? 
+ * Macro added to override this implementation for Windows
+ */
+#ifndef HAVE_MYSIGNAL 
 mysig_t
 mysignal(int sig, mysig_t act)
 {

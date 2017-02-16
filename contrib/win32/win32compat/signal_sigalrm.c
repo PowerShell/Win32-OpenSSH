@@ -35,16 +35,16 @@ struct _timer_info timer_info;
 extern sigset_t pending_signals;
 
 static VOID CALLBACK
-sigalrm_APC(
-	_In_opt_ LPVOID lpArgToCompletionRoutine,
-	_In_     DWORD  dwTimerLowValue,
-	_In_     DWORD  dwTimerHighValue
-	) {
+sigalrm_APC(_In_opt_ LPVOID lpArgToCompletionRoutine,
+	    _In_ DWORD dwTimerLowValue,
+	    _In_ DWORD dwTimerHighValue)
+{
 	sigaddset(&pending_signals, W32_SIGALRM);
 }
 
 unsigned int
-w32_alarm(unsigned int sec) {
+w32_alarm(unsigned int sec)
+{
 	LARGE_INTEGER due;
 	ULONGLONG sec_passed;
 	int ret = 0;
@@ -59,7 +59,7 @@ w32_alarm(unsigned int sec) {
 		return 0;
 	}
 
-	due.QuadPart = -10000000LL; //1 sec in 100 nanosec intervals
+	due.QuadPart = -10000000LL; /* 1 sec in 100 nanosec intervals */
 	due.QuadPart *= sec;
 	/* this call resets the timer if it is already active */
 	if (!SetWaitableTimer(timer_info.timer, &due, 0, sigalrm_APC, NULL, FALSE)) {
@@ -75,16 +75,19 @@ w32_alarm(unsigned int sec) {
 	}
 	timer_info.ticks_at_start = GetTickCount64();
 	timer_info.run_time_sec = sec;
+	
 	return ret;
 }
 
 int
-sw_init_timer() {
+sw_init_timer()
+{
 	memset(&timer_info, 0, sizeof(timer_info));
 	timer_info.timer = CreateWaitableTimer(NULL, TRUE, NULL);
 	if (timer_info.timer == NULL) {
 		errno = ENOMEM;
 		return -1;
 	}
+
 	return 0;
 }

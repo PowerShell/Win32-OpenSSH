@@ -1,4 +1,4 @@
-/* $OpenBSD: match.c,v 1.33 2016/11/06 05:46:37 djm Exp $ */
+/* $OpenBSD: match.c,v 1.34 2017/02/03 23:01:19 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -284,3 +284,32 @@ match_list(const char *client, const char *server, u_int *next)
 	free(s);
 	return NULL;
 }
+
+/*
+ * Filters a comma-separated list of strings, excluding any entry matching
+ * the 'filter' pattern list. Caller must free returned string.
+ */
+char *
+match_filter_list(const char *proposal, const char *filter)
+{
+	size_t len = strlen(proposal) + 1;
+	char *fix_prop = malloc(len);
+	char *orig_prop = strdup(proposal);
+	char *cp, *tmp;
+
+	if (fix_prop == NULL || orig_prop == NULL)
+		return NULL;
+
+	tmp = orig_prop;
+	*fix_prop = '\0';
+	while ((cp = strsep(&tmp, ",")) != NULL) {
+		if (match_pattern_list(cp, filter, 0) != 1) {
+			if (*fix_prop != '\0')
+				strlcat(fix_prop, ",", len);
+			strlcat(fix_prop, cp, len);
+		}
+	}
+	free(orig_prop);
+	return fix_prop;
+}
+

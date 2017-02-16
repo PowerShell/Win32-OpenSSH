@@ -248,6 +248,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sshlogin.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshpty.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_sshd.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)groupaccess.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />

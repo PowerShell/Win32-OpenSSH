@@ -39,7 +39,8 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "put $tempFilePath $serverDirectory
                             ls $serverDirectory"
-                expectedoutput = (join-path $serverdirectory $tempFileName).replace("\", "/")
+                expectedoutput = (join-path $serverdirectory $tempFileName)
+			
              },
              @{
                 title = "get, ls for non-unicode file names"
@@ -47,7 +48,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "get $tempFilePath $clientDirectory
                             ls $clientDirectory"
-                expectedoutput = (join-path $clientDirectory $tempFileName).replace("\", "/")
+                expectedoutput = (join-path $clientDirectory $tempFileName)
              },
              @{
                 title = "mput, ls for non-unicode file names"
@@ -55,7 +56,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "mput $tempFilePath $serverDirectory
                             ls $serverDirectory"
-                expectedoutput = (join-path $serverdirectory $tempFileName).replace("\", "/")
+                expectedoutput = (join-path $serverdirectory $tempFileName)
              },
              @{
                 title = "mget, ls for non-unicode file names"
@@ -63,7 +64,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "mget $tempFilePath $clientDirectory
                             ls $clientDirectory"
-                expectedoutput = (join-path $clientDirectory $tempFileName).replace("\", "/")
+                expectedoutput = (join-path $clientDirectory $tempFileName)
              },
              @{
                 title = "mkdir, cd, pwd for non-unicode directory names"
@@ -73,7 +74,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                             mkdir server_test_dir
                             cd server_test_dir
                             pwd"
-                expectedoutput = (join-path $serverdirectory "server_test_dir").replace("\", "/")
+                expectedoutput = (join-path $serverdirectory "server_test_dir")
              },
              @{
                 Title = "lmkdir, lcd, lpwd for non-unicode directory names"
@@ -91,7 +92,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "put $tempUnicodeFilePath $serverDirectory
                             ls $serverDirectory"
-                expectedoutput = (join-path $serverdirectory $tempUnicodeFileName).replace("\", "/")
+                expectedoutput = (join-path $serverdirectory $tempUnicodeFileName)			
              },
              @{
                 title = "get, ls for unicode file names"
@@ -99,7 +100,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "get $tempUnicodeFilePath $clientDirectory
                             ls $clientDirectory"
-                expectedoutput = (join-path $clientDirectory $tempUnicodeFileName).replace("\", "/")
+                expectedoutput = (join-path $clientDirectory $tempUnicodeFileName)
              },
              @{
                 title = "mput, ls for unicode file names"
@@ -107,7 +108,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "mput $tempUnicodeFilePath $serverDirectory
                             ls $serverDirectory"
-                expectedoutput = (join-path $serverdirectory $tempUnicodeFileName).replace("\", "/")
+                expectedoutput = (join-path $serverdirectory $tempUnicodeFileName)
              },
              @{
                 title = "mget, ls for unicode file names"
@@ -115,7 +116,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                 options = '-i $identifyfile'
                 commands = "mget $tempUnicodeFilePath $clientDirectory
                             ls $clientDirectory"
-                expectedoutput = (join-path $clientDirectory $tempUnicodeFileName).replace("\", "/")
+                expectedoutput = (join-path $clientDirectory $tempUnicodeFileName)
              },
              @{
                 title = "mkdir, cd, pwd for unicode directory names"
@@ -125,7 +126,7 @@ Describe "SFTP Testcases" -Tags "CI" {
                             mkdir server_test_dir_язык
                             cd server_test_dir_язык
                             pwd"
-                expectedoutput = (join-path $serverdirectory "server_test_dir_язык").replace("\", "/")
+                expectedoutput = (join-path $serverdirectory "server_test_dir_язык")
              },
              @{
                 Title = "lmkdir, lcd, lpwd for unicode directory names"
@@ -208,7 +209,7 @@ Describe "SFTP Testcases" -Tags "CI" {
 
            #validate file content.
            $($ExpectedOutput).split($expectedOutputDelimiter) | foreach {
-              $outputFilePath | Should Contain ([RegEx]::Escape($_))
+              Test-Path ($_) | Should be $true
            }
         }
         
@@ -222,7 +223,7 @@ Describe "SFTP Testcases" -Tags "CI" {
            Set-Content $batchFilePath  -Encoding UTF8 -value $commands
            $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
            $client.RunCmd($str)
-           $outputFilePath | Should Contain ([RegEx]::Escape((join-path $tmpDirectoryPath1 $tmpFileName1).replace("\", "/")))
+           Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $true
            
            $commands = "rm $tmpDirectoryPath1\*
                         ls $tmpDirectoryPath1
@@ -231,7 +232,7 @@ Describe "SFTP Testcases" -Tags "CI" {
            Set-Content $batchFilePath  -Encoding UTF8 -value $commands
            $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
            $client.RunCmd($str)
-           $outputFilePath | Should Not Contain ([RegEx]::Escape((join-path $tmpDirectoryPath1 $tmpFileName1).replace("\", "/")))
+           Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $false
            
            #rename file
            Remove-Item $outputFilePath
@@ -242,7 +243,7 @@ Describe "SFTP Testcases" -Tags "CI" {
            Set-Content $batchFilePath -Encoding UTF8 -value $commands
            $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
            $client.RunCmd($str)
-           $outputFilePath | Should Contain ([RegEx]::Escape((join-path $tmpDirectoryPath1 $tmpFileName2).replace("\", "/")))
+           Test-Path (join-path $tmpDirectoryPath1 $tmpFileName2) | Should be $true
            
            #rename directory
            Remove-Item $outputFilePath
@@ -252,7 +253,7 @@ Describe "SFTP Testcases" -Tags "CI" {
            Set-Content $batchFilePath -Encoding UTF8 -value $commands
            $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
            $client.RunCmd($str)
-           $outputFilePath | Should Contain ([RegEx]::Escape($tmpDirectoryPath2.replace("\", "/")))
+           Test-Path $tmpDirectoryPath2 | Should be $true
            
            #rmdir (remove directory)
            Remove-Item $outputFilePath
@@ -261,7 +262,7 @@ Describe "SFTP Testcases" -Tags "CI" {
            Set-Content $batchFilePath -Encoding UTF8 -value $commands
            $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
            $client.RunCmd($str)
-           $outputFilePath | Should Not Contain ([RegEx]::Escape($tmpDirectoryPath2).replace("\", "/"))
+           Test-Path $tmpDirectoryPath2 | Should be $false
         }
     }
 }

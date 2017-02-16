@@ -225,6 +225,10 @@ pwcopy(struct passwd *pw)
 #endif
 	copy->pw_dir = xstrdup(pw->pw_dir);
 	copy->pw_shell = xstrdup(pw->pw_shell);
+#ifdef WINDOWS
+	copy->pw_sid = xstrdup(pw->pw_sid);
+#endif /* WINDOWS */
+
 	return copy;
 }
 
@@ -439,7 +443,7 @@ colon(char *cp)
 #ifdef WINDOWS
 	/*
 	 * Account for Windows file names in the form x: or /x: 
-	 * Note: This may conflict with potential single charecter targets
+	 * Note: This may conflict with potential single character targets
 	 */
 	if ((*cp != '\0' && cp[1] == ':') ||
 	    (cp[0] == '/' && cp[1] != '\0' && cp[2] == ':'))

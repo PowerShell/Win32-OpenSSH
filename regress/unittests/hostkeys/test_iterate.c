@@ -61,6 +61,7 @@ check(struct hostkey_foreach_line *l, void *_ctx)
 
 	test_subtest_info("entry %zu/%zu, file line %ld",
 	    ctx->i + 1, ctx->nexpected, l->linenum);
+
 	for (;;) {
 		ASSERT_SIZE_T_LT(ctx->i, ctx->nexpected);
 		expected = ctx->expected + ctx->i++;
@@ -281,7 +282,6 @@ struct expected expected_full[] = {
 		NULL,	/* filled at runtime */
 		"DSA #2",
 	} },
-#ifdef OPENSSL_HAS_NISTP521
 	{ "ecdsa_2.pub" , -1, -1, HKF_MATCH_HOST, 0, HKF_MATCH_IP, HKF_MATCH_IP, -1, {
 		NULL,
 		10,
@@ -295,7 +295,6 @@ struct expected expected_full[] = {
 		NULL,	/* filled at runtime */
 		"ECDSA #2",
 	} },
-#endif
 	{ "ed25519_2.pub" , -1, -1, HKF_MATCH_HOST, 0, HKF_MATCH_IP, HKF_MATCH_IP, -1, {
 		NULL,
 		11,

@@ -34,7 +34,8 @@
 struct _children children;
 
 int
-register_child(HANDLE child, DWORD pid) {
+register_child(HANDLE child, DWORD pid)
+{
 	DWORD first_zombie_index;
 
 	debug("Register child %p pid %d, %d zombies of %d", child, pid,
@@ -43,6 +44,7 @@ register_child(HANDLE child, DWORD pid) {
 		errno = ENOMEM;
 		return -1;
 	}
+
 	if (children.num_zombies) {
 		first_zombie_index = children.num_children - children.num_zombies;
 		children.handles[children.num_children] = children.handles[first_zombie_index];
@@ -50,26 +52,23 @@ register_child(HANDLE child, DWORD pid) {
 
 		children.handles[first_zombie_index] = child;
 		children.process_id[first_zombie_index] = pid;
-	}
-	else {
+	} else {
 		children.handles[children.num_children] = child;
 		children.process_id[children.num_children] = pid;
 	}
-
 
 	children.num_children++;
 	return 0;
 }
 
 int
-sw_remove_child_at_index(DWORD index) {
+sw_remove_child_at_index(DWORD index)
+{
 	DWORD last_non_zombie;
-
 	debug("Unregister child at index %d, %d zombies of %d", index,
 		children.num_zombies, children.num_children);
 
-	if ((index >= children.num_children)
-		|| (children.num_children == 0)) {
+	if ((index >= children.num_children) || (children.num_children == 0)) {
 		errno = EINVAL;
 		return -1;
 	}
@@ -78,15 +77,13 @@ sw_remove_child_at_index(DWORD index) {
 	if (children.num_zombies == 0) {
 		children.handles[index] = children.handles[children.num_children - 1];
 		children.process_id[index] = children.process_id[children.num_children - 1];
-	}
-	else {
+	} else {
 		/* if its a zombie */
 		if (index >= (children.num_children - children.num_zombies)) {
 			children.handles[index] = children.handles[children.num_children - 1];
 			children.process_id[index] = children.process_id[children.num_children - 1];
 			children.num_zombies--;
-		}
-		else {
+		} else {
 			last_non_zombie = children.num_children - children.num_zombies - 1;
 			children.handles[index] = children.handles[last_non_zombie];
 			children.process_id[index] = children.process_id[last_non_zombie];
@@ -101,7 +98,8 @@ sw_remove_child_at_index(DWORD index) {
 }
 
 int
-sw_child_to_zombie(DWORD index) {
+sw_child_to_zombie(DWORD index)
+{
 	DWORD last_non_zombie, zombie_pid;
 	HANDLE zombie_handle;
 
@@ -114,7 +112,6 @@ sw_child_to_zombie(DWORD index) {
 	}
 
 	last_non_zombie = children.num_children - children.num_zombies - 1;
-	
 	if (last_non_zombie != index) {
 		/* swap */
 		zombie_pid = children.process_id[index];
@@ -129,7 +126,8 @@ sw_child_to_zombie(DWORD index) {
 }
 
 int
-w32_kill(int pid, int sig) {
+w32_kill(int pid, int sig)
+{
 	int child_index, i;
 	if (pid == GetCurrentProcessId())
 		return w32_raise(sig);
@@ -148,7 +146,9 @@ w32_kill(int pid, int sig) {
 }
 
 
-int waitpid(int pid, int *status, int options) {
+int
+waitpid(int pid, int *status, int options)
+{
 	DWORD index, ret, ret_id, exit_code, timeout = 0;
 	HANDLE process = NULL;
 
@@ -214,7 +214,7 @@ int waitpid(int pid, int *status, int options) {
 		sw_remove_child_at_index(children.num_children - 1);
 		return ret_id;
 	}
-	
+
 	/* all children are alive. wait for one of them to exit */
 	timeout = INFINITE;
 	if (options & WNOHANG)
@@ -230,20 +230,19 @@ int waitpid(int pid, int *status, int options) {
 		if (status)
 			*status = exit_code;
 		return ret_id;
-	}
-	else if (ret == WAIT_TIMEOUT) {
+	} else if (ret == WAIT_TIMEOUT) {
 		/* TODO - assert that WNOHANG  was specified*/
 		return 0;
 	}
 
-	DebugBreak();//fatal
+	DebugBreak(); /* fatal */
 	return -1;
 }
 
 void
-sw_cleanup_child_zombies() {
+sw_cleanup_child_zombies()
+{
 	int pid = 1;
-	while (pid > 0) {
+	while (pid > 0)
 		pid = waitpid(-1, NULL, WNOHANG);
-	}
 }

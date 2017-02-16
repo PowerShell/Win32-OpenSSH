@@ -83,10 +83,11 @@ _rs_init(u_char *buf, size_t n)
 static void
 getrnd(u_char *s, size_t len) {
 	HCRYPTPROV hProvider;
-	if (CryptAcquireContextW(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT) == FALSE ||
-		CryptGenRandom(hProvider, len, s) == FALSE ||
-		CryptReleaseContext(hProvider, 0) == FALSE)
-		DebugBreak();
+	if (CryptAcquireContextW(&hProvider, 0, 0, PROV_RSA_FULL, 
+		CRYPT_VERIFYCONTEXT | CRYPT_SILENT) == FALSE ||
+	    CryptGenRandom(hProvider, len, s) == FALSE ||
+	    CryptReleaseContext(hProvider, 0) == FALSE)
+		fatal("%s Crypto error: %d", __func__, GetLastError());
 }
 
 #else /* !WINDOWS */

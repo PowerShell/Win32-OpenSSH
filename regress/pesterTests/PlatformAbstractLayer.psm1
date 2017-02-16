@@ -75,9 +75,11 @@ Class Machine
     [string] $localAdminUserName = "localadmin"
     [string] $localAdminPassword = "Bull_dog1"
     [string] $localAdminAuthorizedKeyPath
+    [string] $sshdConfigFile = (join-path $PSScriptRoot "sshd_config")
+    [string] $backupFileName = (join-path $PSScriptRoot "sshd_backup")
     [System.Security.SecureString] $password
     $preLatfpSetting
-    $localUserprofilePath
+    [string] $localUserprofilePath
 
     #Members on client role
     [string []] $clientPrivateKeyPaths
@@ -177,6 +179,47 @@ Class Machine
         }
     }
 
+    [void] SetupSingleSignon([string] $identifyFile) {
+        .\ssh-add.exe $identifyFile
+    }
+
+    [void] CleanupSingleSignon([string] $identifyFile) {
+        .\ssh-add.exe -d $identifyFile
+    }
+
+    [void] AddItemInSSHDConfig([string] $key, [string] $value) {
+        if ( $this.Platform -eq [PlatformType]::Windows ) {
+                Get-Content $this.sshdConfigFile | % {
+                    if($_.StartsWith($key)) {
+                        "#$_"
+                    }
+                    else {$_}
+                } | Set-Content $this.sshdConfigFile
+            Add-Content -Path $this.sshdConfigFile -Value "`r`n$key $value"
+
+            Restart-Service sshd
+        } else {               
+        }
+    }
+
+    [void] BackupSSHDConfig() {
+        if ( $this.Platform -eq [PlatformType]::Windows ) {
+            if(Test-path $this.backupFileName) {
+                Remove-Item -Path $this.backupFileName -Force
+            }
+
+            Copy-Item $this.sshdConfigFile $this.backupFileName -Force
+        }
+    }
+
+    [void] RestoreSSHDConfig() {
+        if ( $this.Platform -eq [PlatformType]::Windows ) {
+            Copy-Item $this.backupFileName $this.sshdConfigFile  -Force
+            Remove-Item -Path $this.backupFileName -Force
+            Restart-Service sshd
+        }
+    }
+
     [void] SetupServerRemoting([Protocol] $protocol) {
         if ($this.Platform -eq [PlatformType]::Windows)
         {
@@ -240,6 +283,56 @@ Class Machine
         }
     }
 
+    [void] AddLocalUser($UserName, $password) {
+        $a = Get-LocalUser -Name $UserName -ErrorAction Ignore
+        if ($a -eq $null)
+        {
+            $pass = ConvertTo-SecureString -String $this.localAdminPassword -AsPlainText -Force
+            $a = New-LocalUser -Name $UserName -Password $pass -AccountNeverExpires -PasswordNeverExpires -UserMayNotChangePassword                
+        }
+    }
+
+    [void] AddLocalGroup($groupName) {
+        $g = Get-LocalGroup -Name $groupName -ErrorAction Ignore
+        if ($g -eq $null)
+        {                
+            $g = New-LocalGroup -Name $groupName
+        }
+    }
+
+    [void] AddUserToLocalGroup($UserName, $password, $groupName) {        
+        if ( $this.Platform -eq [PlatformType]::Windows ) {
+            $this.AddLocalUser($UserName, $password)
+            $this.AddLocalGroup($groupName)
+
+            if((Get-LocalGroupMember -Name $groupName -Member $UserName -ErrorAction Ignore ) -eq $null)
+            {
+                Add-LocalGroupMember -Name $groupName -Member $UserName
+            }
+        } else {    
+            #Todo add local user and add it to a user group on linux
+        }
+    }
+
+    [void] RemoveUserFromLocalGroup($UserName, $groupName) {        
+        if ( $this.Platform -eq [PlatformType]::Windows ) {
+            if((Get-LocalGroupMember -Name $groupName -Member $UserName -ErrorAction Ignore ) -eq $null)
+            {
+                Remove-LocalGroupMember -Name $groupName -Member $UserName
+            }
+        } else {    
+            #Todo add local user and add it to a user group on linux
+        }
+    }
+
+    [void] ClenaupLocalGroup($groupName) {
+        $g = Get-LocalGroup -Name $groupName -ErrorAction Ignore
+        if ($g -eq $null)
+        {                
+            $g | Remove-LocalGroup
+        }
+    }
+
     [void] AddAdminUser($UserName, $password) {        
         if ( $this.Platform -eq [PlatformType]::Windows ) {
             $a = Get-LocalUser -Name $UserName -ErrorAction Ignore
@@ -253,8 +346,7 @@ Class Machine
                 Add-LocalGroupMember -SID s-1-5-32-544 -Member $a
             }
         } else {    
-            #Todo add local user and add it to administrators group on linux
-            #Todo: get $localUserprofilePath    
+            #Todo add local user and add it to a administrators on linux             
         }
     }
 

@@ -66,11 +66,11 @@ Describe "Tests for scp command" -Tags "CI" {
                 Source = $sourceDir
                 Destination = "$($server.localAdminUserName)@$($server.MachineName):$DestinationDir"
             },
-            @{
+            <#  @{
                 Title = 'copy from local dir to local dir'
                 Source = $sourceDir
                 Destination = $DestinationDir
-            },
+            },#>
             @{
                 Title = 'copy from remote dir to local dir'            
                 Source = "$($server.localAdminUserName)@$($server.MachineName):$sourceDir"

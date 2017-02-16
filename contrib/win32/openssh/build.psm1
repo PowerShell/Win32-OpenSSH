@@ -152,17 +152,6 @@ function Start-SSHBootstrap
     {
         Write-BuildMsg -AsInfo -Message "Chocolatey not present. Installing chocolatey." -Silent:$silent
         Invoke-Expression ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1')) 2>&1 >> $script:BuildLogFile
-
-        if (-not ($machinePath.ToLower().Contains($chocolateyPath.ToLower())))
-        {
-            Write-BuildMsg -AsVerbose -Message "Adding $chocolateyPath to Path environment variable" -Silent:$silent
-            $newMachineEnvironmentPath += ";$chocolateyPath"
-            $env:Path += ";$chocolateyPath"
-        }
-        else
-        {
-            Write-BuildMsg -AsVerbose -Message "$chocolateyPath already present in Path environment variable" -Silent:$silent
-        }
     }
 
     # Add git\cmd to the path
@@ -231,7 +220,7 @@ function Start-SSHBootstrap
 
     # Install Windows 8.1 SDK
     $packageName = "windows-sdk-8.1"
-    $sdkPath = "C:\Program Files (x86)\Windows Kits\8.1\bin\x86\register_app.vbs"
+    $sdkPath = "${env:ProgramFiles(x86)}\Windows Kits\8.1\bin\x86\register_app.vbs"
 
     if (-not (Test-Path -Path $sdkPath))
     {
@@ -264,7 +253,7 @@ function Start-SSHBootstrap
     Write-BuildMsg -AsVerbose -Message "vcPath: $script:vcPath" -Silent:$silent
     if ((Test-Path -Path "$script:vcPath\vcvarsall.bat") -eq $false)
     {
-        Write-BuildMsg -AsError -ErrorAction Stop -Message "Could not find Visual Studio vcvarsall.bat at" + $script:vcPath
+        Write-BuildMsg -AsError -ErrorAction Stop -Message "Could not find Visual Studio vcvarsall.bat at$script:vcPath, which means some required develop kits are missing on the machine." 
     }
 }
 

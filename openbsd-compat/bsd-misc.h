@@ -95,12 +95,10 @@ int unsetenv(const char *);
 #endif
 
 /* wrapper for signal interface */
-#ifdef HAVE_SIGACTION
 typedef void (*mysig_t)(int);
 mysig_t mysignal(int sig, mysig_t act);
 
 #define signal(a,b) mysignal(a,b)
-#endif
 
 #ifndef HAVE_ISBLANK
 int	isblank(int);

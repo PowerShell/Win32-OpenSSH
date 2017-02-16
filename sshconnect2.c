@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.251 2016/12/04 23:54:02 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.254 2017/02/03 02:56:00 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -198,8 +198,8 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 	}
 
 	if (options.rekey_limit || options.rekey_interval)
-		packet_set_rekey_limits((u_int32_t)options.rekey_limit,
-		    (time_t)options.rekey_interval);
+		packet_set_rekey_limits(options.rekey_limit,
+		    options.rekey_interval);
 
 	/* start key exchange */
 	if ((r = kex_setup(active_state, myproposal)) != 0)
@@ -939,14 +939,14 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, void *ctxt)
 	Authctxt *authctxt = ctxt;
 	char *info, *lang, *password = NULL, *retype = NULL;
 	char prompt[150];
-	const char *host = options.host_key_alias ? options.host_key_alias :
-	    authctxt->host;
+	const char *host;
 
 	debug2("input_userauth_passwd_changereq");
 
 	if (authctxt == NULL)
 		fatal("input_userauth_passwd_changereq: "
 		    "no authentication context");
+	host = options.host_key_alias ? options.host_key_alias : authctxt->host;
 
 	info = packet_get_string(NULL);
 	lang = packet_get_string(NULL);
@@ -1641,7 +1641,7 @@ ssh_keysign(struct sshkey *key, u_char **sigp, size_t *lenp,
 	if ((b = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	/* send # of sock, data to be signed */
-	if ((r = sshbuf_put_u32(b, sock) != 0) ||
+	if ((r = sshbuf_put_u32(b, sock)) != 0 ||
 	    (r = sshbuf_put_string(b, data, datalen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (ssh_msg_send(to[1], version, b) == -1)

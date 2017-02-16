@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.480 2016/12/09 03:04:29 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.482 2017/02/06 09:22:51 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -375,14 +375,14 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 {
 	u_int i;
 	int remote_major, remote_minor;
-	char *s, *newline = "\n";
+	char *s;
 	char buf[256];			/* Must not be larger than remote_version. */
 	char remote_version[256];	/* Must be at least as big as buf. */
 
-	xasprintf(&server_version_string, "SSH-%d.%d-%.100s%s%s%s",
+	xasprintf(&server_version_string, "SSH-%d.%d-%.100s%s%s\r\n",
 	    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION,
 	    *options.version_addendum == '\0' ? "" : " ",
-	    options.version_addendum, newline);
+	    options.version_addendum);
 
 	/* Send our protocol version identification. */
 	if (atomicio(vwrite, sock_out, server_version_string,
@@ -1087,7 +1087,8 @@ server_listen(void)
 #ifdef WINDOWS
 		/* disable inheritance on listener socket */
 		if (fcntl(listen_sock, F_SETFD, FD_CLOEXEC) != 0) {
-			error("F_SETFD  FD_CLOEXEC on listener socket %d failed with %d", listen_sock, errno);
+			error("F_SETFD  FD_CLOEXEC on socket %d error %d", 
+			    listen_sock, errno);
 			close(listen_sock);
 			continue;
 		}
@@ -1297,19 +1298,25 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			*/
 			{
 				char* path_utf8 = utf16_to_utf8(GetCommandLineW());
-				char fd_handle[30];  /* large enough to hold pointer value in hex */
+				/* large enough to hold pointer value in hex */
+				char fd_handle[30];  
 
 				if (path_utf8 == NULL)
 					fatal("Failed to alloc memory");
 				
-				if (snprintf(fd_handle, sizeof(fd_handle), "%p", w32_fd_to_handle(*newsock)) == -1
+				if (snprintf(fd_handle, sizeof(fd_handle), "%p", 
+					w32_fd_to_handle(*newsock)) == -1
 				    || SetEnvironmentVariable("SSHD_REMSOC", fd_handle) == FALSE
-				    || snprintf(fd_handle, sizeof(fd_handle), "%p", w32_fd_to_handle(startup_p[1])) == -1
+				    || snprintf(fd_handle, sizeof(fd_handle), "%p", 
+					w32_fd_to_handle(startup_p[1])) == -1
 				    || SetEnvironmentVariable("SSHD_STARTUPSOC", fd_handle) == FALSE
 				    || fcntl(startup_p[0], F_SETFD, FD_CLOEXEC) == -1) {
-					error("unable to set the right environment for child, closing connection ");
+					error("unable to set environment for child");
 					close(*newsock);
-					/* close child end of startup pipe. parent end will automatically be cleaned up on next iteration*/
+					/* 
+					 * close child end of startup pipe. parent end will 
+					 * automatically be cleaned up on next iteration
+					 */
 					close(startup_p[1]);
 					continue;
 				}
@@ -2261,7 +2268,7 @@ do_ssh2_kex(void)
 
 	if (options.rekey_limit || options.rekey_interval)
 		packet_set_rekey_limits(options.rekey_limit,
-		    (time_t)options.rekey_interval);
+		    options.rekey_interval);
 
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = compat_pkalg_proposal(
 	    list_hostkey_types());

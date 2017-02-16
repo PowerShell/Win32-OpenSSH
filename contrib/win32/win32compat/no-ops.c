@@ -31,23 +31,28 @@
 #include "inc\sys\types.h"
 
 /* uuidswap.c defs */
-void temporarily_use_uid(struct passwd *pw){
-        return;
+void
+temporarily_use_uid(struct passwd *pw)
+{
+	return;
 }
 
 void
-permanently_drop_suid(uid_t uid) {
-        return;
+permanently_drop_suid(uid_t uid)
+{
+	return;
 }
 
 void
-restore_uid(void) {
-        return;
+restore_uid(void)
+{
+	return;
 }
 
 void
-permanently_set_uid(struct passwd *pw) {
-        return;
+permanently_set_uid(struct passwd *pw)
+{
+	return;
 }
 
 
@@ -56,74 +61,63 @@ int muxserver_sock = -1;
 typedef struct Channel Channel;
 unsigned int muxclient_command = 0;
 void
-muxserver_listen(void){
-        return;
+muxserver_listen(void)
+{
+	return;
 }
 
 void
-mux_exit_message(Channel *c, int exitval) {
-        return;
+mux_exit_message(Channel *c, int exitval)
+{
+	return;
 }
 
 void
-mux_tty_alloc_failed(Channel *c) {
-        return;
+mux_tty_alloc_failed(Channel *c)
+{
+	return;
 }
 
 void
-muxclient(const char *path) {
-        return;
-}
-
-
-int 
-innetgr(const char *netgroup, const char *host,
-        const char *user, const char *domain) {
-        return -1;
-}
-
-
-/* groupaccess.c*/
-int
-ga_init(const char *user, gid_t base) {
-        return -1;
+muxclient(const char *path)
+{
+	return;
 }
 
 int
-ga_match(char * const *groups, int n) {
-        return -1;
+innetgr(const char *netgroup, const char *host, const char *user, const char *domain)
+{
+	return -1;
 }
 
 int
-ga_match_pattern_list(const char *group_pattern) {
-        return -1;
+chroot(const char *path)
+{
+	return -1;
 }
 
-void
-ga_free(void) {
-        return;
+int
+initgroups(const char *user, gid_t group)
+{
+	return -1;
 }
-
-int chroot(const char *path) {
-        return -1;
-}
-
-int initgroups(const char *user, gid_t group) {
-        return -1;
-}
-
 
 /* sshd.c */
 int
-setgroups(gid_t group, char* name) {
-        return 0;
+setgroups(gid_t group, char* name)
+{
+	return 0;
 }
 
 int
-setsid(void) {
-        return 0;
-}
-
-int startup_handler(void) {
+setsid(void)
+{
 	return 0;
 }
+
+int
+startup_handler(void)
+{
+	return 0;
+}
+

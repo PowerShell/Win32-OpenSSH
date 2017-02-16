@@ -27,11 +27,11 @@
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
 #include <Windows.h>
 #include <io.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+
 #include "inc\syslog.h"
 #include "misc_internal.h"
 
@@ -39,14 +39,15 @@
 static int logfd = -1;
 
 void
-openlog(char *ident, unsigned int option, int facility) {
+openlog(char *ident, unsigned int option, int facility)
+{
 	if (logfd != -1 || ident == NULL)
 		return;
-	
+
 	wchar_t path[PATH_MAX], log_file[PATH_MAX + 12];
 	if (GetModuleFileNameW(NULL, path, PATH_MAX) == 0)
-
 		return;
+
 	path[PATH_MAX - 1] = '\0';
 
 	/* split path root and module */
@@ -64,20 +65,20 @@ openlog(char *ident, unsigned int option, int facility) {
 		memcpy(p, L"log\0", 8);
 	}
 
-	logfd = _wopen(log_file, O_WRONLY | O_CREAT | O_APPEND,
-		S_IREAD | S_IWRITE);
+	logfd = _wopen(log_file, O_WRONLY | O_CREAT | O_APPEND, S_IREAD | S_IWRITE);
 	if (logfd != -1)
-		SetHandleInformation((HANDLE)_get_osfhandle(logfd),
-		HANDLE_FLAG_INHERIT, 0);	
+		SetHandleInformation((HANDLE)_get_osfhandle(logfd), HANDLE_FLAG_INHERIT, 0);
 }
 
 void
-closelog(void) {
+closelog(void)
+{
 	/*NOOP*/
 }
 
-void 
-syslog(int priority, const char *format, const char *formatBuffer) {
+void
+syslog(int priority, const char *format, const char *formatBuffer)
+{
 	char msgbufTimestamp[MSGBUFSIZ];
 	SYSTEMTIME st;
 

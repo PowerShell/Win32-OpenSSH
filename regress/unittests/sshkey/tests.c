@@ -18,10 +18,9 @@ void sshkey_fuzz_tests(void);
 void
 tests(void)
 {
-#ifdef WITH_OPENSSL
 	OpenSSL_add_all_algorithms();
 	ERR_load_CRYPTO_strings();
-#endif
+
 	sshkey_tests();
 	sshkey_file_tests();
 	sshkey_fuzz_tests();
