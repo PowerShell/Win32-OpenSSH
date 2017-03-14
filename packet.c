@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.245 2017/02/03 23:03:33 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.246 2017/02/28 06:10:08 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1466,8 +1466,10 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				break;
 			}
 		}
-		if (r == 0)
-			return SSH_ERR_CONN_TIMEOUT;
+		if (r == 0) {
+			r = SSH_ERR_CONN_TIMEOUT;
+			goto out;
+		}
 		/* Read data from the socket. */
 		len = read(state->connection_in, buf, sizeof(buf));
 		if (len == 0) {

@@ -35,8 +35,11 @@
 #include <string.h>
 #include <windows.h>
 #include "ansiprsr.h"
+#include "inc\utf.h"
 
 #define dwBuffer 4096
+
+extern BOOL isAnsiParsingRequired;
 
 /*
  * Server will always be returning a sequence of ANSI control characters which the client
@@ -44,8 +47,8 @@
  * type. We're not using termcap so we're only supporting the ANSI (vt100) sequences that
  * are hardcoded in the server and will be transformed to Windows Console commands.
  */
-size_t 
-telProcessNetwork(char *buf, size_t len, unsigned char **respbuf, size_t *resplen)
+void
+processBuffer(HANDLE handle, char *buf, size_t len, unsigned char **respbuf, size_t *resplen)
 {
 	unsigned char szBuffer[dwBuffer + 8];
 	unsigned char* pszNewHead = NULL;
@@ -53,7 +56,17 @@ telProcessNetwork(char *buf, size_t len, unsigned char **respbuf, size_t *resple
 	unsigned char* pszTail = NULL;
 
 	if (len == 0)
-		return len;
+		return;
+
+	if (false == isAnsiParsingRequired) {
+		/* Console has the capability to parse so pass the raw buffer to console directly */
+		ConRestoreViewRect(); /* Restore the visible window, otherwise WriteConsoleW() gets messy */
+		wchar_t* t = utf8_to_utf16(buf);
+		WriteConsoleW(handle, t, wcslen(t), 0, 0);
+		free(t);		
+		ConSaveViewRect();
+		return;
+	}
 
 	/* Transform a single carriage return into a single linefeed before continuing */
 	if ((len == 1) && (buf[0] == 13))
@@ -74,6 +87,4 @@ telProcessNetwork(char *buf, size_t len, unsigned char **respbuf, size_t *resple
 		pszNewHead = ParseBuffer(pszHead, pszTail, respbuf, resplen);
 
 	} while ((pszNewHead != pszHead) && (pszNewHead < pszTail) && (resplen == NULL || (resplen != NULL && *resplen == 0)));
-	len = 0;
-	return len;
 }

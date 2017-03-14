@@ -52,8 +52,8 @@ static int _in_raw_mode = 0;
  * TTY raw mode routines for Windows 
  */
 
-int ConInit(DWORD OutputHandle, BOOL fSmartInit);
-int ConUnInit(void);
+int ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit);
+int ConExitRawMode(void);
 
 struct termios term_settings;
 
@@ -70,12 +70,12 @@ struct termios *
 
 void
 leave_raw_mode(int quiet) {
-        ConUnInit();
+        ConExitRawMode();
 }
 
 void
 enter_raw_mode(int quiet) {
-        ConInit(STD_OUTPUT_HANDLE, TRUE);
+        ConEnterRawMode(STD_OUTPUT_HANDLE, TRUE);
 }
 #else /* !WINDOWS */
 struct termios *

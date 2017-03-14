@@ -52,13 +52,14 @@ int ScrollTop;
 int ScrollBottom;
 int LastCursorX;
 int LastCursorY;
-BOOL bAnsiParsing = FALSE;
+BOOL isAnsiParsingRequired = FALSE;
 char *pSavedScreen = NULL;
 static COORD ZeroCoord = { 0,0 };
 COORD SavedScreenSize = { 0,0 };
 COORD SavedScreenCursor = { 0, 0 };
 SMALL_RECT SavedViewRect = { 0,0,0,0 };
 CONSOLE_SCREEN_BUFFER_INFOEX SavedWindowState;
+BOOL isConHostParserEnabled = TRUE;
 
 typedef struct _SCREEN_RECORD {
 	PCHAR_INFO pScreenBuf;
@@ -69,10 +70,11 @@ typedef struct _SCREEN_RECORD {
 
 PSCREEN_RECORD pSavedScreenRec = NULL;
 int in_raw_mode = 0;
+char *consoleTitle = "Microsoft openSSH client";
 
-/* Used to Initialize the Console for output */
+/* Used to enter the raw mode */
 int 
-ConInit(DWORD OutputHandle, BOOL fSmartInit)
+ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 {
 	OSVERSIONINFO os;
 	DWORD dwAttributes = 0;
@@ -87,15 +89,17 @@ ConInit(DWORD OutputHandle, BOOL fSmartInit)
 	hOutputConsole = GetStdHandle(OutputHandle);
 	if (hOutputConsole == INVALID_HANDLE_VALUE) {
 		dwRet = GetLastError();
-		printf("GetStdHandle on OutputHandle failed with %d\n", dwRet);
+		error("GetStdHandle on OutputHandle failed with %d\n", dwRet);
 		return dwRet;
 	}
 
 	if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwSavedAttributes)) {
 		dwRet = GetLastError();
-		printf("GetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
+		error("GetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
 		return dwRet;
 	}
+
+	SetConsoleTitle(consoleTitle);
 
 	dwAttributes = dwSavedAttributes;
 	dwAttributes &= ~(ENABLE_LINE_INPUT |
@@ -104,53 +108,69 @@ ConInit(DWORD OutputHandle, BOOL fSmartInit)
 
 	if (!SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwAttributes)) { /* Windows NT */
 		dwRet = GetLastError();
-		printf("SetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
+		error("SetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
 		return dwRet;
 	}
 
 	if (!GetConsoleMode(hOutputConsole, &dwAttributes)) {
 		dwRet = GetLastError();
-		printf("GetConsoleMode on hOutputConsole failed with %d\n", dwRet);
+		error("GetConsoleMode on hOutputConsole failed with %d\n", dwRet);
 		return dwRet;
+
 	}
 
 	dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
-	if (!SetConsoleMode(hOutputConsole, dwAttributes)) /* Windows NT */
-		bAnsiParsing = TRUE;
+	if (NULL != getenv("SSH_TERM_CONHOST_PARSER"))
+		isConHostParserEnabled = atoi(getenv("SSH_TERM_CONHOST_PARSER"));
+
+	/* We use our custom ANSI parser when
+	 * a) User sets the environment variable "SSH_TERM_CONHOST_PARSER" to 0
+	 * b) or when the console doesn't have the inbuilt capability to parse the ANSI/Xterm raw buffer.
+	 */	 
+	if (FALSE == isConHostParserEnabled || !SetConsoleMode(hOutputConsole, dwAttributes)) /* Windows NT */
+		isAnsiParsingRequired = TRUE;
+			
+	GetConsoleScreenBufferInfo(hOutputConsole, &csbi);
+	
+	/* if we are passing rawbuffer to console then we need to move the cursor to top 
+	 *  so that the clearscreen will not erase any lines.
+	 */
+	if (TRUE == isAnsiParsingRequired) {
+		SavedViewRect = csbi.srWindow;
+		debug("console doesn't support the ansi parsing");
+	} else {
+		ConMoveCurosorTop(csbi);
+		debug("console supports the ansi parsing");
+	}		
 
 	ConSetScreenX();
 	ConSetScreenY();
 	ScrollTop = 0;
-	ScrollBottom = ConWindowSizeY();
-
-	if (GetConsoleScreenBufferInfo(hOutputConsole, &csbi))
-		SavedViewRect = csbi.srWindow;
-
+	ScrollBottom = ConVisibleWindowHeight();		
+	
 	in_raw_mode = 1;
+
 	return 0;
 }
 
 /* Used to Uninitialize the Console */
 int 
-ConUnInit(void)
+ConExitRawMode()
 {
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 	in_raw_mode = 0;
-	if (hOutputConsole == NULL)
+	if (hOutputConsole == NULL || !GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
 		return 0;
-
-	if (!GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
-		return 0;
-
+	
 	SetConsoleMode(hOutputConsole, dwSavedAttributes);
 
 	return 0;
 }
 
-/* Used to Uninitialize the Console */
+/* Used to exit the raw mode */
 int 
-ConUnInitWithRestore(void)
+ConUnInitWithRestore()
 {
 	DWORD dwWritten;
 	COORD Coord;
@@ -446,9 +466,9 @@ ConScreenSizeY()
 	return (consoleInfo.srWindow.Bottom - consoleInfo.srWindow.Top + 1);
 }
 
-/* returns visible size of screen window */
+/* returns width of visible window */
 int
-ConWindowSizeX()
+ConVisibleWindowWidth()
 {
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 
@@ -458,9 +478,9 @@ ConWindowSizeX()
 	return (consoleInfo.srWindow.Right - consoleInfo.srWindow.Left + 1);
 }
 
-/* returns visible size of screen window */
+/* returns height of visible window */
 int
-ConWindowSizeY()
+ConVisibleWindowHeight()
 {
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 
@@ -837,7 +857,7 @@ ConDisplayCursor(BOOL bVisible)
 }
 
 void 
-ConClearScreen(void)
+ConClearScreen()
 {
 	DWORD dwWritten;
 	COORD Coord;
@@ -850,7 +870,7 @@ ConClearScreen(void)
 	Coord.X = 0;
 	Coord.Y = 0;
 
-	DWORD dwNumChar = (consoleInfo.srWindow.Bottom + 1) * (consoleInfo.srWindow.Right + 1);
+	DWORD dwNumChar = (consoleInfo.dwSize.Y) * (consoleInfo.dwSize.X);
 	FillConsoleOutputCharacter(hOutputConsole, ' ', dwNumChar, Coord, &dwWritten);
 	FillConsoleOutputAttribute(hOutputConsole, consoleInfo.wAttributes, dwNumChar, Coord, &dwWritten);
 	srcWindow = consoleInfo.srWindow;
@@ -1056,10 +1076,24 @@ ConScrollUp(int topline, int botline)
 }
 
 void 
+ConMoveVisibleWindow(int offset)
+{
+	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+	SMALL_RECT visibleWindowRect;
+
+	if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo)) {
+		memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
+		visibleWindowRect.Top += offset;
+		visibleWindowRect.Bottom += offset;
+
+		SetConsoleWindowInfo(hOutputConsole, TRUE, &visibleWindowRect);
+	}
+}
+
+void 
 ConScrollDown(int topline, int botline)
 {
-	SMALL_RECT ScrollRect;
-	SMALL_RECT ClipRect;
+	SMALL_RECT ScrollRect;	
 	COORD destination;
 	CHAR_INFO Fill;
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
@@ -1077,11 +1111,6 @@ ConScrollDown(int topline, int botline)
 
 	ScrollRect.Left = 0;
 	ScrollRect.Right = ConScreenSizeX() - 1;
-
-	ClipRect.Top = ScrollRect.Top;
-	ClipRect.Bottom = ScrollRect.Bottom;
-	ClipRect.Left = ScrollRect.Left;
-	ClipRect.Right = ScrollRect.Right;
 
 	destination.X = 0;
 	destination.Y = ScrollRect.Top - 1;
@@ -1152,6 +1181,17 @@ ConChangeCursor(CONSOLE_CURSOR_INFO *pCursorInfo)
 	return SetConsoleCursorInfo(hOutputConsole, pCursorInfo);
 }
 
+void
+ConGetCursorPosition(int *x, int *y)
+{
+	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+
+	if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo)) {
+		*x = consoleInfo.dwCursorPosition.X;
+		*y = consoleInfo.dwCursorPosition.Y;
+	}
+}
+
 int 
 ConGetCursorX()
 {
@@ -1161,6 +1201,21 @@ ConGetCursorX()
 		return 0;
 
 	return consoleInfo.dwCursorPosition.X;
+}
+
+int
+is_cursor_at_lastline_of_visible_window()
+{
+	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+	int return_val = 0;
+
+	if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo)) {
+		int cursor_linenum_in_visible_window = consoleInfo.dwCursorPosition.Y - consoleInfo.srWindow.Top;
+		if (cursor_linenum_in_visible_window >= ConVisibleWindowHeight() - 1)
+			return_val = 1;
+	}
+
+	return return_val;
 }
 
 int 
@@ -1175,14 +1230,14 @@ ConGetCursorY()
 }
 
 int 
-ConGetCursorInBufferY()
+ConGetBufferHeight()
 {
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 
 	if (!GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
 		return 0;
 
-	return (consoleInfo.dwCursorPosition.Y);
+	return (consoleInfo.dwSize.Y - 1);
 }
 
 void 
@@ -1390,28 +1445,53 @@ ConDeleteScreenHandle(SCREEN_HANDLE hScreen)
 
 /* Restores Previous Saved screen info and buffer */
 BOOL
-ConRestoreScreen(void)
+ConRestoreScreen()
 {
 	return ConRestoreScreenHandle(pSavedScreenRec);
 }
 
 /* Saves current screen info and buffer */
-BOOL
-ConSaveScreen(void)
+void
+ConSaveScreen()
 {
-	pSavedScreenRec = (PSCREEN_RECORD)ConSaveScreenHandle(pSavedScreenRec);
-	return TRUE;
+	pSavedScreenRec = (PSCREEN_RECORD)ConSaveScreenHandle(pSavedScreenRec);	
 }
 
 void
-ConSaveViewRect(void)
+ConSaveViewRect()
 {
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 
-	if (!GetConsoleScreenBufferInfo(hOutputConsole, &csbi))
-		return;
+	if (GetConsoleScreenBufferInfo(hOutputConsole, &csbi))
+		SavedViewRect = csbi.srWindow;
+}
 
-	SavedViewRect = csbi.srWindow;
+void
+ConRestoreViewRect()
+{
+	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+	HWND hwnd = FindWindow(NULL, consoleTitle);
+
+	WINDOWPLACEMENT wp;
+	wp.length = sizeof(WINDOWPLACEMENT);
+	GetWindowPlacement(hwnd, &wp);
+
+	if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo) &&
+	    ((consoleInfo.srWindow.Top != SavedViewRect.Top ||
+	      consoleInfo.srWindow.Bottom != SavedViewRect.Bottom))) {
+		if ((SavedViewRect.Right - SavedViewRect.Left > consoleInfo.dwSize.X) ||
+		    (wp.showCmd == SW_SHOWMAXIMIZED)) {
+			COORD coordScreen;
+			coordScreen.X = SavedViewRect.Right - SavedViewRect.Left;
+			coordScreen.Y = consoleInfo.dwSize.Y;
+			SetConsoleScreenBufferSize(hOutputConsole, coordScreen);
+			
+			ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+		} else
+			ShowWindow(hwnd, SW_RESTORE);
+
+		SetConsoleWindowInfo(hOutputConsole, TRUE, &SavedViewRect);
+	}
 }
 
 BOOL
@@ -1460,7 +1540,7 @@ GetConsoleInputHandle()
 }
 
 void
-ConSaveWindowsState(void)
+ConSaveWindowsState()
 {
 	CONSOLE_SCREEN_BUFFER_INFOEX csbiex;
 	csbiex.cbSize = sizeof(CONSOLE_SCREEN_BUFFER_INFOEX);
@@ -1469,4 +1549,13 @@ ConSaveWindowsState(void)
 		return;
 
 	SavedWindowState = csbiex;
+}
+
+void
+ConMoveCurosorTop(CONSOLE_SCREEN_BUFFER_INFO csbi)
+{
+	int offset = csbi.dwCursorPosition.Y - csbi.srWindow.Top;
+	ConMoveVisibleWindow(offset);
+
+	ConSaveViewRect();
 }

@@ -1,37 +1,37 @@
 /*
- * Author: Ray Hayes <ray.hayes@microsoft.com>
- * ANSI TTY Reader - Maps Windows console input events to ANSI stream
- * 
- * Author: Balu <bagajjal@microsoft.com>
- * Misc fixes and code cleanup
- *
- * Copyright (c) 2017 Microsoft Corp.
- * All rights reserved
- *
- * This file is responsible for console reading calls for building an emulator
- * over Windows Console.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- * notice, this list of conditions and the following disclaimer in the
- * documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+* Author: Ray Hayes <ray.hayes@microsoft.com>
+* ANSI TTY Reader - Maps Windows console input events to ANSI stream
+*
+* Author: Balu <bagajjal@microsoft.com>
+* Misc fixes and code cleanup
+*
+* Copyright (c) 2017 Microsoft Corp.
+* All rights reserved
+*
+* This file is responsible for console reading calls for building an emulator
+* over Windows Console.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions
+* are met:
+*
+* 1. Redistributions of source code must retain the above copyright
+* notice, this list of conditions and the following disclaimer.
+* 2. Redistributions in binary form must reproduce the above copyright
+* notice, this list of conditions and the following disclaimer in the
+* documentation and/or other materials provided with the distribution.
+*
+* THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+* IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+* OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+* IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+* NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+* THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+* THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -75,10 +75,10 @@ TelParams* pParams = &Parameters;
 void queue_terminal_window_change_event();
 
 /*
- * For our case, in NetWriteString2(), we do not use socket, but write the out going data to
- * a global buffer setup by ReadConsoleForTermEmul().
- */
-int 
+* For our case, in NetWriteString2(), we do not use socket, but write the out going data to
+* a global buffer setup by ReadConsoleForTermEmul().
+*/
+int
 NetWriteString2(SOCKET sock, char* source, size_t len, int options)
 {
 	while (len > 0) {
@@ -91,7 +91,7 @@ NetWriteString2(SOCKET sock, char* source, size_t len, int options)
 	return glob_outlen;
 }
 
-BOOL 
+BOOL
 DataAvailable(HANDLE h)
 {
 	DWORD dwRet = WaitForSingleObject(h, INFINITE);
@@ -102,7 +102,7 @@ DataAvailable(HANDLE h)
 	return FALSE;
 }
 
-int 
+int
 ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 {
 	HANDLE hHandle[] = { hInput, NULL };
@@ -130,7 +130,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 			break;
 
 		case FOCUS_EVENT:
-		/* FALLTHROUGH */
+			/* FALLTHROUGH */
 		case MENU_EVENT:
 			break;
 
@@ -210,41 +210,41 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 					case VK_F1:
 						if (dwControlKeyState == 0)
 							NetWriteString2(pParams->Socket, (char *)PF1_KEY, strlen(PF1_KEY), 0);
-						
+
 						else if (dwControlKeyState == SHIFT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)SHIFT_PF1_KEY, strlen(SHIFT_PF1_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_CTRL_PRESSED || dwControlKeyState == RIGHT_CTRL_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)CTRL_PF1_KEY, strlen(CTRL_PF1_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_ALT_PRESSED || dwControlKeyState == RIGHT_ALT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)ALT_PF1_KEY, strlen(ALT_PF1_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & RIGHT_ALT_PRESSED) ||
 							(dwControlKeyState & LEFT_ALT_PRESSED)) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_CTRL_PF1_KEY, strlen(SHIFT_ALT_CTRL_PF1_KEY), 0);
-						
+
 						else if ((dwControlKeyState & RIGHT_ALT_PRESSED) || (dwControlKeyState & LEFT_ALT_PRESSED) &&
 							((dwControlKeyState & LEFT_CTRL_PRESSED) || (dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)ALT_CTRL_PF1_KEY, strlen(ALT_CTRL_PF1_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & RIGHT_ALT_PRESSED) ||
 							(dwControlKeyState & LEFT_ALT_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_PF1_KEY, strlen(SHIFT_ALT_PF1_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_CTRL_PF1_KEY, strlen(SHIFT_CTRL_PF1_KEY), 0);
-						
+
 						break;
 					case VK_F2:
 						if (dwControlKeyState == 0)
 							NetWriteString2(pParams->Socket, (char *)PF2_KEY, strlen(PF2_KEY), 0);
-						
+
 						else if (dwControlKeyState == SHIFT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)SHIFT_PF2_KEY, strlen(SHIFT_PF2_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_CTRL_PRESSED || dwControlKeyState == RIGHT_CTRL_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)CTRL_PF2_KEY, strlen(CTRL_PF2_KEY), 0);
 
@@ -255,15 +255,15 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 							(dwControlKeyState & LEFT_ALT_PRESSED)) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_CTRL_PF2_KEY, strlen(SHIFT_ALT_CTRL_PF2_KEY), 0);
-						
+
 						else if ((dwControlKeyState & RIGHT_ALT_PRESSED) || (dwControlKeyState & LEFT_ALT_PRESSED) &&
 							((dwControlKeyState & LEFT_CTRL_PRESSED) || (dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)ALT_CTRL_PF2_KEY, strlen(ALT_CTRL_PF2_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & RIGHT_ALT_PRESSED) ||
 							(dwControlKeyState & LEFT_ALT_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_PF2_KEY, strlen(SHIFT_ALT_PF2_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_CTRL_PF2_KEY, strlen(SHIFT_CTRL_PF2_KEY), 0);
@@ -271,13 +271,13 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 					case VK_F3:
 						if (dwControlKeyState == 0)
 							NetWriteString2(pParams->Socket, (char *)PF3_KEY, strlen(PF3_KEY), 0);
-						
+
 						else if (dwControlKeyState == SHIFT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)SHIFT_PF3_KEY, strlen(SHIFT_PF3_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_CTRL_PRESSED || dwControlKeyState == RIGHT_CTRL_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)CTRL_PF3_KEY, strlen(CTRL_PF3_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_ALT_PRESSED || dwControlKeyState == RIGHT_ALT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)ALT_PF3_KEY, strlen(ALT_PF3_KEY), 0);
 
@@ -301,29 +301,29 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 					case VK_F4:
 						if (dwControlKeyState == 0)
 							NetWriteString2(pParams->Socket, (char *)PF4_KEY, strlen(PF4_KEY), 0);
-						
+
 						else if (dwControlKeyState == SHIFT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)SHIFT_PF4_KEY, strlen(SHIFT_PF4_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_CTRL_PRESSED || dwControlKeyState == RIGHT_CTRL_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)CTRL_PF4_KEY, strlen(CTRL_PF4_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_ALT_PRESSED || dwControlKeyState == RIGHT_ALT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)ALT_PF4_KEY, strlen(ALT_PF4_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & RIGHT_ALT_PRESSED) ||
 							(dwControlKeyState & LEFT_ALT_PRESSED)) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_CTRL_PF4_KEY, strlen(SHIFT_ALT_CTRL_PF4_KEY), 0);
-						
+
 						else if ((dwControlKeyState & RIGHT_ALT_PRESSED) || (dwControlKeyState & LEFT_ALT_PRESSED) &&
 							((dwControlKeyState & LEFT_CTRL_PRESSED) || (dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)ALT_CTRL_PF4_KEY, strlen(ALT_CTRL_PF4_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & RIGHT_ALT_PRESSED) ||
 							(dwControlKeyState & LEFT_ALT_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_PF4_KEY, strlen(SHIFT_ALT_PF4_KEY), 0);
-						
+
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_CTRL_PF4_KEY, strlen(SHIFT_CTRL_PF4_KEY), 0);
@@ -331,10 +331,10 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 					case VK_F5:
 						if (dwControlKeyState == 0)
 							NetWriteString2(pParams->Socket, (char *)PF5_KEY, strlen(PF5_KEY), 0);
-						
+
 						else if (dwControlKeyState == SHIFT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)SHIFT_PF5_KEY, strlen(SHIFT_PF5_KEY), 0);
-						
+
 						else if (dwControlKeyState == LEFT_CTRL_PRESSED || dwControlKeyState == RIGHT_CTRL_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)CTRL_PF5_KEY, strlen(CTRL_PF5_KEY), 0);
 
@@ -345,7 +345,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 							(dwControlKeyState & LEFT_ALT_PRESSED)) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_CTRL_PF5_KEY, strlen(SHIFT_ALT_CTRL_PF5_KEY), 0);
-						
+
 						else if ((dwControlKeyState & RIGHT_ALT_PRESSED) || (dwControlKeyState & LEFT_ALT_PRESSED) &&
 							((dwControlKeyState & LEFT_CTRL_PRESSED) || (dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)ALT_CTRL_PF5_KEY, strlen(ALT_CTRL_PF5_KEY), 0);
@@ -492,7 +492,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 							NetWriteString2(pParams->Socket, (char *)ALT_PF10_KEY, strlen(ALT_PF10_KEY), 0);
 
 						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & RIGHT_ALT_PRESSED) ||
-							(dwControlKeyState & LEFT_ALT_PRESSED)) &&((dwControlKeyState & LEFT_CTRL_PRESSED) ||
+							(dwControlKeyState & LEFT_ALT_PRESSED)) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_CTRL_PF10_KEY, strlen(SHIFT_ALT_CTRL_PF10_KEY), 0);
 
@@ -521,7 +521,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 						else if (dwControlKeyState == LEFT_ALT_PRESSED || dwControlKeyState == RIGHT_ALT_PRESSED)
 							NetWriteString2(pParams->Socket, (char *)ALT_PF11_KEY, strlen(ALT_PF11_KEY), 0);
 
-						else if ((dwControlKeyState & SHIFT_PRESSED) &&((dwControlKeyState & RIGHT_ALT_PRESSED) ||
+						else if ((dwControlKeyState & SHIFT_PRESSED) && ((dwControlKeyState & RIGHT_ALT_PRESSED) ||
 							(dwControlKeyState & LEFT_ALT_PRESSED)) && ((dwControlKeyState & LEFT_CTRL_PRESSED) ||
 							(dwControlKeyState & RIGHT_CTRL_PRESSED)))
 							NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_CTRL_PF11_KEY, strlen(SHIFT_ALT_CTRL_PF11_KEY), 0);

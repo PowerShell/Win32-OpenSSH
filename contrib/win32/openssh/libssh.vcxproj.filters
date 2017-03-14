@@ -282,9 +282,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sandbox-pledge.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)utf8.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c">
       <Filter>Source Files</Filter>
     </ClCompile>

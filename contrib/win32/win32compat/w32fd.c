@@ -35,6 +35,7 @@
 #include "inc\sys\types.h"
 #include "inc\unistd.h"
 #include "inc\fcntl.h"
+#include "inc\sys\un.h"
 
 #include "w32fd.h"
 #include "signal_internal.h"
@@ -206,14 +207,21 @@ w32_socket(int domain, int type, int protocol)
 	errno = 0;
 	if (min_index == -1)
 		return -1;
+	
+	if (domain == AF_UNIX && type == SOCK_STREAM) {
+		pio = fileio_afunix_socket();		
+		if (pio == NULL)
+			return -1;
+		pio->type = NONSOCK_FD;
+	} else {
+		pio = socketio_socket(domain, type, protocol);
+		if (pio == NULL)
+			return -1;
+		pio->type = SOCK_FD;
+	}	
 
-	pio = socketio_socket(domain, type, protocol);
-	if (pio == NULL)
-		return -1;
-
-	pio->type = SOCK_FD;
 	fd_table_set(pio, min_index);
-	debug("socket:%d, io:%p, fd:%d ", pio->sock, pio, min_index);
+	debug("socket:%d, socktype:%d, io:%p, fd:%d ", pio->sock, type, pio, min_index);
 	return min_index;
 }
 
@@ -290,6 +298,12 @@ int
 w32_connect(int fd, const struct sockaddr* name, int namelen)
 {
 	CHECK_FD(fd);
+
+	if (fd_table.w32_ios[fd]->type == NONSOCK_FD) {
+		struct sockaddr_un* addr = (struct sockaddr_un*)name;
+		return fileio_connect(fd_table.w32_ios[fd], addr->sun_path);
+	}
+
 	CHECK_SOCK_IO(fd_table.w32_ios[fd]);
 	return socketio_connect(fd_table.w32_ios[fd], name, namelen);
 }
@@ -298,6 +312,7 @@ int
 w32_recv(int fd, void *buf, size_t len, int flags)
 {
 	CHECK_FD(fd);
+
 	CHECK_SOCK_IO(fd_table.w32_ios[fd]);
 	return socketio_recv(fd_table.w32_ios[fd], buf, len, flags);
 }
@@ -503,10 +518,16 @@ w32_io_process_fd_flags(struct w32_io* pio, int flags)
 	shi_flags = (flags & FD_CLOEXEC) ? 0 : HANDLE_FLAG_INHERIT;
 
 	if (SetHandleInformation(WINHANDLE(pio), HANDLE_FLAG_INHERIT, shi_flags) == FALSE) {
-		debug("fcntl - SetHandleInformation failed  %d, io:%p",
-			GetLastError(), pio);
-		errno = EOTHER;
-		return -1;
+		/* 
+		 * Ignore if handle is not valid yet. It will not be valid for 
+		 * UF_UNIX sockets that are not connected yet 
+		 */
+		if (GetLastError() != ERROR_INVALID_HANDLE) {
+			debug("fcntl - SetHandleInformation failed  %d, io:%p",
+				GetLastError(), pio);
+			errno = EOTHER;
+			return -1;
+		}
 	}
 
 	pio->fd_flags = flags;

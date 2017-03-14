@@ -283,7 +283,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)platform-tracing.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)platform.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sandbox-pledge.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)utf8.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)digest-openssl.c">
       <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>

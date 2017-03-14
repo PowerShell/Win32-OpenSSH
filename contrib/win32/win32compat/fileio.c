@@ -37,6 +37,7 @@
 
 #include "w32fd.h"
 #include "inc\utf.h"
+#include "inc\fcntl.h"
 #include "misc_internal.h"
 
 /* internal read buffer size */
@@ -72,6 +73,76 @@ errno_from_Win32Error(int win32_error)
 	default:
 		return win32_error;
 	}
+}
+
+struct w32_io*
+fileio_afunix_socket() 
+{
+	struct w32_io* ret = (struct w32_io*)malloc(sizeof(struct w32_io));
+	if (ret == NULL) {
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	memset(ret, 0, sizeof(struct w32_io));
+	return ret;
+}
+
+int
+fileio_connect(struct w32_io* pio, char* name) 
+{
+	wchar_t* name_w = NULL;
+	wchar_t pipe_name[PATH_MAX];
+	HANDLE h = INVALID_HANDLE_VALUE;
+	int ret = 0;
+
+	if (pio->handle != 0 && pio->handle != INVALID_HANDLE_VALUE) {
+		debug("fileio_connect called in unexpected state, pio = %p", pio);
+		errno = EOTHER;
+		ret = -1;
+		goto cleanup;
+	}
+
+	if ((name_w = utf8_to_utf16(name)) == NULL) {
+		errno = ENOMEM;
+		return -1;
+	}
+	_snwprintf(pipe_name, PATH_MAX, L"\\\\.\\pipe\\%ls", name_w);
+	h = CreateFileW(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, 
+		NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	
+	/* TODO - support nonblocking connect */
+	/* wait until we have a server pipe instance to connect */
+	while (h == INVALID_HANDLE_VALUE && GetLastError() == ERROR_PIPE_BUSY) {
+		debug2("waiting for agent connection, retrying after 1 sec");
+		if ((ret = wait_for_any_event(NULL, 0, 1000) != 0) != 0)
+			goto cleanup;
+	}
+
+	if (h == INVALID_HANDLE_VALUE) {
+		debug("unable to connect to pipe %ls, error: %d", name_w, GetLastError());
+		errno = errno_from_Win32LastError();
+		ret = -1;
+		goto cleanup;
+	}
+
+	if (SetHandleInformation(h, HANDLE_FLAG_INHERIT,
+	    pio->fd_flags & FD_CLOEXEC ? 0 : HANDLE_FLAG_INHERIT) == FALSE) {
+		errno = errno_from_Win32LastError();
+		debug("SetHandleInformation failed, error = %d, pio = %p", GetLastError(), pio);
+		ret = -1;
+		goto cleanup;
+	}
+	
+	pio->handle = h;
+	h = NULL;
+
+cleanup:
+	if (name_w)
+		free(name_w);
+	if (h != INVALID_HANDLE_VALUE)
+		CloseHandle(h);
+	return ret;
 }
 
 /* used to name named pipes used to implement pipe() */
@@ -662,6 +733,12 @@ int
 fileio_close(struct w32_io* pio)
 {
 	debug2("fileclose - pio:%p", pio);
+
+	/* handle can be null on AF_UNIX sockets that are not yet connected */
+	if (WINHANDLE(pio) == 0 || WINHANDLE(pio) == INVALID_HANDLE_VALUE) {
+		free(pio);
+		return 0;
+	}
 
 	CancelIo(WINHANDLE(pio));
 	/* let queued APCs (if any) drain */

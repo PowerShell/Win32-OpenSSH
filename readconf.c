@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.268 2017/02/03 23:01:19 djm Exp $ */
+/* $OpenBSD: readconf.c,v 1.270 2017/03/10 04:27:32 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1505,6 +1505,7 @@ parse_keytypes:
 			if (r == GLOB_NOMATCH) {
 				debug("%.200s line %d: include %s matched no "
 				    "files",filename, linenum, arg2);
+				free(arg2);
 				continue;
 			} else if (r != 0 || gl.gl_pathc < 0)
 				fatal("%.200s line %d: glob failed for %s.",
@@ -1724,7 +1725,7 @@ read_config_file_depth(const char *filename, struct passwd *pw,
     int flags, int *activep, int depth)
 {
 	FILE *f;
-	char line[1024];
+	char line[4096];
 	int linenum;
 	int bad_options = 0;
 
@@ -1756,6 +1757,8 @@ read_config_file_depth(const char *filename, struct passwd *pw,
 	while (fgets(line, sizeof(line), f)) {
 		/* Update line number counter. */
 		linenum++;
+		if (strlen(line) == sizeof(line) - 1)
+			fatal("%s line %d too long", filename, linenum);
 		if (process_config_line_depth(options, pw, host, original_host,
 		    line, filename, linenum, activep, flags, depth) != 0)
 			bad_options++;

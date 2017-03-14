@@ -1,7 +1,7 @@
-#ifndef COMPAT_UN_H
-#define COMPAT_UN_H 1
+#pragma once
 
+struct	sockaddr_un {
+	short	sun_family;		/* AF_UNIX */
+	char	sun_path[108];		/* path name (gag) */
+};
 
-/* Compatibility header to avoid lots of #ifdef _WIN32's in includes.h */
-
-#endif

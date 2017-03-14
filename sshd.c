@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.482 2017/02/06 09:22:51 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.483 2017/02/24 03:16:34 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1084,15 +1084,11 @@ server_listen(void)
 			close(listen_sock);
 			continue;
 		}
-#ifdef WINDOWS
-		/* disable inheritance on listener socket */
-		if (fcntl(listen_sock, F_SETFD, FD_CLOEXEC) != 0) {
-			error("F_SETFD  FD_CLOEXEC on socket %d error %d", 
-			    listen_sock, errno);
+		if (fcntl(listen_sock, F_SETFD, FD_CLOEXEC) == -1) {
+			verbose("socket: CLOEXEC: %s", strerror(errno));
 			close(listen_sock);
 			continue;
 		}
-#endif /* WINDOWS */
 		/*
 		 * Set socket options.
 		 * Allow local port reuse in TIME_WAIT.

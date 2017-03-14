@@ -482,6 +482,9 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 	fcntl(pipeout[0], F_SETFD, FD_CLOEXEC);
 	fcntl(pipeerr[0], F_SETFD, FD_CLOEXEC);
 
+	/* setup Environment varibles */
+	setup_session_vars(s);
+
 	/* prepare exec - path used with CreateProcess() */
 	if (s->is_subsystem || (command && memcmp(command, "scp", 3) == 0)) {
 		/* relative or absolute */
@@ -530,17 +533,13 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		*c = '\0';
 	}
 
-	/* setup Environment varibles */
-	setup_session_vars(s);
-	
-	extern int debug_flag;
-
 	/* start the process */
 	{
 		PROCESS_INFORMATION pi;
 		STARTUPINFOW si;
 		BOOL b;
 		HANDLE hToken = INVALID_HANDLE_VALUE;
+		extern int debug_flag;
 
 		memset(&si, 0, sizeof(STARTUPINFO));
 		si.cb = sizeof(STARTUPINFO);

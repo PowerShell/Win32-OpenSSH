@@ -1,4 +1,4 @@
-/* $OpenBSD: match.c,v 1.34 2017/02/03 23:01:19 djm Exp $ */
+/* $OpenBSD: match.c,v 1.37 2017/03/10 04:24:55 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -42,9 +42,11 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "xmalloc.h"
 #include "match.h"
+#include "misc.h"
 
 /*
  * Returns true if the given string matches the pattern (which may contain ?
@@ -145,7 +147,7 @@ match_pattern_list(const char *string, const char *pattern, int dolower)
 		if (subi >= sizeof(sub) - 1)
 			return 0;
 
-		/* If the subpattern was terminated by a comma, skip the comma. */
+		/* If the subpattern was terminated by a comma, then skip it. */
 		if (i < len && pattern[i] == ',')
 			i++;
 
@@ -177,7 +179,13 @@ match_pattern_list(const char *string, const char *pattern, int dolower)
 int
 match_hostname(const char *host, const char *pattern)
 {
-	return match_pattern_list(host, pattern, 1);
+	char *hostcopy = xstrdup(host);
+	int r;
+
+	lowercase(hostcopy);
+	r = match_pattern_list(hostcopy, pattern, 1);
+	free(hostcopy);
+	return r;
 }
 
 /*
@@ -297,8 +305,11 @@ match_filter_list(const char *proposal, const char *filter)
 	char *orig_prop = strdup(proposal);
 	char *cp, *tmp;
 
-	if (fix_prop == NULL || orig_prop == NULL)
+	if (fix_prop == NULL || orig_prop == NULL) {
+		free(orig_prop);
+		free(fix_prop);
 		return NULL;
+	}
 
 	tmp = orig_prop;
 	*fix_prop = '\0';

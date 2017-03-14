@@ -108,6 +108,9 @@ int sshd_main(int argc, wchar_t **wargv) {
 			argv[i] = utf16_to_utf8(wargv[i]);
 	}
 
+	if (getenv("SSH_AUTH_SOCK") == NULL)
+		_putenv("SSH_AUTH_SOCK=ssh-agent");
+
 	w32posix_initialize();
 	if (getenv("SSHD_REMSOC"))
 		is_child = 1;

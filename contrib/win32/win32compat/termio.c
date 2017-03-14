@@ -39,6 +39,7 @@
 #include "w32fd.h"
 #include "tncon.h"
 #include "inc\utf.h"
+#include "tnnet.h"
 
 #define TERM_IO_BUF_SIZE 2048
 
@@ -136,6 +137,7 @@ WriteAPCProc(_In_ ULONG_PTR dwParam)
 	pio->write_overlapped.hEvent = 0;
 }
 
+
 /* Write worker thread */
 static DWORD WINAPI 
 WriteThread(_In_ LPVOID lpParameter)
@@ -145,20 +147,19 @@ WriteThread(_In_ LPVOID lpParameter)
 	size_t resplen = 0;
 	DWORD dwSavedAttributes = ENABLE_PROCESSED_INPUT;
 	debug3("TermWrite thread, io:%p", pio);
-
-	if (in_raw_mode == 0) {
-		/* convert stream to utf16 and dump on console */
-		pio->write_details.buf[write_status.to_transfer] = '\0';
+	
+	pio->write_details.buf[write_status.to_transfer] = '\0';
+	
+	if (0 == in_raw_mode) {
 		wchar_t* t = utf8_to_utf16(pio->write_details.buf);
 		WriteConsoleW(WINHANDLE(pio), t, wcslen(t), 0, 0);
-		free(t);
-		write_status.transferred = write_status.to_transfer;
+		free(t);		
 	} else {
-		/* console mode */
-		telProcessNetwork(pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
+		processBuffer(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
 		/* TODO - respbuf is not null in some cases, this needs to be returned back via read stream */
-		write_status.transferred = write_status.to_transfer;
 	}
+
+	write_status.transferred = write_status.to_transfer;
 
 	if (0 == QueueUserAPC(WriteAPCProc, main_thread, (ULONG_PTR)pio)) {
 		debug("TermWrite thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
@@ -166,6 +167,7 @@ WriteThread(_In_ LPVOID lpParameter)
 		pio->write_details.error = GetLastError();
 		DebugBreak();
 	}
+
 	return 0;
 }
 

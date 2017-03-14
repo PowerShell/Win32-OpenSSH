@@ -4375,6 +4375,33 @@ connect_local_xsocket(u_int dnr)
 	return connect_local_xsocket_path(buf);
 }
 
+#ifdef __APPLE__
+static int
+is_path_to_xsocket(const char *display, char *path, size_t pathlen)
+{
+	struct stat sbuf;
+
+	if (strlcpy(path, display, pathlen) >= pathlen) {
+		error("%s: display path too long", __func__);
+		return 0;
+	}
+	if (display[0] != '/')
+		return 0;
+	if (stat(path, &sbuf) == 0) {
+		return 1;
+	} else {
+		char *dot = strrchr(path, '.');
+		if (dot != NULL) {
+			*dot = '\0';
+			if (stat(path, &sbuf) == 0) {
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
+#endif
+
 int
 x11_connect_display(void)
 {
@@ -4396,15 +4423,22 @@ x11_connect_display(void)
 	 * connection to the real X server.
 	 */
 
-	/* Check if the display is from launchd. */
 #ifdef __APPLE__
-	if (strncmp(display, "/tmp/launch", 11) == 0) {
-		sock = connect_local_xsocket_path(display);
-		if (sock < 0)
-			return -1;
+	/* Check if display is a path to a socket (as set by launchd). */
+	{
+		char path[PATH_MAX];
 
-		/* OK, we now have a connection to the display. */
-		return sock;
+		if (is_path_to_xsocket(display, path, sizeof(path))) {
+			debug("x11_connect_display: $DISPLAY is launchd");
+
+			/* Create a socket. */
+			sock = connect_local_xsocket_path(path);
+			if (sock < 0)
+				return -1;
+
+			/* OK, we now have a connection to the display. */
+			return sock;
+		}
 	}
 #endif
 	/*

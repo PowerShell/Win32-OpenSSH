@@ -34,7 +34,8 @@
 #include "inc\utf.h"
 #include "misc_internal.h"
 
-int main(int, char **);
+int
+main(int, char **);
 
 int
 wmain(int argc, wchar_t **wargv) {
@@ -47,6 +48,9 @@ wmain(int argc, wchar_t **wargv) {
                 for (i = 0; i < argc; i++)
                         argv[i] = utf16_to_utf8(wargv[i]);
         }
+
+	if (getenv("SSH_AUTH_SOCK") == NULL)
+		_putenv("SSH_AUTH_SOCK=ssh-agent");
 
         w32posix_initialize();
         r = main(argc, argv);

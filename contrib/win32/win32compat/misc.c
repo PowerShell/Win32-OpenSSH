@@ -276,6 +276,75 @@ w32_fopen_utf8(const char *path, const char *mode)
 	return f;
 }
 
+/* fgets to support Unicode input */
+char*
+ w32_fgets(char *str, int n, FILE *stream) {
+	HANDLE h = (HANDLE)_get_osfhandle(_fileno(stream));
+	wchar_t* str_w = NULL;
+	char *ret = NULL, *str_tmp = NULL;
+
+	if (h != NULL && h != INVALID_HANDLE_VALUE
+	    && GetFileType(h) == FILE_TYPE_CHAR) {
+		/* 
+		 * read only n/4 wide chars from console 
+		 * each UTF-16 char may bloat upto 4 utf-8 chars when converted to utf-8 
+		 * so we can fit in str[n] provided as input
+		 */
+		if ((str_w = malloc((n/4) * sizeof(wchar_t))) == NULL) {
+			errno = ENOMEM;
+			goto cleanup;
+		}
+		/* prepare for Unicode input */
+		_setmode(_fileno(stream), O_U16TEXT); 
+		if (fgetws(str_w, n/4, stream) == NULL)
+			goto cleanup;
+		if ((str_tmp = utf16_to_utf8(str_w)) == NULL) {
+			errno = ENOMEM;
+			goto cleanup;
+		}
+		if (strlen(str_tmp) > n - 1) {
+			/* shouldn't happen. but handling in case */
+			errno = EINVAL;
+			goto cleanup;
+		}
+		memcpy(str, str_tmp, strlen(str_tmp) + 1);
+		ret = str;
+	}
+	else
+		ret = fgets(str, n, stream);
+cleanup:
+	if (str_w)
+		free(str_w);
+	if (str_tmp)
+		free(str_tmp);
+	return ret;
+}
+
+/* Account for differences between Unix's and Windows versions of setvbuf */
+int 
+w32_setvbuf(FILE *stream, char *buffer, int mode, size_t size) {
+	
+	/* BUG: setvbuf on console stream interferes with Unicode I/O	*/
+	HANDLE h = (HANDLE)_get_osfhandle(_fileno(stream));
+	
+	if (h != NULL && h != INVALID_HANDLE_VALUE
+	    && GetFileType(h) == FILE_TYPE_CHAR)
+		return 0;
+
+	/* BUG: setvbuf on file stream is interfering with w32_fopen */
+	/* short circuit for now*/
+	return 0;
+
+	/*
+	 * if size is 0, set no buffering. 
+	 * Windows does not differentiate __IOLBF and _IOFBF
+	 */
+	if (size == 0)
+		return setvbuf(stream, NULL, _IONBF, 0);
+	else
+		return setvbuf(stream, buffer, mode, size);
+}
+
 char *
 w32_programdir()
 {
@@ -319,10 +388,12 @@ w32_ioctl(int d, int request, ...)
 			errno = EINVAL;
 			return -1;
 		}
-		wsize->ws_col = c_info.dwSize.X - 5;
-		wsize->ws_row = c_info.dwSize.Y;
+
+		wsize->ws_col = c_info.dwSize.X;
+		wsize->ws_row = c_info.srWindow.Bottom - c_info.srWindow.Top + 1;
 		wsize->ws_xpixel = 640;
 		wsize->ws_ypixel = 480;
+
 		return 0;
 	}
 	default:

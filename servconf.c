@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.304 2017/02/03 23:01:19 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.305 2017/03/10 04:11:00 dtucker Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -2164,8 +2164,6 @@ dump_cfg_fmtint(ServerOpCodes code, int val)
 static void
 dump_cfg_string(ServerOpCodes code, const char *val)
 {
-	if (val == NULL)
-		return;
 	printf("%s %s\n", lookup_opcode_name(code),
 	    val == NULL ? "none" : val);
 }

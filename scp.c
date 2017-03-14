@@ -1034,17 +1034,7 @@ rsource(char *name, struct stat *statp)
 	(void) snprintf(path, sizeof path, "D%04o %d %.1024s\n",
 	    (u_int) (statp->st_mode & FILEMODEMASK), 0, last);
 	if (verbose_mode)
-#ifdef WINDOWS
-	/* TODO - make fmprintf work for Windows  */
-	{
-		printf("Entering directory: ");
-		wchar_t* wtmp = utf8_to_utf16(path);
-		WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
-		free(wtmp);
-	}
-#else /* !WINDOWS */
 		fmprintf(stderr, "Entering directory: %s", path);
-#endif /* !WINDOWS */
 	(void) atomicio(vwrite, remout, path, strlen(path));
 	if (response() < 0) {
 		closedir(dirp);
@@ -1119,17 +1109,7 @@ sink(int argc, char **argv)
 		} while (cp < &buf[sizeof(buf) - 1] && ch != '\n');
 		*cp = 0;
 		if (verbose_mode)
-#ifdef WINDOWS
-		/* TODO - make fmprintf work for Windows  */
-		{
-			printf("Sink: ");
-			wchar_t* wtmp = utf8_to_utf16(buf);
-			WriteConsoleW(GetStdHandle(STD_ERROR_HANDLE), wtmp, wcslen(wtmp), 0, 0);
-			free(wtmp);
-		}
-#else /* !WINDOWS */
 			fmprintf(stderr, "Sink: %s", buf);
-#endif /* !WINDOWS */
 
 		if (buf[0] == '\01' || buf[0] == '\02') {
 			if (iamremote == 0) {

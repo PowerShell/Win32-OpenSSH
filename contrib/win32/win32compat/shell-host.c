@@ -121,6 +121,9 @@ struct key_translation keys[] = {
     { "\x1b[24~",   VK_F12,      0 }
 };
 
+static SHORT lastX = 0;
+static SHORT lastY = 0;
+
 consoleEvent* head = NULL;
 consoleEvent* tail = NULL;
 
@@ -181,6 +184,17 @@ STARTUPINFO inputSi;
 	if ((exp) != 0)			\
 		goto cleanup;		\
 } while(0)
+
+int
+ConSRWidth()
+{
+	CONSOLE_SCREEN_BUFFER_INFOEX  consoleBufferInfo;
+	ZeroMemory(&consoleBufferInfo, sizeof(consoleBufferInfo));
+	consoleBufferInfo.cbSize = sizeof(consoleBufferInfo);
+
+	GetConsoleScreenBufferInfoEx(child_out, &consoleBufferInfo);
+	return consoleBufferInfo.srWindow.Right;
+}
 
 /*
  * This function will handle the console keystrokes.
@@ -426,7 +440,7 @@ SendBuffer(HANDLE hInput, CHAR_INFO *buffer, DWORD bufferSize)
 }
 
 void 
-CalculateAndSetCursor(HANDLE hInput, UINT aboveTopLine, UINT viewPortHeight, UINT x, UINT y)
+CalculateAndSetCursor(HANDLE hInput, UINT x, UINT y)
 {
 
 	SendSetCursor(pipe_out, x + 1, y + 1);
@@ -548,14 +562,13 @@ ProcessEvent(void *p)
 	case EVENT_CONSOLE_CARET:
 	{
 		COORD co;
+		co.X = LOWORD(idChild);
+		co.Y = HIWORD(idChild);
 		
-		if (idObject == CONSOLE_CARET_SELECTION) {
-			co.X = HIWORD(idChild);
-			co.Y = LOWORD(idChild);
-		} else {
-			co.X = HIWORD(idChild);
-			co.Y = LOWORD(idChild);
-		}
+		lastX = co.X;
+		lastY = co.Y;
+
+		SendSetCursor(pipe_out, lastX + 1, lastY + 1);
 
 		break;
 	}
@@ -567,6 +580,8 @@ ProcessEvent(void *p)
 		readRect.Left = LOWORD(idObject);
 		readRect.Bottom = HIWORD(idChild);
 		readRect.Right = LOWORD(idChild);
+
+		readRect.Right = max(readRect.Right, ConSRWidth());
 
 		/* Detect a "cls" (Windows) */
 		if (!bStartup &&
@@ -632,7 +647,7 @@ ProcessEvent(void *p)
 				SendLF(pipe_out);
 
 		/* Set cursor location based on the reported location from the message */
-		CalculateAndSetCursor(pipe_out, ViewPortY, viewPortHeight, readRect.Left, readRect.Top);
+		CalculateAndSetCursor(pipe_out, readRect.Left, readRect.Top);
 
 		/* Send the entire block */
 		SendBuffer(pipe_out, pBuffer, bufferSize);
@@ -649,12 +664,37 @@ ProcessEvent(void *p)
 		wAttributes = HIWORD(idChild);
 		wX = LOWORD(idObject);
 		wY = HIWORD(idObject);
-
+		
+		SMALL_RECT readRect;
+		readRect.Top = wY;
+		readRect.Bottom = wY;
+		readRect.Left = wX;
+		readRect.Right = ConSRWidth();
+		
 		/* Set cursor location based on the reported location from the message */
-		CalculateAndSetCursor(pipe_out, ViewPortY, viewPortHeight, wX, wY);
+		CalculateAndSetCursor(pipe_out, wX, wY);
+		
+		COORD coordBufSize;
+		coordBufSize.Y = readRect.Bottom - readRect.Top + 1;
+		coordBufSize.X = readRect.Right - readRect.Left + 1;
 
+		/* The top left destination cell of the temporary buffer is row 0, col 0 */
+		COORD coordBufCoord;
+		coordBufCoord.X = 0;
+		coordBufCoord.Y = 0;
+		int pBufferSize = coordBufSize.X * coordBufSize.Y;
 		/* Send the one character. Note that a CR doesn't end up here */
-		SendCharacter(pipe_out, wAttributes, chUpdate);
+		CHAR_INFO *pBuffer = (PCHAR_INFO)malloc(sizeof(CHAR_INFO) * pBufferSize);
+
+		/* Copy the block from the screen buffer to the temp. buffer */
+		if (!ReadConsoleOutput(child_out, pBuffer, coordBufSize, coordBufCoord, &readRect)) {
+			DWORD dwError = GetLastError();
+			free(pBuffer);
+			return dwError;
+		}
+
+		SendBuffer(pipe_out, pBuffer, pBufferSize);
+		free(pBuffer);
 
 		break;
 	}
@@ -699,18 +739,24 @@ ProcessEvent(void *p)
 	}
 	}
 
-	ZeroMemory(&consoleInfo, sizeof(consoleInfo));
-	consoleInfo.cbSize = sizeof(consoleInfo);
-	GetConsoleScreenBufferInfoEx(child_out, &consoleInfo);
-
 	return ERROR_SUCCESS;
 }
 
 DWORD WINAPI 
 ProcessEventQueue(LPVOID p)
 {
-	static SHORT lastX = 0;
-	static SHORT lastY = 0;
+	if (child_in != INVALID_HANDLE_VALUE && child_in != NULL &&
+	    child_out != INVALID_HANDLE_VALUE && child_out != NULL) {
+		DWORD dwInputMode;
+		DWORD dwOutputMode;
+
+		if (GetConsoleMode(child_in, &dwInputMode) && GetConsoleMode(child_out, &dwOutputMode))
+			if (((dwOutputMode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == ENABLE_VIRTUAL_TERMINAL_PROCESSING) &&
+			    ((dwInputMode & ENABLE_VIRTUAL_TERMINAL_INPUT) == ENABLE_VIRTUAL_TERMINAL_INPUT))
+				bAnsi = TRUE;
+			else
+				bAnsi = FALSE;
+	}
 
 	while (1) {
 		while (head) {
@@ -737,14 +783,6 @@ ProcessEventQueue(LPVOID p)
 		    child_out != INVALID_HANDLE_VALUE && child_out != NULL) {
 			DWORD dwInputMode;
 			DWORD dwOutputMode;
-
-			if (GetConsoleMode(child_in, &dwInputMode) && GetConsoleMode(child_out, &dwOutputMode)) {
-				if (((dwOutputMode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == ENABLE_VIRTUAL_TERMINAL_PROCESSING) &&
-				    ((dwInputMode & ENABLE_VIRTUAL_TERMINAL_INPUT) == ENABLE_VIRTUAL_TERMINAL_INPUT))
-					bAnsi = TRUE;
-				else
-					bAnsi = FALSE;
-			}
 
 			ZeroMemory(&consoleInfo, sizeof(consoleInfo));
 			consoleInfo.cbSize = sizeof(consoleInfo);
@@ -953,7 +991,7 @@ start_with_pty(wchar_t *command)
 	/* 
 	 * Windows PTY sends cursor positions in absolute coordinates starting from <0,0>
 	 * We send a clear screen upfront to simplify client 
-	 */
+	 */	
 	SendClearScreen(pipe_out);
 	ZeroMemory(&inputSi, sizeof(STARTUPINFO));
 	GetStartupInfo(&inputSi);
@@ -963,7 +1001,7 @@ start_with_pty(wchar_t *command)
 	hostThreadId = GetCurrentThreadId();
 	hostProcessId = GetCurrentProcessId();
 	InitializeCriticalSection(&criticalSection);
-	hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_LAYOUT, NULL,
+	hEventHook = __SetWinEventHook(EVENT_CONSOLE_CARET, EVENT_CONSOLE_END_APPLICATION, NULL,
 					ConsoleEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
 	memset(&si, 0, sizeof(STARTUPINFO));
 	memset(&pi, 0, sizeof(PROCESS_INFORMATION));
@@ -1205,8 +1243,14 @@ wmain(int ac, wchar_t **av)
 		char *cmd_b64_utf8, *cmd_utf8;
 		if ((cmd_b64_utf8 = utf16_to_utf8(cmd_b64)) == NULL ||
 		    /* strlen(b64) should be sufficient for decoded length */
-		    (cmd_utf8 = malloc(strlen(cmd_b64_utf8))) == NULL ||
-		    b64_pton(cmd_b64_utf8, cmd_utf8, strlen(cmd_b64_utf8)) == -1 ||
+		    (cmd_utf8 = malloc(strlen(cmd_b64_utf8))) == NULL) {
+			printf("ssh-shellhost - out of memory");
+			return -1;
+		}
+		   
+		memset(cmd_utf8, 0, strlen(cmd_b64_utf8));
+
+		if (b64_pton(cmd_b64_utf8, cmd_utf8, strlen(cmd_b64_utf8)) == -1 ||
 		    (cmd = utf8_to_utf16(cmd_utf8)) == NULL) {
 			printf("ssh-shellhost encountered an internal error while decoding base64 cmdline");
 			return -1;

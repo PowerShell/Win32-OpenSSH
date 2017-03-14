@@ -159,7 +159,6 @@
       <AdditionalLibraryDirectories>$(OpenSSL-Win32-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>ssh-lsa.def</ModuleDefinitionFile>
       <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
-      <StripPrivateSymbols>No</StripPrivateSymbols>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -184,7 +183,6 @@
       <AdditionalLibraryDirectories>$(OpenSSL-x64-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>ssh-lsa.def</ModuleDefinitionFile>
       <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
-      <StripPrivateSymbols>No</StripPrivateSymbols>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

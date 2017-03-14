@@ -497,16 +497,16 @@ function Deploy-OpenSSHTests
     else
     {
         $RealConfiguration = $Configuration
-    }
-    
+    }    
 
     [System.IO.DirectoryInfo] $repositoryRoot = Get-RepositoryRoot
     #copy all pester tests
     $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "regress\pesterTests"
     Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHTestDir -Include *.ps1,*.psm1, sshd_config -Force -ErrorAction Stop
     #copy all unit tests.
-    $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "bin\$folderName\$RealConfiguration"
-    Copy-Item -Path "$sourceDir\unittest-*" -Destination $OpenSSHTestDir -Force -ErrorAction Stop
+    $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "bin\$folderName\$RealConfiguration"    
+    Copy-Item -Path "$sourceDir\*" -Destination "$OpenSSHTestDir\" -Container -Include unittest-* -Recurse -Force -ErrorAction Stop
+    
     #restart the service to use the test copy of sshd_config
     Restart-Service sshd
 }
@@ -668,14 +668,18 @@ function Run-OpenSSHUnitTest
     {
         Remove-Item -Path $unitTestOutputFile -Force -ErrorAction SilentlyContinue
     }
-
-    $unitTestFiles = Get-ChildItem -Path "$testRoot\unittest*.exe" -Exclude unittest-kex.exe,unittest-hostkeys.exe
+    $testFolders = Get-ChildItem unittest-*.exe -Recurse -Exclude unittest-sshkey.exe,unittest-kex.exe |
+                 ForEach-Object{ Split-Path $_.FullName} |
+                 Sort-Object -Unique
     $testfailed = $false
-    if ($unitTestFiles -ne $null)
-    {        
-        $unitTestFiles | % {
-            Write-Output "Running OpenSSH unit $($_.FullName)..."
-            & $_.FullName >> $unitTestOutputFile
+    if ($testFolders -ne $null)
+    {
+        $testFolders | % {
+            Push-Location $_
+            $unittestFile = "$(Split-Path $_ -Leaf).exe"
+            Write-Output "Running OpenSSH unit $unittestFile ..."
+            & .\$unittestFile >> $unitTestOutputFile
+            
             $errorCode = $LASTEXITCODE
             if ($errorCode -ne 0)
             {
@@ -685,6 +689,7 @@ function Run-OpenSSHUnitTest
                 Write-BuildMessage -Message $errorMessage -Category Error
                 Set-BuildVariable TestPassed False
             }
+            Pop-Location
         }
         if(-not $testfailed)
         {
@@ -747,7 +752,7 @@ function Upload-OpenSSHTestResults
     
     if($env:TestPassed -ieq 'True')
     {
-        Write-BuildMessage -Message "The checkin validation success!"
+        Write-BuildMessage -Message "The checkin validation success!" -Category Information
     }
     else
     {

@@ -48,14 +48,12 @@ extern int ScreenX;
 extern int ScreenY;
 extern int ScrollTop;
 extern int ScrollBottom;
-extern BOOL bAnsiParsing;
 
 bool gbVTAppMode = false;
 /* private message for port printing to */
 unsigned char VT_ST[] = { 0x1b, '/', '\0' };
 static int AutoWrap = 1;
 BOOL bAtEOLN = FALSE;
-static int term_mode = TERM_ANSI;
 
 /*
  * ParseANSI globals - these need to be here, because sometimes blocks are sent
@@ -142,12 +140,24 @@ BufConvertToG2(char * pszBuffer, int length)
 void
 GoToNextLine()
 {
-	if (ConGetCursorY() >= (ConWindowSizeY() - 1)) {
-		ConScrollDown(ScrollTop, ScrollBottom);
-		ConMoveCursorPosition(-ConGetCursorX(), 0);
-	}
-	else
-		ConMoveCursorPosition(-ConGetCursorX(), 1);
+	int currentX = 0;
+	int currentY = 0;
+	
+	ConGetCursorPosition(&currentX, &currentY);
+
+	/* If the cursor is the last line of the visible window */
+	if (is_cursor_at_lastline_of_visible_window()) {		
+		if (currentY >= ConGetBufferHeight()) {
+			/* handle the max window buffer size */
+			ConScrollDown(0, currentY);
+			ConMoveCursorPosition(-currentX, 0);		
+		} else {
+			/* max window buffer is not breached */
+			ConMoveVisibleWindow(1);
+			ConMoveCursorPosition(-currentX, 1);
+		}
+	} else /* If the cursor is NOT the last line of the visible window */
+		ConMoveCursorPosition(-currentX, 1);
 	
 	bAtEOLN = FALSE;
 }
@@ -155,8 +165,8 @@ GoToNextLine()
 unsigned char* 
 ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char **respbuf, size_t *resplen)
 {
-	int CurrentX;
-	int CurrentY;
+	int currentX;
+	int currentY;
 	int bufLen, cmpLen, i;
 
 	if (!fcompletion) {
@@ -164,8 +174,7 @@ ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char
 			unsigned char * pszCurrent = pszBuffer + 1;
 			unsigned char * pszNewCurrent = pszCurrent;
 
-			if (term_mode == TERM_ANSI && bAnsiParsing)
-				pszNewCurrent = ParseANSI(pszCurrent, pszBufferEnd, respbuf, resplen);
+			pszNewCurrent = ParseANSI(pszCurrent, pszBufferEnd, respbuf, resplen);
 
 			/* Pointer didn't move inside Parse function */
 			if (pszCurrent == pszNewCurrent) {
@@ -200,8 +209,8 @@ ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char
 	case 8:
 		pszBuffer++;
 		if (!bAtEOLN) {
-			CurrentX = ConGetCursorX();
-			if (CurrentX == 0) {
+			currentX = ConGetCursorX();
+			if (currentX == 0) {
 				ConMoveCursorPosition(ScreenX - 1, -1);
 				ConWriteString(" ", 1);
 			} else {
@@ -263,10 +272,8 @@ ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char
 			if (*pszCurrent == 27) {
 				pszNewCurrent += ConWriteString((char *)pszCurrent, 1);
 				return pszBuffer + 1;
-			} else {
-				if (term_mode == TERM_ANSI)
-					pszNewCurrent = ParseANSI(pszCurrent, pszBufferEnd, respbuf, resplen);
-			}
+			} else				
+				pszNewCurrent = ParseANSI(pszCurrent, pszBufferEnd, respbuf, resplen);
 
 			if (pszNewCurrent > pszCurrent)
 				pszBuffer = pszNewCurrent;
@@ -278,12 +285,12 @@ ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char
 		if (bAtEOLN) GoToNextLine();
 
 		unsigned char* pszCurrent = pszBuffer;
-		CurrentX = ConGetCursorX();
+		currentX = ConGetCursorX();
 		int nCharCount = 0;
 
 		while ((pszCurrent < pszBufferEnd) && (*pszCurrent != (unsigned char)27)
 			&& (*pszCurrent > (unsigned char)15) && (*pszCurrent != (unsigned char)255)
-			&& (CurrentX++ < ScreenX)) {
+			&& (currentX++ < ScreenX)) {
 			if (*pszCurrent > 127) {
 				unsigned char nLead = *pszCurrent;
 				nCharCount++;
@@ -305,7 +312,7 @@ ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char
 
 		pszBuffer += ConWriteString((char *)pszBuffer, (int)(pszCurrent - pszBuffer));
 
-		if ((CurrentX >= ScreenX) && AutoWrap && !(VTMode & MODE_CURSORAPP))
+		if ((currentX >= ScreenX) && AutoWrap && !(VTMode & MODE_CURSORAPP))
 			bAtEOLN = TRUE;
 	}
 	break;
@@ -561,10 +568,10 @@ ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char
 			if (iParam[0]) {
 				int i;
 				for (i = 0; i < iParam[0]; i++)
-					ConScrollUp(ConGetCursorY() - 1, ScrollTop + ConWindowSizeY() - 2);
+					ConScrollUp(ConGetCursorY() - 1, ScrollTop + ConVisibleWindowHeight() - 2);
 			} else {
-				if (ConGetCursorY() <= ScrollTop + ConWindowSizeY() - 2)
-					ConScrollUp(ConGetCursorY() - 1, ScrollTop + ConWindowSizeY() - 2);
+				if (ConGetCursorY() <= ScrollTop + ConVisibleWindowHeight() - 2)
+					ConScrollUp(ConGetCursorY() - 1, ScrollTop + ConVisibleWindowHeight() - 2);
 			}
 			fcompletion = 1;
 			bAtEOLN = FALSE;
@@ -600,7 +607,7 @@ ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char
 				for (i = 0; i < iParam[0]; i++)
 					ConScrollUp(ConGetCursorY(), ScrollTop - ConGetCursorY());
 			} else {
-				if (ConGetCursorY() <= ScrollTop + ConWindowSizeY() - 2)
+				if (ConGetCursorY() <= ScrollTop + ConVisibleWindowHeight() - 2)
 					ConScrollUp(ConGetCursorY(), ScrollTop - ConGetCursorY());
 			}
 			fcompletion = 1;
