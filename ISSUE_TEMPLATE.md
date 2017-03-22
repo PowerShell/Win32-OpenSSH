@@ -1,13 +1,13 @@
 Please answer the following
 
-"OpenSSH for Windows" version?
- ((Get-Item (Get-Command sshd).Source).VersionInfo.FileVersion) 
+**"OpenSSH for Windows" version**
+ `((Get-Item (Get-Command sshd).Source).VersionInfo.FileVersion)`
 
-OS details?
- ((Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows nt\CurrentVersion\" -Name ProductName).ProductName) 
+**OS details**
+ `((Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows nt\CurrentVersion\" -Name ProductName).ProductName)`
 
-What is failing?
+**What is failing**
 
-Expected output?
+**Expected output**
 
-Actual output?
+**Actual output**
