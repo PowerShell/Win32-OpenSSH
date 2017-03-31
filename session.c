@@ -410,14 +410,16 @@ static void setup_session_vars(Session* s) {
 		UTF8_TO_UTF16_FATAL(tmp, s->display);
 		SetEnvironmentVariableW(L"DISPLAY", tmp);
 	}
-	SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w);
 	SetEnvironmentVariableW(L"USERPROFILE", pw_dir_w);
 
-	if (pw_dir_w[1] == L':') {
+	if (pw_dir_w[0] && pw_dir_w[1] == L':') {
+		SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w + 2);
 		wchar_t wc = pw_dir_w[2];
 		pw_dir_w[2] = L'\0';
 		SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_w);
 		pw_dir_w[2] = wc;
+	} else {
+		SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w);
 	}
 
 	snprintf(buf, sizeof buf, "%.50s %d %d",
