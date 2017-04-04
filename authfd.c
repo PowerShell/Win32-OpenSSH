@@ -113,7 +113,6 @@ ssh_get_authentication_socket(int *fdp)
 		errno = oerrno;
 		return SSH_ERR_SYSTEM_ERROR;
 	}
-
 	if (fdp != NULL)
 		*fdp = sock;
 	else

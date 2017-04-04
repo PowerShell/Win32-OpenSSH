@@ -53,21 +53,21 @@ int
 ga_init(const char *user, gid_t base)
 {
 #ifdef WINDOWS
-	DWORD i = 0, j = 0;
 	LPLOCALGROUP_USERS_INFO_0 local_groups_info = NULL, tmp_groups_info;
 	wchar_t *user_utf16 = NULL, *full_name_utf16 = NULL, *udom_utf16 = NULL, *tmp;
 	char *group_utf8 = NULL;
+	DWORD i = 0, j = 0;
 	DWORD entries_read = 0, total_entries = 0, full_name_len = 0, index = 0;
 	NET_API_STATUS nStatus;
 	
 	if (ngroups > 0)
 		ga_free();
 
-	user_utf16 = utf8_to_utf16(user);
 	if ((user_utf16 = utf8_to_utf16(user)) == NULL) {
 		errno = ENOMEM;
 		goto done;
 	}
+
 	full_name_len = wcslen(user_utf16) + 1;
 	if ((full_name_utf16 = malloc(full_name_len * sizeof(wchar_t))) == NULL) {
 		errno = ENOMEM;
@@ -151,7 +151,6 @@ done:
 	free(groups_bygid);
 #endif /* !WINDOWS */
 	return (ngroups = j);
-
 }
 
 /*

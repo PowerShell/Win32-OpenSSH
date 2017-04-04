@@ -222,6 +222,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)auth2-passwd.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)auth2-pubkey.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)auth2.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)groupaccess.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)gss-serv-krb5.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)gss-serv.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)kexdhs.c" />
@@ -244,9 +245,8 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sftp-common.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshd.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshlogin.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)sshpty.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\win32_sshpty.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_sshd.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)groupaccess.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />

@@ -1,30 +1,39 @@
-﻿using module .\PlatformAbstractLayer.psm1
-
+﻿
 #covered -i -p -q -r -v -c -S -C
 #todo: -F, -l and -P should be tested over the network
 Describe "Tests for scp command" -Tags "CI" {
-    BeforeAll {        
+    BeforeAll {
+        if($OpenSSHTestInfo -eq $null)
+        {
+            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+        }
+
+        if(-not (Test-Path $OpenSSHTestInfo["TestDataPath"]))
+        {
+            $null = New-Item $OpenSSHTestInfo["TestDataPath"] -ItemType directory -Force -ErrorAction SilentlyContinue
+        }
+
         $fileName1 = "test.txt"
         $fileName2 = "test2.txt"
         $SourceDirName = "SourceDir"
-        $SourceDir = Join-Path ${TestDrive} $SourceDirName
+        $SourceDir = Join-Path "$($OpenSSHTestInfo["TestDataPath"])\SCP" $SourceDirName
         $SourceFilePath = Join-Path $SourceDir $fileName1
-        $DestinationDir = Join-Path ${TestDrive} "DestDir"
+        $DestinationDir = Join-Path "$($OpenSSHTestInfo["TestDataPath"])\SCP" "DestDir"
         $DestinationFilePath = Join-Path $DestinationDir $fileName1        
         $NestedSourceDir= Join-Path $SourceDir "nested"
         $NestedSourceFilePath = Join-Path $NestedSourceDir $fileName2
-        $null = New-Item $SourceDir -ItemType directory -Force
-        $null = New-Item $NestedSourceDir -ItemType directory -Force
-        $null = New-item -path $SourceFilePath -force
-        $null = New-item -path $NestedSourceFilePath -force
+        $null = New-Item $SourceDir -ItemType directory -Force -ErrorAction SilentlyContinue
+        $null = New-Item $NestedSourceDir -ItemType directory -Force -ErrorAction SilentlyContinue
+        $null = New-item -path $SourceFilePath -force -ErrorAction SilentlyContinue
+        $null = New-item -path $NestedSourceFilePath -force -ErrorAction SilentlyContinue
         "Test content111" | Set-content -Path $SourceFilePath
         "Test content in nested dir" | Set-content -Path $NestedSourceFilePath
-        $null = New-Item $DestinationDir -ItemType directory -Force
-        
-        [Machine] $client = [Machine]::new([MachineRole]::Client)
-        [Machine] $server = [Machine]::new([MachineRole]::Server)
-        $client.SetupClient($server)
-        $server.SetupServer($client)
+        $null = New-Item $DestinationDir -ItemType directory -Force -ErrorAction SilentlyContinue
+        $sshcmd = (get-command ssh).Path        
+
+        $server = $OpenSSHTestInfo["Target"]
+        $port = $OpenSSHTestInfo["Port"]
+        $ssouser = $OpenSSHTestInfo["SSOUser"]
         $script:logNum = 0        
 
         $testData = @(
@@ -32,31 +41,37 @@ Describe "Tests for scp command" -Tags "CI" {
                 Title = 'Simple copy local file to local file'
                 Source = $SourceFilePath                   
                 Destination = $DestinationFilePath
+                Options = "-P $port "
             },
             @{
                 Title = 'Simple copy local file to remote file'
                 Source = $SourceFilePath
-                Destination = "$($server.localAdminUserName)@$($server.MachineName):$DestinationFilePath"                
+                Destination = "$($ssouser)@$($server):$DestinationFilePath"
+                Options = "-P $port -S $sshcmd"
             },
             @{
                 Title = 'Simple copy remote file to local file'
-                Source = "$($server.localAdminUserName)@$($server.MachineName):$SourceFilePath"
-                Destination = $DestinationFilePath                    
+                Source = "$($ssouser)@$($server):$SourceFilePath"
+                Destination = $DestinationFilePath
+                Options = "-P $port -p -c aes128-ctr -C"
             },            
             @{
                 Title = 'Simple copy local file to local dir'
                 Source = $SourceFilePath
                 Destination = $DestinationDir
+                Options = "-P $port "
             },
             @{
                 Title = 'simple copy local file to remote dir'         
                 Source = $SourceFilePath
-                Destination = "$($server.localAdminUserName)@$($server.MachineName):$DestinationDir"
+                Destination = "$($ssouser)@$($server):$DestinationDir"
+                Options = "-P $port -C -q"
             },
             @{
                 Title = 'simple copy remote file to local dir'
-                Source = "$($server.localAdminUserName)@$($server.MachineName):$SourceFilePath"
+                Source = "$($ssouser)@$($server):$SourceFilePath"
                 Destination = $DestinationDir
+                Options = "-P $port "
             }
         )
 
@@ -64,27 +79,45 @@ Describe "Tests for scp command" -Tags "CI" {
             @{
                 Title = 'copy from local dir to remote dir'
                 Source = $sourceDir
-                Destination = "$($server.localAdminUserName)@$($server.MachineName):$DestinationDir"
+                Destination = "$($ssouser)@$($server):$DestinationDir"
+                Options = "-P $port -r -p -c aes128-ctr"
             },
-            <#  @{
+            @{
                 Title = 'copy from local dir to local dir'
                 Source = $sourceDir
                 Destination = $DestinationDir
-            },#>
+                Options = "-r "
+            },
             @{
                 Title = 'copy from remote dir to local dir'            
-                Source = "$($server.localAdminUserName)@$($server.MachineName):$sourceDir"
+                Source = "$($ssouser)@$($server):$sourceDir"
                 Destination = $DestinationDir
+                Options = "-P $port -C -r -q"
             }
         )
+
+        # for the first time, delete the existing log files.
+        if ($OpenSSHTestInfo['DebugMode'])
+        {
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction ignore
+        }
 
         function CheckTarget {
             param([string]$target)
             if(-not (Test-path $target))
-            {                
-                Copy-Item .\logs\ssh-agent.log ".\logs\failedagent$script:logNum.log" -Force
-                Copy-Item .\logs\sshd.log ".\logs\failedsshd$script:logNum.log" -Force
-                $script:logNum++
+            {
+                if( $OpenSSHTestInfo["DebugMode"])
+                {
+                    Copy-Item "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\failedagent$script:logNum.log" -Force
+                    Copy-Item "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\failedsshd$script:logNum.log" -Force
+                    
+                    $script:logNum++
+                    
+                    # clear the ssh-agent, sshd logs so that next testcase will get fresh logs.
+                    Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore
+                    Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction ignore
+                }
              
                 return $false
             }
@@ -93,11 +126,21 @@ Describe "Tests for scp command" -Tags "CI" {
     }
     AfterAll {
 
-        $client.CleanupClient()
-        $server.CleanupServer()
-
-        Get-Item $SourceDir | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-        Get-Item $DestinationDir | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        if($OpenSSHTestInfo -eq $null)
+        {
+            #do nothing
+        }
+        elseif( -not $OpenSSHTestInfo['DebugMode'])
+        {
+            if(-not [string]::IsNullOrEmpty($SourceDir))
+            {
+                Get-Item $SourceDir | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            if(-not [string]::IsNullOrEmpty($DestinationDir))
+            {
+                Get-Item $DestinationDir | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
 
     BeforeAll {
@@ -106,170 +149,50 @@ Describe "Tests for scp command" -Tags "CI" {
 
     AfterEach {
         Get-ChildItem $DestinationDir -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-    }
-
-    <#Context "SCP usage" {
-        It 'SCP usage' {
-            #TODO: usage output does not redirect to file
-        }
-    }#>       
+    }       
     
-    Context "Key is Secured in ssh-agent on server" {
-        BeforeAll {
-            $Server.SecureHostKeys($server.PrivateHostKeyPaths)
-            $privateKeyFile = $client.clientPrivateKeyPaths[0]            
-        }
-        BeforeEach {
-            if ($env:DebugMode)
-            {
-                Stop-Service ssh-agent -Force
-                Start-Sleep 2
-                Remove-Item .\logs\ssh-agent.log -Force -ErrorAction ignore
-                Remove-Item .\logs\sshd.log -Force -ErrorAction ignore
-                Start-Service sshd
-            }
-        }
 
-        AfterAll {
-            $Server.CleanupHostKeys()
-        }
-        
-        It 'File copy with -i option and private key: <Title> ' -TestCases:$testData {
-            param([string]$Title, $Source, $Destination)
-            .\scp -i $privateKeyFile $Source $Destination
-            $LASTEXITCODE | Should Be 0
-
-            #validate file content. DestPath is the path to the file.
-            CheckTarget -target $DestinationFilePath | Should Be $true
-            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0            
-            $equal | Should Be $true            
-        }
-
-        It 'Directory recursive copy with -i option and private key: <Title> ' -TestCases:$testData1 {
-            param([string]$Title, $Source, $Destination)            
-
-            .\scp -r -i $privateKeyFile $Source $Destination
-            $LASTEXITCODE | Should Be 0
-            CheckTarget -target (join-path $DestinationDir $SourceDirName) | Should Be $true
+    It 'File copy: <Title> ' -TestCases:$testData {
+        param([string]$Title, $Source, $Destination, $Options)
             
-            $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
-            $equal | Should Be $true
-            
-            $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
-            $equal | Should Be $true            
-        }        
-    }
-    
-    Context "Single signon with keys -p -v -c option Secured in ssh-agent" {
-        BeforeAll {        
-            $Server.SecureHostKeys($server.PrivateHostKeyPaths)
-            $identifyFile = $client.clientPrivateKeyPaths[0]
-            #setup single signon
-            .\ssh-add.exe $identifyFile
-        }
+        iex  "scp $Options $Source $Destination"
+        $LASTEXITCODE | Should Be 0
+        #validate file content. DestPath is the path to the file.
+        CheckTarget -target $DestinationFilePath | Should Be $true
 
-        AfterAll {
-            $Server.CleanupHostKeys()
+        $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length ).Length -eq 0
+        $equal | Should Be $true
 
-            #cleanup single signon
-            .\ssh-add.exe -D
-        }        
-
-        It 'File copy with -S -v option (positive)' {
-            .\scp -S .\ssh.exe -v $SourceFilePath "$($server.localAdminUserName)@$($server.MachineName):$DestinationFilePath"
-            $LASTEXITCODE | Should Be 0
-            #validate file content. DestPath is the path to the file.
-            CheckTarget -target $DestinationFilePath | Should Be $true
-            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0
+        if($Options.contains("-p"))
+        {
+            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath).LastWriteTime.DateTime (Get-ChildItem -path $DestinationFilePath).LastWriteTime.DateTime ).Length -eq 0
             $equal | Should Be $true
         }
-
-        It 'File copy with -p -c option: <Title> ' -TestCases:$testData {
-            param([string]$Title, $Source, $Destination)
-            
-            .\scp -p -c aes128-ctr -C $Source $Destination
-            $LASTEXITCODE | Should Be 0
-            #validate file content. DestPath is the path to the file.
-            CheckTarget -target $DestinationFilePath | Should Be $true
-            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
-            $equal | Should Be $true            
-        }
+    }
                 
-        It 'Directory recursive copy with -r -p -c option: <Title> ' -TestCases:$testData1 {
-            param([string]$Title, $Source, $Destination)                        
+    It 'Directory recursive copy: <Title> ' -TestCases:$testData1 {
+        param([string]$Title, $Source, $Destination, $Options)                        
             
-            .\scp -r -p -c aes128-ctr $Source $Destination
-            $LASTEXITCODE | Should Be 0
-            CheckTarget -target (join-path $DestinationDir $SourceDirName) | Should Be $true
-            $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
-            $equal | Should Be $true
-                        
-            $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
-            $equal | Should Be $true
-        }
-    }
-   
-   Context "Private key authentication with -i -C -q options. host keys are not secured on server" {
-        BeforeAll {
-            $identifyFile = $client.clientPrivateKeyPaths[0]
-        }
-        
-        It 'File copy with -i -C -q options: <Title> ' -TestCases:$testData{
-            param([string]$Title, $Source, $Destination)
+        iex  "scp $Options $Source $Destination"
+        $LASTEXITCODE | Should Be 0
+        CheckTarget -target (join-path $DestinationDir $SourceDirName) | Should Be $true
 
-            .\scp -i $identifyFile -C -q $Source $Destination
-            $LASTEXITCODE | Should Be 0
-            #validate file content. DestPath is the path to the file.
-            CheckTarget -target $DestinationFilePath | Should Be $true
-            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length).Length -eq 0
+        $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0        
+        $equal | Should Be $true
+
+        if($Options.contains("-p"))
+        {
+            $equal = @(Compare-Object (Get-Item -path $SourceDir).LastWriteTime.DateTime (Get-Item -path (join-path $DestinationDir $SourceDirName)).LastWriteTime.DateTime).Length -eq 0            
             $equal | Should Be $true
         }
 
-        It 'Directory recursive copy with -i -C -r and -q options: <Title> ' -TestCases:$testData1 {
-            param([string]$Title, $Source, $Destination)               
+        $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
+        $equal | Should Be $true
 
-            .\scp -i $identifyFile -C -r -q $Source $Destination
-            $LASTEXITCODE | Should Be 0
-            CheckTarget -target (join-path $DestinationDir $SourceDirName) | Should Be $true
-            $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
+        if($Options.contains("-p"))
+        {
+            $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir).LastWriteTime.DateTime (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ).LastWriteTime.DateTime).Length -eq 0            
             $equal | Should Be $true
-                        
-            $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length).Length -eq 0
-            $equal | Should Be $true          
-        }
-    }
-
-    Context "Password authentication" {
-        BeforeAll {
-            $client.AddPasswordSetting($server.localAdminPassword)
-        }
-
-        AfterAll {
-            $client.CleanupPasswordSetting()
-        }
-        
-        It 'File copy with -p options: <Title> ' -TestCases:$testData {
-            param([string]$Title, $Source, $Destination)
-
-            .\scp -p $Source $Destination
-            $LASTEXITCODE | Should Be 0
-            #validate file content. DestPath is the path to the file.
-            CheckTarget -target $DestinationFilePath | Should Be $true
-            $equal = @(Compare-Object (Get-ChildItem -path $SourceFilePath) (Get-ChildItem -path $DestinationFilePath) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
-            $equal | Should Be $true
-        }
-
-        It 'Directory recursive copy with -p and -v options: <Title> ' -TestCases:$testData1 {
-            param([string]$Title, $Source, $Destination)               
-
-            .\scp -r -p $Source $Destination
-            $LASTEXITCODE | Should Be 0
-            CheckTarget -target (join-path $DestinationDir $SourceDirName) | Should Be $true
-            $equal = @(Compare-Object (Get-Item -path $SourceDir ) (Get-Item -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
-            $equal | Should Be $true
-                        
-            $equal = @(Compare-Object (Get-ChildItem -Recurse -path $SourceDir) (Get-ChildItem -Recurse -path (join-path $DestinationDir $SourceDirName) ) -Property Name, Length, LastWriteTime.DateTime).Length -eq 0
-            $equal | Should Be $true          
         }
     }
 }   

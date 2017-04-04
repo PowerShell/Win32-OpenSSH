@@ -139,8 +139,9 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\ctype.h">
       <Filter>inc</Filter>
     </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\debug.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.h" />
-    <ClInclude Include="..\win32compat\tnnet.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="inc">

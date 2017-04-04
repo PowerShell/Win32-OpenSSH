@@ -33,6 +33,7 @@
 #include <time.h>
 #include <Shlwapi.h>
 
+#include "inc\unistd.h"
 #include "inc\sys\stat.h"
 #include "inc\sys\statvfs.h"
 #include "inc\sys\time.h"
@@ -44,6 +45,7 @@
 #include "inc\fcntl.h"
 #include "inc\utf.h"
 #include "signal_internal.h"
+#include "debug.h"
 
 static char* s_programdir = NULL;
 
@@ -249,7 +251,7 @@ w32_fopen_utf8(const char *path, const char *mode)
 	if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, PATH_MAX) == 0 ||
 	    MultiByteToWideChar(CP_UTF8, 0, mode, -1, wmode, 5) == 0) {
 		errno = EFAULT;
-		debug("WideCharToMultiByte failed for %c - ERROR:%d", path, GetLastError());
+		debug3("WideCharToMultiByte failed for %c - ERROR:%d", path, GetLastError());
 		return NULL;
 	}
 
@@ -402,15 +404,26 @@ w32_ioctl(int d, int request, ...)
 	}
 }
 
+/* 
+ * spawn a child process 
+ * - specified by cmd with agruments argv
+ * - with std handles set to in, out, err
+ * - flags are passed to CreateProcess call
+ * 
+ * cmd will be internally decoarated with a set of '"'
+ * to account for any spaces within the commandline
+ * this decoration is done only when additional arguments are passed in argv
+ */
 int
-spawn_child(char* cmd, int in, int out, int err, DWORD flags)
+spawn_child(char* cmd, char** argv, int in, int out, int err, DWORD flags)
 {
 	PROCESS_INFORMATION pi;
 	STARTUPINFOW si;
 	BOOL b;
-	char *abs_cmd, *t;
-	wchar_t * cmd_utf16;
-	int add_module_path = 0;
+	char *cmdline, *t, **t1;
+	DWORD cmdline_len = 0;
+	wchar_t * cmdline_utf16;
+	int add_module_path = 0, ret = -1;
 
 	/* should module path be added */
 	do {
@@ -424,31 +437,57 @@ spawn_child(char* cmd, int in, int out, int err, DWORD flags)
 		add_module_path = 1;
 	} while (0);
 
-	/* add current module path to start if needed */
-	if (add_module_path) {
-		char* ctr;
-		abs_cmd = malloc(strlen(w32_programdir()) + 1 + strlen(cmd) + 1);
-		if (abs_cmd == NULL) {
-			errno = ENOMEM;
-			return -1;
-		}
-		ctr = abs_cmd;
-		memcpy(ctr, w32_programdir(), strlen(w32_programdir()));
-		ctr += strlen(w32_programdir());
-		*ctr++ = '\\';
-		memcpy(ctr, cmd, strlen(cmd) + 1);
-	} else
-		abs_cmd = cmd;
+	/* compute total cmdline len*/
+	if (add_module_path)
+		cmdline_len += strlen(w32_programdir()) + 1 + strlen(cmd) + 1 + 2;
+	else
+		cmdline_len += strlen(cmd) + 1 + 2;
 
-	debug("spawning %s", abs_cmd);
-
-	if ((cmd_utf16 = utf8_to_utf16(abs_cmd)) == NULL) {
-		errno = ENOMEM;
-		return -1;
+	if (argv) {
+		t1 = argv;
+		while (*t1)
+			cmdline_len += strlen(*t1++) + 1 + 2;
 	}
 
-	if (abs_cmd != cmd)
-		free(abs_cmd);
+	if ((cmdline = malloc(cmdline_len)) == NULL) {
+		errno = ENOMEM;
+		goto cleanup;
+	}
+
+	/* add current module path to start if needed */
+	t = cmdline;
+	if (argv && argv[0])
+		*t++ = '\"';
+	if (add_module_path) {
+		memcpy(t, w32_programdir(), strlen(w32_programdir()));
+		t += strlen(w32_programdir());
+		*t++ = '\\';
+	}
+	
+	memcpy(t, cmd, strlen(cmd));
+	t += strlen(cmd);
+
+	if (argv && argv[0])
+		*t++ = '\"';
+
+	if (argv) {
+		t1 = argv;
+		while (*t1) {
+			*t++ = ' ';
+			*t++ = '\"';
+			memcpy(t, *t1, strlen(*t1));
+			t += strlen(*t1);
+			*t++ = '\"';
+			t1++;
+		}
+	}
+
+	*t = '\0';
+
+	if ((cmdline_utf16 = utf8_to_utf16(cmdline)) == NULL) {
+		errno = ENOMEM;
+		goto cleanup;
+	}
 
 	memset(&si, 0, sizeof(STARTUPINFOW));
 	si.cb = sizeof(STARTUPINFOW);
@@ -457,22 +496,29 @@ spawn_child(char* cmd, int in, int out, int err, DWORD flags)
 	si.hStdError = w32_fd_to_handle(err);
 	si.dwFlags = STARTF_USESTDHANDLES;
 
-	b = CreateProcessW(NULL, cmd_utf16, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi);
+	debug3("spawning %ls", cmdline_utf16);
+	b = CreateProcessW(NULL, cmdline_utf16, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi);
 
 	if (b) {
 		if (register_child(pi.hProcess, pi.dwProcessId) == -1) {
 			TerminateProcess(pi.hProcess, 0);
 			CloseHandle(pi.hProcess);
-			pi.dwProcessId = -1;
+			goto cleanup;
 		}
 		CloseHandle(pi.hThread);
 	} else {
 		errno = GetLastError();
-		pi.dwProcessId = -1;
+		goto cleanup;
 	}
 
-	free(cmd_utf16);
-	return pi.dwProcessId;
+	ret = pi.dwProcessId;
+cleanup:
+	if (cmdline)
+		free(cmdline);
+	if (cmdline_utf16)
+		free(cmdline_utf16);
+
+	return ret;
 }
 
 void
@@ -618,13 +664,13 @@ settimes(wchar_t * path, FILETIME *cretime, FILETIME *acttime, FILETIME *modtime
 	if (handle == INVALID_HANDLE_VALUE) {
 		/* TODO - convert Win32 error to errno */
 		errno = GetLastError();
-		debug("w32_settimes - CreateFileW ERROR:%d", errno);
+		debug3("w32_settimes - CreateFileW ERROR:%d", errno);
 		return -1;
 	}
 
 	if (SetFileTime(handle, cretime, acttime, modtime) == 0) {
 		errno = GetLastError();
-		debug("w32_settimes - SetFileTime ERROR:%d", errno);
+		debug3("w32_settimes - SetFileTime ERROR:%d", errno);
 		CloseHandle(handle);
 		return -1;
 	}
@@ -953,12 +999,12 @@ statvfs(const char *path, struct statvfs *buf)
 	wchar_t* path_utf16 = utf8_to_utf16(sanitized_path(path));
 	if (GetDiskFreeSpaceW(path_utf16, &sectorsPerCluster, &bytesPerSector,
 	    &freeClusters, &totalClusters) == TRUE) {
-		debug3("path              : [%s]", path);
-		debug3("sectorsPerCluster : [%lu]", sectorsPerCluster);
-		debug3("bytesPerSector    : [%lu]", bytesPerSector);
-		debug3("bytesPerCluster   : [%lu]", sectorsPerCluster * bytesPerSector);
-		debug3("freeClusters      : [%lu]", freeClusters);
-		debug3("totalClusters     : [%lu]", totalClusters);
+		debug5("path              : [%s]", path);
+		debug5("sectorsPerCluster : [%lu]", sectorsPerCluster);
+		debug5("bytesPerSector    : [%lu]", bytesPerSector);
+		debug5("bytesPerCluster   : [%lu]", sectorsPerCluster * bytesPerSector);
+		debug5("freeClusters      : [%lu]", freeClusters);
+		debug5("totalClusters     : [%lu]", totalClusters);
 
 		buf->f_bsize = sectorsPerCluster * bytesPerSector;
 		buf->f_frsize = sectorsPerCluster * bytesPerSector;
@@ -975,7 +1021,7 @@ statvfs(const char *path, struct statvfs *buf)
 		free(path_utf16);
 		return 0;
 	} else {
-		debug3("ERROR: Cannot get free space for [%s]. Error code is : %d.\n", path, GetLastError());
+		debug5("ERROR: Cannot get free space for [%s]. Error code is : %d.\n", path, GetLastError());
 
 		free(path_utf16);
 		return -1;
@@ -995,4 +1041,59 @@ w32_strerror(int errnum)
 	if (errnum >= EADDRINUSE  && errnum <= EWOULDBLOCK)
 		return _sys_errlist_ext[errnum - EADDRINUSE];
 	return strerror(errnum);
+}
+/* 
+ * Temporary implementation of readpassphrase. 
+ * TODO - this needs to be reimplemented as per 
+ * https://linux.die.net/man/3/readpassphrase
+ */
+char * 
+readpassphrase(const char *prompt, char *out, size_t out_len, int flags) {
+	char *askpass = NULL;
+	char *ret = NULL;
+
+	DWORD mode;
+	size_t len = 0;
+	int retr = 0;
+
+	/* prompt user */
+	wchar_t* wtmp = utf8_to_utf16(prompt);
+	if (wtmp == NULL)
+		fatal("unable to alloc memory");
+	_cputws(wtmp);
+	free(wtmp);
+
+	len = retr = 0;
+
+	while (_kbhit())
+		_getch();
+
+	while (len < out_len) {
+		out[len] = (unsigned char)_getch();
+
+		if (out[len] == '\r') {
+			if (_kbhit()) /* read linefeed if its there */
+				_getch();
+			break;
+		}
+		else if (out[len] == '\n') {
+			break;
+		}
+		else if (out[len] == '\b') { /* backspace */
+			if (len > 0)
+				len--; /* overwrite last character */
+		}
+		else if (out[len] == '\003') {
+			/* exit on Ctrl+C */
+			fatal("");
+		}
+		else {
+			len++; /* keep reading in the loop */
+		}
+	}
+
+	out[len] = '\0'; /* get rid of the cr/lf */
+	_cputs("\n"); /*show a newline as we do not echo password or the line */
+
+	return out;
 }

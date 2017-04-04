@@ -290,7 +290,6 @@
     <ClInclude Include="$(OpenSSH-Src-Path)uuencode.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)version.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)xmalloc.h" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_common.c" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(OpenSSH-Src-Path)clientloop.c" />
@@ -299,7 +298,8 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sshconnect.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshconnect1.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sshconnect2.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)sshtty.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_common.c" />    
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\win32_sshtty.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />

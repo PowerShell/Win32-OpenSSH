@@ -30,6 +30,7 @@
 
 #include "signal_internal.h"
 #include "inc\signal.h"
+#include "debug.h"
 
 struct _timer_info timer_info;
 extern sigset_t pending_signals;
@@ -49,7 +50,7 @@ w32_alarm(unsigned int sec)
 	ULONGLONG sec_passed;
 	int ret = 0;
 
-	debug3("alarm() %d secs", sec);
+	debug5("alarm() %d secs", sec);
 	errno = 0;
 	/* cancel any live timer if seconds is 0*/
 	if (sec == 0) {
@@ -63,7 +64,7 @@ w32_alarm(unsigned int sec)
 	due.QuadPart *= sec;
 	/* this call resets the timer if it is already active */
 	if (!SetWaitableTimer(timer_info.timer, &due, 0, sigalrm_APC, NULL, FALSE)) {
-		debug("alram() - ERROR SetWaitableTimer() %d", GetLastError());
+		debug3("alram() - ERROR SetWaitableTimer() %d", GetLastError());
 		return 0;;
 	}
 

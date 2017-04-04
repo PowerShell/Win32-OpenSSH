@@ -119,4 +119,4 @@ Subsystem	sftp	sftp-server.exe
 #	X11Forwarding no
 #	AllowTcpForwarding no
 #	ForceCommand cvs server
-PubkeyAcceptedKeyTypes ssh-ed25519*
+# PubkeyAcceptedKeyTypes ssh-ed25519*

@@ -64,7 +64,7 @@ function Is-CoreCLR {
 
 Class Machine
 {
-    [string] $MachineName = $env:COMPUTERNAME
+    [string] $MachineName = "localhost"
     [MachineRole] $Role = [MachineRole]::Client
     [PlatformType] $Platform
     [boolean] $IsCoreCLR
@@ -72,8 +72,9 @@ Class Machine
     #Members on server role
     [string []] $PublicHostKeyPaths
     [string []] $PrivateHostKeyPaths
-    [string] $localAdminUserName = "localadmin"
-    [string] $localAdminPassword = "Bull_dog1"
+    [string] $ssouser = "sshtest_ssouser"
+    [string] $passwduser = "sshtest_passwduser"
+    [string] $passwduser_pw = "P@ssw0rd_1"
     [string] $localAdminAuthorizedKeyPath
     [string] $sshdConfigFile = (join-path $PSScriptRoot "sshd_config")
     [string] $backupFileName = (join-path $PSScriptRoot "sshd_backup")
@@ -92,19 +93,19 @@ Class Machine
     Machine() {
         $this.Platform = Set-Platform        
         $this.IsCoreCLR = Is-CoreCLR
-        $this.InitializeClient()
-        $this.InitializeServer()
+        #$this.InitializeClient()
+        #$this.InitializeServer()
     }
 
     Machine ([MachineRole] $r) {
         $this.Platform = Set-Platform        
         $this.IsCoreCLR = Is-CoreCLR
         $this.Role = $r
-        if($this.Role -eq [MachineRole]::Client) {
-            $this.InitializeClient()
-        } else {
-            $this.InitializeServer()
-        }        
+        #if($this.Role -eq [MachineRole]::Client) {
+        #    $this.InitializeClient()
+        #} else {
+        #    $this.InitializeServer()
+        #}        
     }    
 
     [void] InitializeClient() {
@@ -127,14 +128,6 @@ Class Machine
             }
         }
         
-        foreach($key in @("ed25519"))            #@("rsa","dsa","ecdsa","ed25519")
-        {
-            $keyPath = "$($this.ClientKeyDirectory)\id_$key"
-            $this.clientPrivateKeyPaths += $keyPath
-            $this.clientPublicKeyPaths += "$keyPath.pub"
-            $str = ".\ssh-keygen -t $key -P """" -f $keyPath"
-            $this.RunCmd($str)            
-        }
     }
 
     [void] InitializeServer() {
@@ -157,13 +150,6 @@ Class Machine
         }
         $this.localAdminAuthorizedKeyPath = join-path $($this.localUserprofilePath)  ".ssh/authorized_keys"
         Remove-Item -Path $($this.localAdminAuthorizedKeyPath) -Force -ea silentlycontinue
-
-        #Generate all host keys
-        .\ssh-keygen -A
-        $this.PublicHostKeyPaths = @("$psscriptroot\ssh_host_ed25519_key.pub")
-	    # @("$psscriptroot\ssh_host_rsa_key.pub","$psscriptroot\ssh_host_dsa_key.pub","$psscriptroot\ssh_host_ecdsa_key.pub","$psscriptroot\ssh_host_ed25519_key.pub")
-        $this.PrivateHostKeyPaths = @("$psscriptroot\ssh_host_ed25519_key")
-        # @("$psscriptroot\ssh_host_rsa_key","$psscriptroot\ssh_host_dsa_key","$psscriptroot\ssh_host_ecdsa_key","$psscriptroot\ssh_host_ed25519_key")
     }
 
     [void] SetupClient([Machine] $server) {
@@ -251,6 +237,11 @@ Class Machine
         {
             $this.SetKeys($null, $publicKeyPath, $($this.localAdminAuthorizedKeyPath))
         }        
+        # Provide Read Access to NT Service\sshd
+        $acl = get-acl $($this.localAdminAuthorizedKeyPath)
+        $ar = New-Object  System.Security.AccessControl.FileSystemAccessRule("NT Service\sshd", "Read", "Allow")
+        $acl.SetAccessRule($ar)
+        Set-Acl  $($this.localAdminAuthorizedKeyPath) $acl
     }
 
     [void] CleanupServer() {
@@ -351,7 +342,8 @@ Class Machine
     }
 
     [void] AddPasswordSetting([string] $pass) {
-        if ($this.Platform -eq [PlatformType]::Windows) {        
+        if ($this.Platform -eq [PlatformType]::Windows) {
+            if (-not($env:DISPLAY)) {$env:DISPLAY=1}
             $env:SSH_ASKPASS="$($env:ComSpec) /c echo $pass"
         }
     }
@@ -359,6 +351,7 @@ Class Machine
     [void] CleanupPasswordSetting() {
         if ($this.Platform -eq [PlatformType]::Windows -and (Test-Path env:SSH_ASKPASS))
         {
+            if ($env:DISPLAY -eq 1) {Remove-Item env:\DISPLAY}
             remove-item "env:SSH_ASKPASS" -ErrorAction SilentlyContinue
         }
     }

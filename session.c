@@ -183,7 +183,7 @@ static int
 auth_input_request_forwarding(struct passwd * pw)
 {
 #ifdef WINDOWS
-	packet_send_debug("Agent forwarding not supported yet in Windows");
+	packet_send_debug("Agent forwarding not supported in Windows yet");
 	return 0;
 #else  /* !WINDOWS */
 	Channel *nc;
@@ -2377,9 +2377,9 @@ static int
 session_env_req(Session *s)
 {
 	char *name, *val;
-	u_int name_chars, val_len, i;
+	u_int name_len, val_len, i;
 
-	name = packet_get_cstring(&name_chars);
+	name = packet_get_cstring(&name_len);
 	val = packet_get_cstring(&val_len);
 	packet_check_eom();
 

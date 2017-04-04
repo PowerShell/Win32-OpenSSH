@@ -292,29 +292,11 @@ do_cmd(char *host, char *remuser, char *cmd, int *fdin, int *fdout)
 	addargs(&args, "%s", host);
 	addargs(&args, "%s", cmd);
 
-	{
-		char* full_cmd;
-		size_t cmdlen = 0;
-		char** list = args.list;
+	fcntl(pout[0], F_SETFD, FD_CLOEXEC);
+	fcntl(pin[1], F_SETFD, FD_CLOEXEC);
 
-		cmdlen = 1; /* null term */
-		while (*list)
-			cmdlen += strlen(*list++) + 1;
+	do_cmd_pid = spawn_child(args.list[0], args.list + 1, pin[0], pout[1], STDERR_FILENO, 0);
 
-		full_cmd = xmalloc(cmdlen);
-		full_cmd[0] = '\0';
-		list = args.list;
-		while (*list) {
-			strcat(full_cmd, *list++);
-			strcat(full_cmd, " ");
-		}
-
-		fcntl(pout[0], F_SETFD, FD_CLOEXEC);
-		fcntl(pin[1], F_SETFD, FD_CLOEXEC);
-
-		do_cmd_pid = spawn_child(full_cmd, pin[0], pout[1], STDERR_FILENO, 0);
-		free(full_cmd);
-	}
 #else /* !WINDOWS */
 	do_cmd_pid = fork();
 #endif /* !WINDOWS */
@@ -382,26 +364,8 @@ do_cmd2(char *host, char *remuser, char *cmd, int fdin, int fdout)
 	addargs(&args, "%s", host);
 	addargs(&args, "%s", cmd);
 
-	{
-		char* full_cmd;
-		size_t cmdlen = 0;
-		char** list = args.list;
-
-		cmdlen = 1; /* null term */
-		while (*list)
-			cmdlen += strlen(*list++) + 1;
-
-		full_cmd = xmalloc(cmdlen);
-		full_cmd[0] = '\0';
-		list = args.list;
-		while (*list) {
-			strcat(full_cmd, *list++);
-			strcat(full_cmd, " ");
-		}
-
-		pid = spawn_child(full_cmd, fdin, fdout, STDERR_FILENO, 0);
-		free(full_cmd);
-	}
+	pid = spawn_child(args.list[0], args.list + 1, fdin, fdout, STDERR_FILENO, 0);
+		
 #else /* !WINDOWS */
 	pid = fork();
 #endif /* !WINDOWS */
@@ -1512,4 +1476,3 @@ lostconn(int signo)
 	else
 		exit(1);
 }
-

@@ -1,8 +1,6 @@
-﻿using module .\PlatformAbstractLayer.psm1
-
-#covered -i -q -v -l -c -C
+﻿#covered -i -q -v -l -c -C
 #todo: -S -F -V -e
-Describe "Tests for ssh command" -Tags "CI" {
+Describe "Tests for ssh command" -Tags "Scenario" {
     BeforeAll {        
         $fileName = "test.txt"
         $filePath = Join-Path ${TestDrive} $fileName

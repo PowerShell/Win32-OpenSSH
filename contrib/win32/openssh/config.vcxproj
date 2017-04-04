@@ -117,6 +117,10 @@
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\ &amp; copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\  &amp;  If NOT exist $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\sshd_config (copy $(SolutionDir)sshd_config $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\)</Command>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1 and sshd_config (if not already present) to build directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -141,6 +145,10 @@
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\ &amp; copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\  &amp;  If NOT exist $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\sshd_config (copy $(SolutionDir)sshd_config $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\)</Command>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1 and sshd_config (if not already present) to build directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -169,6 +177,10 @@
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\ &amp; copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\  &amp;  If NOT exist $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\sshd_config (copy $(SolutionDir)sshd_config $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\)</Command>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1 and sshd_config (if not already present) to build directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -197,6 +209,10 @@
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\ &amp; copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\  &amp;  If NOT exist $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\sshd_config (copy $(SolutionDir)sshd_config $(OpenSSH-Bin-Path)$(Platform)\$(Configuration)\)</Command>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1 and sshd_config (if not already present) to build directory</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

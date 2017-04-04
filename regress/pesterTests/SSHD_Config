@@ -10,7 +10,7 @@
 # possible, but leave them commented.  Uncommented options override the
 # default value.
 
-#Port 22
+Port 47002
 #AddressFamily any
 #ListenAddress 0.0.0.0
 #ListenAddress ::
@@ -21,9 +21,10 @@
 # HostKey for protocol version 1
 #HostKey /etc/ssh/ssh_host_key
 # HostKeys for protocol version 2
-#HostKey /etc/ssh/ssh_host_rsa_key
-#HostKey /etc/ssh/ssh_host_dsa_key
-#HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey sshtest_hostkey_rsa
+HostKey sshtest_hostkey_dsa
+HostKey sshtest_hostkey_ecdsa
+HostKey sshtest_hostkey_ed25519
 
 # Lifetime and size of ephemeral version 1 server key
 #KeyRegenerationInterval 1h
@@ -112,7 +113,7 @@ AuthorizedKeysFile	.ssh/authorized_keys
 #Banner none
 
 # override default of no subsystems
-Subsystem	sftp	sftp-server.exe
+Subsystem	sftp	sftp-server.exe -l DEBUG3
 
 # Example of overriding settings on a per-user basis
 #Match User anoncvs
@@ -121,7 +122,7 @@ Subsystem	sftp	sftp-server.exe
 #	ForceCommand cvs server
 PubkeyAcceptedKeyTypes ssh-ed25519*
 
-DenyUsers denyuser1 deny*2 denyuse?3, 
-AllowUsers allowuser1 allowu*r2 allow?se?3 allowuser4 localuser1 localu*r2 loc?lu?er3 localadmin
-DenyGroups denygroup1 denygr*p2 deny?rou?3
-AllowGroups allowgroup1 allowg*2 allowg?ou?3 Adm*
+#DenyUsers denyuser1 deny*2 denyuse?3, 
+#AllowUsers allowuser1 allowu*r2 allow?se?3 allowuser4 localuser1 localu*r2 loc?lu?er3 localadmin
+#DenyGroups denygroup1 denygr*p2 deny?rou?3
+#AllowGroups allowgroup1 allowg*2 allowg?ou?3 Adm*

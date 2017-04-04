@@ -33,8 +33,8 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: sshd_config.5,v 1.242 2017/02/03 23:01:19 djm Exp $
-.Dd $Mdocdate: February 3 2017 $
+.\" $OpenBSD: sshd_config.5,v 1.243 2017/03/14 07:19:07 djm Exp $
+.Dd $Mdocdate: March 14 2017 $
 .Dt SSHD_CONFIG 5
 .Os
 .Sh NAME
@@ -1494,28 +1494,6 @@ is enabled, you will not be able to run
 as a non-root user.
 The default is
 .Cm no .
-.It Cm UsePrivilegeSeparation
-Specifies whether
-.Xr sshd 8
-separates privileges by creating an unprivileged child process
-to deal with incoming network traffic.
-After successful authentication, another process will be created that has
-the privilege of the authenticated user.
-The goal of privilege separation is to prevent privilege
-escalation by containing any corruption within the unprivileged processes.
-The argument must be
-.Cm yes ,
-.Cm no ,
-or
-.Cm sandbox .
-If
-.Cm UsePrivilegeSeparation
-is set to
-.Cm sandbox
-then the pre-authentication unprivileged process is subject to additional
-restrictions.
-The default is
-.Cm sandbox .
 .It Cm VersionAddendum
 Optionally specifies additional text to append to the SSH protocol banner
 sent by the server upon connection.

@@ -63,6 +63,12 @@ mm_is_monitor(void) {
 	return 0;
 }
 
+int 
+mm_user_key_allowed(struct passwd *pw, Key *k, int i)
+{
+	return 0;
+}
+
 int	 kexgex_server(struct ssh * sh) {
 	return -1;
 }

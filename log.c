@@ -455,15 +455,7 @@ do_log(LogLevel level, const char *fmt, va_list args)
 	} else if (log_on_stderr) {
 		snprintf(msgbuf, sizeof msgbuf, "%.*s\r\n",
 		    (int)sizeof msgbuf - 3, fmtbuf);
-#ifdef WINDOWS
-		/* 
-		 * In Windows, write is implemented  as part of POSIX compat layer
-		 * that itself may "log" resulting in a infinite recursion loop
-		 */
-		_write(STDERR_FILENO, msgbuf, strlen(msgbuf));
-#else /* !WINDOWS */
 		(void)write(log_stderr_fd, msgbuf, strlen(msgbuf));
-#endif /* !WINDOWS */
 	} else {
 #if defined(HAVE_OPENLOG_R) && defined(SYSLOG_DATA_INIT)
 		openlog_r(argv0 ? argv0 : __progname, LOG_PID, log_facility, &sdata);

@@ -38,10 +38,6 @@
 
 #include "console.h"
 
-#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#define ENABLE_VIRTUAL_TERMINAL_PROCESSING  0x4
-#endif
-
 HANDLE	hOutputConsole = NULL;
 DWORD	dwSavedAttributes = 0;
 WORD	wStartingAttributes = 0;
@@ -140,7 +136,7 @@ ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 		SavedViewRect = csbi.srWindow;
 		debug("console doesn't support the ansi parsing");
 	} else {
-		ConMoveCurosorTop(csbi);
+		ConMoveCursorTop(csbi);
 		debug("console supports the ansi parsing");
 	}		
 
@@ -1075,16 +1071,27 @@ ConScrollUp(int topline, int botline)
 	);
 }
 
-void 
+void
 ConMoveVisibleWindow(int offset)
 {
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 	SMALL_RECT visibleWindowRect;
 
 	if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo)) {
-		memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
-		visibleWindowRect.Top += offset;
-		visibleWindowRect.Bottom += offset;
+		/* Check if applying the offset results in console buffer overflow.
+		* if yes, then scrolldown the console buffer.
+		*/
+		if ((consoleInfo.srWindow.Bottom + offset) >= (consoleInfo.dwSize.Y - 1)) {
+			for (int i = 0; i < offset; i++)
+				ConScrollDown(0, consoleInfo.dwSize.Y - 1);
+
+			if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
+				memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
+		} else {
+			memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
+			visibleWindowRect.Top += offset;
+			visibleWindowRect.Bottom += offset;
+		}
 
 		SetConsoleWindowInfo(hOutputConsole, TRUE, &visibleWindowRect);
 	}
@@ -1552,10 +1559,48 @@ ConSaveWindowsState()
 }
 
 void
-ConMoveCurosorTop(CONSOLE_SCREEN_BUFFER_INFO csbi)
+ConMoveCursorTop(CONSOLE_SCREEN_BUFFER_INFO csbi)
 {
+	/* Windows server at first sends the "cls" after the connection is established.
+	 * Since we don't want to loose any data on the console, we would like to scroll down
+	 * the visible window.
+	 */
 	int offset = csbi.dwCursorPosition.Y - csbi.srWindow.Top;
 	ConMoveVisibleWindow(offset);
 
 	ConSaveViewRect();
+}
+
+HANDLE
+get_console_handle(FILE *stream, DWORD * mode)
+{
+	int file_num = 0, ret = 0;
+	intptr_t lHandle = 0;
+	HANDLE hFile = NULL;
+	DWORD type = 0;
+
+	file_num = (_fileno)(stream);
+	if (file_num == -1) {
+		return -1;
+	}
+	lHandle = _get_osfhandle(file_num);
+	if (lHandle == -1 && errno == EBADF) {
+		return -1;
+	}
+	type = GetFileType((HANDLE)lHandle);
+	if (type == FILE_TYPE_CHAR && file_num >= 0 && file_num <= 2) {
+		if (file_num == 0)
+			hFile = GetStdHandle(STD_INPUT_HANDLE);
+		else if (file_num == 1)
+			hFile = GetStdHandle(STD_OUTPUT_HANDLE);
+		else if (file_num == 2)
+			hFile = GetStdHandle(STD_ERROR_HANDLE);
+
+		if ((hFile != NULL) &&
+			(hFile != INVALID_HANDLE_VALUE) &&
+			(GetFileType(hFile) == FILE_TYPE_CHAR) &&
+			GetConsoleMode(hFile, mode))
+			return hFile;
+	}
+	return INVALID_HANDLE_VALUE;
 }

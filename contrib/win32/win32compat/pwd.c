@@ -41,6 +41,7 @@
 #include "inc\grp.h"
 #include "inc\utf.h"
 #include "misc_internal.h"
+#include "debug.h"
 
 static struct passwd pw;
 static char* pw_shellpath = NULL;
@@ -128,7 +129,7 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 	if (user_sid == NULL) {
 		NET_API_STATUS status;
 		if ((status = NetUserGetInfo(udom_utf16, uname_utf16, 23, &user_info)) != NERR_Success) {
-			debug("NetUserGetInfo() failed with error: %d for user: %ls and domain: %ls \n", status, uname_utf16, udom_utf16);
+			debug3("NetUserGetInfo() failed with error: %d for user: %ls and domain: %ls \n", status, uname_utf16, udom_utf16);
 
 			if ((dsStatus = DsGetDcNameW(NULL, udom_utf16, NULL, NULL, DS_DIRECTORY_SERVICE_PREFERRED, &pdc)) != ERROR_SUCCESS) {
 				error("DsGetDcNameW() failed with error: %d \n", dsStatus);
@@ -137,14 +138,14 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 			}
 
 			if ((status = NetUserGetInfo(pdc->DomainControllerName, uname_utf16, 23, &user_info)) != NERR_Success) {
-				debug("NetUserGetInfo() with domainController: %ls failed with error: %d \n", pdc->DomainControllerName, status);
+				debug3("NetUserGetInfo() with domainController: %ls failed with error: %d \n", pdc->DomainControllerName, status);
 				errno = ENOENT;
 				goto done;
 			}
 		}
 
 		if (ConvertSidToStringSidW(((LPUSER_INFO_23)user_info)->usri23_user_sid, &user_sid_local) == FALSE) {
-			debug("NetUserGetInfo() Succeded but ConvertSidToStringSidW() failed with error: %d\n", GetLastError());
+			debug3("NetUserGetInfo() Succeded but ConvertSidToStringSidW() failed with error: %d\n", GetLastError());
 			errno = ENOENT;
 			goto done;
 		}

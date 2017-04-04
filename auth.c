@@ -490,7 +490,7 @@ auth_secure_path(const char *name, struct stat *stp, const char *pw_dir,
     uid_t uid, char *err, size_t errlen)
 {
 #ifdef WINDOWS
-	error("auth_secure_path should not be called in Windows");
+	error("auth_secure_path should not be called in Windows yet");
 	return -1;
 #else /* !WINDOWS */
 	char buf[PATH_MAX], homedir[PATH_MAX];
@@ -579,7 +579,7 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 	FILE *f;
 
 #ifdef WINDOWS
-        /* Windows POSIX adpater does not support fdopen() on open(file)*/
+        /* Windows POSIX adapter does not support fdopen() on open(file)*/
         if ((f = fopen(file, "r")) == NULL) {
                 debug("Could not open %s '%s': %s", file_type, file,
                         strerror(errno));

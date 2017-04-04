@@ -56,11 +56,6 @@ tests(void)
 {
 	char	*loc;
 
-#ifdef WINDOWS
-	TEST_START("not applicable to Windows yet");
-	TEST_DONE();
-	return;
-#endif
 	TEST_START("utf8_setlocale");
 	loc = setlocale(LC_CTYPE, "en_US.UTF-8");
 	ASSERT_PTR_NE(loc, NULL);

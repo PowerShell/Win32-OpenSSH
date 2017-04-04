@@ -67,6 +67,13 @@ extern int showprogress;
 /* Maximum depth to descend in directory trees */
 #define MAX_DIR_DEPTH 64
 
+/* Directory separator characters */
+#ifdef HAVE_CYGWIN
+# define SFTP_DIRECTORY_CHARS      "/\\"
+#else /* HAVE_CYGWIN */
+# define SFTP_DIRECTORY_CHARS      "/"
+#endif /* HAVE_CYGWIN */
+
 struct sftp_conn {
 	int fd_in;
 	int fd_out;
@@ -619,7 +626,7 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 			 * These can be used to attack recursive ops
 			 * (e.g. send '../../../../etc/passwd')
 			 */
-			if (strchr(filename, '/') != NULL) {
+			if (strpbrk(filename, SFTP_DIRECTORY_CHARS) != NULL) {
 				error("Server sent suspect path \"%s\" "
 				    "during readdir of \"%s\"", filename, path);
 			} else if (dir) {

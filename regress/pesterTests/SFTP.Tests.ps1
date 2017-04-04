@@ -1,75 +1,80 @@
-using module .\PlatformAbstractLayer.psm1
-
-Describe "SFTP Testcases" -Tags "CI" {
+﻿Describe "SFTP Test Cases" -Tags "CI" {
     BeforeAll {
-        $rootDirectory = $TestDrive
+        if($OpenSSHTestInfo -eq $null)
+        {
+            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+        }
+
+        if(-not (Test-Path $OpenSSHTestInfo["TestDataPath"]))
+        {
+            $null = New-Item $OpenSSHTestInfo["TestDataPath"] -ItemType directory -Force -ErrorAction SilentlyContinue
+        }
+
+        $rootDirectory = "$($OpenSSHTestInfo["TestDataPath"])\SFTP"
         
         $outputFileName = "output.txt"
         $batchFileName = "sftp-batchcmds.txt"
         $outputFilePath = Join-Path $rootDirectory $outputFileName
         $batchFilePath = Join-Path $rootDirectory $batchFileName
-        
+
         $tempFileName = "tempFile.txt"
         $tempFilePath = Join-Path $rootDirectory $tempFileName
-        
+
         $tempUnicodeFileName = "tempFile_язык.txt"
         $tempUnicodeFilePath = Join-Path $rootDirectory $tempUnicodeFileName
-        
+
         $clientDirectory = Join-Path $rootDirectory 'client_dir'
         $serverDirectory = Join-Path $rootDirectory 'server_dir'
-        
+
         $null = New-Item $clientDirectory -ItemType directory -Force
         $null = New-Item $serverDirectory -ItemType directory -Force
         $null = New-Item $batchFilePath -ItemType file -Force
         $null = New-Item $outputFilePath -ItemType file -Force
         $null = New-Item $tempFilePath -ItemType file -Force -value "temp file data"
         $null = New-Item $tempUnicodeFilePath -ItemType file -Force -value "temp file data"
-        
-        $expectedOutputDelimiter = "#DL$"
-        
-        [Machine] $client = [Machine]::new([MachineRole]::Client)
-        [Machine] $server = [Machine]::new([MachineRole]::Server)
-        $client.SetupClient($server)
-        $server.SetupServer($client)
-        
+
+        $server = $OpenSSHTestInfo["Target"]
+        $port = $OpenSSHTestInfo["Port"]
+        $ssouser = $OpenSSHTestInfo["SSOUser"]
+        $script:testId = 1
+
         $testData1 = @(
              @{
                 title = "put, ls for non-unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "put $tempFilePath $serverDirectory
                             ls $serverDirectory"
                 expectedoutput = (join-path $serverdirectory $tempFileName)
-			
              },
              @{
                 title = "get, ls for non-unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "get $tempFilePath $clientDirectory
                             ls $clientDirectory"
                 expectedoutput = (join-path $clientDirectory $tempFileName)
              },
              @{
                 title = "mput, ls for non-unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "mput $tempFilePath $serverDirectory
                             ls $serverDirectory"
                 expectedoutput = (join-path $serverdirectory $tempFileName)
              },
              @{
                 title = "mget, ls for non-unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "mget $tempFilePath $clientDirectory
                             ls $clientDirectory"
                 expectedoutput = (join-path $clientDirectory $tempFileName)
              },
              @{
                 title = "mkdir, cd, pwd for non-unicode directory names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "cd $serverdirectory
                             mkdir server_test_dir
                             cd server_test_dir
@@ -78,8 +83,8 @@ Describe "SFTP Testcases" -Tags "CI" {
              },
              @{
                 Title = "lmkdir, lcd, lpwd for non-unicode directory names"
-                LogonStr = "$($server.localAdminUserName)@$($server.MachineName)"
-                Options = '-i $identifyFile'
+                LogonStr = "$($ssouser)@$($server)"
+                Options = ''
                 Commands = "lcd $clientDirectory
                             lmkdir client_test_dir
                             lcd client_test_dir
@@ -88,40 +93,40 @@ Describe "SFTP Testcases" -Tags "CI" {
              },
              @{
                 title = "put, ls for unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "put $tempUnicodeFilePath $serverDirectory
                             ls $serverDirectory"
                 expectedoutput = (join-path $serverdirectory $tempUnicodeFileName)			
              },
              @{
                 title = "get, ls for unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "get $tempUnicodeFilePath $clientDirectory
                             ls $clientDirectory"
                 expectedoutput = (join-path $clientDirectory $tempUnicodeFileName)
              },
              @{
                 title = "mput, ls for unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "mput $tempUnicodeFilePath $serverDirectory
                             ls $serverDirectory"
                 expectedoutput = (join-path $serverdirectory $tempUnicodeFileName)
              },
              @{
                 title = "mget, ls for unicode file names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "mget $tempUnicodeFilePath $clientDirectory
                             ls $clientDirectory"
                 expectedoutput = (join-path $clientDirectory $tempUnicodeFileName)
              },
              @{
                 title = "mkdir, cd, pwd for unicode directory names"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile'
+                logonstr = "$($ssouser)@$($server)"
+                options = ''
                 commands = "cd $serverdirectory
                             mkdir server_test_dir_язык
                             cd server_test_dir_язык
@@ -130,8 +135,8 @@ Describe "SFTP Testcases" -Tags "CI" {
              },
              @{
                 Title = "lmkdir, lcd, lpwd for unicode directory names"
-                LogonStr = "$($server.localAdminUserName)@$($server.MachineName)"
-                Options = '-i $identifyFile'
+                LogonStr = "$($ssouser)@$($server)"
+                Options = ''
                 Commands = "lcd $clientDirectory
                             lmkdir client_test_dir_язык
                             lcd client_test_dir_язык
@@ -144,8 +149,8 @@ Describe "SFTP Testcases" -Tags "CI" {
         $testData2 = @(
             @{
                 title = "rm, rmdir, rename for unicode file, directory"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile -b $batchFilePath'
+                logonstr = "$($ssouser)@$($server)"
+                options = '-b $batchFilePath'
                 
                 tmpFileName1 = $tempUnicodeFileName
                 tmpFilePath1 = $tempUnicodeFilePath
@@ -159,8 +164,8 @@ Describe "SFTP Testcases" -Tags "CI" {
             },
             @{
                 title = "rm, rmdir, rename for non-unicode file, directory"
-                logonstr = "$($server.localadminusername)@$($server.machinename)"
-                options = '-i $identifyfile -b $batchFilePath'
+                logonstr = "$($ssouser)@$($server)"
+                options = '-b $batchFilePath'
                 
                 tmpFileName1 = $tempFileName
                 tmpFilePath1 = $tempFilePath
@@ -173,96 +178,110 @@ Describe "SFTP Testcases" -Tags "CI" {
                 tmpDirectoryPath2 = (join-path $serverDirectory "test_dir_2")
             }
         )
+
+        # for the first time, delete the existing log files.
+        if ($OpenSSHTestInfo['DebugMode'])
+        {
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction ignore
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" -Force -ErrorAction ignore
+        }
+
+        function CopyDebugLogs {
+            if($OpenSSHTestInfo["DebugMode"])
+            {
+                Copy-Item "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent_$script:testId.log" -Force
+                Copy-Item "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd_$script:testId.log" -Force
+                Copy-Item "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server_$script:testId.log" -Force
+                
+                $script:testId++
+                
+                # clear the ssh-agent, sshd logs so that next testcase will get fresh logs.
+                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore
+                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction ignore
+                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" -Force -ErrorAction ignore
+            }
+        }
     }
 
     AfterAll {
-        $client.CleanupClient()
-        $server.CleanupServer()
-    }
-
-    Context "Single signon" {
-        BeforeAll {
-            $Server.SecureHostKeys($server.PrivateHostKeyPaths)
-            $identifyFile = $client.clientPrivateKeyPaths[0]
-            .\ssh-add.exe $identifyFile #setup single signon            
-        }
-        AfterAll {
-            $Server.CleanupHostKeys()
-            .\ssh-add.exe -D #cleanup single signon
-            
+        if(!$OpenSSHTestInfo["DebugMode"])
+        {
             Get-Item $rootDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         }
+    }
 
-        BeforeEach {
-           Get-ChildItem $serverDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-           Get-ChildItem $clientDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-           Remove-Item $batchFilePath
-           Remove-Item $outputFilePath
-        }
-        
-        It '<Title>' -TestCases:$testData1 {
-           param([string]$Title, $LogonStr, $Options, $Commands, $ExpectedOutput, $SkipVerification = $false)
-           
-           Set-Content $batchFilePath -Encoding UTF8 -value $Commands
-           $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) -b $batchFilePath $($LogonStr) > $outputFilePath")
-           $client.RunCmd($str)
+    BeforeEach {
+       Get-ChildItem $serverDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+       Get-ChildItem $clientDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+       Remove-Item $batchFilePath
+       Remove-Item $outputFilePath
+    }
 
-           #validate file content.
-           $($ExpectedOutput).split($expectedOutputDelimiter) | foreach {
-              Test-Path ($_) | Should be $true
-           }
-        }
-        
-        It '<Title>' -TestCases:$testData2 {
-           param([string]$Title, $LogonStr, $Options, $tmpFileName1, $tmpFilePath1, $tmpFileName2, $tmpFilePath2, $tmpDirectoryName1, $tmpDirectoryPath1, $tmpDirectoryName2, $tmpDirectoryPath2, $SkipVerification = $false)
-           
-           #rm (remove file)
-           $commands = "mkdir $tmpDirectoryPath1
-                        put $tmpFilePath1 $tmpDirectoryPath1
-                        ls $tmpDirectoryPath1"
-           Set-Content $batchFilePath  -Encoding UTF8 -value $commands
-           $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
-           $client.RunCmd($str)
-           Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $true
-           
-           $commands = "rm $tmpDirectoryPath1\*
-                        ls $tmpDirectoryPath1
-                        pwd
-                       "
-           Set-Content $batchFilePath  -Encoding UTF8 -value $commands
-           $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
-           $client.RunCmd($str)
-           Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $false
-           
-           #rename file
-           Remove-Item $outputFilePath
-           Copy-Item $tmpFilePath1 -destination $tmpDirectoryPath1
-           $commands = "rename $tmpDirectoryPath1\$tmpFileName1 $tmpDirectoryPath1\$tmpFileName2
-                        ls $tmpDirectoryPath1
-                        pwd"
-           Set-Content $batchFilePath -Encoding UTF8 -value $commands
-           $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
-           $client.RunCmd($str)
-           Test-Path (join-path $tmpDirectoryPath1 $tmpFileName2) | Should be $true
-           
-           #rename directory
-           Remove-Item $outputFilePath
-           $commands = "rm $tmpDirectoryPath1\*
-                        rename $tmpDirectoryPath1 $tmpDirectoryPath2
-                        ls $serverDirectory"
-           Set-Content $batchFilePath -Encoding UTF8 -value $commands
-           $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
-           $client.RunCmd($str)
-           Test-Path $tmpDirectoryPath2 | Should be $true
-           
-           #rmdir (remove directory)
-           Remove-Item $outputFilePath
-           $commands = "rmdir $tmpDirectoryPath2
-                        ls $serverDirectory"
-           Set-Content $batchFilePath -Encoding UTF8 -value $commands
-           $str = $ExecutionContext.InvokeCommand.ExpandString(".\sftp $($Options) $($LogonStr) > $outputFilePath")
-           $client.RunCmd($str)
-           Test-Path $tmpDirectoryPath2 | Should be $false
-        }
+    AfterEach {
+        CopyDebugLogs
+    }
+
+    It '<Title>' -TestCases:$testData1 {
+       param([string]$Title, $LogonStr, $Options, $Commands, $ExpectedOutput)
+
+       Set-Content $batchFilePath -Encoding UTF8 -value $Commands
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) -b $batchFilePath $($LogonStr) > $outputFilePath")
+       iex $str
+
+       #validate file content.
+       Test-Path $ExpectedOutput | Should be $true
+    }
+
+    It '<Title>' -TestCases:$testData2 {
+       param([string]$Title, $LogonStr, $Options, $tmpFileName1, $tmpFilePath1, $tmpFileName2, $tmpFilePath2, $tmpDirectoryName1, $tmpDirectoryPath1, $tmpDirectoryName2, $tmpDirectoryPath2)
+
+       #rm (remove file)
+       $commands = "mkdir $tmpDirectoryPath1
+                    put $tmpFilePath1 $tmpDirectoryPath1
+                    ls $tmpDirectoryPath1"
+       Set-Content $batchFilePath  -Encoding UTF8 -value $commands
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       iex $str
+       Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $true
+
+       $commands = "rm $tmpDirectoryPath1\*
+                    ls $tmpDirectoryPath1
+                    pwd
+                   "
+       Set-Content $batchFilePath  -Encoding UTF8 -value $commands
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       iex $str
+       Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $false
+
+       #rename file
+       Remove-Item $outputFilePath
+       Copy-Item $tmpFilePath1 -destination $tmpDirectoryPath1
+       $commands = "rename $tmpDirectoryPath1\$tmpFileName1 $tmpDirectoryPath1\$tmpFileName2
+                    ls $tmpDirectoryPath1
+                    pwd"
+       Set-Content $batchFilePath -Encoding UTF8 -value $commands
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       iex $str
+       Test-Path (join-path $tmpDirectoryPath1 $tmpFileName2) | Should be $true
+
+       #rename directory
+       Remove-Item $outputFilePath
+       $commands = "rm $tmpDirectoryPath1\*
+                    rename $tmpDirectoryPath1 $tmpDirectoryPath2
+                    ls $serverDirectory"
+       Set-Content $batchFilePath -Encoding UTF8 -value $commands
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       iex $str
+       Test-Path $tmpDirectoryPath2 | Should be $true
+
+       #rmdir (remove directory)
+       Remove-Item $outputFilePath
+       $commands = "rmdir $tmpDirectoryPath2
+                    ls $serverDirectory"
+       Set-Content $batchFilePath -Encoding UTF8 -value $commands
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       iex $str
+       Test-Path $tmpDirectoryPath2 | Should be $false
     }
 }

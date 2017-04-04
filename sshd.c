@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.483 2017/02/24 03:16:34 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.485 2017/03/15 03:52:30 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1317,7 +1317,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					continue;
 				}
                 
-				pid = spawn_child(path_utf8, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, CREATE_NEW_PROCESS_GROUP);
+				pid = spawn_child(path_utf8, NULL, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, CREATE_NEW_PROCESS_GROUP);
 				free(path_utf8);
 				close(*newsock);
 			}
@@ -1747,14 +1747,23 @@ main(int ac, char **av)
 			error("Could not connect to agent \"%s\": %s",
 			    options.host_key_agent, ssh_err(r));
 	}
-#ifdef WINDOWS /* Windows version always needs and has agent running */
+#ifdef WINDOWS /* Windows version always needs and has agent running */  
 	have_agent = 1;
-#endif
+#endif  
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if (options.host_key_files[i] == NULL)
 			continue;
 		key = key_load_private(options.host_key_files[i], "", NULL);
 		pubkey = key_load_public(options.host_key_files[i], NULL);
+
+		if ((pubkey != NULL && pubkey->type == KEY_RSA1) ||
+		    (key != NULL && key->type == KEY_RSA1)) {
+			verbose("Ignoring RSA1 key %s",
+			    options.host_key_files[i]);
+			key_free(key);
+			key_free(pubkey);
+			continue;
+		}
 		if (pubkey == NULL && key != NULL)
 			pubkey = key_demote(key);
 		sensitive_data.host_keys[i] = key;

@@ -1681,13 +1681,12 @@
 /* Windows specific macro added to workaround mysignal implementaion in bsd-misc.c */
 #define HAVE_MYSIGNAL 1
 
+
 #define PATH_MAX MAX_PATH
-
 #define S_IFIFO        0x1000  
-
 #define HAVE_EXPLICIT_BZERO
-
 #define HAVE_MBTOWC 1
+#define HAVE_LLABS 1
 
 #include <signal.h>
 #include <io.h>

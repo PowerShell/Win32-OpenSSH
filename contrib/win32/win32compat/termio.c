@@ -39,6 +39,7 @@
 #include "w32fd.h"
 #include "tncon.h"
 #include "inc\utf.h"
+#include "debug.h"
 #include "tnnet.h"
 
 #define TERM_IO_BUF_SIZE 2048
@@ -57,7 +58,7 @@ static VOID CALLBACK
 ReadAPCProc(_In_ ULONG_PTR dwParam)
 {
 	struct w32_io* pio = (struct w32_io*)dwParam;
-	debug3("TermRead CB - io:%p, bytes: %d, pending: %d, error: %d", pio, read_status.transferred,
+	debug5("TermRead CB - io:%p, bytes: %d, pending: %d, error: %d", pio, read_status.transferred,
 		pio->read_details.pending, read_status.error);
 	pio->read_details.error = read_status.error;
 	pio->read_details.remaining = read_status.transferred;
@@ -75,7 +76,7 @@ ReadConsoleThread(_In_ LPVOID lpParameter)
 	int nBytesReturned = 0;
 	struct w32_io* pio = (struct w32_io*)lpParameter;
 
-	debug3("TermRead thread, io:%p", pio);
+	debug5("TermRead thread, io:%p", pio);
 	memset(&read_status, 0, sizeof(read_status));
 	while (nBytesReturned == 0) {
 		nBytesReturned = ReadConsoleForTermEmul(WINHANDLE(pio),
@@ -83,7 +84,7 @@ ReadConsoleThread(_In_ LPVOID lpParameter)
 	}
 	read_status.transferred = nBytesReturned;
 	if (0 == QueueUserAPC(ReadAPCProc, main_thread, (ULONG_PTR)pio)) {
-		debug("TermRead thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
+		debug3("TermRead thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
 		pio->read_details.pending = FALSE;
 		pio->read_details.error = GetLastError();
 		DebugBreak();
@@ -98,7 +99,7 @@ termio_initiate_read(struct w32_io* pio)
 {
 	HANDLE read_thread;
 
-	debug3("TermRead initiate io:%p", pio);
+	debug5("TermRead initiate io:%p", pio);
 	if (pio->read_details.buf_size == 0) {
 		pio->read_details.buf = malloc(TERM_IO_BUF_SIZE);
 		if (pio->read_details.buf == NULL) {
@@ -111,7 +112,7 @@ termio_initiate_read(struct w32_io* pio)
 	read_thread = CreateThread(NULL, 0, ReadConsoleThread, pio, 0, NULL);
 	if (read_thread == NULL) {
 		errno = errno_from_Win32Error(GetLastError());
-		debug("TermRead initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
+		debug3("TermRead initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
 		return -1;
 	}
 
@@ -125,7 +126,7 @@ static VOID CALLBACK
 WriteAPCProc(_In_ ULONG_PTR dwParam)
 {
 	struct w32_io* pio = (struct w32_io*)dwParam;
-	debug3("TermWrite CB - io:%p, bytes: %d, pending: %d, error: %d", pio, write_status.transferred,
+	debug5("TermWrite CB - io:%p, bytes: %d, pending: %d, error: %d", pio, write_status.transferred,
 		pio->write_details.pending, write_status.error);
 	pio->write_details.error = write_status.error;
 	pio->write_details.remaining -= write_status.transferred;
@@ -144,10 +145,9 @@ WriteThread(_In_ LPVOID lpParameter)
 {
 	struct w32_io* pio = (struct w32_io*)lpParameter;
 	char *respbuf = NULL;
-	size_t resplen = 0;
-	DWORD dwSavedAttributes = ENABLE_PROCESSED_INPUT;
-	debug3("TermWrite thread, io:%p", pio);
-	
+	size_t resplen = 0;	
+	debug5("TermWrite thread, io:%p", pio);
+
 	pio->write_details.buf[write_status.to_transfer] = '\0';
 	
 	if (0 == in_raw_mode) {
@@ -162,7 +162,7 @@ WriteThread(_In_ LPVOID lpParameter)
 	write_status.transferred = write_status.to_transfer;
 
 	if (0 == QueueUserAPC(WriteAPCProc, main_thread, (ULONG_PTR)pio)) {
-		debug("TermWrite thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
+		debug3("TermWrite thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
 		pio->write_details.pending = FALSE;
 		pio->write_details.error = GetLastError();
 		DebugBreak();
@@ -176,13 +176,13 @@ int
 termio_initiate_write(struct w32_io* pio, DWORD num_bytes)
 {
 	HANDLE write_thread;
-	debug3("TermWrite initiate io:%p", pio);
+	debug5("TermWrite initiate io:%p", pio);
 	memset(&write_status, 0, sizeof(write_status));
 	write_status.to_transfer = num_bytes;
 	write_thread = CreateThread(NULL, 0, WriteThread, pio, 0, NULL);
 	if (write_thread == NULL) {
 		errno = errno_from_Win32Error(GetLastError());
-		debug("TermWrite initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
+		debug3("TermWrite initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
 		return -1;
 	}
 
@@ -195,7 +195,7 @@ termio_initiate_write(struct w32_io* pio, DWORD num_bytes)
 int 
 termio_close(struct w32_io* pio)
 {
-	debug2("termio_close - pio:%p", pio);
+	debug4("termio_close - pio:%p", pio);
 	HANDLE h;
 	CancelIoEx(WINHANDLE(pio), NULL);
 	/* If io is pending, let write worker threads exit. The read thread is blocked so terminate it.*/

@@ -2163,12 +2163,11 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 		free(dir);
 	}
 
-	interactive = !batchmode && isatty(STDIN_FILENO);
-	err = 0;
-
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	setvbuf(infile, NULL, _IOLBF, 0);
 
+	interactive = !batchmode && isatty(STDIN_FILENO);
+	err = 0;
 	for (;;) {
 		char *cp;
 
@@ -2256,32 +2255,11 @@ connect_to_server(char *path, char **args, int *in, int *out)
 
 #ifdef WINDOWS
 	/* fork replacement on Windows */
-	{
-		size_t cmdlen = 0;
-		int i = 0;
-		char* full_cmd;
+	/* disable inheritance on local pipe ends*/
+	fcntl(pout[1], F_SETFD, FD_CLOEXEC);
+	fcntl(pin[0], F_SETFD, FD_CLOEXEC);
 
-		cmdlen = strlen(path) + 1;
-		for (i = 1; args[i]; i++)
-			cmdlen += strlen(args[i]) + 1 + 2;
-
-		full_cmd = xmalloc(cmdlen);
-		full_cmd[0] = '\0';
-		strcat(full_cmd, path);
-		for (i = 1; args[i]; i++) 	{
-			strcat(full_cmd, " \"");
-			strcat(full_cmd, args[i]);
-			strcat(full_cmd, "\"");
-		}
-
-		/* disable inheritance on local pipe ends*/
-		fcntl(pout[1], F_SETFD, FD_CLOEXEC);
-		fcntl(pin[0], F_SETFD, FD_CLOEXEC);
-
-		sshpid = spawn_child(full_cmd, c_in, c_out, STDERR_FILENO, 0);
-		free(full_cmd);
- 	}
-
+	sshpid = spawn_child(path, args + 1, c_in, c_out, STDERR_FILENO, 0);
 	if (sshpid == -1)
 #else /* !WINDOWS */
 	if ((sshpid = fork()) == -1)

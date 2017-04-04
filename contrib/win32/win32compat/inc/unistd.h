@@ -81,4 +81,21 @@ char *crypt(const char *key, const char *salt);
 int link(const char *oldpath, const char *newpath);
 int readlink(const char *path, char *link, int linklen);
 
-int spawn_child(char* cmd, int in, int out, int err, unsigned long flags);
+int spawn_child(char* cmd, char** argv, int in, int out, int err, unsigned long flags);
+
+
+/* 
+ * readpassphrase.h definitions 
+ * cannot create a separate header due to the way
+ * its included in openbsdcompat.h
+ */
+
+#define RPP_ECHO_OFF    0x00		/* Turn off echo (default). */
+#define RPP_ECHO_ON     0x01		/* Leave echo on. */
+#define RPP_REQUIRE_TTY 0x02		/* Fail if there is no tty. */
+#define RPP_FORCELOWER  0x04		/* Force input to lower case. */
+#define RPP_FORCEUPPER  0x08		/* Force input to upper case. */
+#define RPP_SEVENBIT    0x10		/* Strip the high bit from input. */
+#define RPP_STDIN       0x20		/* Read from stdin, not /dev/tty */
+
+char * readpassphrase(const char *, char *, size_t, int);

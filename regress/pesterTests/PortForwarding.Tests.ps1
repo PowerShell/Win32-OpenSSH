@@ -1,53 +1,45 @@
-﻿using module .\PlatformAbstractLayer.psm1
-
+﻿
 Describe "Tests for portforwarding" -Tags "CI" {
-    BeforeAll {        
+    BeforeAll {
+
+        if($OpenSSHTestInfo -eq $null)
+        {
+            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+        }
         $fileName = "test.txt"
         $filePath = Join-Path ${TestDrive} $fileName
-
-        [Machine] $client = [Machine]::new([MachineRole]::Client)
-        [Machine] $server = [Machine]::new([MachineRole]::Server)
-        $client.SetupClient($server)
-        $server.SetupServer($client)
-
-        $server.SecureHostKeys($server.PrivateHostKeyPaths)
-        $server.SetupServerRemoting([Protocol]::WSMAN)
-        #setup single signon
-        .\ssh-add.exe $client.clientPrivateKeyPaths[0]
-        Remove-Item -Path $filePath -Force -ea silentlycontinue
+        $logName = "log.txt"
+        $logPath = Join-Path ${TestDrive} $logName        
+        $server = $OpenSSHTestInfo["Target"]
+        $port = $OpenSSHTestInfo["Port"]
+        $ssouser = $OpenSSHTestInfo["SSOUser"]
 
         $testData = @(
             @{
                 Title = "Local port forwarding"
                 Options = "-L 5432:127.0.0.1:47001"
-                Port = 5432
+                FwdedPort = 5432
 
             },
             @{
                 Title = "Remote port forwarding"
                 Options = "-R 5432:127.0.0.1:47001"
-                Port = 5432
+                FwdedPort = 5432
             }
         )      
     }
 
-    AfterAll {
-        #cleanup single signon
-        .\ssh-add.exe -D
-        $Server.CleanupHostKeys()
-        $client.CleanupClient()
-        $server.CleanupServer()
-    }
-
     AfterEach {
         Remove-Item -Path $filePath -Force -ea silentlycontinue
+        Remove-Item -Path $logPath -Force -ea silentlycontinue
     }
 
     It '<Title>' -TestCases:$testData {
-        param([string]$Title, $Options, $port)
-           
-        $str = ".\ssh $($Options) $($server.localAdminUserName)@$($server.MachineName) powershell.exe Test-WSMan -computer 127.0.0.1 -port $port > $filePath"
-        $client.RunCmd($str)
+        param([string]$Title, $Options, $FwdedPort)
+         
+        $str = "ssh -p $($port) -E $logPath $($Options) $($ssouser)@$($server) powershell.exe Test-WSMan -computer 127.0.0.1 -port $FwdedPort > $filePath"
+        # TODO - move this to PAL
+        cmd /c $str
         #validate file content.           
         $content = Get-Content $filePath
         $content -like "wsmid*" | Should Not Be $null

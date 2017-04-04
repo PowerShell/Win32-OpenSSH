@@ -1,6 +1,4 @@
-﻿using module .\PlatformAbstractLayer.psm1
-
-Describe "Tests of sshd_config" -Tags "CI" {
+﻿Describe "Tests of sshd_config" -Tags "Scenario" {
     BeforeAll {
         $fileName = "test.txt"
         $filePath = Join-Path ${TestDrive} $fileName

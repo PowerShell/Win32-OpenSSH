@@ -204,8 +204,9 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\types.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\ctype.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\stdlib.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\debug.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.h" />
-    <ClInclude Include="..\win32compat\tnnet.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -10,7 +10,7 @@ start_sshd
 base=33
 last=$PORT
 fwd=""
-CTL=$OBJ/ctl-sock
+CTL=/tmp/openssh.regress.ctl-sock.$$
 
 for j in 0 1 2; do
 	for i in 0 1 2; do

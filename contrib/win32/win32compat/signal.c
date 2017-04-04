@@ -32,6 +32,7 @@
 #include "w32fd.h"
 #include "signal_internal.h"
 #include "inc\signal.h"
+#include "debug.h"
 
 #undef signal
 #undef raise
@@ -56,28 +57,28 @@ extern struct _children children;
 static VOID CALLBACK
 sigint_APCProc(_In_ ULONG_PTR dwParam)
 {
-	debug3("SIGINT APCProc()");
+	debug5("SIGINT APCProc()");
 	sigaddset(&pending_signals, W32_SIGINT);
 }
 
 static VOID CALLBACK
 sigterm_APCProc(_In_ ULONG_PTR dwParam)
 {
-	debug3("SIGTERM APCProc()");
+	debug5("SIGTERM APCProc()");
 	sigaddset(&pending_signals, W32_SIGTERM);
 }
 
 static VOID CALLBACK
 sigtstp_APCProc(_In_ ULONG_PTR dwParam)
 {
-	debug3("SIGTSTP APCProc()");
+	debug5("SIGTSTP APCProc()");
 	sigaddset(&pending_signals, W32_SIGTSTP);
 }
 
 BOOL WINAPI
 native_sig_handler(DWORD dwCtrlType)
 {
-	debug("Native Ctrl+C handler, CtrlType %d", dwCtrlType);
+	debug3("Native Ctrl+C handler, CtrlType %d", dwCtrlType);
 	switch (dwCtrlType) {
 	case CTRL_C_EVENT:
 		QueueUserAPC(sigint_APCProc, main_thread, (ULONG_PTR)NULL);
@@ -100,7 +101,7 @@ native_sig_handler(DWORD dwCtrlType)
 static VOID CALLBACK
 sigwinch_APCProc(_In_ ULONG_PTR dwParam)
 {
-	debug3("SIGTERM APCProc()");
+	debug5("SIGTERM APCProc()");
 	sigaddset(&pending_signals, W32_SIGWINCH);
 }
 
@@ -128,7 +129,7 @@ sighandler_t
 w32_signal(int signum, sighandler_t handler)
 {
 	sighandler_t prev;
-	debug2("signal() sig:%d, handler:%p", signum, handler);
+	debug4("signal() sig:%d, handler:%p", signum, handler);
 	if (signum >= W32_SIGMAX) {
 		errno = EINVAL;
 		return W32_SIG_ERR;
@@ -144,7 +145,7 @@ w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 {
 	/* this is only used by sshd to block SIGCHLD while doing waitpid() */
 	/* our implementation of waidpid() is never interrupted, so no need to implement this for now*/
-	debug3("sigprocmask() how:%d");
+	debug5("sigprocmask() how:%d");
 	return 0;
 }
 
@@ -153,7 +154,7 @@ w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 int
 w32_raise(int sig)
 {
-	debug("raise sig:%d", sig);
+	debug3("raise sig:%d", sig);
 	if (sig == W32_SIGSEGV)
 		return raise(SIGSEGV); /* raise native exception handler*/
 
@@ -191,7 +192,7 @@ sw_process_pending_signals()
 	sigset_t pending_tmp = pending_signals;
 	BOOL sig_int = FALSE; /* has any signal actually interrupted */
 
-	debug3("process_signals()");
+	debug5("process_signals()");
 	int i, exp[] = { W32_SIGCHLD , W32_SIGINT , W32_SIGALRM, W32_SIGTERM, W32_SIGTSTP, W32_SIGWINCH };
 
 	/* check for expected signals*/
@@ -199,7 +200,7 @@ sw_process_pending_signals()
 		sigdelset(&pending_tmp, exp[i]);
 	if (pending_tmp) {
 		/* unexpected signals queued up */
-		debug("process_signals() - ERROR unexpected signals in queue: %d", pending_tmp);
+		debug3("process_signals() - ERROR unexpected signals in queue: %d", pending_tmp);
 		errno = ENOTSUP;
 		DebugBreak();
 		return -1;
@@ -228,7 +229,7 @@ sw_process_pending_signals()
 		DebugBreak();
 
 	if (sig_int) {
-		debug("process_queued_signals: WARNING - A signal has interrupted and was processed");
+		debug3("process_queued_signals: WARNING - A signal has interrupted and was processed");
 		errno = EINTR;
 		return -1;
 	}
@@ -257,7 +258,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	num_all_events = num_events + live_children;
 
 	if (num_all_events > MAXIMUM_WAIT_OBJECTS) {
-		debug("wait() - ERROR max events reached");
+		debug3("wait() - ERROR max events reached");
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -265,7 +266,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 	memcpy(all_events, children.handles, live_children * sizeof(HANDLE));
 	memcpy(all_events + live_children, events, num_events * sizeof(HANDLE));
 
-	debug3("wait() on %d events and %d children", num_events, live_children);
+	debug5("wait() on %d events and %d children", num_events, live_children);
 	/* TODO - implement signal catching and handling */
 	if (num_all_events) {
 		DWORD ret = WaitForMultipleObjectsEx(num_all_events, all_events, FALSE, milli_seconds, TRUE);
@@ -284,7 +285,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 			return 0;
 		} else { /* some other error*/
 			errno = EOTHER;
-			debug("ERROR: unxpected wait end: %d", ret);
+			debug3("ERROR: unxpected wait end: %d", ret);
 			return -1;
 		}
 	} else {
@@ -296,7 +297,7 @@ wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds)
 			return 0;
 		} else { /* some other error */
 			errno = EOTHER;
-			debug("ERROR: unxpected SleepEx error: %d", ret);
+			debug3("ERROR: unxpected SleepEx error: %d", ret);
 			return -1;
 		}
 	}

@@ -69,7 +69,7 @@ ssh_askpass(char *askpass, const char *msg)
 #ifdef WINDOWS 
 	/* spawd child for Windows */
 	fcntl(p[0], F_SETFD, FD_CLOEXEC);
-	pid = spawn_child(askpass, p[1], p[1], STDERR_FILENO, 0);
+	pid = spawn_child(askpass, NULL, p[1], p[1], STDERR_FILENO, 0);
 	if (pid < 0) {
 #else  /* !WINDOWS */
 	if ((pid = fork()) < 0) {
@@ -125,71 +125,6 @@ ssh_askpass(char *askpass, const char *msg)
 char *
 read_passphrase(const char *prompt, int flags)
 {
-	
-#ifdef WINDOWS
-	/* TODO - do flags apply on Windows? */
-	char *askpass = NULL;
-	char *ret = NULL;
-	char buf[1024] = { 0 };
-
-	DWORD mode;
-	size_t len = 0;
-	int retr = 0;
-
-	if (getenv(SSH_ASKPASS_ENV)) {
-		askpass = getenv(SSH_ASKPASS_ENV);
-		if ((ret = ssh_askpass(askpass, prompt)) == NULL) 
-			return xstrdup("");
-		return ret;
-	}
-
-	/* prompt user */
-	wchar_t* wtmp = utf8_to_utf16(prompt);
-	if (wtmp == NULL)
-		fatal("unable to alloc memory");
-	_cputws(wtmp);
-	free(wtmp);
-
-	len = retr = 0;
-	int bufsize = sizeof(buf);
-
-	while (_kbhit())
-		_getch();
-
-	while (len < bufsize) {
-		buf[len] = (unsigned char)_getch();
-
-		if (buf[len] == '\r') {
-			if (_kbhit()) /* read linefeed if its there */
-				_getch();
-			break;
-		}
-		else if (buf[len] == '\n') {
-			break;
-}
-		else if (buf[len] == '\b') { /* backspace */
-			if (len > 0)
-				len--; /* overwrite last character */
-		}
-		else if (buf[len] == '\003') {
-			/* exit on Ctrl+C */
-			fatal("");
-		}
-		else {
-			len++; /* keep reading in the loop */
-		}
-	}
-
-	buf[len] = '\0'; /* get rid of the cr/lf */
-	_cputs("\n"); /*show a newline as we do not echo password or the line */
-
-	ret = xstrdup(buf);
-
-	memset(buf, 'x', sizeof(buf));
-
-	return ret;
-
-#else   /* !WINDOWS */
 	char *askpass = NULL, *ret, buf[1024];
 	int rppflags, use_askpass = 0, ttyfd;
 
@@ -236,7 +171,6 @@ read_passphrase(const char *prompt, int flags)
 	ret = xstrdup(buf);
 	explicit_bzero(buf, sizeof(buf));
 	return ret;
-#endif  /* !WINDOWS */
 }
 
 int

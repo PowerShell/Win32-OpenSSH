@@ -227,15 +227,16 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 #elif defined(WINDOWS)
 /*
 * Authenticate on Windows - Pass credentials to ssh-agent and retrieve token
-* upon succesful authentication
+* upon successful authentication
+* TODO - password is sent in plain text over IPC. Consider implications. 
 */
-extern int auth_sock;
 int sys_auth_passwd(Authctxt *authctxt, const char *password)
 {
+	struct sshbuf *msg = NULL;
 	size_t blen = 0;
 	DWORD token = 0;
-	struct sshbuf *msg = NULL;
-	int r;
+	extern int auth_sock;
+	int r = 0;
 
 	msg = sshbuf_new();
 	if (!msg)
