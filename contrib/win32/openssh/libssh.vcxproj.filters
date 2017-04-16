@@ -177,9 +177,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)match.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)md-sha256.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)misc.c">
       <Filter>Source Files</Filter>
     </ClCompile>

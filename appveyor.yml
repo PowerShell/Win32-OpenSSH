@@ -1,4 +1,4 @@
-version: 0.0.10.0.{build}
+version: 0.0.12.0.{build}
 image: Visual Studio 2015
 
 branches:
@@ -18,10 +18,6 @@ after_build:
   - ps: |
       Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1 -DisableNameChecking
       Install-OpenSSH
-  - ps: Write-Verbose "Restart computer ..."
-  - ps: Restart-Computer -Force
-  - ps: Start-Sleep -s 5 # Needs to be proceeded with -ps: as it's interpreted by AppVeyor
-  - ps: Write-Verbose "Restart computer completed!"
 
 before_test:
   - ps: |

@@ -81,8 +81,6 @@ function Invoke-AppVeyorFull
         Set-OpenSSHTestParams
         Invoke-AppVeyorBuild
         Install-OpenSSH
-        Install-OpenSSHTestDependencies
-        Deploy-OpenSSHTests
         Setup-OpenSSHTestEnvironment
         Run-OpenSSHTests
         Publish-Artifact

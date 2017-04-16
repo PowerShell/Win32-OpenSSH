@@ -233,6 +233,12 @@ int use_privsep = -1;
 #endif
 struct monitor *pmonitor = NULL;
 int privsep_is_preauth = 1;
+#ifdef WINDOWS
+/* Windows does not use Unix privilege separation model */
+static int privsep_chroot = 0;
+#else
+static int privsep_chroot = 1;
+#endif
 
 /* global authentication context */
 Authctxt *the_authctxt = NULL;
@@ -577,7 +583,7 @@ privsep_preauth_child(void)
 	demote_sensitive_data();
 
 	/* Demote the child */
-	if (getuid() == 0 || geteuid() == 0) {
+	if (privsep_chroot) {
 		/* Change our root directory */
 		if (chroot(_PATH_PRIVSEP_CHROOT_DIR) == -1)
 			fatal("chroot(\"%s\"): %s", _PATH_PRIVSEP_CHROOT_DIR,
@@ -1314,6 +1320,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					 * automatically be cleaned up on next iteration
 					 */
 					close(startup_p[1]);
+					free(path_utf8);
 					continue;
 				}
                 
@@ -1717,8 +1724,9 @@ main(int ac, char **av)
 
 #ifndef WINDOWS /* not applicable in Windows */
 	/* Store privilege separation user for later use if required. */
+	privsep_chroot = use_privsep && (getuid() == 0 || geteuid() == 0);
 	if ((privsep_pw = getpwnam(SSH_PRIVSEP_USER)) == NULL) {
-		if (use_privsep || options.kerberos_authentication)
+		if (privsep_chroot || options.kerberos_authentication)
 			fatal("Privilege separation user %s does not exist",
 			    SSH_PRIVSEP_USER);
 	} else {
@@ -1847,7 +1855,7 @@ main(int ac, char **av)
 		    key_type(key));
 	}
 
-	if (use_privsep) {
+	if (privsep_chroot) {
 		struct stat st;
 
 		if ((stat(_PATH_PRIVSEP_CHROOT_DIR, &st) == -1) ||

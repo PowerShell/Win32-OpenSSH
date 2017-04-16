@@ -24,7 +24,7 @@
 
 #include "includes.h"
 
-#include <sys/types.h>
+#include "inc/sys/types.h"
 
 #include <errno.h>
 #include <string.h>

@@ -297,7 +297,7 @@
 
 /* Define to 1 if you have the declaration of `O_NONBLOCK', and to 0 if you
    don't. */
-#define HAVE_DECL_O_NONBLOCK 0
+#define HAVE_DECL_O_NONBLOCK 1
 
 /* Define to 1 if you have the declaration of `passwdexpired', and to 0 if you
    don't. */

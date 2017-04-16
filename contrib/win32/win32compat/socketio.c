@@ -104,12 +104,20 @@ int
 socketio_acceptEx(struct w32_io* pio)
 {
 	struct acceptEx_context *context;
+	struct sockaddr_storage addr; int addrlen = sizeof addr;
+	
 	debug5("acceptEx - io:%p", pio);
 	context = (struct acceptEx_context *)pio->internal.context;
 	ResetEvent(pio->read_overlapped.hEvent);
 
+	if (getsockname(pio->sock, (struct sockaddr*)&addr, &addrlen) == SOCKET_ERROR) {
+		errno = errno_from_WSALastError();
+		debug("acceptEx - getsockname() ERROR:%d, io:%p", errno, pio);
+		return -1;		
+	}
+
 	/* create accepting socket */
-	context->accept_socket = socket(AF_UNSPEC, SOCK_STREAM, IPPROTO_TCP);
+	context->accept_socket = socket(addr.ss_family, SOCK_STREAM, IPPROTO_TCP);
 	if (context->accept_socket == INVALID_SOCKET) {
 		errno = errno_from_WSALastError();
 		debug3("acceptEx - socket() ERROR:%d, io:%p", errno, pio);

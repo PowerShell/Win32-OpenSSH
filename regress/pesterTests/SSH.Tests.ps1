@@ -1,14 +1,30 @@
-﻿#covered -i -q -v -l -c -C
+﻿#todo: -i -q -v -l -c -C
 #todo: -S -F -V -e
-Describe "Tests for ssh command" -Tags "Scenario" {
+$tB = 1
+$tI = 0
+        
+Describe "ssh client tests" -Tags "CI" {
     BeforeAll {        
-        $fileName = "test.txt"
-        $filePath = Join-Path ${TestDrive} $fileName
+        if($OpenSSHTestInfo -eq $null)
+        {
+            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+        }
 
-        [Machine] $client = [Machine]::new([MachineRole]::Client)
-        [Machine] $server = [Machine]::new([MachineRole]::Server)
-        $client.SetupClient($server)
-        $server.SetupServer($client)
+        if(-not (Test-Path $OpenSSHTestInfo["TestDataPath"]))
+        {
+            $null = New-Item $OpenSSHTestInfo["TestDataPath"] -ItemType directory -Force -ErrorAction SilentlyContinue
+        }
+
+        $server = $OpenSSHTestInfo["Target"]
+        $port = $OpenSSHTestInfo["Port"]
+        $ssouser = $OpenSSHTestInfo["SSOUser"]
+        $sshCmdDefault = "ssh -p $port $($ssouser)@$($server)"
+
+        $testDir = Join-Path $OpenSSHTestInfo["TestDataPath"] "ssh"
+        if(-not (Test-Path $testDir))
+        {
+            $null = New-Item $testDir -ItemType directory -Force -ErrorAction SilentlyContinue
+        }
 
         $testData = @(
             @{
@@ -55,12 +71,71 @@ Describe "Tests for ssh command" -Tags "Scenario" {
         
     }
 
-    AfterAll {
-        $client.CleanupClient()
-        $server.CleanupServer()
+    BeforeEach {
+        $tI++;
+        $tFile=Join-Path $testDir "$tB.$tI.txt"
+    }        
+
+    Context "$tB - Basic Scenarios" {
+        
+        BeforeAll {$tI=1}
+        AfterAll{$tB++}
+
+        <# these 2 tests dont work on AppVeyor that sniffs stderr channel
+        It "$tB.$tI - test version" {
+            iex "ssh -V 2> $tFile"
+            $tFile | Should Contain "OpenSSH_"
+        }
+
+        It "$tB.$tI - test help" {
+            iex "ssh -? 2> $tFile"
+            $tFile | Should Contain "usage: ssh"
+        }
+        #>
+
+        It "$tB.$tI - remote echo command" {
+            iex "$sshDefaultCmd echo 1234" | Should Be "1234"
+        }
     }
 
-    Context "Key is not secured in ssh-agent on server" {
+    Context "$tB - Redirection Scenarios" {
+        
+        BeforeAll {$tI=1}
+        AfterAll{$tB++}
+
+        It "$tB.$tI - stdout to file" {
+            iex "$sshDefaultCmd powershell get-process > $tFile"
+            $tFile | Should Contain "ProcessName"
+        }
+
+        It "$tB.$tI - stdout to PS object" {
+            $o = iex "$sshDefaultCmd echo 1234"
+            $o | Should Be "1234"
+        }
+
+        <#It "$tB.$tI - stdin from PS object" {
+            #if input redirection doesn't work, this would hang
+            0 | ssh -p $port $ssouser@$server pause
+            $true | Should Be $true
+        }#>
+    }
+
+    Context "$tB - cmdline parameters" {
+        
+        BeforeAll {$tI=1}
+        AfterAll{$tB++}
+
+        It "$tB.$tI - verbose to file" {
+            $logFile = Join-Path $testDir "$tB.$tI.log.txt"
+            $o = ssh -p $port -v -E $logFile $ssouser@$server echo 1234
+            $o | Should Be "1234"
+            #TODO - checks below are very inefficient (time taking). 
+            $logFile | Should Contain "OpenSSH_"
+            $logFile | Should Contain "Exit Status 0"
+        }
+
+    }
+    <#Context "Key is not secured in ssh-agent on server" {
         BeforeAll {            
             $identifyFile = $client.clientPrivateKeyPaths[0]
             Remove-Item -Path $filePath -Force -ea silentlycontinue
@@ -156,5 +231,5 @@ Describe "Tests for ssh command" -Tags "Scenario" {
            #validate file content.           
            Get-Content $filePath | Should be $server.MachineName           
         }
-    }
+    }#>
 }

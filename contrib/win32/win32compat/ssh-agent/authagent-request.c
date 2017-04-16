@@ -127,7 +127,7 @@ generate_user_token(wchar_t* user_cpn) {
 	if (domain_user)
 		InitLsaString(&auth_package_name, MICROSOFT_KERBEROS_NAME_A);
 	else
-		InitLsaString(&auth_package_name, "SSH-LSA");
+		InitLsaString(&auth_package_name, MSV1_0_PACKAGE_NAME);
 
 	InitLsaString(&originName, "sshd");
 	if (ret = LsaRegisterLogonProcess(&logon_process_name, &lsa_handle, &mode) != STATUS_SUCCESS)
@@ -154,11 +154,24 @@ generate_user_token(wchar_t* user_cpn) {
 		s4u_logon->ClientRealm.MaximumLength = 0;
 		s4u_logon->ClientRealm.Buffer = 0;
 	} else {
-		logon_info_size = (wcslen(user_cpn) + 1)*sizeof(wchar_t);
+		MSV1_0_S4U_LOGON *s4u_logon;
+		logon_info_size = sizeof(MSV1_0_S4U_LOGON);
+		/* additional buffer size = size of user_cpn + size of "." and their null terminators */
+		logon_info_size += (wcslen(user_cpn) * 2 + 2) + 4;
 		logon_info = malloc(logon_info_size);
 		if (logon_info == NULL)
 			goto done;
-		memcpy(logon_info, user_cpn, logon_info_size);
+		s4u_logon = (MSV1_0_S4U_LOGON*)logon_info;
+		s4u_logon->MessageType = MsV1_0S4ULogon;
+		s4u_logon->Flags = 0;
+		s4u_logon->UserPrincipalName.Length = wcslen(user_cpn) * 2;
+		s4u_logon->UserPrincipalName.MaximumLength = s4u_logon->UserPrincipalName.Length;
+		s4u_logon->UserPrincipalName.Buffer = (WCHAR*)(s4u_logon + 1);
+		memcpy(s4u_logon->UserPrincipalName.Buffer, user_cpn, s4u_logon->UserPrincipalName.Length + 2);
+		s4u_logon->DomainName.Length = 2;
+		s4u_logon->DomainName.MaximumLength = 2;
+		s4u_logon->DomainName.Buffer = ((WCHAR*)s4u_logon->UserPrincipalName.Buffer) + wcslen(user_cpn) + 1;
+		memcpy(s4u_logon->DomainName.Buffer, L".", 4);
 	}
 
 	memcpy(sourceContext.SourceName,"sshagent", sizeof(sourceContext.SourceName));
@@ -180,7 +193,7 @@ generate_user_token(wchar_t* user_cpn) {
 		&token,
 		&quotas,
 		&subStatus) != STATUS_SUCCESS) {
-		debug("LsaLogonUser failed %d", ret);
+		debug("LsaLogonUser failed NTSTATUS: %d", ret);
 		goto done;
 	}
 	debug3("LsaLogonUser succeeded");
@@ -265,7 +278,7 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 	char *key_blob, *user, *sig, *blob;
 	size_t key_blob_len, user_len, sig_len, blob_len;
 	struct sshkey *key = NULL;
-	HANDLE token = NULL, restricted_token = NULL, dup_token = NULL, client_proc = NULL;
+	HANDLE token = NULL, dup_token = NULL, client_proc = NULL;
 	wchar_t *user_utf16 = NULL, *udom_utf16 = NULL, *tmp;
 	PWSTR wuser_home = NULL;
 	ULONG client_pid;
@@ -292,14 +305,8 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 		goto done;
 	}
 
-	/* for key based auth, remove SeTakeOwnershipPrivilege */
-	if (LookupPrivilegeValueW(NULL, L"SeTakeOwnershipPrivilege", &priv_to_delete[0].Luid) == FALSE ||
-	    CreateRestrictedToken(token, 0, 0, NULL, 1, priv_to_delete, 0, NULL, &restricted_token) == FALSE) {
-		debug("unable to remove SeTakeOwnershipPrivilege privilege");
-		goto done;
-	}
 	
-	if (SHGetKnownFolderPath(&FOLDERID_Profile, 0, restricted_token, &wuser_home) != S_OK ||
+	if (SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
 	    pubkey_allowed(key, user_utf16, wuser_home) != 1) {
 		debug("unable to verify public key for user %ls (profile:%ls)", user_utf16, wuser_home);
 		goto done;
@@ -312,14 +319,14 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 
 	if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
 	    ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
-	    (FALSE == DuplicateHandle(GetCurrentProcess(), restricted_token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
+	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
 	    (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)) {
 		debug("failed to authorize user");
 		goto done;
 	}
 
-	con->auth_token = restricted_token; 
-	restricted_token = NULL;
+	con->auth_token = token; 
+	token = NULL;
 	if ((tmp = wcschr(user_utf16, L'@')) != NULL) {
 		udom_utf16 = tmp + 1;
 		*tmp = L'\0';

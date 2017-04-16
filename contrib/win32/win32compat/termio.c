@@ -9,6 +9,10 @@
  * Author: Balu <bagajjal@microsoft.com>
  *  Misc fixes and code cleanup
  *
+ * Author: Manoj Ampalam <manojamp@microsoft.com>
+ *  Extended support to other Windows IO that does not support 
+ *  overlapped IO. Ex. pipe handles returned by CreatePipe()
+ * 
  * Copyright (c) 2017 Microsoft Corp.
  * All rights reserved
  *
@@ -71,18 +75,26 @@ ReadAPCProc(_In_ ULONG_PTR dwParam)
 
 /* Read worker thread */
 static DWORD WINAPI
-ReadConsoleThread(_In_ LPVOID lpParameter)
+ReadThread(_In_ LPVOID lpParameter)
 {
 	int nBytesReturned = 0;
 	struct w32_io* pio = (struct w32_io*)lpParameter;
 
 	debug5("TermRead thread, io:%p", pio);
 	memset(&read_status, 0, sizeof(read_status));
-	while (nBytesReturned == 0) {
-		nBytesReturned = ReadConsoleForTermEmul(WINHANDLE(pio),
-			pio->read_details.buf, pio->read_details.buf_size);
+	if (FILETYPE(pio) == FILE_TYPE_CHAR) {
+		while (nBytesReturned == 0) {
+			nBytesReturned = ReadConsoleForTermEmul(WINHANDLE(pio),
+				pio->read_details.buf, pio->read_details.buf_size);
+		}
+		read_status.transferred = nBytesReturned;
+	} else {
+		if (!ReadFile(WINHANDLE(pio), pio->read_details.buf,
+		    pio->read_details.buf_size, &read_status.transferred, NULL)) {
+			read_status.error = GetLastError();
+			debug("ReadThread - ReadFile failed %d, io:%p", GetLastError(), pio);
+		}
 	}
-	read_status.transferred = nBytesReturned;
 	if (0 == QueueUserAPC(ReadAPCProc, main_thread, (ULONG_PTR)pio)) {
 		debug3("TermRead thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
 		pio->read_details.pending = FALSE;
@@ -95,11 +107,11 @@ ReadConsoleThread(_In_ LPVOID lpParameter)
 
 /* Initiates read on tty */
 int
-termio_initiate_read(struct w32_io* pio)
+syncio_initiate_read(struct w32_io* pio)
 {
 	HANDLE read_thread;
 
-	debug5("TermRead initiate io:%p", pio);
+	debug5("syncio_initiate_read io:%p", pio);
 	if (pio->read_details.buf_size == 0) {
 		pio->read_details.buf = malloc(TERM_IO_BUF_SIZE);
 		if (pio->read_details.buf == NULL) {
@@ -109,7 +121,7 @@ termio_initiate_read(struct w32_io* pio)
 		pio->read_details.buf_size = TERM_IO_BUF_SIZE;
 	}
 
-	read_thread = CreateThread(NULL, 0, ReadConsoleThread, pio, 0, NULL);
+	read_thread = CreateThread(NULL, 0, ReadThread, pio, 0, NULL);
 	if (read_thread == NULL) {
 		errno = errno_from_Win32Error(GetLastError());
 		debug3("TermRead initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
@@ -148,19 +160,26 @@ WriteThread(_In_ LPVOID lpParameter)
 	size_t resplen = 0;	
 	debug5("TermWrite thread, io:%p", pio);
 
-	pio->write_details.buf[write_status.to_transfer] = '\0';
-	
-	if (0 == in_raw_mode) {
-		wchar_t* t = utf8_to_utf16(pio->write_details.buf);
-		WriteConsoleW(WINHANDLE(pio), t, wcslen(t), 0, 0);
-		free(t);		
+	if (FILETYPE(pio) == FILE_TYPE_CHAR) {
+		pio->write_details.buf[write_status.to_transfer] = '\0';
+		if (0 == in_raw_mode) {
+			wchar_t* t = utf8_to_utf16(pio->write_details.buf);
+			WriteConsoleW(WINHANDLE(pio), t, wcslen(t), 0, 0);
+			free(t);		
+		} else {
+			processBuffer(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
+			/* TODO - respbuf is not null in some cases, this needs to be returned back via read stream */
+		}
+		write_status.transferred = write_status.to_transfer;
 	} else {
-		processBuffer(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
-		/* TODO - respbuf is not null in some cases, this needs to be returned back via read stream */
+		if (!WriteFile(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer,
+		    &write_status.transferred, NULL)) {
+			write_status.error = GetLastError();
+			debug("WriteThread - ReadFile WriteFile %d, io:%p", GetLastError(), pio);
+		}
 	}
 
-	write_status.transferred = write_status.to_transfer;
-
+	
 	if (0 == QueueUserAPC(WriteAPCProc, main_thread, (ULONG_PTR)pio)) {
 		debug3("TermWrite thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
 		pio->write_details.pending = FALSE;
@@ -173,7 +192,7 @@ WriteThread(_In_ LPVOID lpParameter)
 
 /* Initiates write on tty */
 int
-termio_initiate_write(struct w32_io* pio, DWORD num_bytes)
+syncio_initiate_write(struct w32_io* pio, DWORD num_bytes)
 {
 	HANDLE write_thread;
 	debug5("TermWrite initiate io:%p", pio);
@@ -193,21 +212,27 @@ termio_initiate_write(struct w32_io* pio, DWORD num_bytes)
 
 /* tty close */
 int 
-termio_close(struct w32_io* pio)
+syncio_close(struct w32_io* pio)
 {
-	debug4("termio_close - pio:%p", pio);
+	debug4("syncio_close - pio:%p", pio);
 	HANDLE h;
 	CancelIoEx(WINHANDLE(pio), NULL);
-	/* If io is pending, let write worker threads exit. The read thread is blocked so terminate it.*/
-	if (pio->read_details.pending)
-		TerminateThread(pio->read_overlapped.hEvent, 0);
+
+	/* If io is pending, let worker threads exit. */
+	if (pio->read_details.pending) {
+		/* For console - the read thread is blocked so terminate it. */
+		if (FILETYPE(pio) == FILE_TYPE_CHAR)
+			TerminateThread(pio->read_overlapped.hEvent, 0);
+		else
+			WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);
+	}
 	if (pio->write_details.pending)
 		WaitForSingleObject(pio->write_overlapped.hEvent, INFINITE);
 	/* drain queued APCs */
 	SleepEx(0, TRUE);
-	if (pio->type != STD_IO_FD) {
-		/* STD handles are never explicitly closed */
-		CloseHandle(WINHANDLE(pio));
+	CloseHandle(WINHANDLE(pio));
+	/* free up if non stdio */
+	if (!IS_STDIO(pio)) {
 		if (pio->read_details.buf)
 			free(pio->read_details.buf);
 		if (pio->write_details.buf)

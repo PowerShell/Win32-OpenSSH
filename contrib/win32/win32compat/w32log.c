@@ -30,7 +30,7 @@
 #include <Windows.h>
 #include <io.h>
 #include <fcntl.h>
-#include <sys/stat.h>
+#include "inc/sys/stat.h"
 
 #include "inc\syslog.h"
 #include "misc_internal.h"

@@ -299,7 +299,10 @@ function Package-OpenSSH
         [string]$NativeHostArch = "x64",
 
         [ValidateSet('Debug', 'Release', '')]
-        [string]$Configuration = "Release"
+        [string]$Configuration = "Release",
+
+        # Copy payload to DestinationPath instead of packaging
+        [string]$DestinationPath = ""
     )
 
     [System.IO.DirectoryInfo] $repositoryRoot = Get-RepositoryRoot
@@ -311,9 +314,8 @@ function Package-OpenSSH
     }
     $buildDir = Join-Path $repositoryRoot ("bin\" + $folderName + "\" + $Configuration)
     $payload = "sshd.exe", "ssh.exe", "ssh-agent.exe", "ssh-add.exe", "sftp.exe"
-    $payload += "sftp-server.exe", "scp.exe", "ssh-lsa.dll", "ssh-shellhost.exe", "ssh-keygen.exe" 
+    $payload += "sftp-server.exe", "scp.exe", "ssh-shellhost.exe", "ssh-keygen.exe" 
     $payload += "sshd_config", "install-sshd.ps1", "uninstall-sshd.ps1"
-    $payload += "install-sshlsa.ps1", "uninstall-sshlsa.ps1"
 
     $packageName = "OpenSSH-Win64"
     if ($NativeHostArch -eq 'x86') {
@@ -343,12 +345,29 @@ function Package-OpenSSH
         }
     }
 
-    Remove-Item ($packageDir + '.zip') -Force -ErrorAction SilentlyContinue
-    Compress-Archive -Path $packageDir -DestinationPath ($packageDir + '.zip')
+    if ($DestinationPath -ne "") {
+        if (Test-Path $DestinationPath) {
+            Remove-Item $DestinationPath\* -Force
+        }
+        else {
+            New-Item -ItemType Directory $DestinationPath | Out-Null
+        }
+        Copy-Item -Path $packageDir\* -Destination $DestinationPath -Force -Recurse
+    }
+    else {
+        Remove-Item ($packageDir + '.zip') -Force -ErrorAction SilentlyContinue
+        Compress-Archive -Path $packageDir -DestinationPath ($packageDir + '.zip')
+    }
     Remove-Item $packageDir -Recurse -Force -ErrorAction SilentlyContinue
 
-    Remove-Item ($symbolsDir + '.zip') -Force -ErrorAction SilentlyContinue
-    Compress-Archive -Path $symbolsDir -DestinationPath ($symbolsDir + '.zip')
+    
+    if ($DestinationPath -ne "") {
+        Copy-Item -Path $symbolsDir\* -Destination $DestinationPath -Force -Recurse
+    }
+    else {
+        Remove-Item ($symbolsDir + '.zip') -Force -ErrorAction SilentlyContinue
+        Compress-Archive -Path $symbolsDir -DestinationPath ($symbolsDir + '.zip')
+    }
     Remove-Item $symbolsDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -436,75 +455,6 @@ function Get-SolutionFile
 
 <#
     .Synopsis
-    Deploy all required files to build a package and create zip file.
-#>
-function Deploy-Win32OpenSSHBinaries
-{
-    [CmdletBinding()]
-    param
-    (
-        [ValidateSet('Debug', 'Release', '')]
-        [string]$Configuration = "",
-        [ValidateSet('x86', 'x64', '')]
-        [string]$NativeHostArch = "",
-        [string]$OpenSSHDir = "$env:SystemDrive\OpenSSH"
-    )
-
-    if (-not (Test-Path -Path $OpenSSHDir -PathType Container))
-    {
-        $null = New-Item -Path $OpenSSHDir -ItemType Directory -Force -ErrorAction Stop
-    }
-
-    [string] $platform = $env:PROCESSOR_ARCHITECTURE    
-    if(-not [String]::IsNullOrEmpty($NativeHostArch))
-    {
-        $folderName = $NativeHostArch
-        if($NativeHostArch -ieq 'x86')
-        {
-            $folderName = "Win32"
-        }
-    }
-    else
-    {
-        if($platform -ieq "AMD64")
-        {
-            $folderName = "x64"
-        }
-        else
-        {
-            $folderName = "Win32"
-        }
-    }
-    
-    if([String]::IsNullOrEmpty($Configuration))
-    {
-        if( $folderName -ieq "Win32" )
-        {
-            $RealConfiguration = "Debug"
-        }
-        else
-        {
-            $RealConfiguration = "Release"
-        }
-    }
-    else
-    {
-        $RealConfiguration = $Configuration
-    }
-
-    [System.IO.DirectoryInfo] $repositoryRoot = Get-RepositoryRoot
-    
-    $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "bin\$folderName\$RealConfiguration"
-    if((Get-Service ssh-agent -ErrorAction Ignore) -ne $null) {
-        Stop-Service ssh-agent -Force
-    }
-    Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHDir -Include *.exe,*.dll -Exclude *unittest*.* -Force -ErrorAction Stop
-    $sourceDir = Join-Path $repositoryRoot.FullName -ChildPath "contrib\win32\openssh"
-    Copy-Item -Path "$sourceDir\*" -Destination $OpenSSHDir -Include *.ps1,sshd_config -Exclude AnalyzeCodeDiff.ps1 -Force -ErrorAction Stop
-}
-
-<#
-    .Synopsis
     Deploy all required files to a location and install the binaries
 #>
 function Install-OpenSSH
@@ -521,12 +471,25 @@ function Install-OpenSSH
         [string]$OpenSSHDir = "$env:SystemDrive\OpenSSH"
     )
 
-    Deploy-Win32OpenSSHBinaries @PSBoundParameters
+    if ($Configuration -eq "")
+    {
+        $Configuration = 'Release'
+    }
+
+    if ($NativeHostArch -eq "") 
+    {
+        $NativeHostArch = 'x64'
+        if ($env:PROCESSOR_ARCHITECTURE  -eq 'x86') {
+            $NativeHostArch = 'x86'
+        }
+    }
+
+    Package-OpenSSH -NativeHostArch $NativeHostArch -Configuration $Configuration -DestinationPath $OpenSSHDir
 
     Push-Location $OpenSSHDir 
     & ( "$OpenSSHDir\install-sshd.ps1") 
     .\ssh-keygen.exe -A
-    & ( "$OpenSSHDir\install-sshlsa.ps1")
+
 
     #machine will be reboot after Install-openssh anyway
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')

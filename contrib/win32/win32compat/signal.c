@@ -78,7 +78,7 @@ sigtstp_APCProc(_In_ ULONG_PTR dwParam)
 BOOL WINAPI
 native_sig_handler(DWORD dwCtrlType)
 {
-	debug3("Native Ctrl+C handler, CtrlType %d", dwCtrlType);
+	debug4("Native Ctrl+C handler, CtrlType %d", dwCtrlType);
 	switch (dwCtrlType) {
 	case CTRL_C_EVENT:
 		QueueUserAPC(sigint_APCProc, main_thread, (ULONG_PTR)NULL);
@@ -154,7 +154,7 @@ w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 int
 w32_raise(int sig)
 {
-	debug3("raise sig:%d", sig);
+	debug4("raise sig:%d", sig);
 	if (sig == W32_SIGSEGV)
 		return raise(SIGSEGV); /* raise native exception handler*/
 
@@ -229,7 +229,7 @@ sw_process_pending_signals()
 		DebugBreak();
 
 	if (sig_int) {
-		debug3("process_queued_signals: WARNING - A signal has interrupted and was processed");
+		debug4("process_queued_signals: WARNING - A signal has interrupted and was processed");
 		errno = EINTR;
 		return -1;
 	}

@@ -240,7 +240,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)log.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)mac.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)match.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)md-sha256.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)misc.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)moduli.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)monitor_fdpass.c" />

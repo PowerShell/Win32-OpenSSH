@@ -559,6 +559,10 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		debug("Executing command: %s", exec_command);
 		UTF8_TO_UTF16_FATAL(exec_command_w, exec_command);
 		
+		_putenv_s("SSH_ASYNC_STDIN", "1");
+		_putenv_s("SSH_ASYNC_STDOUT", "1");
+		_putenv_s("SSH_ASYNC_STDERR", "1");
+
 		/* in debug mode launch using sshd.exe user context */
 		if (debug_flag)
 			b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
@@ -568,6 +572,10 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 			b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
 				DETACHED_PROCESS , NULL, pw_dir_w,
 				&si, &pi);
+
+		_putenv_s("SSH_ASYNC_STDIN", "");
+		_putenv_s("SSH_ASYNC_STDOUT", "");
+		_putenv_s("SSH_ASYNC_STDERR", "");
 
 		if (!b)
 			fatal("ERROR. Cannot create process (%u).\n", GetLastError());

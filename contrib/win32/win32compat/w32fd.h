@@ -39,7 +39,22 @@ enum w32_io_type {
 	UNKNOWN_FD = 0,
 	SOCK_FD = 1,	/*maps a socket fd*/
 	NONSOCK_FD = 2,	/*maps a file fd, pipe fd or a tty fd*/
-	STD_IO_FD = 5	/*maps a std fd - ex. STDIN_FILE*/
+	/*
+	 * maps a NONSOCK_FD that doesnt support async or overlapped io
+	 * these are typically used for stdio on ssh client side
+	 * executables (ssh, sftp and scp). 
+	 * Ex. ssh ... > output.txt
+	 *   In the above case, stdout passed to ssh.exe is a handle to 
+	 *   output.txt that is opened in non-overlapped mode
+	 * Ex. sample.exe | ssh ...
+	 *   In the above case, stdin passed to ssh.exe is a handle to
+	 *   a pipe opened in non-overlapped mode
+         * Ex. in Powershell
+	 * $o = ssh ...
+	 *   In the above case, stdout passed to ssh.exe is a handle to 
+	 *   a pipe opened in non-overlapped mode 
+	 */
+	NONSOCK_SYNC_FD = 3 
 };
 
 enum w32_io_sock_state {
@@ -51,7 +66,7 @@ enum w32_io_sock_state {
 };
 
 /*
-* This structure encapsulates the state info needed to map a File Descriptor
+* This structure encapsulates the I/O state info needed to map a File Descriptor
 * to Win32 Handle
 */
 struct w32_io {
@@ -94,7 +109,8 @@ struct w32_io {
 	}internal;
 };
 
-#define WINHANDLE(pio) (((pio)->type == STD_IO_FD)? GetStdHandle((pio)->std_handle):(pio)->handle)
+#define IS_STDIO(pio) ((pio)->table_index <= 2)
+#define WINHANDLE(pio) (IS_STDIO(pio)? GetStdHandle((pio)->std_handle):(pio)->handle)
 #define FILETYPE(pio) (GetFileType(WINHANDLE(pio)))
 extern HANDLE main_thread;
 
@@ -102,7 +118,7 @@ BOOL w32_io_is_blocking(struct w32_io*);
 BOOL w32_io_is_io_available(struct w32_io* pio, BOOL rd);
 int wait_for_any_event(HANDLE* events, int num_events, DWORD milli_seconds);
 
-/*POSIX mimic'ing socket API*/
+/*POSIX mimic'ing socket API and socket helper API*/
 int socketio_initialize();
 int socketio_done();
 BOOL socketio_is_io_available(struct w32_io* pio, BOOL rd);
@@ -122,7 +138,7 @@ int socketio_send(struct w32_io* pio, const void *buf, size_t len, int flags);
 int socketio_shutdown(struct w32_io* pio, int how);
 int socketio_close(struct w32_io* pio);
 
-/*POSIX mimic'ing file API*/
+/*POSIX mimic'ing file API and file helper API*/
 BOOL fileio_is_io_available(struct w32_io* pio, BOOL rd);
 void fileio_on_select(struct w32_io* pio, BOOL rd);
 int fileio_close(struct w32_io* pio);
@@ -136,45 +152,3 @@ int fileio_fstat(struct w32_io* pio, struct _stat64 *buf);
 int fileio_stat(const char *path, struct _stat64 *buf);
 long fileio_lseek(struct w32_io* pio, long offset, int origin);
 FILE* fileio_fdopen(struct w32_io* pio, const char *mode);
-
-/* terminal io specific versions */
-int termio_close(struct w32_io* pio);
-
-/*
-* open() flags and modes
-* all commented out macros are defined in fcntl.h
-* they are listed here so as to cross check any conflicts with macros explicitly
-* defined below.
-*/
-/*open access modes. only one of these can be specified*/
-/* #define O_RDONLY    0x0  */
-/* #define O_WRONLY    0x1 */
-/* #define O_RDWR      0x2 */
-/* open file creation and file status flags can be bitwise-or'd*/
-/* #define O_APPEND    0x8    /*file is opened in append mode*/
-#ifndef O_NONBLOCK
-#define O_NONBLOCK  0x0004    /*io operations wont block*/
-#endif
-/* #define O_CREAT     0x100   /*If the file does not exist it will be created*/
-/*
-* If the file exists and is a regular file, and the file is successfully
-* opened O_RDWR or O_WRONLY, its length shall be truncated to 0, and the mode
-* and owner shall be unchanged
-*/
-/* #define O_TRUNC     0x200    */
-/* If O_CREAT and O_EXCL are set, open() shall fail if the file exists */
-/* #define O_EXCL      0x400   */
-/* #define O_BINARY    0x8000   //Gives raw data (while O_TEXT normalises line endings */
-/* open modes */
-#ifndef  S_IRUSR
-#define S_IRUSR     00400   /* user has read permission */
-#endif /* ! S_IRUSR */
-#ifndef S_IWUSR
-#define S_IWUSR     00200   /* user has write permission */ 
-#endif
-#ifndef S_IRGRP
-#define S_IRGRP     00040   /* group has read permission  */
-#endif
-#ifndef S_IROTH
-#define S_IROTH     00004   /* others have read permission */
-#endif

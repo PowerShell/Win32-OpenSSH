@@ -3513,11 +3513,7 @@ sshkey_private_pem_to_blob(struct sshkey *key, struct sshbuf *blob,
 	int success, r;
 	int blen, len = strlen(_passphrase);
 	u_char *passphrase = (len > 0) ? (u_char *)_passphrase : NULL;
-#if (OPENSSL_VERSION_NUMBER < 0x00907000L)
-	const EVP_CIPHER *cipher = (len > 0) ? EVP_des_ede3_cbc() : NULL;
-#else
- 	const EVP_CIPHER *cipher = (len > 0) ? EVP_aes_128_cbc() : NULL;
-#endif
+	const EVP_CIPHER *cipher = (len > 0) ? EVP_aes_128_cbc() : NULL;
 	const u_char *bptr;
 	BIO *bio = NULL;
 

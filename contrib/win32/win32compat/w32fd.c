@@ -36,6 +36,7 @@
 #include "inc\unistd.h"
 #include "inc\fcntl.h"
 #include "inc\sys\un.h"
+#include "inc\utf.h"
 
 #include "w32fd.h"
 #include "signal_internal.h"
@@ -74,15 +75,24 @@ fd_table_initialize()
 	memset(&fd_table, 0, sizeof(fd_table));
 	memset(&w32_io_stdin, 0, sizeof(w32_io_stdin));
 	w32_io_stdin.std_handle = STD_INPUT_HANDLE;
-	w32_io_stdin.type = STD_IO_FD;
+	w32_io_stdin.type = NONSOCK_SYNC_FD;
+	if (getenv(SSH_ASYNC_STDIN) && strcmp(getenv(SSH_ASYNC_STDIN), "1") == 0)
+		w32_io_stdin.type = NONSOCK_FD;
+	_putenv_s(SSH_ASYNC_STDIN, "");
 	fd_table_set(&w32_io_stdin, STDIN_FILENO);
 	memset(&w32_io_stdout, 0, sizeof(w32_io_stdout));
 	w32_io_stdout.std_handle = STD_OUTPUT_HANDLE;
-	w32_io_stdout.type = STD_IO_FD;
+	w32_io_stdout.type = NONSOCK_SYNC_FD;
+	if (getenv(SSH_ASYNC_STDOUT) && strcmp(getenv(SSH_ASYNC_STDOUT), "1") == 0)
+		w32_io_stdout.type = NONSOCK_FD;
+	_putenv_s(SSH_ASYNC_STDOUT, "");
 	fd_table_set(&w32_io_stdout, STDOUT_FILENO);
 	memset(&w32_io_stderr, 0, sizeof(w32_io_stderr));
 	w32_io_stderr.std_handle = STD_ERROR_HANDLE;
-	w32_io_stderr.type = STD_IO_FD;
+	w32_io_stderr.type = NONSOCK_SYNC_FD;
+	if (getenv(SSH_ASYNC_STDERR) && strcmp(getenv(SSH_ASYNC_STDERR), "1") == 0)
+		w32_io_stderr.type = NONSOCK_FD;
+	_putenv_s(SSH_ASYNC_STDERR, "");
 	fd_table_set(&w32_io_stderr, STDERR_FILENO);
 	return 0;
 }
@@ -128,7 +138,6 @@ fd_table_set(struct w32_io* pio, int index)
 static void
 fd_table_clear(int index)
 {
-	fd_table.w32_ios[index]->table_index = -1;
 	fd_table.w32_ios[index] = NULL;
 	FD_CLR(index, &(fd_table.occupied));
 }
@@ -483,6 +492,7 @@ int
 w32_close(int fd)
 {
 	struct w32_io* pio;
+	int r;
 	if ((fd < 0) || (fd > MAX_FDS - 1) || fd_table.w32_ios[fd] == NULL) {
 		errno = EBADF;
 		return -1;
@@ -492,17 +502,14 @@ w32_close(int fd)
 
 	debug3("close - io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd,
 		pio->table_index);
-	fd_table_clear(pio->table_index);
-
+	
 	if (pio->type == SOCK_FD)
-		return socketio_close(pio);
+		r = socketio_close(pio);
 	else
-		switch (FILETYPE(pio)) {
-		case FILE_TYPE_CHAR:
-			return termio_close(pio);
-		default:
-			return fileio_close(pio);
-		}
+		r = fileio_close(pio);		
+
+	fd_table_clear(fd);
+	return r;
 }
 
 static int
@@ -798,7 +805,7 @@ w32_dup(int oldfd)
 
 	memset(pio, 0, sizeof(struct w32_io));
 	pio->handle = target;
-	pio->type = NONSOCK_FD;
+	pio->type = fd_table.w32_ios[oldfd]->type;
 	fd_table_set(pio, min_index);
 	return min_index;
 }
@@ -865,4 +872,132 @@ w32_fsync(int fd)
 {
 	CHECK_FD(fd);
 	return FlushFileBuffers(w32_fd_to_handle(fd));
+}
+
+
+/*
+* spawn a child process
+* - specified by cmd with agruments argv
+* - with std handles set to in, out, err
+* - flags are passed to CreateProcess call
+*
+* cmd will be internally decoarated with a set of '"'
+* to account for any spaces within the commandline
+* this decoration is done only when additional arguments are passed in argv
+*/
+int
+spawn_child(char* cmd, char** argv, int in, int out, int err, DWORD flags)
+{
+	PROCESS_INFORMATION pi;
+	STARTUPINFOW si;
+	BOOL b;
+	char *cmdline, *t, **t1;
+	DWORD cmdline_len = 0;
+	wchar_t * cmdline_utf16;
+	int add_module_path = 0, ret = -1;
+
+	/* should module path be added */
+	do {
+		if (!cmd)
+			break;
+		t = cmd;
+		if (*t == '\"')
+			t++;
+		if (t[0] == '\0' || t[0] == '\\' || t[0] == '.' || t[1] == ':')
+			break;
+		add_module_path = 1;
+	} while (0);
+
+	/* compute total cmdline len*/
+	if (add_module_path)
+		cmdline_len += strlen(w32_programdir()) + 1 + strlen(cmd) + 1 + 2;
+	else
+		cmdline_len += strlen(cmd) + 1 + 2;
+
+	if (argv) {
+		t1 = argv;
+		while (*t1)
+			cmdline_len += strlen(*t1++) + 1 + 2;
+	}
+
+	if ((cmdline = malloc(cmdline_len)) == NULL) {
+		errno = ENOMEM;
+		goto cleanup;
+	}
+
+	/* add current module path to start if needed */
+	t = cmdline;
+	if (argv && argv[0])
+		*t++ = '\"';
+	if (add_module_path) {
+		memcpy(t, w32_programdir(), strlen(w32_programdir()));
+		t += strlen(w32_programdir());
+		*t++ = '\\';
+	}
+
+	memcpy(t, cmd, strlen(cmd));
+	t += strlen(cmd);
+
+	if (argv && argv[0])
+		*t++ = '\"';
+
+	if (argv) {
+		t1 = argv;
+		while (*t1) {
+			*t++ = ' ';
+			*t++ = '\"';
+			memcpy(t, *t1, strlen(*t1));
+			t += strlen(*t1);
+			*t++ = '\"';
+			t1++;
+		}
+	}
+
+	*t = '\0';
+
+	if ((cmdline_utf16 = utf8_to_utf16(cmdline)) == NULL) {
+		errno = ENOMEM;
+		goto cleanup;
+	}
+
+	memset(&si, 0, sizeof(STARTUPINFOW));
+	si.cb = sizeof(STARTUPINFOW);
+	si.hStdInput = w32_fd_to_handle(in);
+	si.hStdOutput = w32_fd_to_handle(out);
+	si.hStdError = w32_fd_to_handle(err);
+	si.dwFlags = STARTF_USESTDHANDLES;
+
+	debug3("spawning %ls", cmdline_utf16);
+	if (fd_table.w32_ios[in]->type != NONSOCK_SYNC_FD)
+		_putenv_s(SSH_ASYNC_STDIN, "1");
+	if (fd_table.w32_ios[out]->type != NONSOCK_SYNC_FD)
+		_putenv_s(SSH_ASYNC_STDOUT, "1");
+	if (fd_table.w32_ios[err]->type != NONSOCK_SYNC_FD)
+		_putenv_s(SSH_ASYNC_STDERR, "1");
+	b = CreateProcessW(NULL, cmdline_utf16, NULL, NULL, TRUE, flags, NULL, NULL, &si, &pi);
+	_putenv_s(SSH_ASYNC_STDIN, "");
+	_putenv_s(SSH_ASYNC_STDOUT, "");
+	_putenv_s(SSH_ASYNC_STDERR, "");
+
+	if (b) {
+		if (register_child(pi.hProcess, pi.dwProcessId) == -1) {
+			TerminateProcess(pi.hProcess, 0);
+			CloseHandle(pi.hProcess);
+			goto cleanup;
+		}
+		CloseHandle(pi.hThread);
+	}
+	else {
+		errno = GetLastError();
+		goto cleanup;
+	}
+
+	ret = pi.dwProcessId;
+cleanup:
+	if (cmdline)
+		free(cmdline);
+	if (cmdline_utf16)
+		free(cmdline_utf16);
+
+	return ret;
 }

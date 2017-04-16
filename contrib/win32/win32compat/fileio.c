@@ -29,8 +29,8 @@
 */
 
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include "inc/sys/stat.h"
+#include "inc/sys/types.h"
 #include <io.h>
 #include <errno.h>
 #include <stddef.h>
@@ -55,8 +55,9 @@ struct createFile_flags {
 	DWORD dwFlagsAndAttributes;
 };
 
-int termio_initiate_read(struct w32_io* pio);
-int termio_initiate_write(struct w32_io* pio, DWORD num_bytes);
+int syncio_initiate_read(struct w32_io* pio);
+int syncio_initiate_write(struct w32_io* pio, DWORD num_bytes);
+int syncio_close(struct w32_io* pio);
 
 /* maps Win32 error to errno */
 int
@@ -440,11 +441,10 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max)
 	}
 
 	if (fileio_is_io_available(pio, TRUE) == FALSE) {
-		if (FILETYPE(pio) == FILE_TYPE_CHAR) {
-			if (-1 == termio_initiate_read(pio))
+		if (pio->type == NONSOCK_SYNC_FD || FILETYPE(pio) == FILE_TYPE_CHAR) {
+			if (-1 == syncio_initiate_read(pio))
 				return -1;
-		}
-		else {
+		} else {
 			if (-1 == fileio_ReadFileEx(pio, max)) {
 				if ((FILETYPE(pio) == FILE_TYPE_PIPE)
 					&& (errno == ERROR_BROKEN_PIPE)) {
@@ -571,46 +571,12 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max)
 	bytes_copied = min(max, pio->write_details.buf_size);
 	memcpy(pio->write_details.buf, buf, bytes_copied);
 
-	if (FILETYPE(pio) == FILE_TYPE_CHAR) {
-		if (termio_initiate_write(pio, bytes_copied) == 0) {
+	if (pio->type == NONSOCK_SYNC_FD || FILETYPE(pio) == FILE_TYPE_CHAR) {
+		if (syncio_initiate_write(pio, bytes_copied) == 0) {
 			pio->write_details.pending = TRUE;
 			pio->write_details.remaining = bytes_copied;
-		}
-		else
+		} else
 			return -1;
-	} else if ( FILETYPE(pio) == FILE_TYPE_PIPE &&
-	    GetNamedPipeInfo(WINHANDLE(pio), &pipe_flags, NULL, NULL, &pipe_instances) &&
-	    pipe_flags == PIPE_CLIENT_END && pipe_instances == 1) {
-		/* 
-		 * TODO - Figure out a better solution to this problem 
-		 * IO handle corresponding to this object (pio->handle) may be referring
-		 * to something that isn't opened in overlapped mode. While all handles
-		 * opened by this POSIX wrapper are opened in overlapped mode, other handles
-		 * that are inherited (ex. via std i/o) are typically not. 
-		 * Ex. When we do this in Powershell
-		 * $o = ssh.exe user@target hostname
-		 * Powershell creates anonymous pipes (that do not support overlapped i.o)
-		 * Calling asynchronous I/O APIs (WriteFileEx) for example will not work in 
-		 * those cases (the callback is never called and it typically manifests as a 
-		 * hang to end user
-		 *
-		 * This conditional logic is put in place to specifically handle Powershell 
-		 * redirection scenarios. Thinking behind these conditions
-		 * - should be a pipe handle. console I/O is handled in termio.c, impacting file i/o
-		 *   scenarios not found yet.
-		 * - pipe should be the client end. This is to skip pipes created internally in POSIX
-		 *   wrapper (by pipe() calls) - The write ends on these pipes are on server
-		 * - pipe_instances == 1. This is to skip pipe handles created as part of Connect(AF_UNIX)
-		 *   sockets (that typically are created for unlimited instances). 
-		 * For such I/O we do a synchronous write. 
-		 */
-		/* DebugBreak() */;
-		if (WriteFile(WINHANDLE(pio), pio->write_details.buf, bytes_copied, &bytes_copied, NULL) == FALSE) {
-			errno = errno_from_Win32LastError();
-			debug3("write - WriteFile() ERROR:%d, io:%p", GetLastError(), pio);
-			return -1;
-		}
-		return bytes_copied;
 	} else {
 		if (WriteFileEx(WINHANDLE(pio), pio->write_details.buf, bytes_copied,
 			&pio->write_overlapped, &WriteCompletionRoutine)) {
@@ -753,8 +719,8 @@ fileio_on_select(struct w32_io* pio, BOOL rd)
 
 	if (!pio->read_details.pending && !fileio_is_io_available(pio, rd))
 		/* initiate read, record any error so read() will pick up */
-		if (FILETYPE(pio) == FILE_TYPE_CHAR) {
-			if (termio_initiate_read(pio) != 0) {
+		if (pio->type == NONSOCK_SYNC_FD || FILETYPE(pio) == FILE_TYPE_CHAR) {
+			if (syncio_initiate_read(pio) != 0) {
 				pio->read_details.error = errno;
 				errno = 0;
 				return;
@@ -773,6 +739,9 @@ fileio_close(struct w32_io* pio)
 {
 	debug4("fileclose - pio:%p", pio);
 
+	if (pio->type == NONSOCK_SYNC_FD || FILETYPE(pio) == FILE_TYPE_CHAR)
+		return syncio_close(pio);
+
 	/* handle can be null on AF_UNIX sockets that are not yet connected */
 	if (WINHANDLE(pio) == 0 || WINHANDLE(pio) == INVALID_HANDLE_VALUE) {
 		free(pio);
@@ -782,15 +751,13 @@ fileio_close(struct w32_io* pio)
 	CancelIo(WINHANDLE(pio));
 	/* let queued APCs (if any) drain */
 	SleepEx(0, TRUE);
-	if (pio->type != STD_IO_FD) { /* STD handles are never explicitly closed */
-		CloseHandle(WINHANDLE(pio));
-
+	CloseHandle(WINHANDLE(pio));
+	/* free up non stdio */
+	if (!IS_STDIO(pio)) {
 		if (pio->read_details.buf)
 			free(pio->read_details.buf);
-
 		if (pio->write_details.buf)
 			free(pio->write_details.buf);
-
 		free(pio);
 	}
 	return 0;

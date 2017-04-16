@@ -54,14 +54,6 @@
 #include "sshbuf.h"
 #include "digest.h"
 
-#if OPENSSL_VERSION_NUMBER >= 0x00907000L
-# if defined(HAVE_EVP_SHA256)
-# define evp_ssh_sha256 EVP_sha256
-# else
-extern const EVP_MD *evp_ssh_sha256(void);
-# endif
-#endif
-
 /* prototype */
 static int kex_choose_conf(struct ssh *);
 static int kex_input_newkeys(int, u_int32_t, void *);
