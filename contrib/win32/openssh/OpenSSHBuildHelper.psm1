@@ -190,20 +190,6 @@ function Start-OpenSSHBootstrap
         [Environment]::SetEnvironmentVariable('Path', $newMachineEnvironmentPath, 'MACHINE')
     }
 
-    # install nasm
-    $packageName = "nasm"
-    $nasmPath = "${env:ProgramFiles(x86)}\NASM"
-
-    if (-not (Test-Path -Path $nasmPath -PathType Container))
-    {
-        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName." -Silent:$silent
-        choco install $packageName -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
-    }
-    else
-    {
-        Write-BuildMsg -AsVerbose -Message "$packageName present. Skipping installation." -Silent:$silent
-    }
-
     # Install Visual Studio 2015 Community
     $packageName = "VisualStudio2015Community"
     $VSPackageInstalled = Get-ItemProperty "HKLM:\software\WOW6432Node\Microsoft\VisualStudio\14.0\setup\vs" -ErrorAction SilentlyContinue
@@ -380,7 +366,9 @@ function Build-OpenSSH
         [string]$NativeHostArch = "x64",
 
         [ValidateSet('Debug', 'Release', '')]
-        [string]$Configuration = "Release"
+        [string]$Configuration = "Release",
+
+        [switch]$NoOpenSSL
     )
     Set-StrictMode -Version Latest
     $script:BuildLogFile = $null
@@ -407,11 +395,29 @@ function Build-OpenSSH
 
     Start-OpenSSHBootstrap
 
-    Clone-Win32OpenSSH
-    Copy-OpenSSLSDK
+    if (-not (Test-Path (Join-Path $PSScriptRoot OpenSSLSDK)))
+    {
+        Clone-Win32OpenSSH
+        Copy-OpenSSLSDK
+    }
+
+    if ($NoOpenSSL) 
+    {
+        $f = Join-Path $PSScriptRoot paths.targets
+        (Get-Content $f).Replace('<!-- <UseOpenSSL>false</UseOpenSSL> -->', '<UseOpenSSL>false</UseOpenSSL>') | Set-Content $f
+        $f = Join-Path $PSScriptRoot config.h.vs
+        (Get-Content $f).Replace('#define WITH_OPENSSL 1','') | Set-Content $f
+        (Get-Content $f).Replace('#define OPENSSL_HAS_ECC 1','') | Set-Content $f
+        (Get-Content $f).Replace('#define OPENSSL_HAS_NISTP521 1','') | Set-Content $f
+    }
+
     $msbuildCmd = "msbuild.exe"
     $solutionFile = Get-SolutionFile -root $repositoryRoot.FullName
     $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/m", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
+
+    if ($NoOpenSSL) {
+        $cmdMsg += @("/t:core\scp", "/t:core\sftp", "/t:core\sftp-server", "/t:core\ssh", "/t:core\ssh-add", "/t:core\ssh-agent", "/t:core\sshd", "/t:core\ssh-keygen", "/t:core\ssh-shellhost")
+    }
 
     & $msbuildCmd $cmdMsg
     $errorCode = $LASTEXITCODE
