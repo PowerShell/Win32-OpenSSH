@@ -307,6 +307,12 @@ function Package-OpenSSH
     if ($NativeHostArch -eq 'x86') {
         $packageName = "OpenSSH-Win32"
     }
+    while((($service = Get-Service ssh-agent -ErrorAction Ignore) -ne $null) -and ($service.Status -ine 'Stopped'))
+    {        
+        Stop-Service ssh-agent -Force
+        #sleep to wait the servicelog file write        
+        Start-Sleep 5
+    }
 
     $packageDir = Join-Path $buildDir $packageName
     Remove-Item $packageDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -320,23 +326,23 @@ function Package-OpenSSH
         if ((-not(Test-Path (Join-Path $buildDir $file)))) {
             Throw "Cannot find $file under $buildDir. Did you run Build-OpenSSH?"
         }
-        Copy-Item (Join-Path $buildDir $file) $packageDir
+        Copy-Item (Join-Path $buildDir $file) $packageDir -Force
         if ($file.EndsWith(".exe")) {
             $pdb = $file.Replace(".exe", ".pdb")
-            Copy-Item (Join-Path $buildDir $pdb) $symbolsDir
+            Copy-Item (Join-Path $buildDir $pdb) $symbolsDir -Force
         }
         if ($file.EndsWith(".dll")) {
             $pdb = $file.Replace(".dll", ".pdb")
-            Copy-Item (Join-Path $buildDir $pdb) $symbolsDir
+            Copy-Item (Join-Path $buildDir $pdb) $symbolsDir -Force
         }
     }
 
     if ($DestinationPath -ne "") {
-        if (Test-Path $DestinationPath) {
-            Remove-Item $DestinationPath\* -Force
+        if (Test-Path $DestinationPath) {            
+            Remove-Item $DestinationPath\* -Force -Recurse
         }
         else {
-            New-Item -ItemType Directory $DestinationPath | Out-Null
+            New-Item -ItemType Directory $DestinationPath -Force | Out-Null
         }
         Copy-Item -Path $packageDir\* -Destination $DestinationPath -Force -Recurse
     }
@@ -493,8 +499,12 @@ function Install-OpenSSH
     Package-OpenSSH -NativeHostArch $NativeHostArch -Configuration $Configuration -DestinationPath $OpenSSHDir
 
     Push-Location $OpenSSHDir 
-    & ( "$OpenSSHDir\install-sshd.ps1") 
-    .\ssh-keygen.exe -A
+    & "$OpenSSHDir\install-sshd.ps1"
+    & "$OpenSSHDir\ssh-keygen.exe" -A
+
+    $keyFiles = Get-ChildItem "$OpenSSHDir\ssh_host_*_key*" | % {        
+        Add-PermissionToFileACL -FilePath $_.FullName -User "NT Service\sshd" -Perm "Read"
+    }
 
 
     #machine will be reboot after Install-openssh anyway

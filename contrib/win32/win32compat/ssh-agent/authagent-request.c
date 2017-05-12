@@ -243,7 +243,7 @@ int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response
 		goto done;
 	}
 
-	if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
+	if ((FALSE == GetNamedPipeClientProcessId(con->pipe_handle, &client_pid)) ||
 	    ((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
 	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
 	    (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)) {
@@ -306,8 +306,7 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 	}
 
 	
-	if (SHGetKnownFolderPath(&FOLDERID_Profile, 0, token, &wuser_home) != S_OK ||
-	    pubkey_allowed(key, user_utf16, wuser_home) != 1) {
+	if (pubkey_allowed(key, token) != 1) {
 		debug("unable to verify public key for user %ls (profile:%ls)", user_utf16, wuser_home);
 		goto done;
 	}
@@ -317,7 +316,7 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 		goto done;
 	}
 
-	if ((FALSE == GetNamedPipeClientProcessId(con->connection, &client_pid)) ||
+	if ((FALSE == GetNamedPipeClientProcessId(con->pipe_handle, &client_pid)) ||
 	    ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
 	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
 	    (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)) {

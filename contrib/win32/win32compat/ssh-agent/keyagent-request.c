@@ -36,21 +36,33 @@
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
 
+/* 
+ * get registry root where keys are stored 
+ * user keys are stored in user's hive
+ * while system keys (host keys) in HKLM
+ */
 static int
-get_user_root(struct agent_connection* con, HKEY *root){
+get_user_root(struct agent_connection* con, HKEY *root)
+{
 	int r = 0;
-	*root = NULL;
-	if (ImpersonateNamedPipeClient(con->connection) == FALSE)
-		return -1;
+	LONG ret;
+	*root = HKEY_LOCAL_MACHINE;
 	
-	if (con->client_process > OTHER)
-		*root = HKEY_LOCAL_MACHINE;
-	else if (RegOpenCurrentUser(KEY_ALL_ACCESS, root) != ERROR_SUCCESS)
-		r = -1;
-
-	if (*root == NULL)
-		debug("cannot connect to user's registry root");
-	RevertToSelf();
+	if (con->client_type == USER) {
+		if (ImpersonateNamedPipeClient(con->pipe_handle) == FALSE)
+			return -1;
+		*root = NULL;
+		/* 
+		 * TODO - check that user profile is loaded, 
+		 * otherwise, this will return default profile 
+		 */
+		if ((ret = RegOpenCurrentUser(KEY_ALL_ACCESS, root)) != ERROR_SUCCESS) {
+			debug("unable to open user's registry hive, ERROR - %d", ret);
+			r = -1;
+		}
+			
+		RevertToSelf();
+	}
 	return r;
 }
 
@@ -59,8 +71,8 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 	int success = 0;
 	DATA_BLOB in, out;
 
-	if (con->client_process == OTHER)
-		if (ImpersonateNamedPipeClient(con->connection) == FALSE)
+	if (con->client_type == USER)
+		if (ImpersonateNamedPipeClient(con->pipe_handle) == FALSE)
 			return -1;
 
 	in.cbData = blen;
@@ -73,8 +85,7 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 			debug("cannot encrypt data");
 			goto done;
 		}
-	}
-	else {
+	} else {
 		if (!CryptUnprotectData(&in, NULL, NULL, 0, NULL, 0, &out)) {
 			debug("cannot decrypt data");
 			goto done;
@@ -91,7 +102,7 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 done:
 	if (out.pbData)
 		LocalFree(out.pbData);
-	if (con->client_process == OTHER)
+	if (con->client_type == USER)
 		RevertToSelf();
 	return success? 0: -1;
 }
@@ -99,7 +110,8 @@ done:
 #define REG_KEY_SDDL L"D:P(A;; GA;;; SY)(A;; GA;;; BA)"
 
 int
-process_add_identity(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+process_add_identity(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
+{
 	struct sshkey* key = NULL;
 	int r = 0, blob_len, eblob_len, request_invalid = 0, success = 0;
 	size_t comment_len, pubkey_blob_len;
@@ -170,7 +182,8 @@ done:
 }
 
 static int sign_blob(const struct sshkey *pubkey, u_char ** sig, size_t *siglen,
-	const u_char *blob, size_t blen, u_int flags, struct agent_connection* con) {
+	const u_char *blob, size_t blen, u_int flags, struct agent_connection* con) 
+{
 	HKEY reg = 0, sub = 0, user_root = 0;
 	int r = 0, success = 0;
 	struct sshkey* prikey = NULL;
@@ -225,7 +238,8 @@ done:
 }
 
 int
-process_sign_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+process_sign_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
+{
 	u_char *blob, *data, *signature = NULL;
 	size_t blen, dlen, slen = 0;
 	u_int flags = 0;
@@ -257,8 +271,7 @@ done:
 			    sshbuf_put_string(response, signature, slen) != 0) {
 				r = -1;
 			}
-		}
-		else
+		} else
 			if (sshbuf_put_u8(response, SSH_AGENT_FAILURE) != 0)
 				r = -1;
 	}
@@ -271,7 +284,8 @@ done:
 }
 
 int
-process_remove_key(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+process_remove_key(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
+{
 	HKEY user_root = 0, root = 0;
 	char *blob, *thumbprint = NULL;
 	size_t blen;
@@ -285,10 +299,10 @@ process_remove_key(struct sshbuf* request, struct sshbuf* response, struct agent
 	}
 
 	if ((thumbprint = sshkey_fingerprint(key, SSH_FP_HASH_DEFAULT, SSH_FP_DEFAULT)) == NULL ||
-		get_user_root(con, &user_root) != 0 ||
-		RegOpenKeyExW(user_root, SSH_KEYS_ROOT, 0,
-			DELETE | KEY_ENUMERATE_SUB_KEYS | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &root) != 0 ||
-		RegDeleteTreeA(root, thumbprint) != 0)
+	    get_user_root(con, &user_root) != 0 ||
+	    RegOpenKeyExW(user_root, SSH_KEYS_ROOT, 0,
+		DELETE | KEY_ENUMERATE_SUB_KEYS | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &root) != 0 ||
+	    RegDeleteTreeA(root, thumbprint) != 0)
 		goto done;
 	success = 1;
 done:
@@ -309,7 +323,8 @@ done:
 	return r;
 }
 int 
-process_remove_all(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+process_remove_all(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
+{
 	HKEY user_root = 0, root = 0;
 	int r = 0;
 
@@ -333,7 +348,8 @@ done:
 }
 
 int
-process_request_identities(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+process_request_identities(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
+{
 	int count = 0, index = 0, success = 0, r = 0;
 	HKEY root = NULL, sub = NULL, user_root = 0;
 	char* count_ptr = NULL;
@@ -379,8 +395,7 @@ process_request_identities(struct sshbuf* request, struct sshbuf* response, stru
 
 				key_count++;
 			}
-		}
-		else
+		} else
 			break;
 
 	}
@@ -393,8 +408,7 @@ done:
 			sshbuf_put_u32(response, key_count) != 0 ||
 			sshbuf_putb(response, identities) != 0)
 			goto done;
-	}
-	else
+	} else
 		r = -1;
 
 	if (pkblob)
@@ -413,7 +427,8 @@ done:
 }
 
 
-int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) 
+{
 	u_char type;
 
 	if (sshbuf_get_u8(request, &type) != 0)

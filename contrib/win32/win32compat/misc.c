@@ -278,38 +278,62 @@ w32_fopen_utf8(const char *path, const char *mode)
 	return f;
 }
 
-/* fgets to support Unicode input */
+/*
+* fgets to support Unicode input 
+* each UTF-16 char may bloat up to 4 utf-8 chars. We cannot determine if the length of 
+* input unicode string until it is readed and converted to utf8 string.
+* There is a risk to miss on unicode char when last unicode char read from console
+* does not fit the remain space in str. use cauciously. 
+*/
 char*
  w32_fgets(char *str, int n, FILE *stream) {
 	HANDLE h = (HANDLE)_get_osfhandle(_fileno(stream));
 	wchar_t* str_w = NULL;
-	char *ret = NULL, *str_tmp = NULL;
+	char *ret = NULL, *str_tmp = NULL, *cp = NULL;
+	int actual_read = 0;
 
 	if (h != NULL && h != INVALID_HANDLE_VALUE
 	    && GetFileType(h) == FILE_TYPE_CHAR) {
-		/* 
-		 * read only n/4 wide chars from console 
-		 * each UTF-16 char may bloat upto 4 utf-8 chars when converted to utf-8 
-		 * so we can fit in str[n] provided as input
-		 */
-		if ((str_w = malloc((n/4) * sizeof(wchar_t))) == NULL) {
+
+		/* Allocate memory for one UTF-16 char (up to 4 bytes) and a terminate char (\0) */
+		if ((str_w = malloc(3 * sizeof(wchar_t))) == NULL) {
 			errno = ENOMEM;
 			goto cleanup;
 		}
 		/* prepare for Unicode input */
-		_setmode(_fileno(stream), O_U16TEXT); 
-		if (fgetws(str_w, n/4, stream) == NULL)
-			goto cleanup;
-		if ((str_tmp = utf16_to_utf8(str_w)) == NULL) {
-			errno = ENOMEM;
-			goto cleanup;
-		}
-		if (strlen(str_tmp) > n - 1) {
+		_setmode(_fileno(stream), O_U16TEXT);
+		cp = str;
+		/*
+		* each UTF-16 char may bloat up to 4 utf-8 chars
+		* read one wide chars at time from console and convert it to utf8
+		* stop reading until reach '\n' or the converted utf8 string length is n-1
+		*/
+		do {
+			if (str_tmp)
+				free(str_tmp);			
+			if (fgetws(str_w, 2, stream) == NULL)
+				goto cleanup;
+			if ((str_tmp = utf16_to_utf8(str_w)) == NULL) {
+				debug3("utf16_to_utf8 failed!");
+				errno = ENOMEM;
+				goto cleanup;
+			}
+			
+			if((actual_read + strlen(str_tmp)) >= n)
+				break;
+			memcpy(cp, str_tmp, strlen(str_tmp));
+			actual_read += strlen(str_tmp);
+			cp += strlen(str_tmp);
+			
+		} while ((actual_read < n - 1) && *str_tmp != '\n');
+		*cp = '\0';
+
+		if (actual_read > n - 1) {
 			/* shouldn't happen. but handling in case */
+			debug3("actual_read %d exceeds the limit:%d", actual_read, n-1);
 			errno = EINVAL;
 			goto cleanup;
-		}
-		memcpy(str, str_tmp, strlen(str_tmp) + 1);
+		}		
 		ret = str;
 	}
 	else

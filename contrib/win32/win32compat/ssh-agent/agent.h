@@ -11,7 +11,7 @@
 
 struct agent_connection {
 	OVERLAPPED ol;
-	HANDLE connection;
+	HANDLE pipe_handle;
 	struct {
 		DWORD num_bytes;
 		DWORD transferred;
@@ -27,11 +27,9 @@ struct agent_connection {
 	} state;
 	enum {
 		UNKNOWN = 0,
-		OTHER,
-		LOCAL_SYSTEM,
-		SSHD,
-		NETWORK_SERVICE
-	} client_process;
+		USER, /* client is running as some user */
+		MACHINE /* clinet is running as machine - System, NS or LS */
+	} client_type;
         HANDLE auth_token;
         HANDLE hProfile;
 };
@@ -40,7 +38,8 @@ void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);
 void agent_connection_on_error(struct agent_connection* , DWORD);
 void agent_connection_disconnect(struct agent_connection*);
 
-void agent_start(BOOL, BOOL, HANDLE);
+void agent_start(BOOL);
+void agent_process_connection(HANDLE);
 void agent_shutdown();
 void agent_cleanup_connection(struct agent_connection*);
 

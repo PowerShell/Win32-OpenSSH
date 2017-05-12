@@ -54,7 +54,8 @@ struct passwd *privsep_pw = NULL;
 static char *config_file_name = _PATH_SERVER_CONFIG_FILE;
 int auth_sock = -1;
 
-int	 auth2_methods_valid(const char * c, int i) {
+int	
+auth2_methods_valid(const char * c, int i) {
 	return 1;
 }
 
@@ -69,21 +70,21 @@ mm_user_key_allowed(struct passwd *pw, Key *k, int i)
 	return 0;
 }
 
-int	 kexgex_server(struct ssh * sh) {
+int
+kexgex_server(struct ssh * sh) {
 	return -1;
 }
 
-static
-int GetCurrentModulePath(wchar_t *path, int pathSize)
+static int 
+GetCurrentModulePath(wchar_t *path, int pathSize)
 {
 	if (GetModuleFileNameW(NULL, path, pathSize)) {
 		int i;
 		int lastSlashPos = 0;
 
 		for (i = 0; path[i]; i++) {
-			if (path[i] == L'/' || path[i] == L'\\') {
-				lastSlashPos = i;
-			}
+			if (path[i] == L'/' || path[i] == L'\\')
+				lastSlashPos = i;						
 		}
 
 		path[lastSlashPos] = 0;
@@ -92,21 +93,21 @@ int GetCurrentModulePath(wchar_t *path, int pathSize)
 	return -1;
 }
 
-int load_config() {
+int 
+load_config() {
 	wchar_t basePath[PATH_MAX] = { 0 };
 	wchar_t path[PATH_MAX] = { 0 };
         
-	/* TODO - account for UNICODE paths*/
-        if (GetCurrentModulePath(basePath, PATH_MAX) == -1)
-                return -1;
+	if (GetCurrentModulePath(basePath, PATH_MAX) == -1)
+		return -1;
 
 	wcsncpy(path, basePath, PATH_MAX);
-        wcsncat(path, L"/sshd_config", PATH_MAX);
+	wcsncat(path, L"/sshd_config", PATH_MAX);
 	
-        if ((config_file_name = utf16_to_utf8(path)) == NULL)
-                return -1;
+	if ((config_file_name = utf16_to_utf8(path)) == NULL)
+		return -1;
 	
-        buffer_init(&cfg);
+	buffer_init(&cfg);
 	initialize_server_options(&options);
 	load_server_config(config_file_name, &cfg);
 	parse_server_config(&options, config_file_name, &cfg, NULL);
@@ -115,24 +116,17 @@ int load_config() {
 	return 0;
 }
 
-int config_log_level() {
+int 
+config_log_level() {
 	return options.log_level;
 }
 
-int pubkey_allowed(struct sshkey* pubkey, wchar_t* wuser, wchar_t* wuser_home) {
-	struct passwd pw;
-        int ret;
-	char *user = NULL, *user_home = NULL;
-	memset(&pw, 0, sizeof(pw));
+int
+pubkey_allowed(struct sshkey* pubkey, HANDLE user_token) {
+	struct passwd *pw;
 
-        if ((user_home = utf16_to_utf8(wuser_home)) == NULL ||
-            (user = utf16_to_utf8(wuser)) == NULL)
-                return 0;
-	
-        pw.pw_dir = user_home;
-	pw.pw_name = user;
-	ret = user_key_allowed(&pw, pubkey, 1);
-        free(user);
-        free(user_home);
-        return ret;
+	if ((pw = w32_getpwtoken(user_token)) == NULL)
+		return 0;
+
+	return user_key_allowed(pw, pubkey, 1);
 }

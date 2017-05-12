@@ -285,9 +285,15 @@
     <ClCompile Include="$(OpenSSH-Src-Path)digest-openssl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\w32-sshfileperm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)sshfileperm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

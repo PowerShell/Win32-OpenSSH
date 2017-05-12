@@ -221,13 +221,12 @@ w32_getpwnam(const char *user_utf8)
 }
 
 struct passwd*
-w32_getpwuid(uid_t uid)
+w32_getpwtoken(HANDLE t)
 {
 	wchar_t* wuser = NULL;
 	char* user_utf8 = NULL;
 	ULONG needed = 0;
 	struct passwd *ret = NULL;
-	HANDLE token = 0;
 	DWORD info_len = 0;
 	TOKEN_USER* info = NULL;
 	LPWSTR user_sid = NULL;
@@ -238,10 +237,9 @@ w32_getpwuid(uid_t uid)
 	    (wuser = malloc(needed * sizeof(wchar_t))) == NULL ||
 	    GetUserNameExW(NameSamCompatible, wuser, &needed) == 0 ||
 	    (user_utf8 = utf16_to_utf8(wuser)) == NULL ||
-	    OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token) == FALSE ||
-	    GetTokenInformation(token, TokenUser, NULL, 0, &info_len) == TRUE ||
+	    GetTokenInformation(t, TokenUser, NULL, 0, &info_len) == TRUE ||
 	    (info = (TOKEN_USER*)malloc(info_len)) == NULL ||
-	    GetTokenInformation(token, TokenUser, info, info_len, &info_len) == FALSE ||
+	    GetTokenInformation(t, TokenUser, info, info_len, &info_len) == FALSE ||
 	    ConvertSidToStringSidW(info->User.Sid, &user_sid) == FALSE) {
 		errno = ENOMEM;
 		goto done;
@@ -253,8 +251,6 @@ done:
 		free(wuser);
 	if (user_utf8)
 		free(user_utf8);
-	if (token)
-		CloseHandle(token);
 	if (info)
 		free(info);
 	if (user_sid)
@@ -262,7 +258,21 @@ done:
 	return ret;
 }
 
+struct passwd*
+w32_getpwuid(uid_t uid)
+{
+	HANDLE token;
+	struct passwd* ret;
+	if ((OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) == FALSE) {
+		debug("unable to get process token");
+		errno = EOTHER;
+		return NULL;
+	}
 
+	ret = w32_getpwtoken(token);
+	CloseHandle(token);
+	return ret;
+}
 
 char *
 group_from_gid(gid_t gid, int nogroup)

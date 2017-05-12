@@ -66,13 +66,13 @@ Describe "Tests for scp command" -Tags "CI" {
                 Source = $SourceFilePath
                 Destination = "$($ssouser)@$($server):$DestinationDir"
                 Options = "-P $port -C -q"
-            },
+            }<#,
             @{
                 Title = 'simple copy remote file to local dir'
                 Source = "$($ssouser)@$($server):$SourceFilePath"
                 Destination = $DestinationDir
                 Options = "-P $port "
-            }
+            }#>
         )
 
         $testData1 = @(

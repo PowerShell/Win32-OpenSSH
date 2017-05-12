@@ -343,17 +343,17 @@ static void setup_session_user_vars(Session* s)	/* set user environment variable
 		ret = RegEnumValueW(reg_key, i++, name, &name_chars, 0, &type, (LPBYTE)data, &required);
 		if (ret == ERROR_NO_MORE_ITEMS)
 			break;
-		else if (ret != ERROR_SUCCESS) {
-			error("Error retrieving user environment variables. RegEnumValueW returned %d", ret);
-			break;
-		}
-		else if (required > data_chars * 2) {
+		else if (ret == ERROR_MORE_DATA || required > data_chars * 2) {
 			if (data != NULL)
 				free(data);
 			data = xmalloc(required);
 			data_chars = required/2;
 			i--;
 			continue;
+		}
+		else if (ret != ERROR_SUCCESS) {
+			error("Error retrieving user environment variables. RegEnumValueW returned %d", ret);
+			break;
 		}
 
 		if (type == REG_SZ)

@@ -1,6 +1,6 @@
 ﻿#todo: -i -q -v -l -c -C
 #todo: -S -F -V -e
-$tB = 1
+$tC = 1
 $tI = 0
         
 Describe "ssh client tests" -Tags "CI" {
@@ -73,60 +73,65 @@ Describe "ssh client tests" -Tags "CI" {
 
     BeforeEach {
         $tI++;
-        $tFile=Join-Path $testDir "$tB.$tI.txt"
+        $tFile=Join-Path $testDir "$tC.$tI.txt"
     }        
 
-    Context "$tB - Basic Scenarios" {
+    Context "$tC - Basic Scenarios" {
         
         BeforeAll {$tI=1}
-        AfterAll{$tB++}
+        AfterAll{$tC++}
 
-        <# these 2 tests dont work on AppVeyor that sniffs stderr channel
-        It "$tB.$tI - test version" {
-            iex "ssh -V 2> $tFile"
+        It "$tC.$tI - test version" {
+            iex "cmd /c `"ssh -V 2> $tFile`""
             $tFile | Should Contain "OpenSSH_"
         }
 
-        It "$tB.$tI - test help" {
-            iex "ssh -? 2> $tFile"
+        It "$tC.$tI - test help" {
+            iex "cmd /c `"ssh -? 2> $tFile`""
             $tFile | Should Contain "usage: ssh"
         }
-        #>
-
-        It "$tB.$tI - remote echo command" {
+        
+        It "$tC.$tI - remote echo command" {
             iex "$sshDefaultCmd echo 1234" | Should Be "1234"
+        }
+
+        It "$tC.$tI - exit code" {
+            ssh -p $port $ssouser@$server exit 0
+            $LASTEXITCODE | Should Be 0
+            ssh -p $port $ssouser@$server exit 21
+            $LASTEXITCODE | Should Be 21
         }
     }
 
-    Context "$tB - Redirection Scenarios" {
+    Context "$tC - Redirection Scenarios" {
         
         BeforeAll {$tI=1}
-        AfterAll{$tB++}
+        AfterAll{$tC++}
 
-        It "$tB.$tI - stdout to file" {
+        It "$tC.$tI - stdout to file" {
             iex "$sshDefaultCmd powershell get-process > $tFile"
             $tFile | Should Contain "ProcessName"
         }
 
-        It "$tB.$tI - stdout to PS object" {
+        It "$tC.$tI - stdout to PS object" {
             $o = iex "$sshDefaultCmd echo 1234"
             $o | Should Be "1234"
         }
 
-        <#It "$tB.$tI - stdin from PS object" {
+        <#It "$tC.$tI - stdin from PS object" {
             #if input redirection doesn't work, this would hang
             0 | ssh -p $port $ssouser@$server pause
             $true | Should Be $true
         }#>
     }
 
-    Context "$tB - cmdline parameters" {
+    Context "$tC - cmdline parameters" {
         
         BeforeAll {$tI=1}
-        AfterAll{$tB++}
+        AfterAll{$tC++}
 
-        It "$tB.$tI - verbose to file" {
-            $logFile = Join-Path $testDir "$tB.$tI.log.txt"
+        It "$tC.$tI - verbose to file" {
+            $logFile = Join-Path $testDir "$tC.$tI.log.txt"
             $o = ssh -p $port -v -E $logFile $ssouser@$server echo 1234
             $o | Should Be "1234"
             #TODO - checks below are very inefficient (time taking). 

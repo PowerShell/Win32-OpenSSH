@@ -108,6 +108,10 @@ function Setup-OpenSSHTestEnvironment
     }
 
     $Global:OpenSSHTestInfo.Add("OpenSSHBinPath", $script:OpenSSHBinPath)
+    if (-not ($env:Path.ToLower().Contains($script:OpenSSHBinPath.ToLower())))
+    {
+        $env:Path = "$($script:OpenSSHBinPath);$($env:path)"
+    }
 
     $warning = @"
 WARNING: Following changes will be made to OpenSSH configuration
@@ -125,15 +129,12 @@ WARNING: Following changes will be made to OpenSSH configuration
     if (-not $Quiet) {
         Write-Warning $warning
         $continue = Read-Host -Prompt "Do you want to continue with the above changes? [Yes] Y; [No] N (default is `"Y`")"
-        if( ($continue -eq "") -or ($continue -ieq "Y") -or ($continue -ieq "Yes") )
-        {            
-        }
-        elseif( ($continue -ieq "N") -or ($continue -ieq "No") )
+        if( ($continue -ieq "N") -or ($continue -ieq "No") )
         {
             Write-Host "User decided not to make the changes."
             return
         }
-        else
+        elseif(($continue -ne "") -and ($continue -ine "Y") -and ($continue -ine "Yes"))        
         {
             Throw "User entered invalid option ($continue). Exit now."
         }
@@ -152,9 +153,21 @@ WARNING: Following changes will be made to OpenSSH configuration
         Copy-Item (Join-Path $script:OpenSSHBinPath sshd_config) $backupConfigPath -Force
     }
     
-    # copy new sshd_config    
-    Copy-Item (Join-Path $Script:E2ETestDirectory sshd_config) (Join-Path $script:OpenSSHBinPath sshd_config) -Force    
-    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force    
+    # copy new sshd_config
+    Copy-Item (Join-Path $Script:E2ETestDirectory sshd_config) (Join-Path $script:OpenSSHBinPath sshd_config) -Force
+    
+    #workaround for the cariggage new line added by git before copy them
+    Get-ChildItem "$($Script:E2ETestDirectory)\sshtest_*key*" | % {
+        (Get-Content $_.FullName -Raw).Replace("`r`n","`n") | Set-Content $_.FullName -Force
+    }
+
+    #copy sshtest keys
+    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force
+    $owner = New-Object System.Security.Principal.NTAccount($env:USERDOMAIN, $env:USERNAME)
+    Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*" -Exclude *.pub | % {
+        Cleanup-SecureFileACL -FilePath $_.FullName -Owner $owner
+        Add-PermissionToFileACL -FilePath $_.FullName -User "NT Service\sshd" -Perm "Read"
+    }
     Restart-Service sshd -Force
    
     #Backup existing known_hosts and replace with test version
@@ -174,45 +187,50 @@ WARNING: Following changes will be made to OpenSSH configuration
     #TODO - this is Windows specific. Need to be in PAL
     foreach ($user in $OpenSSHTestAccounts)
     {
-        try 
+        try
         {
             $objUser = New-Object System.Security.Principal.NTAccount($user)
             $strSID = $objUser.Translate([System.Security.Principal.SecurityIdentifier])
         }
         catch
-        {    
+        {
             #only add the local user when it does not exists on the machine        
             net user $user $Script:OpenSSHTestAccountsPassword /ADD 2>&1 >> $Script:TestSetupLogFile
-        }
+        }        
     }
 
-    #setup single sign on for ssouser
-    #TODO - this is Windows specific. Need to be in PAL
-    $ssousersid = Get-UserSID -User sshtest_ssouser
-    $ssouserProfileRegistry = Join-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" $ssousersid
-    if (-not (Test-Path $ssouserProfileRegistry) ) {        
+    #setup single sign on for ssouser    
+    $ssouserProfile = Get-LocalUserProfile -User $SSOUser
+    $Global:OpenSSHTestInfo.Add("SSOUserProfile", $ssouserProfile)
+    $Global:OpenSSHTestInfo.Add("PubKeyUserProfile", (Get-LocalUserProfile -User $PubKeyUser))        
+
+    New-Item -ItemType Directory -Path (Join-Path $ssouserProfile .ssh) -Force -ErrorAction SilentlyContinue  | out-null
+    $authorizedKeyPath = Join-Path $ssouserProfile .ssh\authorized_keys
+    $testPubKeyPath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519.pub    
+    Copy-Item $testPubKeyPath $authorizedKeyPath -Force -ErrorAction SilentlyContinue
+    Add-PermissionToFileACL -FilePath $authorizedKeyPath -User "NT Service\sshd" -Perm "Read"
+    $testPriKeypath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519
+    Cleanup-SecureFileACL -FilePath $testPriKeypath -owner $owner
+    cmd /c "ssh-add $testPriKeypath 2>&1 >> $Script:TestSetupLogFile"
+}
+#TODO - this is Windows specific. Need to be in PAL
+function Get-LocalUserProfile
+{
+    param([string]$User)
+    $sid = Get-UserSID -User $User
+    $userProfileRegistry = Join-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" $sid
+    if (-not (Test-Path $userProfileRegistry) ) {        
         #create profile
         if (-not($env:DISPLAY)) { $env:DISPLAY = 1 }
         $env:SSH_ASKPASS="$($env:ComSpec) /c echo $($OpenSSHTestAccountsPassword)"
-        cmd /c "ssh -p 47002 sshtest_ssouser@localhost echo %userprofile% > profile.txt"
+        $ret = ssh -p 47002 "$User@localhost" echo %userprofile%
         if ($env:DISPLAY -eq 1) { Remove-Item env:\DISPLAY }
         remove-item "env:SSH_ASKPASS" -ErrorAction SilentlyContinue
-    }
-    $ssouserProfile = (Get-ItemProperty -Path $ssouserProfileRegistry -Name 'ProfileImagePath').ProfileImagePath
-    New-Item -ItemType Directory -Path (Join-Path $ssouserProfile .ssh) -Force -ErrorAction SilentlyContinue  | out-null
-    $authorizedKeyPath = Join-Path $ssouserProfile .ssh\authorized_keys
-    $testPubKeyPath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519.pub
-    #workaround for the cariggage new line added by git
-    (Get-Content $testPubKeyPath -Raw).Replace("`r`n","`n") | Set-Content $testPubKeyPath -Force
-    Copy-Item $testPubKeyPath $authorizedKeyPath -Force -ErrorAction SilentlyContinue
-    $acl = get-acl $authorizedKeyPath
-    $ar = New-Object  System.Security.AccessControl.FileSystemAccessRule("NT Service\sshd", "Read", "Allow")
-    $acl.SetAccessRule($ar)
-    Set-Acl  $authorizedKeyPath $acl
-    $testPriKeypath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519
-    (Get-Content $testPriKeypath -Raw).Replace("`r`n","`n") | Set-Content $testPriKeypath -Force
-    cmd /c "ssh-add $testPriKeypath 2>&1 >> $Script:TestSetupLogFile"
+    }   
+    
+    (Get-ItemProperty -Path $userProfileRegistry -Name 'ProfileImagePath').ProfileImagePath    
 }
+
 
 <#
       .SYNOPSIS

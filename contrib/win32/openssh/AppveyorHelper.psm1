@@ -173,7 +173,8 @@ function Publish-Artifact
     [System.Collections.ArrayList] $artifacts = [System.Collections.ArrayList]::new()   
     
     # Get the build.log file for each build configuration        
-    Add-BuildLog -artifacts $artifacts -buildLog (Get-BuildLogFile -root $repoRoot.FullName)
+    Add-BuildLog -artifacts $artifacts -buildLog (Get-BuildLogFile -root $repoRoot.FullName -Configuration Release -NativeHostArch x64)
+    Add-BuildLog -artifacts $artifacts -buildLog (Get-BuildLogFile -root $repoRoot.FullName -Configuration Debug -NativeHostArch x86)
 
     if($Global:OpenSSHTestInfo)
     {

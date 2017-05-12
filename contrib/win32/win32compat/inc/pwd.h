@@ -38,6 +38,7 @@ char *user_from_uid(uid_t uid, int nouser);
 
 struct passwd *w32_getpwuid(uid_t uid);
 struct passwd *w32_getpwnam(const char *username);
+struct passwd* w32_getpwtoken(HANDLE);
 struct passwd *getpwent(void);
 
 #define getpwuid w32_getpwuid

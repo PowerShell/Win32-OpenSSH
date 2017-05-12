@@ -283,12 +283,14 @@
     <ClCompile Include="$(OpenSSH-Src-Path)platform.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sandbox-pledge.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\w32-sshfileperm.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)digest-openssl.c">
       <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sshfileperm.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

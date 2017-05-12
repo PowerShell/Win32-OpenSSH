@@ -1327,6 +1327,8 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				pid = spawn_child(path_utf8, NULL, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, CREATE_NEW_PROCESS_GROUP);
 				free(path_utf8);
 				close(*newsock);
+				SetEnvironmentVariable("SSHD_REMSOC", NULL);
+				SetEnvironmentVariable("SSHD_STARTUPSOC", NULL);
 			}
 #else /* !WINDOWS */
 
@@ -1671,6 +1673,14 @@ main(int ac, char **av)
 
 	/* Fill in default values for those options not explicitly set. */
 	fill_default_server_options(&options);
+
+#ifdef WINDOWS
+	/*
+	 * For windows, enable logging right away to capture failures while loading private host keys.
+	 * On Unix, logging at configured level is not done until private host keys are loaded. Why??
+	 */
+	log_init(__progname, options.log_level, options.log_facility, log_stderr);
+#endif // WINDOWS
 
 	/* challenge-response is implemented via keyboard interactive */
 	if (options.challenge_response_authentication)

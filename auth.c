@@ -76,6 +76,7 @@
 #include "authfile.h"
 #include "ssherr.h"
 #include "compat.h"
+#include "sshfileperm.h"
 
 /* import */
 extern ServerOptions options;
@@ -489,10 +490,6 @@ int
 auth_secure_path(const char *name, struct stat *stp, const char *pw_dir,
     uid_t uid, char *err, size_t errlen)
 {
-#ifdef WINDOWS
-	error("auth_secure_path should not be called in Windows yet");
-	return -1;
-#else /* !WINDOWS */
 	char buf[PATH_MAX], homedir[PATH_MAX];
 	char *cp;
 	int comparehome = 0;
@@ -545,7 +542,6 @@ auth_secure_path(const char *name, struct stat *stp, const char *pw_dir,
 			break;
 	}
 	return 0;
-#endif  /* !WINDOWS */
 }
 
 /*
@@ -585,7 +581,12 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
                         strerror(errno));
                 return NULL;
         }
-        /* TODO check permissions  */
+	if (strict_modes && check_secure_file_permission(file, pw) != 0) {
+		fclose(f);
+		logit("Authentication refused.");
+		auth_debug_add("Ignored %s", file_type);
+		return NULL;
+	}
 #else  /* !WINDOWS */
 	if ((fd = open(file, O_RDONLY|O_NONBLOCK)) == -1) {
 		if (log_missing || errno != ENOENT)

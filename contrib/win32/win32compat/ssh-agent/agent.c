@@ -44,40 +44,21 @@ static OVERLAPPED ol;
 static 	HANDLE pipe;
 static	SECURITY_ATTRIBUTES sa;
 
-static int
-init_listener() {
-	{
-		if ((ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL) {
-			debug("cannot create event ERROR:%d", GetLastError());
-			return GetLastError();
-		}
-		pipe = INVALID_HANDLE_VALUE;
-		sa.bInheritHandle = FALSE;
-		if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;; GA;;; AU)", SDDL_REVISION_1,
-			&sa.lpSecurityDescriptor, &sa.nLength)) {
-			debug("cannot convert sddl ERROR:%d", GetLastError());
-			return GetLastError();
-		}
-	}
-
-	return 0;
-}
-
 static void
-agent_cleanup() {
-	{
-		if (ol.hEvent != NULL)
-			CloseHandle(ol.hEvent);
-		if (pipe != INVALID_HANDLE_VALUE)
-			CloseHandle(pipe);
-	}
+agent_cleanup() 
+{
+	if (ol.hEvent != NULL)
+		CloseHandle(ol.hEvent);
+	if (pipe != INVALID_HANDLE_VALUE)
+		CloseHandle(pipe);
 	if (ioc_port)
 		CloseHandle(ioc_port);
 	return;
 }
 
 static DWORD WINAPI 
-iocp_work(LPVOID lpParam) {
+iocp_work(LPVOID lpParam) 
+{
 	DWORD bytes;
 	struct agent_connection* con = NULL;
 	OVERLAPPED *p_ol;
@@ -85,7 +66,7 @@ iocp_work(LPVOID lpParam) {
 		con = NULL;
 		p_ol = NULL;
 		if (GetQueuedCompletionStatus(ioc_port, &bytes, &(ULONG_PTR)con, &p_ol, INFINITE) == FALSE) {
-			debug("iocp error: %d on %p \n", GetLastError(), con);
+			debug("iocp error: %d on %p", GetLastError(), con);
 			if (con)
 				agent_connection_on_error(con, GetLastError());
 			else
@@ -93,80 +74,56 @@ iocp_work(LPVOID lpParam) {
 		}
 		else
 			agent_connection_on_io(con, bytes, p_ol);
-
 	}
 }
 
-static void
-process_connection(HANDLE pipe) {
-	struct agent_connection* con;
-
-	if ((con = malloc(sizeof(struct agent_connection))) == NULL)
-		fatal("failed to alloc");
-
-	memset(con, 0, sizeof(struct agent_connection));
-	con->connection = pipe;
-	if (CreateIoCompletionPort(pipe, ioc_port, (ULONG_PTR)con, 0) != ioc_port)
-		fatal("failed to assign pipe to ioc_port");
-
-	agent_connection_on_io(con, 0, &con->ol);
-	iocp_work(NULL);
-}
-
 static void 
-agent_listen_loop() {
+agent_listen_loop() 
+{
 	DWORD  r;
 	HANDLE wait_events[2];
 
 	wait_events[0] = event_stop_agent;
-
 	wait_events[1] = ol.hEvent;
 
 	while (1) {
-		{
-			{
-				pipe = CreateNamedPipeW(
-					AGENT_PIPE_ID,		  // pipe name 
-					PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
-					PIPE_TYPE_BYTE |       // message type pipe 
-					PIPE_READMODE_BYTE |   // message-read mode 
-					PIPE_WAIT,                // blocking mode 
-					PIPE_UNLIMITED_INSTANCES, // max. instances  
-					BUFSIZE,                  // output buffer size 
-					BUFSIZE,                  // input buffer size 
-					0,                        // client time-out 
-					&sa);
+		pipe = CreateNamedPipeW(
+			AGENT_PIPE_ID,		  // pipe name 
+			PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,       // read/write access 
+			PIPE_TYPE_BYTE |       // message type pipe 
+			PIPE_READMODE_BYTE |   // message-read mode 
+			PIPE_WAIT,                // blocking mode 
+			PIPE_UNLIMITED_INSTANCES, // max. instances  
+			BUFSIZE,                  // output buffer size 
+			BUFSIZE,                  // input buffer size 
+			0,                        // client time-out 
+			&sa);
 
-				if (pipe == INVALID_HANDLE_VALUE) {
-					verbose("cannot create listener pipe ERROR:%d", GetLastError());
-					SetEvent(event_stop_agent);
-				}
-				else if (ConnectNamedPipe(pipe, &ol) != FALSE) {
-					verbose("ConnectNamedPipe returned TRUE unexpectedly ");
-					SetEvent(event_stop_agent);
-				}
+		if (pipe == INVALID_HANDLE_VALUE) {
+			verbose("cannot create listener pipe ERROR:%d", GetLastError());
+			SetEvent(event_stop_agent);
+		} else if (ConnectNamedPipe(pipe, &ol) != FALSE) {
+			verbose("ConnectNamedPipe returned TRUE unexpectedly ");
+			SetEvent(event_stop_agent);
+		}
 				
-				if (GetLastError() == ERROR_PIPE_CONNECTED) {
-					debug("Client has already connected");
-					SetEvent(ol.hEvent);
-				}
+		if (GetLastError() == ERROR_PIPE_CONNECTED) {
+			debug("Client has already connected");
+			SetEvent(ol.hEvent);
+		}
 				
-				if (GetLastError() != ERROR_IO_PENDING) {
-					debug("ConnectNamedPipe failed ERROR: %d", GetLastError());
-					SetEvent(event_stop_agent);
-				}
-
-			}
+		if (GetLastError() != ERROR_IO_PENDING) {
+			debug("ConnectNamedPipe failed ERROR: %d", GetLastError());
+			SetEvent(event_stop_agent);
 		}
 
 		r = WaitForMultipleObjects(2, wait_events, FALSE, INFINITE);
 		if (r == WAIT_OBJECT_0) {
-			//received signal to shutdown
+			/*received signal to shutdown*/
 			debug("shutting down");
 			agent_cleanup();
 			return;
-		}
-		else if ((r > WAIT_OBJECT_0) && (r <= (WAIT_OBJECT_0 + 1))) {
+		} else if ((r > WAIT_OBJECT_0) && (r <= (WAIT_OBJECT_0 + 1))) {
 			/* process incoming connection */
 			HANDLE con = pipe;
 			DWORD client_pid = 0;
@@ -174,11 +131,10 @@ agent_listen_loop() {
 			GetNamedPipeClientProcessId(con, &client_pid);
 			verbose("client pid %d connected", client_pid);
 			if (debug_mode) {
-				process_connection(con);
+				agent_process_connection(con);
 				agent_cleanup();
 				return;
-			}
-			else {
+			} else {
 				/* spawn a child to take care of this*/
 				wchar_t path[PATH_MAX], module_path[PATH_MAX];
 				PROCESS_INFORMATION pi;
@@ -193,8 +149,7 @@ agent_listen_loop() {
 					DETACHED_PROCESS, NULL, NULL,
 					&si, &pi) == FALSE)) {
 					verbose("Failed to create child process %ls ERROR:%d", module_path, GetLastError());
-				}
-				else {
+				} else {
 					debug("spawned worker %d for agent client pid %d ", pi.dwProcessId, client_pid);
 					CloseHandle(pi.hProcess);
 					CloseHandle(pi.hThread);
@@ -203,17 +158,18 @@ agent_listen_loop() {
 				CloseHandle(con);				
 			}
 			
-		}
-		else {
+		} else {
 			fatal("wait on events ended with %d ERROR:%d", r, GetLastError());
 		}
 
 	}
 }
 
-void agent_cleanup_connection(struct agent_connection* con) {
+void 
+agent_cleanup_connection(struct agent_connection* con) 
+{
 	debug("connection %p clean up", con);
-	CloseHandle(con->connection);
+	CloseHandle(con->pipe_handle);
         if (con->hProfile)
                 UnloadUserProfile(con->auth_token, con->hProfile);
         if (con->auth_token)
@@ -223,45 +179,59 @@ void agent_cleanup_connection(struct agent_connection* con) {
 	ioc_port = NULL;
 }
 
-void agent_shutdown() {
-	verbose("shutdown");
+void 
+agent_shutdown() 
+{
 	SetEvent(event_stop_agent);
 }
 
-#define REG_AGENT_SDDL L"D:P(A;; GR;;; AU)(A;; GA;;; SY)(A;; GA;;; BA)"
-
 void
-agent_start(BOOL dbg_mode, BOOL child, HANDLE pipe) {
+agent_start(BOOL dbg_mode) 
+{
 	int r;
 	HKEY agent_root = NULL;
 	DWORD process_id = GetCurrentProcessId();
-
-	verbose("agent_start pid:%d, dbg:%d, child:%d, pipe:%d", process_id, dbg_mode, child, pipe);
+	
+	verbose("%s pid:%d, dbg:%d", __FUNCTION__, process_id, dbg_mode);
 	debug_mode = dbg_mode;
+
+	memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
+	sa.nLength = sizeof(sa);
+	/* allow access to Authenticated users and Network Service */
+	if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(L"D:P(A;;GA;;;AU)(A;;GA;;;NS)", SDDL_REVISION_1,
+	    &sa.lpSecurityDescriptor, &sa.nLength))
+		fatal("cannot convert sddl ERROR:%d", GetLastError());
+	if ((r = RegCreateKeyExW(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, 0, 0, KEY_WRITE, &sa, &agent_root, 0)) != ERROR_SUCCESS)
+		fatal("cannot create agent root reg key, ERROR:%d", r);
+	if ((r = RegSetValueExW(agent_root, L"ProcessID", 0, REG_DWORD, (BYTE*)&process_id, 4)) != ERROR_SUCCESS)
+		fatal("cannot publish agent master process id ERROR:%d", r);
+	if ((event_stop_agent = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
+		fatal("cannot create global stop event ERROR:%d", GetLastError());
+	if ((ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
+		fatal("cannot create event ERROR:%d", GetLastError());
+	pipe = INVALID_HANDLE_VALUE;
+	sa.bInheritHandle = FALSE;
+	agent_listen_loop();
+}
+
+void 
+agent_process_connection(HANDLE pipe) 
+{
+	struct agent_connection* con;
+	verbose("%s pipe:%p", __FUNCTION__, pipe);
 
 	if ((ioc_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, (ULONG_PTR)NULL, 0)) == NULL)
 		fatal("cannot create ioc port ERROR:%d", GetLastError());
 
+	if ((con = malloc(sizeof(struct agent_connection))) == NULL)
+		fatal("failed to alloc");
 
-	if (child == FALSE) {
-		SECURITY_ATTRIBUTES sa;
-		memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
-		sa.nLength = sizeof(sa);
-		if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(REG_AGENT_SDDL, SDDL_REVISION_1, &sa.lpSecurityDescriptor, &sa.nLength))
-			fatal("ConvertStringSecurityDescriptorToSecurityDescriptorW failed");
-		if ((r = RegCreateKeyExW(HKEY_LOCAL_MACHINE, SSH_AGENT_ROOT, 0, 0, 0, KEY_WRITE, &sa, &agent_root, 0)) != ERROR_SUCCESS)
-			fatal("cannot create agent root reg key, ERROR:%d", r);
-		if ((r = RegSetValueExW(agent_root, L"ProcessID", 0, REG_DWORD, (BYTE*)&process_id, 4)) != ERROR_SUCCESS)
-			fatal("cannot publish agent master process id ERROR:%d", r);
-		if ((event_stop_agent = CreateEvent(NULL, TRUE, FALSE, NULL)) == NULL)
-			fatal("cannot create global stop event ERROR:%d", GetLastError());
-		if ((r = init_listener()) != 0)
-			fatal("failed to create server pipes ERROR:%d", r);
-		agent_listen_loop();
-	}
-	else { /* this is a child process that processes one connection */
-		process_connection(pipe);
-	}
-	
+	memset(con, 0, sizeof(struct agent_connection));
+	con->pipe_handle = pipe;
+	if (CreateIoCompletionPort(pipe, ioc_port, (ULONG_PTR)con, 0) != ioc_port)
+		fatal("failed to assign pipe to ioc_port");
+
+	agent_connection_on_io(con, 0, &con->ol);
+	iocp_work(NULL);
 }
 

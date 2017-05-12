@@ -1,6 +1,7 @@
 /*
  * Author: Manoj Ampalam <manoj.ampalam@microsoft.com>
  * ssh-agent implementation on Windows
+ * NT Service routines
  *
  * Copyright (c) 2015 Microsoft Corp.
  * All rights reserved
@@ -43,7 +44,8 @@ static SERVICE_STATUS_HANDLE service_status_handle;
 static SERVICE_STATUS service_status;
 
 
-static VOID ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint)
+static VOID 
+ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWaitHint)
 {
 	service_status.dwCurrentState = dwCurrentState;
 	service_status.dwWin32ExitCode = dwWin32ExitCode;
@@ -62,7 +64,8 @@ static VOID ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
 	SetServiceStatus(service_status_handle, &service_status);
 }
 
-static VOID WINAPI service_handler(DWORD dwControl)
+static VOID WINAPI 
+service_handler(DWORD dwControl)
 {
 	switch (dwControl)
 	{
@@ -81,22 +84,27 @@ static VOID WINAPI service_handler(DWORD dwControl)
 	ReportSvcStatus(service_status.dwCurrentState, NO_ERROR, 0);
 }
 
-BOOL WINAPI ctrl_c_handler(
-	_In_ DWORD dwCtrlType
-) {
+BOOL WINAPI 
+ctrl_c_handler(_In_ DWORD dwCtrlType) 
+{
 	/* for any Ctrl type, shutdown agent*/
-	debug("Ctrl+C received");
+	debug3("Ctrl+C received");
 	agent_shutdown();
 	return TRUE;
 }
 
-int wmain(int argc, wchar_t **argv) {
-
+int 
+wmain(int argc, wchar_t **argv) 
+{
 	w32posix_initialize();
+	/* this exits() on failure*/
 	load_config();
 	if (!StartServiceCtrlDispatcherW(dispatch_table)) {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
-
+			/* 
+			 * agent is not spawned by SCM 
+			 * Its either started in debug mode or a worker child 
+			 */
 			if (argc == 2) {
 				if (wcsncmp(argv[1], L"-ddd", 4) == 0)
 					log_init("ssh-agent", 7, 1, 1);
@@ -105,9 +113,10 @@ int wmain(int argc, wchar_t **argv) {
 				else if (wcsncmp(argv[1], L"-d", 2) == 0)
 					log_init("ssh-agent", 5, 1, 1);
 
+				/* Set Ctrl+C handler if starting in debug mode */
 				if (wcsncmp(argv[1], L"-d", 2) == 0) {
 					SetConsoleCtrlHandler(ctrl_c_handler, TRUE);
-					agent_start(TRUE, FALSE, 0);
+					agent_start(TRUE);
 					return 0;
 				}
 
@@ -116,7 +125,7 @@ int wmain(int argc, wchar_t **argv) {
 				h += _wtoi(*(argv + 1));
 				if (h != 0) {
 					log_init("ssh-agent", config_log_level(), 1, 0);
-					agent_start(FALSE, TRUE, h);
+					agent_process_connection(h);
 					return 0;
 				}
 			}
@@ -146,14 +155,16 @@ int wmain(int argc, wchar_t **argv) {
 	return 0;
 }
 
-int scm_start_service(DWORD num, LPWSTR* args) {
+int 
+scm_start_service(DWORD num, LPWSTR* args) 
+{
 	service_status_handle = RegisterServiceCtrlHandlerW(L"ssh-agent", service_handler);
 	ZeroMemory(&service_status, sizeof(service_status));
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
 	log_init("ssh-agent", config_log_level(), 1, 0);
-	agent_start(FALSE, FALSE, 0);
+	agent_start(FALSE);
 	return 0;
 }
 
