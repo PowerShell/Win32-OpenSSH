@@ -5,11 +5,6 @@
             Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
         }
 
-        if(-not (Test-Path $OpenSSHTestInfo["TestDataPath"]))
-        {
-            $null = New-Item $OpenSSHTestInfo["TestDataPath"] -ItemType directory -Force -ErrorAction SilentlyContinue
-        }
-
         $rootDirectory = "$($OpenSSHTestInfo["TestDataPath"])\SFTP"
         
         $outputFileName = "output.txt"
@@ -41,7 +36,6 @@
         $testData1 = @(
              @{
                 title = "put, ls for non-unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "put $tempFilePath $serverDirectory
                             ls $serverDirectory"
@@ -49,7 +43,6 @@
              },
              @{
                 title = "get, ls for non-unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "get $tempFilePath $clientDirectory
                             ls $clientDirectory"
@@ -57,7 +50,6 @@
              },
              @{
                 title = "mput, ls for non-unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "mput $tempFilePath $serverDirectory
                             ls $serverDirectory"
@@ -65,7 +57,6 @@
              },
              @{
                 title = "mget, ls for non-unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "mget $tempFilePath $clientDirectory
                             ls $clientDirectory"
@@ -73,7 +64,6 @@
              },
              @{
                 title = "mkdir, cd, pwd for non-unicode directory names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "cd $serverdirectory
                             mkdir server_test_dir
@@ -83,7 +73,6 @@
              },
              @{
                 Title = "lmkdir, lcd, lpwd for non-unicode directory names"
-                LogonStr = "$($ssouser)@$($server)"
                 Options = ''
                 Commands = "lcd $clientDirectory
                             lmkdir client_test_dir
@@ -93,7 +82,6 @@
              },
              @{
                 title = "put, ls for unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "put $tempUnicodeFilePath $serverDirectory
                             ls $serverDirectory"
@@ -101,7 +89,6 @@
              },
              @{
                 title = "get, ls for unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "get $tempUnicodeFilePath $clientDirectory
                             ls $clientDirectory"
@@ -109,7 +96,6 @@
              },
              @{
                 title = "mput, ls for unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "mput $tempUnicodeFilePath $serverDirectory
                             ls $serverDirectory"
@@ -117,7 +103,6 @@
              },
              @{
                 title = "mget, ls for unicode file names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "mget $tempUnicodeFilePath $clientDirectory
                             ls $clientDirectory"
@@ -125,7 +110,6 @@
              },
              @{
                 title = "mkdir, cd, pwd for unicode directory names"
-                logonstr = "$($ssouser)@$($server)"
                 options = ''
                 commands = "cd $serverdirectory
                             mkdir server_test_dir_язык
@@ -135,7 +119,6 @@
              },
              @{
                 Title = "lmkdir, lcd, lpwd for unicode directory names"
-                LogonStr = "$($ssouser)@$($server)"
                 Options = ''
                 Commands = "lcd $clientDirectory
                             lmkdir client_test_dir_язык
@@ -149,7 +132,6 @@
         $testData2 = @(
             @{
                 title = "rm, rmdir, rename for unicode file, directory"
-                logonstr = "$($ssouser)@$($server)"
                 options = '-b $batchFilePath'
                 
                 tmpFileName1 = $tempUnicodeFileName
@@ -164,7 +146,6 @@
             },
             @{
                 title = "rm, rmdir, rename for non-unicode file, directory"
-                logonstr = "$($ssouser)@$($server)"
                 options = '-b $batchFilePath'
                 
                 tmpFileName1 = $tempFileName
@@ -223,10 +204,10 @@
     }
 
     It '<Title>' -TestCases:$testData1 {
-       param([string]$Title, $LogonStr, $Options, $Commands, $ExpectedOutput)
+       param([string]$Title, $Options, $Commands, $ExpectedOutput)
 
        Set-Content $batchFilePath -Encoding UTF8 -value $Commands
-       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) -b $batchFilePath $($LogonStr) > $outputFilePath")
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) -b $batchFilePath test_target > $outputFilePath")
        iex $str
 
        #validate file content.
@@ -234,14 +215,14 @@
     }
 
     It '<Title>' -TestCases:$testData2 {
-       param([string]$Title, $LogonStr, $Options, $tmpFileName1, $tmpFilePath1, $tmpFileName2, $tmpFilePath2, $tmpDirectoryName1, $tmpDirectoryPath1, $tmpDirectoryName2, $tmpDirectoryPath2)
+       param([string]$Title, $Options, $tmpFileName1, $tmpFilePath1, $tmpFileName2, $tmpFilePath2, $tmpDirectoryName1, $tmpDirectoryPath1, $tmpDirectoryName2, $tmpDirectoryPath2)
 
        #rm (remove file)
        $commands = "mkdir $tmpDirectoryPath1
                     put $tmpFilePath1 $tmpDirectoryPath1
                     ls $tmpDirectoryPath1"
        Set-Content $batchFilePath  -Encoding UTF8 -value $commands
-       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) test_target > $outputFilePath")
        iex $str
        Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $true
 
@@ -250,7 +231,7 @@
                     pwd
                    "
        Set-Content $batchFilePath  -Encoding UTF8 -value $commands
-       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) test_target > $outputFilePath")
        iex $str
        Test-Path (join-path $tmpDirectoryPath1 $tmpFileName1) | Should be $false
 
@@ -261,7 +242,7 @@
                     ls $tmpDirectoryPath1
                     pwd"
        Set-Content $batchFilePath -Encoding UTF8 -value $commands
-       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) test_target > $outputFilePath")
        iex $str
        Test-Path (join-path $tmpDirectoryPath1 $tmpFileName2) | Should be $true
 
@@ -271,7 +252,7 @@
                     rename $tmpDirectoryPath1 $tmpDirectoryPath2
                     ls $serverDirectory"
        Set-Content $batchFilePath -Encoding UTF8 -value $commands
-       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) test_target > $outputFilePath")
        iex $str
        Test-Path $tmpDirectoryPath2 | Should be $true
 
@@ -280,7 +261,7 @@
        $commands = "rmdir $tmpDirectoryPath2
                     ls $serverDirectory"
        Set-Content $batchFilePath -Encoding UTF8 -value $commands
-       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) $($LogonStr) > $outputFilePath")
+       $str = $ExecutionContext.InvokeCommand.ExpandString("sftp -P $port $($Options) test_target > $outputFilePath")
        iex $str
        Test-Path $tmpDirectoryPath2 | Should be $false
     }

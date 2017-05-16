@@ -1,4 +1,4 @@
-﻿Describe "Tests for ssh config" -Tags "CI" {
+﻿Describe "Tests for ssh config" -Tags "Scenario" {
     BeforeAll {
         if($OpenSSHTestInfo -eq $null)
         {

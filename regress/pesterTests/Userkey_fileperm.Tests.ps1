@@ -1,5 +1,5 @@
 ﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
-Describe "Tests for user Key file permission" -Tags "CI" {
+Describe "Tests for user Key file permission" -Tags "Scenario" {
     BeforeAll {    
         if($OpenSSHTestInfo -eq $null)
         {

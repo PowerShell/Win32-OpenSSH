@@ -1,4 +1,4 @@
-Run OpenSSH Pester Tests:
+﻿Run OpenSSH Pester Tests:
 ==================================
 
 #### To setup the test environment before test run:
@@ -40,3 +40,27 @@ $OpenSSHTestInfo["DebugMode"] = $true
 ```powershell
 Cleanup-OpenSSHTestEnvironment
 ```
+
+
+#### Guidelines for writing Pester based OpenSSH test cases
+Follow these simple steps for test case indexing
+- Initialize the following variables at start
+```  
+  $tC = 1
+  $tI = 0
+```
+- Place the following blocks in Describe
+```
+    BeforeEach {
+        $stderrFile=Join-Path $testDir "$tC.$tI.stderr.txt"
+        $stdoutFile=Join-Path $testDir "$tC.$tI.stdout.txt"
+        $logFile = Join-Path $testDir "$tC.$tI.log.txt"
+    }        
+    AfterEach {$tI++;}
+```
+- Place the following blocks in each Context
+```
+  BeforeAll {$tI=1}
+  AfterAll{$tC++}
+```
+- Prefix any test out file with $tC.$tI. You may use pre-created $stderrFile, $stdoutFile, $logFile for this purpose

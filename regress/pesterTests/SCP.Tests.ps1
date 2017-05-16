@@ -8,11 +8,6 @@ Describe "Tests for scp command" -Tags "CI" {
             Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
         }
 
-        if(-not (Test-Path $OpenSSHTestInfo["TestDataPath"]))
-        {
-            $null = New-Item $OpenSSHTestInfo["TestDataPath"] -ItemType directory -Force -ErrorAction SilentlyContinue
-        }
-
         $fileName1 = "test.txt"
         $fileName2 = "test2.txt"
         $SourceDirName = "SourceDir"
@@ -46,12 +41,12 @@ Describe "Tests for scp command" -Tags "CI" {
             @{
                 Title = 'Simple copy local file to remote file'
                 Source = $SourceFilePath
-                Destination = "$($ssouser)@$($server):$DestinationFilePath"
+                Destination = "test_target:$DestinationFilePath"
                 Options = "-P $port -S $sshcmd"
             },
             @{
                 Title = 'Simple copy remote file to local file'
-                Source = "$($ssouser)@$($server):$SourceFilePath"
+                Source = "test_target:$SourceFilePath"
                 Destination = $DestinationFilePath
                 Options = "-P $port -p -c aes128-ctr -C"
             },            
@@ -64,12 +59,12 @@ Describe "Tests for scp command" -Tags "CI" {
             @{
                 Title = 'simple copy local file to remote dir'         
                 Source = $SourceFilePath
-                Destination = "$($ssouser)@$($server):$DestinationDir"
+                Destination = "test_target:$DestinationDir"
                 Options = "-P $port -C -q"
             }<#,
             @{
                 Title = 'simple copy remote file to local dir'
-                Source = "$($ssouser)@$($server):$SourceFilePath"
+                Source = "test_target:$SourceFilePath"
                 Destination = $DestinationDir
                 Options = "-P $port "
             }#>
@@ -79,7 +74,7 @@ Describe "Tests for scp command" -Tags "CI" {
             @{
                 Title = 'copy from local dir to remote dir'
                 Source = $sourceDir
-                Destination = "$($ssouser)@$($server):$DestinationDir"
+                Destination = "test_target:$DestinationDir"
                 Options = "-P $port -r -p -c aes128-ctr"
             },
             @{
@@ -90,7 +85,7 @@ Describe "Tests for scp command" -Tags "CI" {
             },
             @{
                 Title = 'copy from remote dir to local dir'            
-                Source = "$($ssouser)@$($server):$sourceDir"
+                Source = "test_target:$sourceDir"
                 Destination = $DestinationDir
                 Options = "-P $port -C -r -q"
             }

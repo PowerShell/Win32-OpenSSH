@@ -119,6 +119,8 @@ WARNING: Following changes will be made to OpenSSH configuration
    - will be replaced with a test sshd_config
    - $HOME\.ssh\known_hosts will be backed up as known_hosts.ori
    - will be replaced with a test known_hosts
+   - $HOME\.ssh\config will be backed up as config.ori
+   - will be replaced with a test config
    - sshd test listener will be on port 47002
    - $HOME\.ssh\known_hosts will be modified with test host key entry
    - test accounts - ssouser, pubkeyuser, and passwduser will be added
@@ -172,16 +174,22 @@ WARNING: Following changes will be made to OpenSSH configuration
    
     #Backup existing known_hosts and replace with test version
     #TODO - account for custom known_hosts locations
-    $knowHostsDirectoryPath = Join-Path $home .ssh
-    $knowHostsFilePath = Join-Path $knowHostsDirectoryPath known_hosts
-    if(-not (Test-Path $knowHostsDirectoryPath -PathType Container))
+    $dotSshDirectoryPath = Join-Path $home .ssh
+    $knowHostsFilePath = Join-Path $dotSshDirectoryPath known_hosts
+    if(-not (Test-Path $dotSshDirectoryPath -PathType Container))
     {
-        New-Item -ItemType Directory -Path $knowHostsDirectoryPath -Force -ErrorAction SilentlyContinue | out-null
+        New-Item -ItemType Directory -Path $dotSshDirectoryPath -Force -ErrorAction SilentlyContinue | out-null
     }
-    if ((Test-Path $knowHostsFilePath -PathType Leaf) -and (-not (Test-Path (Join-Path $knowHostsDirectoryPath known_hosts.ori) -PathType Leaf))) {
-        Copy-Item $knowHostsFilePath (Join-Path $knowHostsDirectoryPath known_hosts.ori) -Force
+    if ((Test-Path $knowHostsFilePath -PathType Leaf) -and (-not (Test-Path (Join-Path $dotSshDirectoryPath known_hosts.ori) -PathType Leaf))) {
+        Copy-Item $knowHostsFilePath (Join-Path $dotSshDirectoryPath known_hosts.ori) -Force
     }
     Copy-Item (Join-Path $Script:E2ETestDirectory known_hosts) $knowHostsFilePath -Force
+
+    $sshConfigFilePath = Join-Path $dotSshDirectoryPath config
+    if ((Test-Path $sshConfigFilePath -PathType Leaf) -and (-not (Test-Path (Join-Path $dotSshDirectoryPath config.ori) -PathType Leaf))) {
+        Copy-Item $sshConfigFilePath (Join-Path $dotSshDirectoryPath config.ori) -Force
+    }
+    Copy-Item (Join-Path $Script:E2ETestDirectory ssh_config) $sshConfigFilePath -Force
 
     # create test accounts
     #TODO - this is Windows specific. Need to be in PAL
@@ -212,6 +220,7 @@ WARNING: Following changes will be made to OpenSSH configuration
     $testPriKeypath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519
     Cleanup-SecureFileACL -FilePath $testPriKeypath -owner $owner
     cmd /c "ssh-add $testPriKeypath 2>&1 >> $Script:TestSetupLogFile"
+    Backup-OpenSSHTestInfo
 }
 #TODO - this is Windows specific. Need to be in PAL
 function Get-LocalUserProfile
@@ -314,6 +323,14 @@ function Cleanup-OpenSSHTestEnvironment
         Remove-Item $originKnowHostsPath -Force -ErrorAction SilentlyContinue
     }
 
+    #Restore ssh_config
+    $originConfigPath = Join-Path $home .ssh\config.ori
+    if (Test-Path $originConfigPath)
+    {
+        Copy-Item $originConfigPath (Join-Path $home .ssh\config) -Force -ErrorAction SilentlyContinue
+        Remove-Item $originConfigPath -Force -ErrorAction SilentlyContinue
+    }
+
     #Delete accounts
     foreach ($user in $OpenSSHTestAccounts)
     {
@@ -395,7 +412,7 @@ function Run-OpenSSHE2ETest
    # Discover all CI tests and run them.
     Push-Location $Script:E2ETestDirectory
     Write-Log -Message "Running OpenSSH E2E tests..."    
-    $testFolders = Get-ChildItem *.tests.ps1 -Recurse -Exclude SSHDConfig.tests.ps1, SSH.Tests.ps1 | ForEach-Object{ Split-Path $_.FullName} | Sort-Object -Unique
+    $testFolders = Get-ChildItem *.tests.ps1 -Recurse | ForEach-Object{ Split-Path $_.FullName} | Sort-Object -Unique
     Invoke-Pester $testFolders -OutputFormat NUnitXml -OutputFile $Script:E2ETestResultsFile -Tag 'CI'
     Pop-Location
 }
@@ -439,6 +456,56 @@ function Run-OpenSSHUnitTest
     $testfailed
 }
 
+function Backup-OpenSSHTestInfo
+{
+    param
+    (    
+        [string] $BackupFile = $null
+    )
+
+    if ($Global:OpenSSHTestInfo -eq $null) {
+        Throw "`$OpenSSHTestInfo is null. Did you run Setup-OpenSSHTestEnvironment yet?"
+    }
+    
+    $testInfo = $Global:OpenSSHTestInfo
+    
+    if ([String]::IsNullOrEmpty($BackupFile)) {
+        $BackupFile = Join-Path $testInfo["TestDataPath"] "OpenSSHTestInfo_backup.txt"
+    }
+    
+    $null | Set-Content $BackupFile
+
+    foreach ($key in $testInfo.Keys) {
+        $value = $testInfo[$key]
+        Add-Content $BackupFile "$key,$value"
+    }
+}
+
+function Recover-OpenSSHTestInfo
+{
+    param
+    (
+        [Parameter(Mandatory=$true)]
+        [ValidateNotNullOrEmpty()]
+        [string] $BackupFile
+    )
+
+    if($Global:OpenSSHTestInfo -ne $null)
+    {
+        $Global:OpenSSHTestInfo.Clear()
+        $Global:OpenSSHTestInfo = $null
+    }
+
+    $Global:OpenSSHTestInfo = @{}
+
+    $entries = Get-Content $BackupFile
+
+    foreach ($entry in $entries) {
+        $data = $entry.Split(",")
+        $Global:OpenSSHTestInfo[$data[0]] = $data[1] 
+    }
+}
+
 <#
     Write-Log 
 #>
@@ -460,4 +527,4 @@ function Write-Log
     }  
 }
 
-Export-ModuleMember -Function Setup-OpenSSHTestEnvironment, Cleanup-OpenSSHTestEnvironment, Run-OpenSSHUnitTest, Run-OpenSSHE2ETest
+Export-ModuleMember -Function Setup-OpenSSHTestEnvironment, Cleanup-OpenSSHTestEnvironment, Run-OpenSSHUnitTest, Run-OpenSSHE2ETest, Backup-OpenSSHTestInfo, Recover-OpenSSHTestInfo

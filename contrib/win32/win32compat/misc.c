@@ -117,7 +117,7 @@ char* _sys_errlist_ext[] = {
 	"No STREAM resources",					/* ENOSR           124 */
 	"Not a STREAM",						/* ENOSTR          125 */
 	"The socket is not connected",				/* ENOTCONN        126 */
-	"enotecoverable",					/* ENOTRECOVERABLE 127 */
+	"enotrecoverable",					/* ENOTRECOVERABLE 127 */
 	"Not a socket",						/* ENOTSOCK        128 */
 	"Operation not supported",				/* ENOTSUP         129 */
 	"Operation not supported on socket",			/* EOPNOTSUPP      130 */
@@ -256,7 +256,6 @@ w32_fopen_utf8(const char *path, const char *mode)
 	}
 
 	f = _wfopen(wpath, wmode);
-
 	if (f) {
 		/* BOM adjustments for file streams*/
 		if (mode[0] == 'w' && fseek(f, 0, SEEK_SET) != EBADF) {

@@ -55,8 +55,9 @@
 */
 int
 check_secure_file_permission(const char *name, struct passwd * pw)
-{	
-	PSECURITY_DESCRIPTOR pSD = NULL;
+{
+	return 0;
+	/*PSECURITY_DESCRIPTOR pSD = NULL;
 	wchar_t * name_utf16 = NULL;
 	PSID owner_sid = NULL, user_sid = NULL;
 	PACL dacl = NULL;
@@ -79,10 +80,10 @@ check_secure_file_permission(const char *name, struct passwd * pw)
 	if ((name_utf16 = utf8_to_utf16(name)) == NULL) {
 		errno = ENOMEM;
 		goto cleanup;
-	}
+	}*/
 
 	/*Get the owner sid of the file.*/
-	if ((error_code = GetNamedSecurityInfoW(name_utf16, SE_FILE_OBJECT,
+	/*if ((error_code = GetNamedSecurityInfoW(name_utf16, SE_FILE_OBJECT,
 		OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
 		&owner_sid, NULL, &dacl, NULL, &pSD)) != ERROR_SUCCESS) {
 		debug3("failed to retrieve the owner sid and dacl of file %s with error code: %d", name, error_code);
@@ -102,14 +103,14 @@ check_secure_file_permission(const char *name, struct passwd * pw)
 		debug3("Bad owner on %s", name);
 		ret = -1;
 		goto cleanup;
-	}
+	}*/
 	/*
 	iterate all aces of the file to find out if there is voilation of the following rules:
 		1. no others than administrators group, system account, and current user, owner accounts have write permission on the file
 		2. sshd account can only have read permission
 		3. this user and file owner should at least have read permission 
 	*/
-	for (DWORD i = 0; i < dacl->AceCount; i++) {
+	/*for (DWORD i = 0; i < dacl->AceCount; i++) {
 		PVOID current_ace = NULL;
 		PACE_HEADER current_aceHeader = NULL;
 		PSID current_trustee_sid = NULL;
@@ -152,10 +153,10 @@ check_secure_file_permission(const char *name, struct passwd * pw)
 			// Not interested ACE
 			continue;
 		}
-		}
+		}*/
 		
 		/*no need to check administrators group, owner account, user account and system account*/
-		if (IsWellKnownSid(current_trustee_sid, WinBuiltinAdministratorsSid) ||
+		/*if (IsWellKnownSid(current_trustee_sid, WinBuiltinAdministratorsSid) ||
 			IsWellKnownSid(current_trustee_sid, WinLocalSystemSid) ||
 			EqualSid(current_trustee_sid, owner_sid) ||
 			EqualSid(current_trustee_sid, user_sid) ||
@@ -188,7 +189,7 @@ cleanup:
 		FreeSid(user_sid);
 	if(name_utf16)
 		free(name_utf16);
-	return ret;
+	return ret;*/
 }
 
 static BOOL
@@ -267,7 +268,8 @@ done:
 int
 set_secure_file_permission(const char *name, struct passwd * pw)
 {
-	PSECURITY_DESCRIPTOR pSD = NULL;
+	return 0;
+	/*PSECURITY_DESCRIPTOR pSD = NULL;
 	PSID owner_sid = NULL;
 	PACL dacl = NULL;
 	wchar_t *name_utf16 = NULL, *sid_utf16 = NULL, sddl[256];
@@ -327,10 +329,10 @@ set_secure_file_permission(const char *name, struct passwd * pw)
 		errno = ENOMEM;
 		ret = -1;
 		goto cleanup;
-	}
+	}*/
 
 	/*Set the owner sid and acl of the file.*/
-	if ((error_code = SetNamedSecurityInfoW(name_utf16, SE_FILE_OBJECT,
+	/*if ((error_code = SetNamedSecurityInfoW(name_utf16, SE_FILE_OBJECT,
 		OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
 		owner_sid, NULL, dacl, NULL)) != ERROR_SUCCESS) {
 		debug3("failed to set the owner sid and dacl of file %s with error code: %d", name, error_code);
@@ -348,5 +350,5 @@ cleanup:
 	if (owner_sid)
 		FreeSid(owner_sid);	
 	
-	return ret;
+	return ret;*/
 }

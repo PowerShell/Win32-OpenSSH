@@ -1,5 +1,5 @@
 ﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
-Describe "Tests for host keys file permission" -Tags "CI" {
+Describe "Tests for host keys file permission" -Tags "Scenario" {
     BeforeAll {
         if($OpenSSHTestInfo -eq $null)
         {

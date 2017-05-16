@@ -1,48 +1,36 @@
-﻿
-Describe "Tests for portforwarding" -Tags "CI" {
+﻿$tC = 1
+$tI = 0
+$suite = "portfwd"
+
+Describe "E2E scenarios for port forwarding" -Tags "CI" {
     BeforeAll {
-
-        if($OpenSSHTestInfo -eq $null)
+        $testDir = Join-Path $OpenSSHTestInfo["TestDataPath"] $suite
+        if(-not (Test-Path $testDir))
         {
-            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+            $null = New-Item $testDir -ItemType directory -Force -ErrorAction SilentlyContinue
         }
-        $fileName = "test.txt"
-        $filePath = Join-Path ${TestDrive} $fileName
-        $logName = "log.txt"
-        $logPath = Join-Path ${TestDrive} $logName        
-        $server = $OpenSSHTestInfo["Target"]
-        $port = $OpenSSHTestInfo["Port"]
-        $ssouser = $OpenSSHTestInfo["SSOUser"]
-
-        $testData = @(
-            @{
-                Title = "Local port forwarding"
-                Options = "-L 5432:127.0.0.1:47001"
-                FwdedPort = 5432
-
-            },
-            @{
-                Title = "Remote port forwarding"
-                Options = "-R 5432:127.0.0.1:47001"
-                FwdedPort = 5432
-            }
-        )      
     }
 
-    AfterEach {
-        Remove-Item -Path $filePath -Force -ea silentlycontinue
-        Remove-Item -Path $logPath -Force -ea silentlycontinue
-    }
+    BeforeEach {
+        $stderrFile=Join-Path $testDir "$tC.$tI.stderr.txt"
+        $stdoutFile=Join-Path $testDir "$tC.$tI.stdout.txt"
+        $logFile = Join-Path $testDir "$tC.$tI.log.txt"
+    }        
+    AfterEach {$tI++;}
 
-    It '<Title>' -TestCases:$testData {
-        param([string]$Title, $Options, $FwdedPort)
-         
-        $str = "ssh -p $($port) -E $logPath $($Options) $($ssouser)@$($server) powershell.exe Test-WSMan -computer 127.0.0.1 -port $FwdedPort > $filePath"
-        # TODO - move this to PAL
-        cmd /c $str
-        #validate file content.           
-        $content = Get-Content $filePath
-        $content -like "wsmid*" | Should Not Be $null
-    }
-        
+    Context "$tC - Basic port forwarding scenarios"  {
+        BeforeAll {$tI=1}
+        AfterAll{$tC++}
+
+        #TODO - this relies on winrm (that is windows specific)
+        It "$tC.$tI - local port forwarding" {
+            ssh -L 5432:127.0.0.1:47001 test_target powershell.exe Test-WSMan -computer 127.0.0.1 -port 5432 | Set-Content $stdoutFile
+            $stdoutFile | Should Contain "wsmid"
+        }
+
+        It "$tC.$tI - remote port forwarding" {
+            ssh -R 5432:127.0.0.1:47001 test_target powershell.exe Test-WSMan -computer 127.0.0.1 -port 5432  | Set-Content $stdoutFile
+            $stdoutFile | Should Contain "wsmid"
+        }
+    }        
 }

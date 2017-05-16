@@ -2,7 +2,7 @@
 $tI = 0
 $suite = "keyutils"
 
-Describe "E2E scenarios for ssh key management" -Tags "CI" {
+Describe "E2E scenarios for ssh key management" -Tags "Scenario" {
     BeforeAll {    
         if($OpenSSHTestInfo -eq $null)
         {
@@ -14,6 +14,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         {
             $null = New-Item $testDir -ItemType directory -Force -ErrorAction SilentlyContinue
         }
+
         $keypassphrase = "testpassword"
         $keytypes = @("rsa","dsa","ecdsa","ed25519")     
         #only validate owner and ACE of the file
@@ -36,8 +37,12 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
     }
 
     BeforeEach {
-        $tI++;
-    }     
+        $stderrFile=Join-Path $testDir "$tC.$tI.stderr.txt"
+        $stdoutFile=Join-Path $testDir "$tC.$tI.stdout.txt"
+        $logFile = Join-Path $testDir "$tC.$tI.log.txt"
+    }        
+
+    AfterEach {$tI++;}    
 
     Context "$tC - ssh-keygen all key types" {
 
@@ -124,6 +129,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
 
             #ensure added keys are listed
             $allkeys = ssh-add -L
+            $allkeys | Set-Content (Join-Path $testDir "$tC.$tI.allkeyonAdd.txt")
             
             foreach($type in $keytypes)
             {
@@ -141,7 +147,8 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
 
             #check keys are deleted
             $allkeys = ssh-add -L
-            
+            $allkeys | Set-Content (Join-Path $testDir "$tC.$tI.allkeyonDelete.txt")
+
             foreach($type in $keytypes)
             {
                 $keyPath = Join-Path $testDir "id_$type"
