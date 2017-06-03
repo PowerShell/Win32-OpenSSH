@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.h,v 1.121 2017/02/01 02:59:09 dtucker Exp $ */
+/* $OpenBSD: channels.h,v 1.123 2017/04/30 23:28:41 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -200,11 +200,11 @@ struct Channel {
 
 /* check whether 'efd' is still in use */
 #define CHANNEL_EFD_INPUT_ACTIVE(c) \
-	(compat20 && c->extended_usage == CHAN_EXTENDED_READ && \
+	(c->extended_usage == CHAN_EXTENDED_READ && \
 	(c->efd != -1 || \
 	buffer_len(&c->extended) > 0))
 #define CHANNEL_EFD_OUTPUT_ACTIVE(c) \
-	(compat20 && c->extended_usage == CHAN_EXTENDED_WRITE && \
+	(c->extended_usage == CHAN_EXTENDED_WRITE && \
 	c->efd != -1 && (!(c->flags & (CHAN_EOF_RCVD|CHAN_CLOSE_RCVD)) || \
 	buffer_len(&c->extended) > 0))
 
@@ -238,7 +238,6 @@ int	 channel_proxy_upstream(Channel *, int, u_int32_t, void *);
 
 /* protocol handler */
 
-int	 channel_input_close(int, u_int32_t, void *);
 int	 channel_input_close_confirmation(int, u_int32_t, void *);
 int	 channel_input_data(int, u_int32_t, void *);
 int	 channel_input_extended_data(int, u_int32_t, void *);
@@ -246,7 +245,6 @@ int	 channel_input_ieof(int, u_int32_t, void *);
 int	 channel_input_oclose(int, u_int32_t, void *);
 int	 channel_input_open_confirmation(int, u_int32_t, void *);
 int	 channel_input_open_failure(int, u_int32_t, void *);
-int	 channel_input_port_open(int, u_int32_t, void *);
 int	 channel_input_window_adjust(int, u_int32_t, void *);
 int	 channel_input_status_confirm(int, u_int32_t, void *);
 
@@ -295,14 +293,8 @@ int	 permitopen_port(const char *);
 void	 channel_set_x11_refuse_time(u_int);
 int	 x11_connect_display(void);
 int	 x11_create_display_inet(int, int, int, u_int *, int **);
-int      x11_input_open(int, u_int32_t, void *);
 void	 x11_request_forwarding_with_spoofing(int, const char *, const char *,
 	     const char *, int);
-int	 deny_input_open(int, u_int32_t, void *);
-
-/* agent forwarding */
-
-void	 auth_request_forwarding(void);
 
 /* channel close */
 

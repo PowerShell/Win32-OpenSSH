@@ -60,9 +60,8 @@ enum w32_io_type {
 enum w32_io_sock_state {
 	SOCK_INITIALIZED = 0,
 	SOCK_LISTENING = 1,	/*listen called on socket*/
-	SOCK_ACCEPTED = 2,	/*socket returned from accept()*/
-	SOCK_CONNECTING = 3,	/*connect called on socket, connect is in progress*/
-	SOCK_CONNECTED = 4	/*connect completed on socket*/
+	SOCK_CONNECTING = 2,	/*connect called on socket, connect is in progress*/
+	SOCK_READY = 3		/*recv and send can be done*/
 };
 
 /*
@@ -145,7 +144,7 @@ int fileio_close(struct w32_io* pio);
 int fileio_pipe(struct w32_io* pio[2]);
 struct w32_io* fileio_afunix_socket();
 int fileio_connect(struct w32_io*, char*);
-struct w32_io* fileio_open(const char *pathname, int flags, int mode);
+struct w32_io* fileio_open(const char *pathname, int flags, u_short mode);
 int fileio_read(struct w32_io* pio, void *dst, unsigned int max);
 int fileio_write(struct w32_io* pio, const void *buf, unsigned int max);
 int fileio_fstat(struct w32_io* pio, struct _stat64 *buf);

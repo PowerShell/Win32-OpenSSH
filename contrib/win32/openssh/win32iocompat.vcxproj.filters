@@ -53,9 +53,6 @@
       <Filter>inc\sys</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\signal_internal.h" />
-    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\sys\param.h">
-      <Filter>inc\sys</Filter>
-    </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\utf.h">
       <Filter>inc</Filter>
     </ClInclude>

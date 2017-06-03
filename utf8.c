@@ -1,4 +1,4 @@
-/* $OpenBSD: utf8.c,v 1.5 2017/02/19 00:10:57 djm Exp $ */
+/* $OpenBSD: utf8.c,v 1.6 2017/04/17 14:31:23 schwarze Exp $ */
 /*
  * Copyright (c) 2016 Ingo Schwarze <schwarze@openbsd.org>
  *
@@ -61,7 +61,8 @@ dangerous_locale(void) {
 
 	loc = nl_langinfo(CODESET);
 	return strcmp(loc, "US-ASCII") != 0 && strcmp(loc, "UTF-8") != 0 &&
-	    strcmp(loc, "ANSI_X3.4-1968") != 0 && strcmp(loc, "646") != 0;
+	    strcmp(loc, "ANSI_X3.4-1968") != 0 && strcmp(loc, "646") != 0 &&
+	    strcmp(loc, "") != 0;
 }
 
 static int

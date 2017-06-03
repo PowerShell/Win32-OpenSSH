@@ -387,16 +387,24 @@ w32_pipe(int *pfds)
 }
 
 int
-w32_open(const char *pathname, int flags, ...)
+w32_open(const char *pathname, int flags, ... /* arg */)
 {
 	int min_index = fd_table_get_min_index();
 	struct w32_io* pio;
+	va_list valist;
+	u_short mode = 0;
 
 	errno = 0;
 	if (min_index == -1)
 		return -1;
+	if (flags & O_CREAT) {
+		va_start(valist, flags);
+		mode = va_arg(valist, u_short);
+		va_end(valist);
+	}
 
-	pio = fileio_open(sanitized_path(pathname), flags, 0);
+	pio = fileio_open(sanitized_path(pathname), flags, mode);
+	
 	if (pio == NULL)
 		return -1;
 
@@ -607,12 +615,10 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	}
 
 	/* TODO - see if this needs to be supported */
-	/* if (exceptfds) {
-		errno = EOPNOTSUPP;
-		debug3("select - ERROR: exceptfds not supported");
-		DebugBreak();
-		return -1;
-	} */
+	if (exceptfds) {
+		for (i = 0; i < fds; i++)
+			FD_CLR(i, exceptfds);
+	}
 
 	if (readfds) {
 		for (i = 0; i < fds; i++)
@@ -691,7 +697,6 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 		}
 	}
 
-
 	/* timeout specified and both fields are 0 - polling mode*/
 	/* proceed with further wait if not in polling mode*/
 	if ((timeout == NULL) || (timeout_ms != 0))
@@ -738,26 +743,31 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 	/* clear out fds that are not ready yet */
 	if (readfds)
 		for (i = 0; i < fds; i++)
-			if (FD_ISSET(i, readfds) && (!FD_ISSET(i, &read_ready_fds)))
-				FD_CLR(i, readfds);
+			if (FD_ISSET(i, readfds)) {
+				if (FD_ISSET(i, &read_ready_fds)) {
+					/* for connect() initiated sockets finish WSA connect process*/
+					if ((fd_table.w32_ios[i]->type == SOCK_FD) &&
+						((fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)))
+						if (socketio_finish_connect(fd_table.w32_ios[i]) != 0) {
+							/* async connect failed, error will be picked up by recv or send */
+							errno = 0;
+						}
+				} else
+					FD_CLR(i, readfds);
+			}
 
 	if (writefds)
 		for (i = 0; i < fds; i++)
 			if (FD_ISSET(i, writefds)) {
 				if (FD_ISSET(i, &write_ready_fds)) {
-					/* for connect() completed sockets finish WSA connect process*/
+					/* for connect() initiated sockets finish WSA connect process*/
 					if ((fd_table.w32_ios[i]->type == SOCK_FD) &&
 					    ((fd_table.w32_ios[i]->internal.state == SOCK_CONNECTING)))
 						if (socketio_finish_connect(fd_table.w32_ios[i]) != 0) {
-							/* finalizeing connect failed - recored error */
-							/* error gets picked up later recv and/or send*/
-							fd_table.w32_ios[i]->read_details.error = errno;
-							fd_table.w32_ios[i]->write_details.error = errno;
-							fd_table.w32_ios[i]->internal.state = SOCK_CONNECTED;
+							/* async connect failed, error will be picked up by recv or send */
 							errno = 0;
 						}
-				}
-				else
+				} else
 					FD_CLR(i, writefds);
 			}
 
@@ -847,6 +857,9 @@ w32_allocate_fd_for_handle(HANDLE h, BOOL is_sock)
 
 	pio->type = is_sock ? SOCK_FD : NONSOCK_FD;
 	pio->handle = h;
+
+	/* TODO - get socket state and confirm that its connected */
+	pio->internal.state = SOCK_READY;
 	fd_table_set(pio, min_index);
 	return min_index;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: kexgexc.c,v 1.23 2016/09/12 01:22:38 deraadt Exp $ */
+/* $OpenBSD: kexgexc.c,v 1.24 2017/05/16 16:56:15 djm Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -165,10 +165,6 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, void *ctxt)
 	    (r = sshkey_from_blob(server_host_key_blob, sbloblen,
 	    &server_host_key)) != 0)
 		goto out;
-	if (server_host_key->type != kex->hostkey_type) {
-		r = SSH_ERR_KEY_TYPE_MISMATCH;
-		goto out;
-	}
 	if (server_host_key->type != kex->hostkey_type ||
 	    (kex->hostkey_type == KEY_ECDSA &&
 	    server_host_key->ecdsa_nid != kex->hostkey_nid)) {

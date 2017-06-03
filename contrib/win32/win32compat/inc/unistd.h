@@ -74,15 +74,11 @@ int w32_chdir(const char *dirname);
 char *w32_getcwd(char *buffer, int maxlen);
 #define getcwd w32_getcwd
 
-
-
 int daemon(int nochdir, int noclose);
 char *crypt(const char *key, const char *salt);
 int link(const char *oldpath, const char *newpath);
 int readlink(const char *path, char *link, int linklen);
-
-int spawn_child(char* cmd, char** argv, int in, int out, int err, unsigned long flags);
-
+int spawn_child(char*, char**, int, int, int, DWORD);
 
 /* 
  * readpassphrase.h definitions 

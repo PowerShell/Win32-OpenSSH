@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.451 2017/03/10 04:07:20 djm Exp $ */
+/* $OpenBSD: ssh.c,v 1.459 2017/05/02 08:06:33 jmc Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -81,7 +81,6 @@
 
 #include "xmalloc.h"
 #include "ssh.h"
-#include "ssh1.h"
 #include "ssh2.h"
 #include "canohost.h"
 #include "compat.h"
@@ -198,7 +197,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-"usage: ssh [-1246AaCfGgKkMNnqsTtVvXxYy] [-b bind_address] [-c cipher_spec]\n"
+"usage: ssh [-46AaCfGgKkMNnqsTtVvXxYy] [-b bind_address] [-c cipher_spec]\n"
 "           [-D [bind_address:]port] [-E log_file] [-e escape_char]\n"
 "           [-F configfile] [-I pkcs11] [-i identity_file]\n"
 "           [-J [user@]host[:port]] [-L address] [-l login_name] [-m mac_spec]\n"
@@ -209,7 +208,6 @@ usage(void)
 	exit(255);
 }
 
-static int ssh_session(void);
 static int ssh_session2(void);
 static void load_public_identity_files(void);
 static void main_sigchld_handler(int);
@@ -609,10 +607,10 @@ main(int ac, char **av)
 	    "ACD:E:F:GI:J:KL:MNO:PQ:R:S:TVw:W:XYy")) != -1) {
 		switch (opt) {
 		case '1':
-			options.protocol = SSH_PROTO_1;
+			fatal("SSH protocol v.1 is no longer supported");
 			break;
 		case '2':
-			options.protocol = SSH_PROTO_2;
+			/* Ignored */
 			break;
 		case '4':
 			options.address_family = AF_INET;
@@ -690,11 +688,7 @@ main(int ac, char **av)
 			else if (strcmp(optarg, "key-plain") == 0)
 				cp = sshkey_alg_list(0, 1, 0, '\n');
 			else if (strcmp(optarg, "protocol-version") == 0) {
-#ifdef WITH_SSH1
-				cp = xstrdup("1\n2");
-#else
 				cp = xstrdup("2");
-#endif
 			}
 			if (cp == NULL)
 				fatal("Unsupported query \"%s\"", optarg);
@@ -818,27 +812,14 @@ main(int ac, char **av)
 			}
 			break;
 		case 'c':
-			if (ciphers_valid(*optarg == '+' ?
+			if (!ciphers_valid(*optarg == '+' ?
 			    optarg + 1 : optarg)) {
-				/* SSH2 only */
-				free(options.ciphers);
-				options.ciphers = xstrdup(optarg);
-				options.cipher = SSH_CIPHER_INVALID;
-				break;
-			}
-			/* SSH1 only */
-			options.cipher = cipher_number(optarg);
-			if (options.cipher == -1) {
 				fprintf(stderr, "Unknown cipher type '%s'\n",
 				    optarg);
 				exit(255);
 			}
-			if (options.cipher == SSH_CIPHER_3DES)
-				options.ciphers = xstrdup("3des-cbc");
-			else if (options.cipher == SSH_CIPHER_BLOWFISH)
-				options.ciphers = xstrdup("blowfish-cbc");
-			else
-				options.ciphers = xstrdup(KEX_CLIENT_ENCRYPT);
+			free(options.ciphers);
+			options.ciphers = xstrdup(optarg);
 			break;
 		case 'm':
 			if (mac_valid(optarg)) {
@@ -1007,8 +988,11 @@ main(int ac, char **av)
 	if (logfile != NULL)
 		log_redirect_stderr_to(logfile);
 	log_init(argv0,
-	    options.log_level == -1 ? SYSLOG_LEVEL_INFO : options.log_level,
-	    SYSLOG_FACILITY_USER, !use_syslog);
+	    options.log_level == SYSLOG_LEVEL_NOT_SET ? 
+	    SYSLOG_LEVEL_INFO : options.log_level,
+	    options.log_facility == SYSLOG_FACILITY_NOT_SET ? 
+	    SYSLOG_FACILITY_USER : options.log_facility,
+	    !use_syslog);
 
 	if (debug_flag)
 		logit("%s, %s", SSH_RELEASE,
@@ -1150,7 +1134,7 @@ main(int ac, char **av)
 #endif
 
 	/* reinit */
-	log_init(argv0, options.log_level, SYSLOG_FACILITY_USER, !use_syslog);
+	log_init(argv0, options.log_level, options.log_facility, !use_syslog);
 
 	if (options.request_tty == REQUEST_TTY_YES ||
 	    options.request_tty == REQUEST_TTY_FORCE)
@@ -1244,7 +1228,6 @@ main(int ac, char **av)
 		if ((sock = muxclient(options.control_path)) >= 0) {
 			packet_set_connection(sock, sock);
 			ssh = active_state; /* XXX */
-			enable_compat20();	/* XXX */
 			packet_set_mux();
 			goto skip_connect;
 		}
@@ -1292,8 +1275,7 @@ main(int ac, char **av)
 	sensitive_data.nkeys = 0;
 	sensitive_data.keys = NULL;
 	sensitive_data.external_keysign = 0;
-	if (options.rhosts_rsa_authentication ||
-	    options.hostbased_authentication) {
+	if (options.hostbased_authentication) {
 		sensitive_data.nkeys = 9;
 		sensitive_data.keys = xcalloc(sensitive_data.nkeys,
 		    sizeof(Key));
@@ -1301,10 +1283,6 @@ main(int ac, char **av)
 			sensitive_data.keys[i] = NULL;
 
 		PRIV_START;
-#if WITH_SSH1
-		sensitive_data.keys[0] = key_load_private_type(KEY_RSA1,
-		    _PATH_HOST_KEY_FILE, "", NULL, NULL);
-#endif
 #ifdef OPENSSL_HAS_ECC
 		sensitive_data.keys[1] = key_load_private_cert(KEY_ECDSA,
 		    _PATH_HOST_ECDSA_KEY_FILE, "", NULL);
@@ -1452,7 +1430,7 @@ main(int ac, char **av)
 	}
 
  skip_connect:
-	exit_status = compat20 ? ssh_session2() : ssh_session();
+	exit_status = ssh_session2();
 	packet_close();
 
 	if (options.control_path != NULL && muxserver_sock != -1)
@@ -1605,8 +1583,6 @@ ssh_init_stdio_forwarding(void)
 
 	if (options.stdio_forward_host == NULL)
 		return;
-	if (!compat20)
-		fatal("stdio forwarding require Protocol 2");
 
 	debug3("%s: %s:%d", __func__, options.stdio_forward_host,
 	    options.stdio_forward_port);
@@ -1705,172 +1681,6 @@ check_agent_present(void)
 	}
 }
 
-static int
-ssh_session(void)
-{
-	int type;
-	int interactive = 0;
-	int have_tty = 0;
-	struct winsize ws;
-	char *cp;
-	const char *display;
-	char *proto = NULL, *data = NULL;
-
-	/* Enable compression if requested. */
-	if (options.compression) {
-		debug("Requesting compression at level %d.",
-		    options.compression_level);
-
-		if (options.compression_level < 1 ||
-		    options.compression_level > 9)
-			fatal("Compression level must be from 1 (fast) to "
-			    "9 (slow, best).");
-
-		/* Send the request. */
-		packet_start(SSH_CMSG_REQUEST_COMPRESSION);
-		packet_put_int(options.compression_level);
-		packet_send();
-		packet_write_wait();
-		type = packet_read();
-		if (type == SSH_SMSG_SUCCESS)
-			packet_start_compression(options.compression_level);
-		else if (type == SSH_SMSG_FAILURE)
-			logit("Warning: Remote host refused compression.");
-		else
-			packet_disconnect("Protocol error waiting for "
-			    "compression response.");
-	}
-	/* Allocate a pseudo tty if appropriate. */
-	if (tty_flag) {
-		debug("Requesting pty.");
-
-		/* Start the packet. */
-		packet_start(SSH_CMSG_REQUEST_PTY);
-
-		/* Store TERM in the packet.  There is no limit on the
-		   length of the string. */
-		cp = getenv("TERM");
-		if (!cp)
-			cp = "";
-		packet_put_cstring(cp);
-
-		/* Store window size in the packet. */
-		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) < 0)
-			memset(&ws, 0, sizeof(ws));
-		packet_put_int((u_int)ws.ws_row);
-		packet_put_int((u_int)ws.ws_col);
-		packet_put_int((u_int)ws.ws_xpixel);
-		packet_put_int((u_int)ws.ws_ypixel);
-
-		/* Store tty modes in the packet. */
-		tty_make_modes(fileno(stdin), NULL);
-
-		/* Send the packet, and wait for it to leave. */
-		packet_send();
-		packet_write_wait();
-
-		/* Read response from the server. */
-		type = packet_read();
-		if (type == SSH_SMSG_SUCCESS) {
-			interactive = 1;
-			have_tty = 1;
-		} else if (type == SSH_SMSG_FAILURE)
-			logit("Warning: Remote host failed or refused to "
-			    "allocate a pseudo tty.");
-		else
-			packet_disconnect("Protocol error waiting for pty "
-			    "request response.");
-	}
-	/* Request X11 forwarding if enabled and DISPLAY is set. */
-	display = getenv("DISPLAY");
-	if (display == NULL && options.forward_x11)
-		debug("X11 forwarding requested but DISPLAY not set");
-	if (options.forward_x11 && client_x11_get_proto(display,
-	    options.xauth_location, options.forward_x11_trusted,
-	    options.forward_x11_timeout, &proto, &data) == 0) {
-		/* Request forwarding with authentication spoofing. */
-		debug("Requesting X11 forwarding with authentication "
-		    "spoofing.");
-		x11_request_forwarding_with_spoofing(0, display, proto,
-		    data, 0);
-		/* Read response from the server. */
-		type = packet_read();
-		if (type == SSH_SMSG_SUCCESS) {
-			interactive = 1;
-		} else if (type == SSH_SMSG_FAILURE) {
-			logit("Warning: Remote host denied X11 forwarding.");
-		} else {
-			packet_disconnect("Protocol error waiting for X11 "
-			    "forwarding");
-		}
-	}
-	/* Tell the packet module whether this is an interactive session. */
-	packet_set_interactive(interactive,
-	    options.ip_qos_interactive, options.ip_qos_bulk);
-
-	/* Request authentication agent forwarding if appropriate. */
-	check_agent_present();
-
-	if (options.forward_agent) {
-		debug("Requesting authentication agent forwarding.");
-		auth_request_forwarding();
-
-		/* Read response from the server. */
-		type = packet_read();
-		packet_check_eom();
-		if (type != SSH_SMSG_SUCCESS)
-			logit("Warning: Remote host denied authentication agent forwarding.");
-	}
-
-	/* Initiate port forwardings. */
-	ssh_init_stdio_forwarding();
-	ssh_init_forwarding();
-
-	/* Execute a local command */
-	if (options.local_command != NULL &&
-	    options.permit_local_command)
-		ssh_local_cmd(options.local_command);
-
-	/*
-	 * If requested and we are not interested in replies to remote
-	 * forwarding requests, then let ssh continue in the background.
-	 */
-	if (fork_after_authentication_flag) {
-		if (options.exit_on_forward_failure &&
-		    options.num_remote_forwards > 0) {
-			debug("deferring postauth fork until remote forward "
-			    "confirmation received");
-		} else
-			fork_postauth();
-	}
-
-	/*
-	 * If a command was specified on the command line, execute the
-	 * command now. Otherwise request the server to start a shell.
-	 */
-	if (buffer_len(&command) > 0) {
-		int len = buffer_len(&command);
-		if (len > 900)
-			len = 900;
-		debug("Sending command: %.*s", len,
-		    (u_char *)buffer_ptr(&command));
-		packet_start(SSH_CMSG_EXEC_CMD);
-		packet_put_string(buffer_ptr(&command), buffer_len(&command));
-		packet_send();
-		packet_write_wait();
-	} else {
-		debug("Requesting shell.");
-		packet_start(SSH_CMSG_EXEC_SHELL);
-		packet_send();
-		packet_write_wait();
-	}
-
-	/* Enter the interactive session. */
-	return client_loop(have_tty, tty_flag ?
-	    options.escape_char : SSH_ESCAPECHAR_NONE, 0);
-}
-
-/* request pty/x11/agent/tcpfwd/shell for channel */
 static void
 ssh_session2_setup(int id, int success, void *arg)
 {

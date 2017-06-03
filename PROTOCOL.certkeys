@@ -192,12 +192,13 @@ compatibility.
 The reserved field is currently unused and is ignored in this version of
 the protocol.
 
-signature key contains the CA key used to sign the certificate.
-The valid key types for CA keys are ssh-rsa, ssh-dss and the ECDSA types
-ecdsa-sha2-nistp256, ecdsa-sha2-nistp384, ecdsa-sha2-nistp521. "Chained"
-certificates, where the signature key type is a certificate type itself
-are NOT supported. Note that it is possible for a RSA certificate key to
-be signed by a DSS or ECDSA CA key and vice-versa.
+The signature key field contains the CA key used to sign the
+certificate. The valid key types for CA keys are ssh-rsa,
+ssh-dss, ssh-ed25519 and the ECDSA types ecdsa-sha2-nistp256,
+ecdsa-sha2-nistp384, ecdsa-sha2-nistp521. "Chained" certificates, where
+the signature key type is a certificate type itself are NOT supported.
+Note that it is possible for a RSA certificate key to be signed by a
+Ed25519 or ECDSA CA key and vice-versa.
 
 signature is computed over all preceding fields from the initial string
 up to, and including the signature key. Signatures are computed and
@@ -284,4 +285,4 @@ permit-user-rc          empty         Flag indicating that execution of
                                       of this script will not be permitted if
                                       this option is not present.
 
-$OpenBSD: PROTOCOL.certkeys,v 1.10 2016/05/03 10:27:59 djm Exp $
+$OpenBSD: PROTOCOL.certkeys,v 1.11 2017/05/16 16:54:05 djm Exp $

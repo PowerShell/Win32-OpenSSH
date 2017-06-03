@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.306 2017/03/14 07:19:07 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.308 2017/05/17 01:24:17 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -449,7 +449,7 @@ static struct {
 	{ "keyregenerationinterval", sDeprecated, SSHCFG_GLOBAL },
 	{ "permitrootlogin", sPermitRootLogin, SSHCFG_ALL },
 	{ "syslogfacility", sLogFacility, SSHCFG_GLOBAL },
-	{ "loglevel", sLogLevel, SSHCFG_GLOBAL },
+	{ "loglevel", sLogLevel, SSHCFG_ALL },
 	{ "rhostsauthentication", sDeprecated, SSHCFG_GLOBAL },
 	{ "rhostsrsaauthentication", sDeprecated, SSHCFG_ALL },
 	{ "hostbasedauthentication", sHostbasedAuthentication, SSHCFG_ALL },
@@ -940,13 +940,6 @@ static const struct multistate multistate_gatewayports[] = {
 	{ "no",				0 },
 	{ NULL, -1 }
 };
-static const struct multistate multistate_privsep[] = {
-	{ "yes",			PRIVSEP_NOSANDBOX },
-	{ "sandbox",			PRIVSEP_ON },
-	{ "nosandbox",			PRIVSEP_NOSANDBOX },
-	{ "no",				PRIVSEP_OFF },
-	{ NULL, -1 }
-};
 static const struct multistate multistate_tcpfwd[] = {
 	{ "yes",			FORWARD_ALLOW },
 	{ "all",			FORWARD_ALLOW },
@@ -1357,7 +1350,7 @@ process_server_config_line(ServerOptions *options, char *line,
 		if (value == SYSLOG_LEVEL_NOT_SET)
 			fatal("%.200s line %d: unsupported log level '%s'",
 			    filename, linenum, arg ? arg : "<NONE>");
-		if (*log_level_ptr == -1)
+		if (*activep && *log_level_ptr == -1)
 			*log_level_ptr = (LogLevel) value;
 		break;
 
@@ -2001,6 +1994,7 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(ip_qos_bulk);
 	M_CP_INTOPT(rekey_limit);
 	M_CP_INTOPT(rekey_interval);
+	M_CP_INTOPT(log_level);
 
 	/*
 	 * The bind_mask is a mode_t that may be unsigned, so we can't use

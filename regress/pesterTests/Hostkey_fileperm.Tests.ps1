@@ -1,138 +1,161 @@
-﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
-Describe "Tests for host keys file permission" -Tags "Scenario" {
+﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force -DisableNameChecking
+$tC = 1
+$tI = 0
+$suite = "hostkey_fileperm"
+Describe "Tests for host keys file permission" -Tags "CI" {
     BeforeAll {
         if($OpenSSHTestInfo -eq $null)
         {
             Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
         }
         
-        $testDir = "$($OpenSSHTestInfo["TestDataPath"])\hostkey_fileperm"
+        $testDir = "$($OpenSSHTestInfo["TestDataPath"])\$suite"
         if( -not (Test-path $testDir -PathType Container))
         {
             $null = New-Item $testDir -ItemType directory -Force -ErrorAction SilentlyContinue
         }
         
-        $fileName = "test.txt"
-        $filePath = Join-Path $testDir $fileName
-        $logName = "log.txt"
-        $logPath = Join-Path $testDir $logName
+        $logName = "sshdlog.txt"
         $port = 47003
         $ssouser = $OpenSSHTestInfo["SSOUser"]
         $script:logNum = 0
-
-        # for the first time, delete the existing log files.
-        if ($OpenSSHTestInfo['DebugMode'])
-        {         
-            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore            
-        }        
-
-        Remove-Item -Path $filePath -Force -ErrorAction ignore
+        Remove-Item -Path (Join-Path $testDir "*$logName") -Force -ErrorAction ignore
     }
 
-    AfterEach {        
-        if( $OpenSSHTestInfo["DebugMode"])
-        {
-            Copy-Item "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\failedagent$script:logNum.log" -Force -ErrorAction ignore            
-            Copy-Item $logPath "$($script:logNum)$($logPath)" -Force -ErrorAction ignore
-            Clear-Content $logPath -Force -ErrorAction ignore                    
-            $script:logNum++
-                    
-            # clear the ssh-agent so that next testcase will get fresh logs.
-            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore            
-        }
-        Remove-Item -Path $filePath -Force -ErrorAction ignore
-    }
+    AfterEach { $tI++ }
 
-    Context "Host key files permission" {
+    Context "$tC - Host key files permission" {
         BeforeAll {
-            $hostKeyFilePath = "$($OpenSSHTestInfo['OpenSSHBinPath'])\hostkeyFilePermTest_ed25519_key"
-            if(Test-path $hostKeyFilePath -PathType Leaf){
-                Set-SecureFileACL -filepath $hostKeyFilePath            
+            $systemAccount = New-Object System.Security.Principal.NTAccount("NT AUTHORITY", "SYSTEM")
+            $adminAccount = New-Object System.Security.Principal.NTAccount("BUILTIN","Administrators")
+            $objUser = New-Object System.Security.Principal.NTAccount($ssouser)
+            $currentUser = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
+            $everyone =  New-Object System.Security.Principal.NTAccount("EveryOne")
+            
+            $hostKeyFilePath = join-path $testDir hostkeyFilePermTest_ed25519_key
+            if(Test-path $hostKeyFilePath -PathType Leaf) {
+                Set-FileOwnerAndACL -filepath $hostKeyFilePath
             }
             if(Test-path "$hostKeyFilePath.pub" -PathType Leaf){
-                Set-SecureFileACL -filepath "$hostKeyFilePath.pub"
+                Set-FileOwnerAndACL -filepath "$hostKeyFilePath.pub"
             }
             Remove-Item -path "$hostKeyFilePath*" -Force -ErrorAction Ignore
-            ssh-keygen.exe -t ed25519 -f $hostKeyFilePath -P `"`" 
-
-            Remove-Item $filePath -Force -ErrorAction Ignore
+            ssh-keygen.exe -t ed25519 -f $hostKeyFilePath -P `"`"
             Get-Process -Name sshd | Where-Object {$_.SI -ne 0} | Stop-process
+            $tI=1
         }
 
-        AfterEach {
-            Remove-Item -Path $filePath -Force -ErrorAction ignore            
+        BeforeEach {
+            $logPath = Join-Path $testDir "$tC.$tI.$logName"
         }
 
-        It 'Host keys -- positive (Secured private key and sshd can access to public key file)' {
-            #setup to have current user as owner and grant it full control        
-            Set-SecureFileACL -filepath $hostKeyFilePath
-            #grant sshd Read permission to public key
-            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User "NT Service\sshd" -Perm "Read"            
+        AfterAll {
+            if(Test-path $hostKeyFilePath -PathType Leaf){
+                Adjust-UserKeyFileACL -Filepath $hostKeyFilePath -Owner $systemAccount
+            }
+            if(Test-path "$hostKeyFilePath.pub" -PathType Leaf){
+                Adjust-UserKeyFileACL -Filepath "$hostKeyFilePath.pub" -Owner $systemAccount
+            }
+            $tC++
+        }
+
+        It "$tC.$tI-Host keys-positive (both public and private keys are owned by admin groups and running process can access to public key file)" {
+            Set-FileOwnerAndACL -Filepath $hostKeyFilePath -Owner $adminAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $systemAccount -Perms "FullControl"
+            
+            Set-FileOwnerAndACL -Filepath "$hostKeyFilePath.pub" -Owner $adminAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $systemAccount -Perms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $everyOne -Perms "Read"
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $filePath") -NoNewWindow
+            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+
+            #validate file content does not contain unprotected info.
+            $logPath | Should Not Contain "UNPROTECTED PRIVATE KEY FILE!"
+        }
+
+        It "$tC.$tI-Host keys-positive (both public and private keys are owned by admin groups and pwd user has explicit ACE)" {
+            Set-FileOwnerAndACL -Filepath $hostKeyFilePath -Owner $adminAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $systemAccount -Perms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $currentUser -Perms "Read"
+            
+            Set-FileOwnerAndACL -Filepath "$hostKeyFilePath.pub" -Owner $adminAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $systemAccount -Perms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $everyOne -Perms "Read"
+
+            #Run
+            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 2 } }            
+
+            #validate file content does not contain unprotected info.
+            $logPath | Should Not Contain "UNPROTECTED PRIVATE KEY FILE!"
+        }
+
+        It "$tC.$tI-Host keys-positive (both public and private keys are owned by system and running process can access to public key file)" {               
+            Set-FileOwnerAndACL -Filepath $hostKeyFilePath -Owner $systemAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $adminAccount -Perms "Read"
+
+            Set-FileOwnerAndACL -Filepath "$hostKeyFilePath.pub" -Owner $systemAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $adminAccount -Perms "Read"
+
+            #Run
+            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
             Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
             
 
-            #validate file content does not contain unprotected.
-            $matches = Get-Content $filePath | Select-String -pattern "UNPROTECTED PRIVATE KEY FILE!"
-            $matches.Count | Should Be 0
+            #validate file content does not contain unprotected info.
+            $logPath | Should Not Contain "UNPROTECTED PRIVATE KEY FILE!"
         }
 
-        It 'Host keys -- negative (other account can access private key file)' {
-            #setup to have current user as owner and grant it full control        
-            Set-SecureFileACL -filepath $hostKeyFilePath
-            #add ssouser to access the private key
-            $objUser = New-Object System.Security.Principal.NTAccount($ssouser)
-            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $objUser -Perm "Read"
+        It "$tC.$tI-Host keys-negative (other account can access private key file)" {
+            Set-FileOwnerAndACL -Filepath $hostKeyFilePath -Owner $systemAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $adminAccount -Perms "FullControl"
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $objUser -Perms "Read"
             
-            #grant sshd Read permission to the public key
-            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User "NT Service\sshd" -Perm "Read"
+            Set-FileOwnerAndACL -Filepath "$hostKeyFilePath.pub" -Owner $adminAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $systemAccount -Perms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $everyOne -Perms "Read"
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $filePath") -NoNewWindow
+            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
             Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
 
-            #validate file content does not contain unprotected.
-            $matches = Get-Content $filePath | Select-String -pattern "key_load_private: bad permissions"
-            $matches.Count | Should Be 1
+            #validate file content contains unprotected info.
+            $logPath | Should Contain "key_load_private: bad permissions"            
         }
 
-        It 'Host keys -- negative (the private key has wrong owner)' {
+        It "$tC.$tI-Host keys-negative (the private key has wrong owner)" {
             #setup to have ssouser as owner and grant it full control
-            $objUser = New-Object System.Security.Principal.NTAccount($ssouser)
-            Set-SecureFileACL -filepath $hostKeyFilePath -owner $objUser
-            $currentUser = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
-            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $currentUser -Perm "FullControl"
+            Set-FileOwnerAndACL -FilePath $hostKeyFilePath -Owner $objUser -OwnerPerms "Read","Write"
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $adminAccount -Perms "FullControl"
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $systemAccount -Perms "FullControl"
             
-            #grant sshd Read permission to the public key
-            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User "NT Service\sshd" -Perm "Read"
+            Set-FileOwnerAndACL -Filepath "$hostKeyFilePath.pub" -Owner $adminAccount -OwnerPerms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $systemAccount -Perms "FullControl"
+            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $everyOne -Perms "Read"
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $filePath") -NoNewWindow
+            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
             Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
 
-            #validate file content does not contain unprotected.
-            $matches = Get-Content $filePath | Select-String -pattern "key_load_private: bad permissions"
-            $matches.Count | Should Be 1
+            #validate file content contains unprotected info.
+            $logPath | Should Contain "key_load_private: bad permissions"
         }
-        It 'Host keys -- negative (the running process does not have read access to pub key)' {
+
+        It "$tC.$tI-Host keys-negative (the running process does not have read access to public key)" {
             #setup to have ssouser as owner and grant it full control
-            Set-SecureFileACL -filepath $hostKeyFilePath
+            Set-FileOwnerAndACL -FilePath $hostKeyFilePath -Owner $systemAccount -OwnerPerms "FullControl"            
+            Add-PermissionToFileACL -FilePath $hostKeyFilePath -User $adminAccount -Perms "Read"
 
-            $objUser = New-Object System.Security.Principal.NTAccount($ssouser)
-            Set-SecureFileACL -filepath "$hostKeyFilePath.pub" -owner $objUser
-
-            #grant current user Read permission to public key
-            Add-PermissionToFileACL -FilePath "$hostKeyFilePath.pub" -User $objUser -Perm "Read" 
+            Set-FileOwnerAndACL -Filepath "$hostKeyFilePath.pub" -Owner $systemAccount -OwnerPerms "FullControl"
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $filePath") -NoNewWindow
+            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
             Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
 
-            #validate file content does not contain unprotected.
-            $matches = Get-Content $filePath | Select-String -pattern "key_load_public: Permission denied"
-            $matches.Count | Should Be 1
+            #validate file content contains unprotected info.
+            $logPath | Should Contain "key_load_public: Permission denied"
         }
     }
 }

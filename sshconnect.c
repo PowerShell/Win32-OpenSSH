@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.273 2017/03/10 03:22:40 dtucker Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.278 2017/05/01 02:27:11 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -540,13 +540,8 @@ static void
 send_client_banner(int connection_out, int minor1)
 {
 	/* Send our own protocol version identification. */
-	if (compat20) {
-		xasprintf(&client_version_string, "SSH-%d.%d-%.100s\r\n",
-		    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION);
-	} else {
-		xasprintf(&client_version_string, "SSH-%d.%d-%.100s\n",
-		    PROTOCOL_MAJOR_1, minor1, SSH_VERSION);
-	}
+	xasprintf(&client_version_string, "SSH-%d.%d-%.100s\r\n",
+	    PROTOCOL_MAJOR_2, PROTOCOL_MINOR_2, SSH_VERSION);
 	if (atomicio(vwrite, connection_out, client_version_string,
 	    strlen(client_version_string)) != strlen(client_version_string))
 		fatal("write: %.100s", strerror(errno));
@@ -565,25 +560,18 @@ ssh_exchange_identification(int timeout_ms)
 	int remote_major, remote_minor, mismatch;
 	int connection_in = packet_get_connection_in();
 	int connection_out = packet_get_connection_out();
-	int minor1 = PROTOCOL_MINOR_1, client_banner_sent = 0;
 	u_int i, n;
 	size_t len;
 	int fdsetsz, remaining, rc;
 	struct timeval t_start, t_remaining;
-	fd_set *fdset;
+	fd_set *readfds;
+	fd_set *exceptfds;
 
 	fdsetsz = howmany(connection_in + 1, NFDBITS) * sizeof(fd_mask);
-	fdset = xcalloc(1, fdsetsz);
+	readfds = xcalloc(1, fdsetsz);
+	exceptfds = xcalloc(1, fdsetsz);
 
-	/*
-	 * If we are SSH2-only then we can send the banner immediately and
-	 * save a round-trip.
-	 */
-	if (options.protocol == SSH_PROTO_2) {
-		enable_compat20();
-		send_client_banner(connection_out, 0);
-		client_banner_sent = 1;
-	}
+	send_client_banner(connection_out, 0);
 
 	/* Read other side's version identification. */
 	remaining = timeout_ms;
@@ -592,9 +580,10 @@ ssh_exchange_identification(int timeout_ms)
 			if (timeout_ms > 0) {
 				gettimeofday(&t_start, NULL);
 				ms_to_timeval(&t_remaining, remaining);
-				FD_SET(connection_in, fdset);
-				rc = select(connection_in + 1, fdset, NULL,
-				    fdset, &t_remaining);
+				FD_SET(connection_in, readfds);
+				FD_SET(connection_in, exceptfds);
+				rc = select(connection_in + 1, readfds, NULL,
+					exceptfds, &t_remaining);
 				ms_subtract_diff(&t_start, &remaining);
 				if (rc == 0 || remaining <= 0)
 					fatal("Connection timed out during "
@@ -634,7 +623,8 @@ ssh_exchange_identification(int timeout_ms)
 		debug("ssh_exchange_identification: %s", buf);
 	}
 	server_version_string = xstrdup(buf);
-	free(fdset);
+	free(readfds);
+	free(exceptfds);
 
 	/*
 	 * Check that the versions match.  In future this might accept
@@ -650,51 +640,25 @@ ssh_exchange_identification(int timeout_ms)
 	mismatch = 0;
 
 	switch (remote_major) {
-	case 1:
-		if (remote_minor == 99 &&
-		    (options.protocol & SSH_PROTO_2) &&
-		    !(options.protocol & SSH_PROTO_1_PREFERRED)) {
-			enable_compat20();
-			break;
-		}
-		if (!(options.protocol & SSH_PROTO_1)) {
-			mismatch = 1;
-			break;
-		}
-		if (remote_minor < 3) {
-			fatal("Remote machine has too old SSH software version.");
-		} else if (remote_minor == 3 || remote_minor == 4) {
-			/* We speak 1.3, too. */
-			enable_compat13();
-			minor1 = 3;
-			if (options.forward_agent) {
-				logit("Agent forwarding disabled for protocol 1.3");
-				options.forward_agent = 0;
-			}
-		}
-		break;
 	case 2:
-		if (options.protocol & SSH_PROTO_2) {
-			enable_compat20();
-			break;
-		}
-		/* FALLTHROUGH */
+		break;
+	case 1:
+		if (remote_minor != 99)
+			mismatch = 1;
+		break;
 	default:
 		mismatch = 1;
 		break;
 	}
 	if (mismatch)
 		fatal("Protocol major versions differ: %d vs. %d",
-		    (options.protocol & SSH_PROTO_2) ? PROTOCOL_MAJOR_2 : PROTOCOL_MAJOR_1,
-		    remote_major);
+		    PROTOCOL_MAJOR_2, remote_major);
 	if ((datafellows & SSH_BUG_DERIVEKEY) != 0)
 		fatal("Server version \"%.100s\" uses unsafe key agreement; "
 		    "refusing connection", remote_version);
 	if ((datafellows & SSH_BUG_RSASIGMD5) != 0)
 		logit("Server version \"%.100s\" uses unsafe RSA signature "
 		    "scheme; disabling use of RSA keys", remote_version);
-	if (!client_banner_sent)
-		send_client_banner(connection_out, minor1);
 	chop(server_version_string);
 }
 
@@ -1288,8 +1252,7 @@ verify_host_key(char *host, struct sockaddr *hostaddr, Key *host_key)
 			    host_key->cert->principals[i]);
 		}
 	} else {
-		debug("Server host key: %s %s", compat20 ?
-		    sshkey_ssh_name(host_key) : sshkey_type(host_key), fp);
+		debug("Server host key: %s %s", sshkey_ssh_name(host_key), fp);
 	}
 
 	if (sshkey_equal(previous_host_key, host_key)) {
@@ -1394,17 +1357,8 @@ ssh_login(Sensitive *sensitive, const char *orighost,
 	/* key exchange */
 	/* authenticate user */
 	debug("Authenticating to %s:%d as '%s'", host, port, server_user);
-	if (compat20) {
-		ssh_kex2(host, hostaddr, port);
-		ssh_userauth2(local_user, server_user, host, sensitive);
-	} else {
-#ifdef WITH_SSH1
-		ssh_kex(host, hostaddr);
-		ssh_userauth1(local_user, server_user, host, sensitive);
-#else
-		fatal("ssh1 is not supported");
-#endif
-	}
+	ssh_kex2(host, hostaddr, port);
+	ssh_userauth2(local_user, server_user, host, sensitive);
 	free(local_user);
 }
 
@@ -1431,7 +1385,6 @@ static int
 show_other_keys(struct hostkeys *hostkeys, Key *key)
 {
 	int type[] = {
-		KEY_RSA1,
 		KEY_RSA,
 		KEY_DSA,
 		KEY_ECDSA,

@@ -33,6 +33,8 @@
 #include "agent-request.h"
 #include <sddl.h>
 
+#pragma warning(push, 3)
+
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
 
@@ -48,7 +50,7 @@ get_user_root(struct agent_connection* con, HKEY *root)
 	LONG ret;
 	*root = HKEY_LOCAL_MACHINE;
 	
-	if (con->client_type == USER) {
+	if (con->client_type <= ADMIN_USER) {
 		if (ImpersonateNamedPipeClient(con->pipe_handle) == FALSE)
 			return -1;
 		*root = NULL;
@@ -71,7 +73,7 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 	int success = 0;
 	DATA_BLOB in, out;
 
-	if (con->client_type == USER)
+	if (con->client_type <= ADMIN_USER)
 		if (ImpersonateNamedPipeClient(con->pipe_handle) == FALSE)
 			return -1;
 
@@ -102,7 +104,7 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 done:
 	if (out.pbData)
 		LocalFree(out.pbData);
-	if (con->client_type == USER)
+	if (con->client_type <= ADMIN_USER)
 		RevertToSelf();
 	return success? 0: -1;
 }
@@ -123,6 +125,7 @@ process_add_identity(struct sshbuf* request, struct sshbuf* response, struct age
 	SECURITY_ATTRIBUTES sa;
 
 	/* parse input request */
+	memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
 	blob = sshbuf_ptr(request);
 	if (sshkey_private_deserialize(request, &key) != 0 ||
 	   (blob_len = (sshbuf_ptr(request) - blob) & 0xffffffff) == 0 ||
@@ -142,9 +145,9 @@ process_add_identity(struct sshbuf* request, struct sshbuf* response, struct age
 	    RegCreateKeyExW(user_root, SSH_KEYS_ROOT, 0, 0, 0, KEY_WRITE | KEY_WOW64_64KEY, &sa, &reg, NULL) != 0 ||
 	    RegCreateKeyExA(reg, thumbprint, 0, 0, 0, KEY_WRITE | KEY_WOW64_64KEY, &sa, &sub, NULL) != 0 ||
 	    RegSetValueExW(sub, NULL, 0, REG_BINARY, eblob, eblob_len) != 0 ||
-	    RegSetValueExW(sub, L"pub", 0, REG_BINARY, pubkey_blob, pubkey_blob_len) != 0 ||
+	    RegSetValueExW(sub, L"pub", 0, REG_BINARY, pubkey_blob, (DWORD)pubkey_blob_len) != 0 ||
 	    RegSetValueExW(sub, L"type", 0, REG_DWORD, (BYTE*)&key->type, 4) != 0 ||
-	    RegSetValueExW(sub, L"comment", 0, REG_BINARY, comment, comment_len) != 0 ) {
+	    RegSetValueExW(sub, L"comment", 0, REG_BINARY, comment, (DWORD)comment_len) != 0 ) {
 		debug("failed to add key to store");
 		goto done;
 	}
@@ -451,3 +454,5 @@ int process_keyagent_request(struct sshbuf* request, struct sshbuf* response, st
 		return -1;		
 	}
 }
+
+#pragma warning(pop)

@@ -3,6 +3,7 @@
 *
 * UTF-16 <--> UTF-8 definitions
 */
+#pragma once
 #ifndef UTF_H
 #define UTF_H 1
 

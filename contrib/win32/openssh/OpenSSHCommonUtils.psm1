@@ -30,48 +30,141 @@ function Get-RepositoryRoot
 
 <#
 .Synopsis
-    Sets the Secure File ACL. 
-    1. Removed all user acl except Administrators group, system, and current user
-    2. whether or not take the owner
+    Set owner of the file to by LOCALSYSTEM account
+    Set private host key be fully controlled by LOCALSYSTEM and Administrators
+    Set public host key be fully controlled by LOCALSYSTEM and Administrators, read access by everyone
 
 .Outputs
     N/A
 
 .Inputs
     FilePath - The path to the file
-    takeowner - if want to take the ownership
 #>
-function Cleanup-SecureFileACL 
+function Adjust-HostKeyFileACL
 {
-    [CmdletBinding()]
-    param([string]$FilePath, [System.Security.Principal.NTAccount] $Owner)
+        param (
+        [parameter(Mandatory=$true)]
+        [string]$FilePath
+    )
 
-    $myACL = Get-ACL $filePath
-    $myACL.SetAccessRuleProtection($True, $True)
-    Set-Acl -Path $filePath -AclObject $myACL
+    $myACL = Get-ACL $FilePath
+    $myACL.SetAccessRuleProtection($True, $FALSE)
+    Set-Acl -Path $FilePath -AclObject $myACL
 
-    $myACL = Get-ACL $filePath
-    if($owner -ne $null)
-    {        
-        $myACL.SetOwner($owner)
-    }
-    
+    $systemAccount = New-Object System.Security.Principal.NTAccount("NT AUTHORITY", "SYSTEM")
+    $adminAccount = New-Object System.Security.Principal.NTAccount("BUILTIN","Administrators")
+    $everyoneAccount = New-Object System.Security.Principal.NTAccount("EveryOne")
+    $myACL = Get-ACL $FilePath
+
+    $myACL.SetOwner($systemAccount)
+
     if($myACL.Access) 
     {        
         $myACL.Access | % {
-            if (($_ -ne $null) -and ($_.IdentityReference.Value -ine "BUILTIN\Administrators") -and 
-            ($_.IdentityReference.Value -ine "NT AUTHORITY\SYSTEM") -and 
-            ($_.IdentityReference.Value -ine "$(whoami)"))
+            if(-not ($myACL.RemoveAccessRule($_)))
             {
-                if(-not ($myACL.RemoveAccessRule($_)))
-                {
-                    throw "failed to remove access of $($_.IdentityReference.Value) rule in setup "
-                }
+                throw "failed to remove access of $($_.IdentityReference.Value) rule in setup "
             }
+        }
+    }    
+
+    $adminACE = New-Object System.Security.AccessControl.FileSystemAccessRule `
+        ($adminAccount, "FullControl", "None", "None", "Allow") 
+    $myACL.AddAccessRule($adminACE)
+
+    $systemACE = New-Object System.Security.AccessControl.FileSystemAccessRule `
+        ($systemAccount, "FullControl", "None", "None", "Allow")
+    $myACL.AddAccessRule($systemACE)
+
+    if($FilePath.EndsWith(".pub"))
+    {
+        $everyoneAce = New-Object System.Security.AccessControl.FileSystemAccessRule `
+        ("Everyone", "Read", "None", "None", "Allow")
+        $myACL.AddAccessRule($everyoneAce)
+    }
+
+    Set-Acl -Path $FilePath -AclObject $myACL
+}
+
+<#
+.Synopsis
+    Set owner of the user key file
+    Set ACL to have private user key be fully controlled by LOCALSYSTEM and Administrators, Read, write access by owner
+    Set public user key be fully controlled by LOCALSYSTEM and Administrators, Read, write access by owner, read access by everyone
+
+.Outputs
+    N/A
+
+.Inputs
+    FilePath - The path to the file
+    Owner - owner of the file
+    OwnerPerms - the permissions grant to the owner
+#>
+function Adjust-UserKeyFileACL
+{
+    param (
+    [parameter(Mandatory=$true)]
+    [string]$FilePath,
+    [System.Security.Principal.NTAccount] $Owner = $null,
+    [System.Security.AccessControl.FileSystemRights[]] $OwnerPerms = $null
+    )
+
+    $myACL = Get-ACL $FilePath
+    $myACL.SetAccessRuleProtection($True, $FALSE)
+    Set-Acl -Path $FilePath -AclObject $myACL
+
+    $systemAccount = New-Object System.Security.Principal.NTAccount("NT AUTHORITY", "SYSTEM")
+    $adminAccount = New-Object System.Security.Principal.NTAccount("BUILTIN","Administrators")
+    $everyoneAccount = New-Object System.Security.Principal.NTAccount("EveryOne")
+    $myACL = Get-ACL $FilePath
+
+    $actualOwner = $null
+    if($Owner -eq $null)
+    {
+        $actualOwner = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
+    }
+    else
+    {
+        $actualOwner = $Owner
+    }
+
+    $myACL.SetOwner($actualOwner)
+
+    if($myACL.Access) 
+    {        
+        $myACL.Access | % {
+            if(-not ($myACL.RemoveAccessRule($_)))
+            {
+                throw "failed to remove access of $($_.IdentityReference.Value) rule in setup "
+            }
+        }
+    }    
+
+    $adminACE = New-Object System.Security.AccessControl.FileSystemAccessRule `
+        ($adminAccount, "FullControl", "None", "None", "Allow") 
+    $myACL.AddAccessRule($adminACE)
+
+    $systemACE = New-Object System.Security.AccessControl.FileSystemAccessRule `
+        ($systemAccount, "FullControl", "None", "None", "Allow")
+    $myACL.AddAccessRule($systemACE)
+
+    if($OwnerPerms)
+    {
+        $OwnerPerms | % { 
+            $ownerACE = New-Object System.Security.AccessControl.FileSystemAccessRule `
+                ($actualOwner, $_, "None", "None", "Allow")
+            $myACL.AddAccessRule($ownerACE)
         }
     }
 
-    Set-Acl -Path $filePath -AclObject $myACL
+    if($FilePath.EndsWith(".pub"))
+    {
+        $everyoneAce = New-Object System.Security.AccessControl.FileSystemAccessRule `
+        ("Everyone", "Read", "None", "None", "Allow")
+        $myACL.AddAccessRule($everyoneAce)
+    }
+    
+    Set-Acl -Path $FilePath -AclObject $myACL
 }
 
 <#
@@ -88,20 +181,27 @@ function Cleanup-SecureFileACL
 #>
 function Add-PermissionToFileACL 
 {
-    [CmdletBinding()]
-    param(
+        param (
+        [parameter(Mandatory=$true)]
         [string]$FilePath,
+        [parameter(Mandatory=$true)]
         [System.Security.Principal.NTAccount] $User,
-        [System.Security.AccessControl.FileSystemRights]$Perm
+        [parameter(Mandatory=$true)]
+        [System.Security.AccessControl.FileSystemRights[]]$Perms
     )    
 
-    $myACL = Get-ACL $filePath
+    $myACL = Get-ACL $FilePath
         
-    $objACE = New-Object System.Security.AccessControl.FileSystemAccessRule `
-        ($User, $perm, "None", "None", "Allow") 
-    $myACL.AddAccessRule($objACE)    
+    if($Perms)
+    {
+        $Perms | % { 
+            $userACE = New-Object System.Security.AccessControl.FileSystemAccessRule `
+                ($User, $_, "None", "None", "Allow")
+            $myACL.AddAccessRule($userACE)
+        }
+    }    
 
-    Set-Acl -Path $filePath -AclObject $myACL
+    Set-Acl -Path $FilePath -AclObject $myACL
 }
 
-Export-ModuleMember -Function Get-RepositoryRoot, Add-PermissionToFileACL, Cleanup-SecureFileACL 
+Export-ModuleMember -Function Get-RepositoryRoot, Add-PermissionToFileACL, Adjust-HostKeyFileACL, Adjust-UserKeyFileACL

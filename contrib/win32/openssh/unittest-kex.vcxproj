@@ -198,7 +198,6 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="$(OpenSSH-Src-Path)kexgexs.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\kex\tests.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\kex\test_kex.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\test_helper.c" />

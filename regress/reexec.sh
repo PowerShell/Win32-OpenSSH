@@ -1,4 +1,4 @@
-#	$OpenBSD: reexec.sh,v 1.10 2016/12/16 01:06:27 dtucker Exp $
+#	$OpenBSD: reexec.sh,v 1.11 2017/04/30 23:34:55 djm Exp $
 #	Placed in the Public Domain.
 
 tid="reexec tests"
@@ -19,16 +19,13 @@ start_sshd_copy ()
 copy_tests ()
 {
 	rm -f ${COPY}
-	for p in ${SSH_PROTOCOLS} ; do
-		verbose "$tid: proto $p"
-		${SSH} -nqo "Protocol=$p" -F $OBJ/ssh_config somehost \
-		    cat ${DATA} > ${COPY}
-		if [ $? -ne 0 ]; then
-			fail "ssh cat $DATA failed"
-		fi
-		cmp ${DATA} ${COPY}		|| fail "corrupted copy"
-		rm -f ${COPY}
-	done
+	${SSH} -nq -F $OBJ/ssh_config somehost \
+	    cat ${DATA} > ${COPY}
+	if [ $? -ne 0 ]; then
+		fail "ssh cat $DATA failed"
+	fi
+	cmp ${DATA} ${COPY}		|| fail "corrupted copy"
+	rm -f ${COPY}
 }
 
 verbose "test config passing"

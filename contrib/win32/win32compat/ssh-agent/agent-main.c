@@ -31,7 +31,9 @@
  */
 
 #include "agent.h"
+#include "..\misc_internal.h"
 
+#pragma warning(push, 3)
 
 int scm_start_service(DWORD, LPWSTR*);
 
@@ -133,7 +135,6 @@ wmain(int argc, wchar_t **argv)
 			/* - just start ssh-agent service if needed */
 			{
 				SC_HANDLE sc_handle, svc_handle;
-				DWORD err;
 
 				if ((sc_handle = OpenSCManagerW(NULL, NULL, SERVICE_START)) == NULL ||
 					(svc_handle = OpenServiceW(sc_handle, L"ssh-agent", SERVICE_START)) == NULL) {
@@ -168,3 +169,4 @@ scm_start_service(DWORD num, LPWSTR* args)
 	return 0;
 }
 
+#pragma warning(pop)

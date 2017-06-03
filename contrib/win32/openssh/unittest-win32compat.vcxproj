@@ -25,6 +25,12 @@
     <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\win32compat\tests.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\test_helper.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_common.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\win32compat\dir_tests.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\win32compat\miscellaneous_tests.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\win32compat\string_tests.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(OpenSSH-Src-Path)regress\unittests\win32compat\tests.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{BF295BA9-4BF8-43F8-8CBF-FAE84815466C}</ProjectGuid>

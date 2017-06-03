@@ -179,17 +179,14 @@
     <ClCompile Include="$(OpenSSH-Src-Path)canohost.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)chacha.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)channels.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)cipher-3des1.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-aes.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-aesctr.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)cipher-bf1.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-chachapoly.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-ctr.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cleanup.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)compat.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)crc32.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)deattack.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)dh.c">
       <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
@@ -287,6 +284,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)digest-openssl.c">
       <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)kexgexs.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h" />

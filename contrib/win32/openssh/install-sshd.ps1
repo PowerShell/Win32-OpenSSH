@@ -96,9 +96,9 @@ cmd.exe /c 'sc.exe sdset ssh-agent D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPW
 
 New-Service -Name sshd -BinaryPathName $sshdpath -Description "SSH Daemon" -StartupType Manual -DependsOn ssh-agent | Out-Null
 sc.exe config sshd obj= $sshdAccount
+sc.exe privs sshd SeAssignPrimaryTokenPrivilege
 
 Add-Privilege -Account $sshdAccount -Privilege SeAssignPrimaryTokenPrivilege
-Add-Privilege -Account $sshdAccount -Privilege SeServiceLogonRight
 
 if(-not (test-path $logsdir -PathType Container))
 {

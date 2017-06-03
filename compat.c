@@ -1,4 +1,4 @@
-/* $OpenBSD: compat.c,v 1.100 2017/02/03 23:01:19 djm Exp $ */
+/* $OpenBSD: compat.c,v 1.103 2017/04/30 23:13:25 djm Exp $ */
 /*
  * Copyright (c) 1999, 2000, 2001, 2002 Markus Friedl.  All rights reserved.
  *
@@ -39,24 +39,8 @@
 #include "match.h"
 #include "kex.h"
 
-int compat13 = 0;
-int compat20 = 0;
 int datafellows = 0;
 
-void
-enable_compat20(void)
-{
-	if (compat20)
-		return;
-	debug("Enabling compatibility mode for protocol 2.0");
-	compat20 = 1;
-}
-void
-enable_compat13(void)
-{
-	debug("Enabling compatibility mode for protocol 1.3");
-	compat13 = 1;
-}
 /* datafellows bug compatibility */
 u_int
 compat_datafellows(const char *version)
@@ -232,13 +216,6 @@ proto_spec(const char *spec)
 		return ret;
 	for ((p = strsep(&q, SEP)); p && *p != '\0'; (p = strsep(&q, SEP))) {
 		switch (atoi(p)) {
-		case 1:
-#ifdef WITH_SSH1
-			if (ret == SSH_PROTO_UNKNOWN)
-				ret |= SSH_PROTO_1_PREFERRED;
-			ret |= SSH_PROTO_1;
-#endif
-			break;
 		case 2:
 			ret |= SSH_PROTO_2;
 			break;

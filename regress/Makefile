@@ -89,30 +89,33 @@ INTEROP_TESTS=	putty-transfer putty-ciphers putty-kex conch-ciphers
 
 #LTESTS= 	cipher-speed
 
-USERNAME!=		id -un
+USERNAME=		${LOGNAME}
 CLEANFILES=	*.core actual agent-key.* authorized_keys_${USERNAME} \
 		authorized_keys_${USERNAME}.* \
 		authorized_principals_${USERNAME} \
 		banner.in banner.out cert_host_key* cert_user_key* \
 		copy.1 copy.2 data ed25519-agent ed25519-agent* \
-		ed25519-agent.pub empty.in expect failed-regress.log \
-		failed-ssh.log failed-sshd.log hkr.* host.rsa host.rsa1 \
-		host_* host_ca_key* host_krl_* host_revoked_* key.* \
-		key.dsa-* key.ecdsa-* key.ed25519-512 key.ed25519-512.pub \
-		key.rsa-* keys-command-args kh.* known_hosts \
-		known_hosts-cert known_hosts.* krl-* ls.copy modpipe \
-		netcat pidfile putty.rsa2 ready regress.log remote_pid \
-		revoked-* rsa rsa-agent rsa-agent.pub rsa.pub rsa1 \
-		rsa1-agent rsa1-agent.pub rsa1.pub rsa_ssh2_cr.prv \
+		ed25519-agent.pub ed25519 ed25519.pub empty.in \
+		expect failed-regress.log failed-ssh.log failed-sshd.log \
+		hkr.* host.ed25519 host.rsa host.rsa1 host_* \
+		host_ca_key* host_krl_* host_revoked_* key.* \
+		key.dsa-* key.ecdsa-* key.ed25519-512 \
+		key.ed25519-512.pub key.rsa-* keys-command-args kh.* \
+		known_hosts known_hosts-cert known_hosts.* krl-* ls.copy \
+		modpipe netcat no_identity_config \
+		pidfile putty.rsa2 ready regress.log \
+		remote_pid revoked-* rsa rsa-agent rsa-agent.pub rsa.pub \
+		rsa1 rsa1-agent rsa1-agent.pub rsa1.pub rsa_ssh2_cr.prv \
 		rsa_ssh2_crnl.prv scp-ssh-wrapper.exe \
 		scp-ssh-wrapper.scp setuid-allowed sftp-server.log \
 		sftp-server.sh sftp.log ssh-log-wrapper.sh ssh.log \
 		ssh_config ssh_config.* ssh_proxy ssh_proxy_bak \
-		ssh_proxy_envpass sshd.log sshd_config sshd_config.orig \
-		sshd_proxy sshd_proxy.* sshd_proxy_bak sshd_proxy_orig \
-		t10.out t10.out.pub t12.out t12.out.pub t2.out t3.out \
-		t6.out1 t6.out2 t7.out t7.out.pub t8.out t8.out.pub \
-		t9.out t9.out.pub testdata user_*key* user_ca* user_key*
+		ssh_proxy_envpass sshd.log sshd_config sshd_config_minimal \
+		sshd_config.orig sshd_proxy sshd_proxy.* sshd_proxy_bak \
+		sshd_proxy_orig t10.out t10.out.pub t12.out t12.out.pub \
+		t2.out t3.out t6.out1 t6.out2 t7.out t7.out.pub \
+		t8.out t8.out.pub t9.out t9.out.pub testdata \
+		user_*key* user_ca* user_key*
 
 SUDO_CLEAN+=	/var/run/testdata_${USERNAME} /var/run/keycommand_${USERNAME}
 

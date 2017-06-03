@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.255 2017/03/11 23:40:26 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.258 2017/05/05 10:42:49 naddy Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -1322,8 +1322,6 @@ pubkey_prepare(Authctxt *authctxt)
 	/* list of keys stored in the filesystem and PKCS#11 */
 	for (i = 0; i < options.num_identity_files; i++) {
 		key = options.identity_keys[i];
-		if (key && key->type == KEY_RSA1)
-			continue;
 		if (key && key->cert && key->cert->type != SSH2_CERT_TYPE_USER)
 			continue;
 		options.identity_keys[i] = NULL;
@@ -1352,7 +1350,7 @@ pubkey_prepare(Authctxt *authctxt)
 		if (r != SSH_ERR_AGENT_NOT_PRESENT)
 			debug("%s: ssh_get_authentication_socket: %s",
 			    __func__, ssh_err(r));
-	} else if ((r = ssh_fetch_identitylist(agent_fd, 2, &idlist)) != 0) {
+	} else if ((r = ssh_fetch_identitylist(agent_fd, &idlist)) != 0) {
 		if (r != SSH_ERR_AGENT_NO_IDENTITIES)
 			debug("%s: ssh_fetch_identitylist: %s",
 			    __func__, ssh_err(r));
@@ -1476,7 +1474,7 @@ try_identity(Identity *id)
 		    key_type(id->key), id->filename);
 		return (0);
 	}
-	return (id->key->type != KEY_RSA1);
+	return 1;
 }
 
 int
@@ -1484,6 +1482,7 @@ userauth_pubkey(Authctxt *authctxt)
 {
 	Identity *id;
 	int sent = 0;
+	char *fp;
 
 	while ((id = TAILQ_FIRST(&authctxt->keys))) {
 		if (id->tried++)
@@ -1498,8 +1497,16 @@ userauth_pubkey(Authctxt *authctxt)
 		 */
 		if (id->key != NULL) {
 			if (try_identity(id)) {
-				debug("Offering %s public key: %s",
-				    key_type(id->key), id->filename);
+				if ((fp = sshkey_fingerprint(id->key,
+				    options.fingerprint_hash,
+				    SSH_FP_DEFAULT)) == NULL) {
+					error("%s: sshkey_fingerprint failed",
+					    __func__);
+					return 0;
+				}
+				debug("Offering public key: %s %s %s",
+				    sshkey_type(id->key), fp, id->filename);
+				free(fp);
 				sent = send_pubkey_test(authctxt, id);
 			}
 		} else {
@@ -1765,7 +1772,6 @@ userauth_hostbased(Authctxt *authctxt)
 		private = NULL;
 		for (i = 0; i < authctxt->sensitive->nkeys; i++) {
 			if (authctxt->sensitive->keys[i] == NULL ||
-			    authctxt->sensitive->keys[i]->type == KEY_RSA1 ||
 			    authctxt->sensitive->keys[i]->type == KEY_UNSPEC)
 				continue;
 			if (match_pattern_list(

@@ -40,6 +40,11 @@
 #include "key.h"
 #include "inc\utf.h"
 
+#pragma warning(push, 3)
+
+int 
+pubkey_allowed(struct sshkey*, HANDLE);
+
 static void
 InitLsaString(LSA_STRING *lsa_string, const char *str)
 {
@@ -47,7 +52,7 @@ InitLsaString(LSA_STRING *lsa_string, const char *str)
 		memset(lsa_string, 0, sizeof(LSA_STRING));
 	else {
 		lsa_string->Buffer = (char *)str;
-		lsa_string->Length = strlen(str);
+		lsa_string->Length = (USHORT)strlen(str);
 		lsa_string->MaximumLength = lsa_string->Length + 1;
 	}
 }
@@ -146,7 +151,7 @@ generate_user_token(wchar_t* user_cpn) {
 		s4u_logon = (KERB_S4U_LOGON*)logon_info;
 		s4u_logon->MessageType = KerbS4ULogon;
 		s4u_logon->Flags = 0;
-		s4u_logon->ClientUpn.Length = wcslen(user_cpn) * 2;
+		s4u_logon->ClientUpn.Length = (USHORT)wcslen(user_cpn) * 2;
 		s4u_logon->ClientUpn.MaximumLength = s4u_logon->ClientUpn.Length;
 		s4u_logon->ClientUpn.Buffer = (WCHAR*)(s4u_logon + 1);
 		memcpy(s4u_logon->ClientUpn.Buffer, user_cpn, s4u_logon->ClientUpn.Length + 2);
@@ -164,7 +169,7 @@ generate_user_token(wchar_t* user_cpn) {
 		s4u_logon = (MSV1_0_S4U_LOGON*)logon_info;
 		s4u_logon->MessageType = MsV1_0S4ULogon;
 		s4u_logon->Flags = 0;
-		s4u_logon->UserPrincipalName.Length = wcslen(user_cpn) * 2;
+		s4u_logon->UserPrincipalName.Length = (USHORT)wcslen(user_cpn) * 2;
 		s4u_logon->UserPrincipalName.MaximumLength = s4u_logon->UserPrincipalName.Length;
 		s4u_logon->UserPrincipalName.Buffer = (WCHAR*)(s4u_logon + 1);
 		memcpy(s4u_logon->UserPrincipalName.Buffer, user_cpn, s4u_logon->UserPrincipalName.Length + 2);
@@ -184,7 +189,7 @@ generate_user_token(wchar_t* user_cpn) {
 		Network,
 		auth_package_id,
 		logon_info,
-		logon_info_size,
+		(ULONG)logon_info_size,
 		NULL,
 		&sourceContext,
 		(PVOID*)&pProfile,
@@ -208,14 +213,39 @@ done:
 	return token;
 }
 
+static HANDLE
+duplicate_token_for_client(struct agent_connection* con, HANDLE t) {
+	ULONG client_pid;
+	HANDLE client_proc = NULL, dup_t = NULL;
+
+	/* Should the token match client's session id?
+	ULONG client_sessionId;
+	if (GetNamedPipeClientSessionId(con->pipe_handle, &client_sessionId) == FALSE ||
+	    SetTokenInformation(t, TokenSessionId, &client_sessionId, sizeof(client_sessionId)) == FALSE) {
+		error("unable to set token session id, error: %d", GetLastError());
+		goto done;
+	}*/
+
+	if ((FALSE == GetNamedPipeClientProcessId(con->pipe_handle, &client_pid)) ||
+		((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
+		DuplicateHandle(GetCurrentProcess(), t, client_proc, &dup_t, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS) == FALSE ) {
+		error("failed to duplicate user token");
+		goto done;
+	}
+
+done:
+	if (client_proc)
+		CloseHandle(client_proc);
+	return dup_t;
+}
+
 /* TODO - SecureZeroMemory password */
 int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	char *user = NULL, *domain = NULL, *pwd = NULL;
 	size_t user_len, pwd_len;
 	wchar_t *user_utf16 = NULL, *udom_utf16 = NULL, *pwd_utf16 = NULL, *tmp;
 	int r = -1;
-	HANDLE token = 0, dup_token, client_proc = 0;
-	ULONG client_pid;
+	HANDLE token = 0, dup_token;
 
 	if (sshbuf_get_cstring(request, &user, &user_len) != 0 ||
 	    sshbuf_get_cstring(request, &pwd, &pwd_len) != 0 ||
@@ -243,13 +273,11 @@ int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response
 		goto done;
 	}
 
-	if ((FALSE == GetNamedPipeClientProcessId(con->pipe_handle, &client_pid)) ||
-	    ((client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
-	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
-	    (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)) {
-		debug("failed to duplicate user token");
+	if ((dup_token = duplicate_token_for_client(con, token)) == NULL)
 		goto done;
-	}
+
+	if (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)
+		goto done;
 
 	con->auth_token = token;
 	LoadProfile(con, user_utf16, udom_utf16);
@@ -267,8 +295,6 @@ done:
 		free(user_utf16);
 	if (pwd_utf16)
 		free(pwd_utf16);
-	if (client_proc)
-		CloseHandle(client_proc);
 
 	return r;
 }
@@ -278,11 +304,10 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 	char *key_blob, *user, *sig, *blob;
 	size_t key_blob_len, user_len, sig_len, blob_len;
 	struct sshkey *key = NULL;
-	HANDLE token = NULL, dup_token = NULL, client_proc = NULL;
+	HANDLE token = NULL, dup_token = NULL;
 	wchar_t *user_utf16 = NULL, *udom_utf16 = NULL, *tmp;
 	PWSTR wuser_home = NULL;
-	ULONG client_pid;
-	LUID_AND_ATTRIBUTES priv_to_delete[1];
+	
 
 	user = NULL;
 	if (sshbuf_get_string_direct(request, &key_blob, &key_blob_len) != 0 ||
@@ -301,7 +326,7 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 	}
 
 	if ((token = generate_user_token(user_utf16)) == 0) {
-		debug("unable to generate token for user %ls", user_utf16);
+		error("unable to generate token for user %ls", user_utf16);
 		goto done;
 	}
 
@@ -311,18 +336,16 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 		goto done;
 	}
 
-	if (key_verify(key, sig, sig_len, blob, blob_len) != 1) {
+	if (key_verify(key, sig, (u_int)sig_len, blob, (u_int)blob_len) != 1) {
 		debug("signature verification failed");
 		goto done;
 	}
 
-	if ((FALSE == GetNamedPipeClientProcessId(con->pipe_handle, &client_pid)) ||
-	    ( (client_proc = OpenProcess(PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL) ||
-	    (FALSE == DuplicateHandle(GetCurrentProcess(), token, client_proc, &dup_token, TOKEN_QUERY | TOKEN_IMPERSONATE, FALSE, DUPLICATE_SAME_ACCESS)) ||
-	    (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)) {
-		debug("failed to authorize user");
+	if ((dup_token = duplicate_token_for_client(con, token)) == NULL)
 		goto done;
-	}
+
+	if (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)
+		goto done;
 
 	con->auth_token = token; 
 	token = NULL;
@@ -346,8 +369,6 @@ done:
 		sshkey_free(key);
 	if (wuser_home)
 		CoTaskMemFree(wuser_home);
-	if (client_proc)
-		CloseHandle(client_proc);
 	if (token)
 		CloseHandle(token);
 	return r;
@@ -361,6 +382,12 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 		return -1;
 	}
 
+	/* allow only admins and NT Service\sshd to send auth requests */
+	if (con->client_type != SSHD_SERVICE && con->client_type != ADMIN_USER) {
+		error("cannot authenticate: client process is not admin or sshd");
+		return -1;
+	}
+		
 	if (memcmp(opn, PUBKEY_AUTH_REQUEST, opn_len) == 0)
 		return process_pubkeyauth_request(request, response, con);
 	else if (memcmp(opn, PASSWD_AUTH_REQUEST, opn_len) == 0)
@@ -370,3 +397,5 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 		return -1;
 	}
 }
+
+#pragma warning(pop)

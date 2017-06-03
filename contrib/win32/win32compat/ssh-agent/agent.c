@@ -110,9 +110,7 @@ agent_listen_loop()
 		if (GetLastError() == ERROR_PIPE_CONNECTED) {
 			debug("Client has already connected");
 			SetEvent(ol.hEvent);
-		}
-				
-		if (GetLastError() != ERROR_IO_PENDING) {
+		} else if (GetLastError() != ERROR_IO_PENDING) {
 			debug("ConnectNamedPipe failed ERROR: %d", GetLastError());
 			SetEvent(event_stop_agent);
 		}

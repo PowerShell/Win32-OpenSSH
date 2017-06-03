@@ -1,4 +1,4 @@
-/* $OpenBSD: nchan.c,v 1.63 2010/01/26 01:28:35 djm Exp $ */
+/* $OpenBSD: nchan.c,v 1.65 2017/04/30 23:28:42 djm Exp $ */
 /*
  * Copyright (c) 1999, 2000, 2001, 2002 Markus Friedl.  All rights reserved.
  *
@@ -33,7 +33,6 @@
 #include <stdarg.h>
 
 #include "openbsd-compat/sys-queue.h"
-#include "ssh1.h"
 #include "ssh2.h"
 #include "buffer.h"
 #include "packet.h"
@@ -74,9 +73,6 @@
 /*
  * ACTIONS: should never update the channel states
  */
-static void	chan_send_ieof1(Channel *);
-static void	chan_send_oclose1(Channel *);
-static void	chan_send_close2(Channel *);
 static void	chan_send_eof2(Channel *);
 static void	chan_send_eow2(Channel *);
 
@@ -96,6 +92,7 @@ chan_set_istate(Channel *c, u_int next)
 	    istates[next]);
 	c->istate = next;
 }
+
 static void
 chan_set_ostate(Channel *c, u_int next)
 {
@@ -106,34 +103,6 @@ chan_set_ostate(Channel *c, u_int next)
 	c->ostate = next;
 }
 
-/*
- * SSH1 specific implementation of event functions
- */
-
-static void
-chan_rcvd_oclose1(Channel *c)
-{
-	debug2("channel %d: rcvd oclose", c->self);
-	switch (c->istate) {
-	case CHAN_INPUT_WAIT_OCLOSE:
-		chan_set_istate(c, CHAN_INPUT_CLOSED);
-		break;
-	case CHAN_INPUT_OPEN:
-		chan_shutdown_read(c);
-		chan_send_ieof1(c);
-		chan_set_istate(c, CHAN_INPUT_CLOSED);
-		break;
-	case CHAN_INPUT_WAIT_DRAIN:
-		/* both local read_failed and remote write_failed  */
-		chan_send_ieof1(c);
-		chan_set_istate(c, CHAN_INPUT_CLOSED);
-		break;
-	default:
-		error("channel %d: protocol error: rcvd_oclose for istate %d",
-		    c->self, c->istate);
-		return;
-	}
-}
 void
 chan_read_failed(Channel *c)
 {
@@ -149,6 +118,7 @@ chan_read_failed(Channel *c)
 		break;
 	}
 }
+
 void
 chan_ibuf_empty(Channel *c)
 {
@@ -160,14 +130,9 @@ chan_ibuf_empty(Channel *c)
 	}
 	switch (c->istate) {
 	case CHAN_INPUT_WAIT_DRAIN:
-		if (compat20) {
-			if (!(c->flags & (CHAN_CLOSE_SENT|CHAN_LOCAL)))
-				chan_send_eof2(c);
-			chan_set_istate(c, CHAN_INPUT_CLOSED);
-		} else {
-			chan_send_ieof1(c);
-			chan_set_istate(c, CHAN_INPUT_WAIT_OCLOSE);
-		}
+		if (!(c->flags & (CHAN_CLOSE_SENT|CHAN_LOCAL)))
+			chan_send_eof2(c);
+		chan_set_istate(c, CHAN_INPUT_CLOSED);
 		break;
 	default:
 		error("channel %d: chan_ibuf_empty for istate %d",
@@ -175,44 +140,7 @@ chan_ibuf_empty(Channel *c)
 		break;
 	}
 }
-static void
-chan_rcvd_ieof1(Channel *c)
-{
-	debug2("channel %d: rcvd ieof", c->self);
-	switch (c->ostate) {
-	case CHAN_OUTPUT_OPEN:
-		chan_set_ostate(c, CHAN_OUTPUT_WAIT_DRAIN);
-		break;
-	case CHAN_OUTPUT_WAIT_IEOF:
-		chan_set_ostate(c, CHAN_OUTPUT_CLOSED);
-		break;
-	default:
-		error("channel %d: protocol error: rcvd_ieof for ostate %d",
-		    c->self, c->ostate);
-		break;
-	}
-}
-static void
-chan_write_failed1(Channel *c)
-{
-	debug2("channel %d: write failed", c->self);
-	switch (c->ostate) {
-	case CHAN_OUTPUT_OPEN:
-		chan_shutdown_write(c);
-		chan_send_oclose1(c);
-		chan_set_ostate(c, CHAN_OUTPUT_WAIT_IEOF);
-		break;
-	case CHAN_OUTPUT_WAIT_DRAIN:
-		chan_shutdown_write(c);
-		chan_send_oclose1(c);
-		chan_set_ostate(c, CHAN_OUTPUT_CLOSED);
-		break;
-	default:
-		error("channel %d: chan_write_failed for ostate %d",
-		    c->self, c->ostate);
-		break;
-	}
-}
+
 void
 chan_obuf_empty(Channel *c)
 {
@@ -225,8 +153,6 @@ chan_obuf_empty(Channel *c)
 	switch (c->ostate) {
 	case CHAN_OUTPUT_WAIT_DRAIN:
 		chan_shutdown_write(c);
-		if (!compat20)
-			chan_send_oclose1(c);
 		chan_set_ostate(c, CHAN_OUTPUT_CLOSED);
 		break;
 	default:
@@ -235,47 +161,90 @@ chan_obuf_empty(Channel *c)
 		break;
 	}
 }
-static void
-chan_send_ieof1(Channel *c)
+
+void
+chan_rcvd_eow(Channel *c)
 {
-	debug2("channel %d: send ieof", c->self);
+	debug2("channel %d: rcvd eow", c->self);
 	switch (c->istate) {
 	case CHAN_INPUT_OPEN:
-	case CHAN_INPUT_WAIT_DRAIN:
-		packet_start(SSH_MSG_CHANNEL_INPUT_EOF);
-		packet_put_int(c->remote_id);
-		packet_send();
-		break;
-	default:
-		error("channel %d: cannot send ieof for istate %d",
-		    c->self, c->istate);
-		break;
-	}
-}
-static void
-chan_send_oclose1(Channel *c)
-{
-	debug2("channel %d: send oclose", c->self);
-	switch (c->ostate) {
-	case CHAN_OUTPUT_OPEN:
-	case CHAN_OUTPUT_WAIT_DRAIN:
-		buffer_clear(&c->output);
-		packet_start(SSH_MSG_CHANNEL_OUTPUT_CLOSE);
-		packet_put_int(c->remote_id);
-		packet_send();
-		break;
-	default:
-		error("channel %d: cannot send oclose for ostate %d",
-		    c->self, c->ostate);
+		chan_shutdown_read(c);
+		chan_set_istate(c, CHAN_INPUT_CLOSED);
 		break;
 	}
 }
 
-/*
- * the same for SSH2
- */
 static void
-chan_rcvd_close2(Channel *c)
+chan_send_eof2(Channel *c)
+{
+	debug2("channel %d: send eof", c->self);
+	switch (c->istate) {
+	case CHAN_INPUT_WAIT_DRAIN:
+		packet_start(SSH2_MSG_CHANNEL_EOF);
+		packet_put_int(c->remote_id);
+		packet_send();
+		c->flags |= CHAN_EOF_SENT;
+		break;
+	default:
+		error("channel %d: cannot send eof for istate %d",
+		    c->self, c->istate);
+		break;
+	}
+}
+
+static void
+chan_send_close2(Channel *c)
+{
+	debug2("channel %d: send close", c->self);
+	if (c->ostate != CHAN_OUTPUT_CLOSED ||
+	    c->istate != CHAN_INPUT_CLOSED) {
+		error("channel %d: cannot send close for istate/ostate %d/%d",
+		    c->self, c->istate, c->ostate);
+	} else if (c->flags & CHAN_CLOSE_SENT) {
+		error("channel %d: already sent close", c->self);
+	} else {
+		packet_start(SSH2_MSG_CHANNEL_CLOSE);
+		packet_put_int(c->remote_id);
+		packet_send();
+		c->flags |= CHAN_CLOSE_SENT;
+	}
+}
+
+static void
+chan_send_eow2(Channel *c)
+{
+	debug2("channel %d: send eow", c->self);
+	if (c->ostate == CHAN_OUTPUT_CLOSED) {
+		error("channel %d: must not sent eow on closed output",
+		    c->self);
+		return;
+	}
+	if (!(datafellows & SSH_NEW_OPENSSH))
+		return;
+	packet_start(SSH2_MSG_CHANNEL_REQUEST);
+	packet_put_int(c->remote_id);
+	packet_put_cstring("eow@openssh.com");
+	packet_put_char(0);
+	packet_send();
+}
+
+/* shared */
+
+void
+chan_rcvd_ieof(Channel *c)
+{
+	debug2("channel %d: rcvd eof", c->self);
+	c->flags |= CHAN_EOF_RCVD;
+	if (c->ostate == CHAN_OUTPUT_OPEN)
+		chan_set_ostate(c, CHAN_OUTPUT_WAIT_DRAIN);
+	if (c->ostate == CHAN_OUTPUT_WAIT_DRAIN &&
+	    buffer_len(&c->output) == 0 &&
+	    !CHANNEL_EFD_OUTPUT_ACTIVE(c))
+		chan_obuf_empty(c);
+}
+
+void
+chan_rcvd_oclose(Channel *c)
 {
 	debug2("channel %d: rcvd close", c->self);
 	if (!(c->flags & CHAN_LOCAL)) {
@@ -313,26 +282,7 @@ chan_rcvd_close2(Channel *c)
 }
 
 void
-chan_rcvd_eow(Channel *c)
-{
-	debug2("channel %d: rcvd eow", c->self);
-	switch (c->istate) {
-	case CHAN_INPUT_OPEN:
-		chan_shutdown_read(c);
-		chan_set_istate(c, CHAN_INPUT_CLOSED);
-		break;
-	}
-}
-static void
-chan_rcvd_eof2(Channel *c)
-{
-	debug2("channel %d: rcvd eof", c->self);
-	c->flags |= CHAN_EOF_RCVD;
-	if (c->ostate == CHAN_OUTPUT_OPEN)
-		chan_set_ostate(c, CHAN_OUTPUT_WAIT_DRAIN);
-}
-static void
-chan_write_failed2(Channel *c)
+chan_write_failed(Channel *c)
 {
 	debug2("channel %d: write failed", c->self);
 	switch (c->ostate) {
@@ -348,88 +298,6 @@ chan_write_failed2(Channel *c)
 		    c->self, c->ostate);
 		break;
 	}
-}
-static void
-chan_send_eof2(Channel *c)
-{
-	debug2("channel %d: send eof", c->self);
-	switch (c->istate) {
-	case CHAN_INPUT_WAIT_DRAIN:
-		packet_start(SSH2_MSG_CHANNEL_EOF);
-		packet_put_int(c->remote_id);
-		packet_send();
-		c->flags |= CHAN_EOF_SENT;
-		break;
-	default:
-		error("channel %d: cannot send eof for istate %d",
-		    c->self, c->istate);
-		break;
-	}
-}
-static void
-chan_send_close2(Channel *c)
-{
-	debug2("channel %d: send close", c->self);
-	if (c->ostate != CHAN_OUTPUT_CLOSED ||
-	    c->istate != CHAN_INPUT_CLOSED) {
-		error("channel %d: cannot send close for istate/ostate %d/%d",
-		    c->self, c->istate, c->ostate);
-	} else if (c->flags & CHAN_CLOSE_SENT) {
-		error("channel %d: already sent close", c->self);
-	} else {
-		packet_start(SSH2_MSG_CHANNEL_CLOSE);
-		packet_put_int(c->remote_id);
-		packet_send();
-		c->flags |= CHAN_CLOSE_SENT;
-	}
-}
-static void
-chan_send_eow2(Channel *c)
-{
-	debug2("channel %d: send eow", c->self);
-	if (c->ostate == CHAN_OUTPUT_CLOSED) {
-		error("channel %d: must not sent eow on closed output",
-		    c->self);
-		return;
-	}
-	if (!(datafellows & SSH_NEW_OPENSSH))
-		return;
-	packet_start(SSH2_MSG_CHANNEL_REQUEST);
-	packet_put_int(c->remote_id);
-	packet_put_cstring("eow@openssh.com");
-	packet_put_char(0);
-	packet_send();
-}
-
-/* shared */
-
-void
-chan_rcvd_ieof(Channel *c)
-{
-	if (compat20)
-		chan_rcvd_eof2(c);
-	else
-		chan_rcvd_ieof1(c);
-	if (c->ostate == CHAN_OUTPUT_WAIT_DRAIN &&
-	    buffer_len(&c->output) == 0 &&
-	    !CHANNEL_EFD_OUTPUT_ACTIVE(c))
-		chan_obuf_empty(c);
-}
-void
-chan_rcvd_oclose(Channel *c)
-{
-	if (compat20)
-		chan_rcvd_close2(c);
-	else
-		chan_rcvd_oclose1(c);
-}
-void
-chan_write_failed(Channel *c)
-{
-	if (compat20)
-		chan_write_failed2(c);
-	else
-		chan_write_failed1(c);
 }
 
 void
@@ -447,10 +315,6 @@ chan_is_dead(Channel *c, int do_send)
 	}
 	if (c->istate != CHAN_INPUT_CLOSED || c->ostate != CHAN_OUTPUT_CLOSED)
 		return 0;
-	if (!compat20) {
-		debug2("channel %d: is dead", c->self);
-		return 1;
-	}
 	if ((datafellows & SSH_BUG_EXTEOF) &&
 	    c->extended_usage == CHAN_EXTENDED_WRITE &&
 	    c->efd != -1 &&
@@ -488,7 +352,7 @@ static void
 chan_shutdown_write(Channel *c)
 {
 	buffer_clear(&c->output);
-	if (compat20 && c->type == SSH_CHANNEL_LARVAL)
+	if (c->type == SSH_CHANNEL_LARVAL)
 		return;
 	/* shutdown failure is allowed if write failed already */
 	debug2("channel %d: close_write", c->self);
@@ -504,10 +368,11 @@ chan_shutdown_write(Channel *c)
 			    c->self, c->wfd, strerror(errno));
 	}
 }
+
 static void
 chan_shutdown_read(Channel *c)
 {
-	if (compat20 && c->type == SSH_CHANNEL_LARVAL)
+	if (c->type == SSH_CHANNEL_LARVAL)
 		return;
 	debug2("channel %d: close_read", c->self);
 	if (c->sock != -1) {

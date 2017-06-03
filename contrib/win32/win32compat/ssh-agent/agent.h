@@ -1,5 +1,7 @@
 #include <Windows.h>
 #include <stdio.h>
+#define __attribute__(A)
+#include "log.h"
 #define MAX_MESSAGE_SIZE 256 * 1024
 
 #define SSH_ROOT L"SOFTWARE\\SSH"
@@ -25,10 +27,13 @@ struct agent_connection {
 		WRITING,
 		DONE
 	} state;
-	enum {
+	enum { /* retain this order */
 		UNKNOWN = 0,
-		USER, /* client is running as some user */
-		MACHINE /* clinet is running as machine - System, NS or LS */
+		NONADMIN_USER, /* client is running as a nonadmin user */
+		ADMIN_USER, /* client is running as admin */
+		SSHD_SERVICE, /* client is sshd service */
+		SYSTEM, /* client is running as System */
+		SERVICE, /* client is running as LS or NS */
 	} client_type;
         HANDLE auth_token;
         HANDLE hProfile;

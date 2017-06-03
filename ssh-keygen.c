@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.299 2017/03/10 04:26:06 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.303 2017/05/07 23:15:59 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -150,6 +150,15 @@ u_int32_t certflags_flags = CERTOPT_DEFAULT;
 char *certflags_command = NULL;
 char *certflags_src_addr = NULL;
 
+/* Arbitrary extensions specified by user */
+struct cert_userext {
+	char *key;
+	char *val;
+	int crit;
+};
+struct cert_userext *cert_userext;
+size_t ncert_userext;
+
 /* Conversion to/from various formats */
 int convert_to = 0;
 int convert_from = 0;
@@ -218,17 +227,25 @@ type_bits_valid(int type, const char *name, u_int32_t *bitsp)
 	    OPENSSL_DSA_MAX_MODULUS_BITS : OPENSSL_RSA_MAX_MODULUS_BITS;
 	if (*bitsp > maxbits)
 		fatal("key bits exceeds maximum %d", maxbits);
-	if (type == KEY_DSA && *bitsp != 1024)
-		fatal("DSA keys must be 1024 bits");
-	else if (type != KEY_ECDSA && type != KEY_ED25519 && *bitsp < 1024)
-		fatal("Key must at least be 1024 bits");
-	else if (type == KEY_ECDSA && sshkey_ecdsa_bits_to_nid(*bitsp) == -1)
-		fatal("Invalid ECDSA key length - valid lengths are "
+	switch (type) {
+	case KEY_DSA:
+		if (*bitsp != 1024)
+			fatal("Invalid DSA key length: must be 1024 bits");
+		break;
+	case KEY_RSA:
+		if (*bitsp < SSH_RSA_MINIMUM_MODULUS_SIZE)
+			fatal("Invalid RSA key length: minimum is %d bits",
+			    SSH_RSA_MINIMUM_MODULUS_SIZE);
+		break;
+	case KEY_ECDSA:
+		if (sshkey_ecdsa_bits_to_nid(*bitsp) == -1)
+			fatal("Invalid ECDSA key length: valid lengths are "
 #ifdef OPENSSL_HAS_NISTP521
-		    "256, 384 or 521 bits");
+				"256, 384 or 521 bits");
 #else
 			"256 or 384 bits");
 #endif
+	}
 #endif
 }
 
@@ -242,9 +259,6 @@ ask_filename(struct passwd *pw, const char *prompt)
 		name = _PATH_SSH_CLIENT_ID_RSA;
 	else {
 		switch (sshkey_type_from_name(key_type_name)) {
-		case KEY_RSA1:
-			name = _PATH_SSH_CLIENT_IDENTITY;
-			break;
 		case KEY_DSA_CERT:
 		case KEY_DSA:
 			name = _PATH_SSH_CLIENT_ID_DSA;
@@ -316,8 +330,6 @@ do_convert_to_ssh2(struct passwd *pw, struct sshkey *k)
 	char comment[61];
 	int r;
 
-	if (k->type == KEY_RSA1)
-		fatal("version 1 keys are not supported");
 	if ((r = sshkey_to_blob(k, &blob, &len)) != 0)
 		fatal("key_to_blob failed: %s", ssh_err(r));
 	/* Comment + surrounds must fit into 72 chars (RFC 4716 sec 3.3) */
@@ -339,7 +351,6 @@ static void
 do_convert_to_pkcs8(struct sshkey *k)
 {
 	switch (sshkey_type_plain(k->type)) {
-	case KEY_RSA1:
 	case KEY_RSA:
 		if (!PEM_write_RSA_PUBKEY(stdout, k->rsa))
 			fatal("PEM_write_RSA_PUBKEY failed");
@@ -364,7 +375,6 @@ static void
 do_convert_to_pem(struct sshkey *k)
 {
 	switch (sshkey_type_plain(k->type)) {
-	case KEY_RSA1:
 	case KEY_RSA:
 		if (!PEM_write_RSAPublicKey(stdout, k->rsa))
 			fatal("PEM_write_RSAPublicKey failed");
@@ -821,13 +831,6 @@ try_read_key(char **cpp)
 	struct sshkey *ret;
 	int r;
 
-	if ((ret = sshkey_new(KEY_RSA1)) == NULL)
-		fatal("sshkey_new failed");
-	/* Try RSA1 */
-	if ((r = sshkey_read(ret, cpp)) == 0)
-		return ret;
-	/* Try modern */
-	sshkey_free(ret);
 	if ((ret = sshkey_new(KEY_UNSPEC)) == NULL)
 		fatal("sshkey_new failed");
 	if ((r = sshkey_read(ret, cpp)) == 0)
@@ -983,9 +986,6 @@ do_gen_all_hostkeys(struct passwd *pw)
 		char *path;
 	} key_types[] = {
 #ifdef WITH_OPENSSL
-#ifdef WITH_SSH1
-		{ "rsa1", "RSA1", _PATH_HOST_KEY_FILE },
-#endif /* WITH_SSH1 */
 		{ "rsa", "RSA" ,_PATH_HOST_RSA_KEY_FILE },
 		{ "dsa", "DSA", _PATH_HOST_DSA_KEY_FILE },
 #ifdef OPENSSL_HAS_ECC
@@ -1043,21 +1043,6 @@ do_gen_all_hostkeys(struct passwd *pw)
 		}
 		sshkey_free(private);
 		strlcat(identity_file, ".pub", sizeof(identity_file));
-#ifdef WINDOWS
-		/* Windows POSIX adpater does not support fdopen() on open(file)*/
-		if ((f = fopen(identity_file, "w")) == NULL) {
-			error("fopen %s failed: %s", identity_file, strerror(errno));
-			sshkey_free(public);
-			first = 0;
-			continue;
-		}
-		/*
-		Set the owner of the private key file to the user represented by pw 
-		and only grant it the full control access
-		*/
-		if (set_secure_file_permission(identity_file, pw) !=0) {
-			error("set_secure_file_permission on %s failed!", identity_file);
-#else  /* !WINDOWS */
 		fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (fd == -1) {
 			error("Could not save your public key in %s",
@@ -1066,6 +1051,12 @@ do_gen_all_hostkeys(struct passwd *pw)
 			first = 0;
 			continue;
 		}
+#ifdef WINDOWS
+		/* Windows POSIX adpater does not support fdopen() on open(file)*/
+		close(fd);
+		if ((f = fopen(identity_file, "w")) == NULL) {
+			error("fopen %s failed: %s", identity_file, strerror(errno));			
+#else  /* !WINDOWS */
 		f = fdopen(fd, "w");
 		if (f == NULL) {
 			error("fdopen %s failed", identity_file);
@@ -1462,9 +1453,8 @@ do_change_comment(struct passwd *pw)
 		}
 	}
 
-	if (private->type != KEY_RSA1 && private->type != KEY_ED25519 &&
-	    !use_new_format) {
-		error("Comments are only supported for RSA1 or keys stored in "
+	if (private->type != KEY_ED25519 && !use_new_format) {
+		error("Comments are only supported for keys stored in "
 		    "the new format (-o).");
 		explicit_bzero(passphrase, strlen(passphrase));
 		sshkey_free(private);
@@ -1507,14 +1497,6 @@ do_change_comment(struct passwd *pw)
 
 	strlcat(identity_file, ".pub", sizeof(identity_file));
 	fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-#ifdef WINDOWS
-	/*
-	Set the owner of the private key file to user represented by pw and only grant
-	it the full control access
-	*/
-	if (set_secure_file_permission(identity_file, pw) != 0)
-		fatal("set_secure_file_permission on %s failed!", identity_file);
-#endif /* WINDOWS*/	
 	if (fd == -1)
 		fatal("Could not save your public key in %s", identity_file);
 	f = fdopen(fd, "w");
@@ -1565,6 +1547,8 @@ add_string_option(struct sshbuf *c, const char *name, const char *value)
 static void
 prepare_options_buf(struct sshbuf *c, int which)
 {
+	size_t i;
+
 	sshbuf_reset(c);
 	if ((which & OPTIONS_CRITICAL) != 0 &&
 	    certflags_command != NULL)
@@ -1587,6 +1571,17 @@ prepare_options_buf(struct sshbuf *c, int which)
 	if ((which & OPTIONS_CRITICAL) != 0 &&
 	    certflags_src_addr != NULL)
 		add_string_option(c, "source-address", certflags_src_addr);
+	for (i = 0; i < ncert_userext; i++) {
+		if ((cert_userext[i].crit && (which & OPTIONS_EXTENSIONS)) ||
+		    (!cert_userext[i].crit && (which & OPTIONS_CRITICAL)))
+			continue;
+		if (cert_userext[i].val == NULL)
+			add_flag_option(c, cert_userext[i].key);
+		else {
+			add_string_option(c, cert_userext[i].key,
+			    cert_userext[i].val);
+		}
+	}
 }
 
 static struct sshkey *
@@ -1697,16 +1692,7 @@ do_ca_sign(struct passwd *pw, int argc, char **argv)
 
 		if ((fd = open(out, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1)
 			fatal("Could not open \"%s\" for writing: %s", out,
-			    strerror(errno));
-#ifdef WINDOWS
-		/*
-		Set the owner of the private key file to user represented by pw and only grant
-		it the full control access
-		*/
-		if (set_secure_file_permission(out, pw) != 0)
-			fatal("set_secure_file_permission on %s failed!", identity_file);
-#endif /* WINDOWS */
-		
+			    strerror(errno));		
 		if ((f = fdopen(fd, "w")) == NULL)
 			fatal("%s: fdopen: %s", __func__, strerror(errno));
 		if ((r = sshkey_write(public, f)) != 0)
@@ -1833,7 +1819,8 @@ parse_cert_times(char *timespec)
 static void
 add_cert_option(char *opt)
 {
-	char *val;
+	char *val, *cp;
+	int iscrit = 0;
 
 	if (strcasecmp(opt, "clear") == 0)
 		certflags_flags = 0;
@@ -1873,6 +1860,18 @@ add_cert_option(char *opt)
 		if (addr_match_cidr_list(NULL, val) != 0)
 			fatal("Invalid source-address list");
 		certflags_src_addr = xstrdup(val);
+	} else if (strncasecmp(opt, "extension:", 10) == 0 ||
+		   (iscrit = (strncasecmp(opt, "critical:", 9) == 0))) {
+		val = xstrdup(strchr(opt, ':') + 1);
+		if ((cp = strchr(val, '=')) != NULL)
+			*cp++ = '\0';
+		cert_userext = xreallocarray(cert_userext, ncert_userext + 1,
+		    sizeof(*cert_userext));
+		cert_userext[ncert_userext].key = val;
+		cert_userext[ncert_userext].val = cp == NULL ?
+		    NULL : xstrdup(cp);
+		cert_userext[ncert_userext].crit = iscrit;
+		ncert_userext++;
 	} else
 		fatal("Unsupported certificate option \"%s\"", opt);
 }
@@ -2216,14 +2215,6 @@ do_gen_krl(struct passwd *pw, int updating, int argc, char **argv)
 		fatal("Couldn't generate KRL");
 	if ((fd = open(identity_file, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1)
 		fatal("open %s: %s", identity_file, strerror(errno));
-#ifdef WINDOWS
-	/*
-	Set the owner of the private key file to user represented by pw and only grant
-	it the full control access
-	*/
-	if (set_secure_file_permission(identity_file, pw) != 0)
-		fatal("set_secure_file_permission on %s failed!", identity_file);
-#endif /* WINDOWS */
 	if (atomicio(vwrite, fd, (void *)sshbuf_ptr(kbuf), sshbuf_len(kbuf)) !=
 	    sshbuf_len(kbuf))
 		fatal("write %s: %s", identity_file, strerror(errno));
@@ -2261,17 +2252,11 @@ do_check_krl(struct passwd *pw, int argc, char **argv)
 	exit(ret);
 }
 
-#ifdef WITH_SSH1
-# define RSA1_USAGE " | rsa1"
-#else
-# define RSA1_USAGE ""
-#endif
-
 static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: ssh-keygen [-q] [-b bits] [-t dsa | ecdsa | ed25519 | rsa%s]\n"
+	    "usage: ssh-keygen [-q] [-b bits] [-t dsa | ecdsa | ed25519 | rsa]\n"
 	    "                  [-N new_passphrase] [-C comment] [-f output_keyfile]\n"
 	    "       ssh-keygen -p [-P old_passphrase] [-N new_passphrase] [-f keyfile]\n"
 	    "       ssh-keygen -i [-m key_format] [-f input_keyfile]\n"
@@ -2279,7 +2264,7 @@ usage(void)
 	    "       ssh-keygen -y [-f input_keyfile]\n"
 	    "       ssh-keygen -c [-P passphrase] [-C comment] [-f keyfile]\n"
 	    "       ssh-keygen -l [-v] [-E fingerprint_hash] [-f input_keyfile]\n"
-	    "       ssh-keygen -B [-f input_keyfile]\n", RSA1_USAGE);
+	    "       ssh-keygen -B [-f input_keyfile]\n");
 #ifdef ENABLE_PKCS11
 	fprintf(stderr,
 	    "       ssh-keygen -D pkcs11\n");
@@ -2789,20 +2774,15 @@ passphrase_again:
 		printf("Your identification has been saved in %s.\n", identity_file);
 
 	strlcat(identity_file, ".pub", sizeof(identity_file));
-#ifdef WINDOWS
-	/* Windows POSIX adpater does not support fdopen() on open(file)*/
-	if ((f = fopen(identity_file, "w")) == NULL)
-		fatal("fopen %s failed: %s", identity_file, strerror(errno));
-	/*
-	Set the owner of the private key file to the user represented by pw and only grant
-	it the full control access
-	*/
-	if (set_secure_file_permission(identity_file, pw) != 0)
-		error("set_secure_file_permission on %s failed!", identity_file);
-#else  /* !WINDOWS */
 	if ((fd = open(identity_file, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1)
 		fatal("Unable to save public key to %s: %s",
 		    identity_file, strerror(errno));
+#ifdef WINDOWS
+	/* Windows POSIX adpater does not support fdopen() on open(file)*/
+	close(fd);
+	if ((f = fopen(identity_file, "w")) == NULL)
+		fatal("fopen %s failed: %s", identity_file, strerror(errno));
+#else  /* !WINDOWS */
 	if ((f = fdopen(fd, "w")) == NULL)
 		fatal("fdopen %s failed: %s", identity_file, strerror(errno));
 #endif  /* !WINDOWS */

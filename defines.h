@@ -328,6 +328,28 @@ typedef unsigned int size_t;
 #define SIZE_MAX SIZE_T_MAX
 #endif
 
+#ifndef INT32_MAX
+# if (SIZEOF_INT == 4)
+#  define INT32_MAX INT_MAX
+# elif (SIZEOF_LONG == 4)
+#  define INT32_MAX LONG_MAX
+# else
+#  error "need INT32_MAX"
+# endif
+#endif
+
+#ifndef INT64_MAX
+# if (SIZEOF_INT == 8)
+#  define INT64_MAX INT_MAX
+# elif (SIZEOF_LONG == 8)
+#  define INT64_MAX LONG_MAX
+# elif (SIZEOF_LONG_LONG_INT == 8)
+#  define INT64_MAX LLONG_MAX
+# else
+#  error "need INT64_MAX"
+# endif
+#endif
+
 #ifndef HAVE_SSIZE_T
 typedef int ssize_t;
 # define HAVE_SSIZE_T

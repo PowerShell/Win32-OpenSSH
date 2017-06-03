@@ -1,5 +1,5 @@
 ﻿$ErrorActionPreference = 'Stop'
-Import-Module $PSScriptRoot\OpenSSHCommonUtils.psm1 -DisableNameChecking
+Import-Module $PSScriptRoot\OpenSSHCommonUtils.psm1 -DisableNameChecking -Force
 
 [System.IO.DirectoryInfo] $repositoryRoot = Get-RepositoryRoot
 # test environment parameters initialized with defaults
@@ -158,18 +158,24 @@ WARNING: Following changes will be made to OpenSSH configuration
     # copy new sshd_config
     Copy-Item (Join-Path $Script:E2ETestDirectory sshd_config) (Join-Path $script:OpenSSHBinPath sshd_config) -Force
     
-    #workaround for the cariggage new line added by git before copy them
-    Get-ChildItem "$($Script:E2ETestDirectory)\sshtest_*key*" | % {
+    #copy sshtest keys
+    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force    
+    Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*"| % {
+        #workaround for the cariggage new line added by git before copy them
         (Get-Content $_.FullName -Raw).Replace("`r`n","`n") | Set-Content $_.FullName -Force
+        Adjust-HostKeyFileACL -FilePath $_.FullName
+        if (-not ($_.Name.EndsWith(".pub"))) {
+            Add-PermissionToFileACL -FilePath $_.FullName -User "NT Service\sshd" -Perm "Read"
+        }
     }
 
-    #copy sshtest keys
-    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force
-    $owner = New-Object System.Security.Principal.NTAccount($env:USERDOMAIN, $env:USERNAME)
-    Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*" -Exclude *.pub | % {
-        Cleanup-SecureFileACL -FilePath $_.FullName -Owner $owner
-        Add-PermissionToFileACL -FilePath $_.FullName -User "NT Service\sshd" -Perm "Read"
-    }
+    #register host keys with agent
+    <#Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*"| % {
+        if (-not ($_.Name.EndsWith(".pub"))) {
+            & "$env:ProgramData\chocolatey\lib\sysinternals\tools\psexec" -accepteula -nobanner -i -s -w $($script:OpenSSHBinPath) cmd.exe /c "ssh-add $_"
+            Add-PermissionToFileACL -FilePath $_.FullName -User "NT Service\sshd" -Perm "Read"
+        }
+    }#>
     Restart-Service sshd -Force
    
     #Backup existing known_hosts and replace with test version
@@ -190,6 +196,7 @@ WARNING: Following changes will be made to OpenSSH configuration
         Copy-Item $sshConfigFilePath (Join-Path $dotSshDirectoryPath config.ori) -Force
     }
     Copy-Item (Join-Path $Script:E2ETestDirectory ssh_config) $sshConfigFilePath -Force
+    Adjust-UserKeyFileACL -FilePath $sshConfigFilePath -OwnerPerms "Read,Write"
 
     # create test accounts
     #TODO - this is Windows specific. Need to be in PAL
@@ -216,9 +223,12 @@ WARNING: Following changes will be made to OpenSSH configuration
     $authorizedKeyPath = Join-Path $ssouserProfile .ssh\authorized_keys
     $testPubKeyPath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519.pub    
     Copy-Item $testPubKeyPath $authorizedKeyPath -Force -ErrorAction SilentlyContinue
+    $owner = New-Object System.Security.Principal.NTAccount($SSOUser)
+    Adjust-UserKeyFileACL -FilePath $authorizedKeyPath -Owner $owner -OwnerPerms "Read","Write"
     Add-PermissionToFileACL -FilePath $authorizedKeyPath -User "NT Service\sshd" -Perm "Read"
     $testPriKeypath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519
-    Cleanup-SecureFileACL -FilePath $testPriKeypath -owner $owner
+    (Get-Content $testPriKeypath -Raw).Replace("`r`n","`n") | Set-Content $testPriKeypath -Force
+    Adjust-UserKeyFileACL -FilePath $testPriKeypath -OwnerPerms "Read, Write"
     cmd /c "ssh-add $testPriKeypath 2>&1 >> $Script:TestSetupLogFile"
     Backup-OpenSSHTestInfo
 }
@@ -305,6 +315,13 @@ function Cleanup-OpenSSHTestEnvironment
     {
         Throw "Cannot find OpenSSH binaries under $script:OpenSSHBinPath. "
     }
+
+    #unregister test host keys from agent
+    Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*.pub"| % {
+            $cmd = "cmd /c `"$env:ProgramData\chocolatey\lib\sysinternals\tools\psexec -accepteula -nobanner -s -w $($script:OpenSSHBinPath) ssh-add -d $_ 2> tmp.txt`""
+            iex $cmd
+    }
+    
 
     #Restore sshd_config
     $backupConfigPath = Join-Path $Script:OpenSSHBinPath sshd_config.ori

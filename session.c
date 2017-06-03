@@ -299,101 +299,13 @@ xauth_valid_string(const char *s)
  * - Interactive shell/commands are executed using ssh-shellhost.exe
  * - ssh-shellhost.exe implements server-side PTY for Windows
  */
-#include <Shlobj.h>
-#include <Sddl.h>
 
-#define SET_USER_ENV(folder_id, evn_variable) do  {                \
-       if (SHGetKnownFolderPath(&folder_id,0,token,&path) == S_OK)              \
-        {                                                                       \
-                SetEnvironmentVariableW(evn_variable, path);                    \
-                CoTaskMemFree(path);                                            \
-       }                                                                        \
-} while (0)
 
 #define UTF8_TO_UTF16_FATAL(o, i) do {				\
 	if (o != NULL) free(o);					\
 	if ((o = utf8_to_utf16(i)) == NULL)			\
 		fatal("%s, out of memory", __func__);		\
 } while (0)
-
-static void setup_session_user_vars(Session* s)	/* set user environment variables from user profile */
-{
-	/* retrieve and set env variables. */
-	HKEY reg_key = 0;
-	HANDLE token = s->authctxt->methoddata;
-	wchar_t *path;
-	wchar_t name[256];
-	wchar_t *data = NULL, *data_expanded = NULL, *path_value = NULL, *to_apply;
-	DWORD type, name_chars = 256, data_chars = 0, data_expanded_chars = 0, required, i = 0;
-	LONG ret;
-
-	if (ImpersonateLoggedOnUser(token) == FALSE)
-		debug("Failed to impersonate user token, %d", GetLastError());
-	SET_USER_ENV(FOLDERID_LocalAppData, L"LOCALAPPDATA");
-	SET_USER_ENV(FOLDERID_Profile, L"USERPROFILE");
-	SET_USER_ENV(FOLDERID_RoamingAppData, L"APPDATA");
-
-	ret = RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_QUERY_VALUE, &reg_key);
-	if (ret != ERROR_SUCCESS)
-		error("Error retrieving user environment variables. RegOpenKeyExW returned %d", ret);
-	else while (1) {
-		to_apply = NULL;
-		required = data_chars * 2;
-		name_chars = 256;
-		ret = RegEnumValueW(reg_key, i++, name, &name_chars, 0, &type, (LPBYTE)data, &required);
-		if (ret == ERROR_NO_MORE_ITEMS)
-			break;
-		else if (ret == ERROR_MORE_DATA || required > data_chars * 2) {
-			if (data != NULL)
-				free(data);
-			data = xmalloc(required);
-			data_chars = required/2;
-			i--;
-			continue;
-		}
-		else if (ret != ERROR_SUCCESS) {
-			error("Error retrieving user environment variables. RegEnumValueW returned %d", ret);
-			break;
-		}
-
-		if (type == REG_SZ)
-			to_apply = data;
-		else if (type == REG_EXPAND_SZ) {
-			required = ExpandEnvironmentStringsW(data, data_expanded, data_expanded_chars);
-			if (required > data_expanded_chars) {
-				if (data_expanded)
-					free(data_expanded);
-				data_expanded = xmalloc(required * 2);
-				data_expanded_chars = required;
-				ExpandEnvironmentStringsW(data, data_expanded, data_expanded_chars);
-			}
-			to_apply = data_expanded;
-		}
-
-		if (wcsicmp(name, L"PATH") == 0) {
-			if ((required = GetEnvironmentVariableW(L"PATH", NULL, 0)) != 0) {
-				/* "required" includes null term */
-				path_value = xmalloc((wcslen(to_apply) + 1 + required)*2);
-				GetEnvironmentVariableW(L"PATH", path_value, required);
-				path_value[required - 1] = L';';
-				memcpy(path_value + required, to_apply, (wcslen(to_apply) + 1) * 2);
-				to_apply = path_value;
-			}
-
-		}
-		if (to_apply)
-			SetEnvironmentVariableW(name, to_apply);
-	}
-	if (reg_key)
-		RegCloseKey(reg_key);
-	if (data)
-		free(data);
-	if (data_expanded)
-		free(data_expanded);
-	if (path_value)
-		free(path_value);
-	RevertToSelf();
-}
 
 static void setup_session_vars(Session* s) {
 	wchar_t *pw_dir_w = NULL, *tmp = NULL;
@@ -410,14 +322,16 @@ static void setup_session_vars(Session* s) {
 		UTF8_TO_UTF16_FATAL(tmp, s->display);
 		SetEnvironmentVariableW(L"DISPLAY", tmp);
 	}
-	SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w);
 	SetEnvironmentVariableW(L"USERPROFILE", pw_dir_w);
 
-	if (pw_dir_w[1] == L':') {
+	if (pw_dir_w[0] && pw_dir_w[1] == L':') {
+		SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w + 2);
 		wchar_t wc = pw_dir_w[2];
 		pw_dir_w[2] = L'\0';
 		SetEnvironmentVariableW(L"HOMEDRIVE", pw_dir_w);
 		pw_dir_w[2] = wc;
+	} else {
+		SetEnvironmentVariableW(L"HOMEPATH", pw_dir_w);
 	}
 
 	snprintf(buf, sizeof buf, "%.50s %d %d",
@@ -444,7 +358,6 @@ static void setup_session_vars(Session* s) {
 		SetEnvironmentVariableW(L"PROMPT", wbuf);
 	}
 
-	setup_session_user_vars(s);
 	free(pw_dir_w);
 	free(tmp);
 }
@@ -579,29 +492,6 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 
 		if (!b)
 			fatal("ERROR. Cannot create process (%u).\n", GetLastError());
-		else if (pty) { /*attach to shell console */
-			FreeConsole();
-			if (!debug_flag)
-				ImpersonateLoggedOnUser(hToken);
-			Sleep(20);
-			while (AttachConsole(pi.dwProcessId) == FALSE) {
-				DWORD exit_code;
-				if (GetExitCodeProcess(pi.hProcess, &exit_code) && exit_code != STILL_ACTIVE)
-					break;
-				Sleep(100);
-			}
-			if (!debug_flag)
-				RevertToSelf();
-			{
-				/* TODO - check this - Create Process above is not respecting x# and y# chars, so we are doing this explicity on the
-				* attached console agein */
-
-				COORD coord;
-				coord.X = s->col;
-				coord.Y = 9999;;
-				SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coord);
-			}
-		}
 
 		CloseHandle(pi.hThread);
 		s->pid = pi.dwProcessId;

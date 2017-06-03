@@ -1,4 +1,4 @@
-/* $OpenBSD: dispatch.c,v 1.27 2015/05/01 07:10:01 djm Exp $ */
+/* $OpenBSD: dispatch.c,v 1.29 2017/04/30 23:28:42 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -30,7 +30,6 @@
 #include <signal.h>
 #include <stdarg.h>
 
-#include "ssh1.h"
 #include "ssh2.h"
 #include "log.h"
 #include "dispatch.h"
@@ -45,8 +44,6 @@ dispatch_protocol_error(int type, u_int32_t seq, void *ctx)
 	int r;
 
 	logit("dispatch_protocol_error: type %d seq %u", type, seq);
-	if (!compat20)
-		fatal("protocol error");
 	if ((r = sshpkt_start(ssh, SSH2_MSG_UNIMPLEMENTED)) != 0 ||
 	    (r = sshpkt_put_u32(ssh, seq)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0 ||

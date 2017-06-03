@@ -59,15 +59,9 @@ tty_make_modes(int fd, struct termios *tiop)
 	void (*put_arg)(Buffer *, u_int);
 
 	buffer_init(&buf);
-	if (compat20) {
-		tty_op_ospeed = TTY_OP_OSPEED_PROTO2;
-		tty_op_ispeed = TTY_OP_ISPEED_PROTO2;
-		put_arg = buffer_put_int;
-	} else {
-		tty_op_ospeed = TTY_OP_OSPEED_PROTO1;
-		tty_op_ispeed = TTY_OP_ISPEED_PROTO1;
-		put_arg = (void (*)(Buffer *, u_int)) buffer_put_char;
-	}
+	tty_op_ospeed = TTY_OP_OSPEED_PROTO2;
+	tty_op_ispeed = TTY_OP_ISPEED_PROTO2;
+	put_arg = buffer_put_int;
 
 	/* Store input and output baud rates. */
 	baud = 9600;
@@ -93,10 +87,7 @@ tty_make_modes(int fd, struct termios *tiop)
 end:
 	/* Mark end of mode data. */
 	buffer_put_char(&buf, TTY_OP_END);
-	if (compat20)
-		packet_put_string(buffer_ptr(&buf), buffer_len(&buf));
-	else
-		packet_put_raw(buffer_ptr(&buf), buffer_len(&buf));
+	packet_put_string(buffer_ptr(&buf), buffer_len(&buf));
 	buffer_free(&buf);
 }
 
@@ -116,16 +107,11 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 	u_int (*get_arg)(void);
 	int arg_size;
 
-	if (compat20) {
-		*n_bytes_ptr = packet_get_int();
-		if (*n_bytes_ptr == 0)
-			return;
-		get_arg = packet_get_int;
-		arg_size = 4;
-	} else {
-		get_arg = packet_get_char;
-		arg_size = 1;
-	}
+	*n_bytes_ptr = packet_get_int();
+	if (*n_bytes_ptr == 0)
+		return;
+	get_arg = packet_get_int;
+	arg_size = 4;
 
 	for (;;) {
 		n_bytes += 1;
@@ -168,35 +154,7 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 		default:
 			debug("Ignoring unsupported tty mode opcode %d (0x%x)",
 			    opcode, opcode);
-			if (!compat20) {
-				/*
-				 * SSH1:
-				 * Opcodes 1 to 127 are defined to have
-				 * a one-byte argument.
-				 * Opcodes 128 to 159 are defined to have
-				 * an integer argument.
-				 */
-				if (opcode > 0 && opcode < 128) {
-					n_bytes += 1;
-					(void) packet_get_char();
-					break;
-				} else if (opcode >= 128 && opcode < 160) {
-					n_bytes += 4;
-					(void) packet_get_int();
-					break;
-				} else {
-					/*
-					 * It is a truly undefined opcode (160 to 255).
-					 * We have no idea about its arguments.  So we
-					 * must stop parsing.  Note that some data
-					 * may be left in the packet; hopefully there
-					 * is nothing more coming after the mode data.
-					 */
-					logit("parse_tty_modes: unknown opcode %d",
-					    opcode);
-					goto set;
-				}
-			} else {
+			{
 				/*
 				 * SSH2:
 				 * Opcodes 1 to 159 are defined to have
