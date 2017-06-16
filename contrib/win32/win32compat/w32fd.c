@@ -76,22 +76,46 @@ fd_table_initialize()
 	memset(&w32_io_stdin, 0, sizeof(w32_io_stdin));
 	w32_io_stdin.std_handle = STD_INPUT_HANDLE;
 	w32_io_stdin.type = NONSOCK_SYNC_FD;
-	if (getenv(SSH_ASYNC_STDIN) && strcmp(getenv(SSH_ASYNC_STDIN), "1") == 0)
-		w32_io_stdin.type = NONSOCK_FD;
+
+	char *envValue = NULL;
+	_dupenv_s(&envValue, NULL, SSH_ASYNC_STDIN);
+	if (NULL != envValue) {
+		if(strcmp(envValue, "1") == 0)
+			w32_io_stdin.type = NONSOCK_FD;
+		
+		free(envValue);
+	}
+
 	_putenv_s(SSH_ASYNC_STDIN, "");
 	fd_table_set(&w32_io_stdin, STDIN_FILENO);
 	memset(&w32_io_stdout, 0, sizeof(w32_io_stdout));
 	w32_io_stdout.std_handle = STD_OUTPUT_HANDLE;
 	w32_io_stdout.type = NONSOCK_SYNC_FD;
-	if (getenv(SSH_ASYNC_STDOUT) && strcmp(getenv(SSH_ASYNC_STDOUT), "1") == 0)
-		w32_io_stdout.type = NONSOCK_FD;
+	
+	envValue = NULL;
+	_dupenv_s(&envValue, NULL, SSH_ASYNC_STDOUT);
+	if (NULL != envValue) {
+		if(strcmp(envValue, "1") == 0)
+			w32_io_stdout.type = NONSOCK_FD;
+
+		free(envValue);
+	}
+
 	_putenv_s(SSH_ASYNC_STDOUT, "");
 	fd_table_set(&w32_io_stdout, STDOUT_FILENO);
 	memset(&w32_io_stderr, 0, sizeof(w32_io_stderr));
 	w32_io_stderr.std_handle = STD_ERROR_HANDLE;
 	w32_io_stderr.type = NONSOCK_SYNC_FD;
-	if (getenv(SSH_ASYNC_STDERR) && strcmp(getenv(SSH_ASYNC_STDERR), "1") == 0)
-		w32_io_stderr.type = NONSOCK_FD;
+
+	envValue = NULL;
+	_dupenv_s(&envValue, NULL, SSH_ASYNC_STDERR);
+	if (NULL != envValue) {
+		if(strcmp(envValue, "1") == 0)
+			w32_io_stderr.type = NONSOCK_FD;
+
+		free(envValue);
+	}
+
 	_putenv_s(SSH_ASYNC_STDERR, "");
 	fd_table_set(&w32_io_stderr, STDERR_FILENO);
 	return 0;
@@ -426,7 +450,7 @@ w32_read(int fd, void *dst, size_t max)
 }
 
 int
-w32_write(int fd, const void *buf, unsigned int max)
+w32_write(int fd, const void *buf, size_t max)
 {
 	CHECK_FD(fd);
 
@@ -899,14 +923,14 @@ w32_fsync(int fd)
 * this decoration is done only when additional arguments are passed in argv
 */
 int
-spawn_child(char* cmd, char** argv, int in, int out, int err, DWORD flags)
+spawn_child(char* cmd, char** argv, int in, int out, int err, unsigned long flags)
 {
 	PROCESS_INFORMATION pi;
 	STARTUPINFOW si;
 	BOOL b;
 	char *cmdline, *t, **t1;
 	DWORD cmdline_len = 0;
-	wchar_t * cmdline_utf16;
+	wchar_t * cmdline_utf16 = NULL;
 	int add_module_path = 0, ret = -1;
 
 	/* should module path be added */
@@ -923,14 +947,14 @@ spawn_child(char* cmd, char** argv, int in, int out, int err, DWORD flags)
 
 	/* compute total cmdline len*/
 	if (add_module_path)
-		cmdline_len += strlen(w32_programdir()) + 1 + strlen(cmd) + 1 + 2;
+		cmdline_len += (DWORD)strlen(w32_programdir()) + 1 + (DWORD)strlen(cmd) + 1 + 2;
 	else
-		cmdline_len += strlen(cmd) + 1 + 2;
+		cmdline_len += (DWORD)strlen(cmd) + 1 + 2;
 
 	if (argv) {
 		t1 = argv;
 		while (*t1)
-			cmdline_len += strlen(*t1++) + 1 + 2;
+			cmdline_len += (DWORD)strlen(*t1++) + 1 + 2;
 	}
 
 	if ((cmdline = malloc(cmdline_len)) == NULL) {

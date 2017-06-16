@@ -166,8 +166,6 @@ unsigned char*
 ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char **respbuf, size_t *resplen)
 {
 	int currentX;
-	int currentY;
-	int bufLen, cmpLen, i;
 
 	if (!fcompletion) {
 		if (pszBuffer < pszBufferEnd - 1) {

@@ -35,6 +35,7 @@
 #include <limits.h>
 #ifdef WINDOWS
 #include <lm.h>
+#include <wchar.h>
 #endif
 
 #include "xmalloc.h"
@@ -53,6 +54,7 @@ int
 ga_init(const char *user, gid_t base)
 {
 #ifdef WINDOWS
+#pragma warning(push, 3)
 	LPLOCALGROUP_USERS_INFO_0 local_groups_info = NULL, tmp_groups_info;
 	wchar_t *user_utf16 = NULL, *full_name_utf16 = NULL, *udom_utf16 = NULL, *tmp;
 	char *group_utf8 = NULL;
@@ -68,7 +70,7 @@ ga_init(const char *user, gid_t base)
 		goto done;
 	}
 
-	full_name_len = wcslen(user_utf16) + 1;
+	full_name_len = (DWORD)wcslen(user_utf16) + 1;
 	if ((full_name_utf16 = malloc(full_name_len * sizeof(wchar_t))) == NULL) {
 		errno = ENOMEM;
 		goto done;
@@ -77,7 +79,7 @@ ga_init(const char *user, gid_t base)
 	if ((tmp = wcschr(user_utf16, L'@')) != NULL) {
 		udom_utf16 = tmp + 1;
 		*tmp = L'\0';
-		index = wcslen(udom_utf16) + 1;
+		index = (DWORD)wcslen(udom_utf16) + 1;
 		wmemcpy(full_name_utf16, udom_utf16, index);
 		full_name_utf16[wcslen(udom_utf16)] = L'\\';
 	}
@@ -126,6 +128,8 @@ done:
 		free(full_name_utf16);
 	if (local_groups_info != NULL)
 		NetApiBufferFree(local_groups_info);
+
+#pragma warning(pop)
 
 #else /* !WINDOWS */
 	gid_t *groups_bygid;

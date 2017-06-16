@@ -4,6 +4,7 @@
 * POSIX header and needed function definitions
 */
 #pragma once
+#include <stddef.h>
 #include "sys\types.h"
 #include "fcntl.h"
 
@@ -21,7 +22,7 @@ int w32_pipe(int *pfds);
 int w32_read(int fd, void *dst, size_t max);
 
 #define write w32_write
-int w32_write(int fd, const void *buf, unsigned int max);
+int w32_write(int fd, const void *buf, size_t max);
 
 #define writev w32_writev
 int w32_writev(int fd, const struct iovec *iov, int iovcnt);
@@ -78,7 +79,7 @@ int daemon(int nochdir, int noclose);
 char *crypt(const char *key, const char *salt);
 int link(const char *oldpath, const char *newpath);
 int readlink(const char *path, char *link, int linklen);
-int spawn_child(char*, char**, int, int, int, DWORD);
+int spawn_child(char*, char**, int, int, int, unsigned long);
 
 /* 
  * readpassphrase.h definitions 

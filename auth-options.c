@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-options.c,v 1.72 2016/11/30 02:57:40 djm Exp $ */
+/* $OpenBSD: auth-options.c,v 1.73 2017/05/31 10:54:00 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -119,7 +119,8 @@ match_flag(const char *opt, int allow_negate, char **optsp, const char *msg)
  * side effect: sets key option flags
  */
 int
-auth_parse_options(struct passwd *pw, char *opts, char *file, u_long linenum)
+auth_parse_options(struct passwd *pw, char *opts, const char *file,
+    u_long linenum)
 {
 	struct ssh *ssh = active_state;		/* XXX */
 	const char *cp;

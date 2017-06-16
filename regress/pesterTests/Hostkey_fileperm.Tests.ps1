@@ -69,7 +69,7 @@ Describe "Tests for host keys file permission" -Tags "CI" {
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 2; Stop-Process $_; Start-sleep 1 } }            
 
             #validate file content does not contain unprotected info.
             $logPath | Should Not Contain "UNPROTECTED PRIVATE KEY FILE!"
@@ -86,7 +86,7 @@ Describe "Tests for host keys file permission" -Tags "CI" {
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 2 } }            
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 2; Stop-Process $_; Start-sleep 1 } }            
 
             #validate file content does not contain unprotected info.
             $logPath | Should Not Contain "UNPROTECTED PRIVATE KEY FILE!"
@@ -101,7 +101,7 @@ Describe "Tests for host keys file permission" -Tags "CI" {
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 2; Stop-Process $_; Start-sleep 1 } }
             
 
             #validate file content does not contain unprotected info.
@@ -119,7 +119,7 @@ Describe "Tests for host keys file permission" -Tags "CI" {
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 2; Stop-Process $_; Start-sleep 1 } }
 
             #validate file content contains unprotected info.
             $logPath | Should Contain "key_load_private: bad permissions"            
@@ -137,7 +137,7 @@ Describe "Tests for host keys file permission" -Tags "CI" {
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 2; Stop-Process $_; Start-sleep 1 } }
 
             #validate file content contains unprotected info.
             $logPath | Should Contain "key_load_private: bad permissions"
@@ -152,7 +152,7 @@ Describe "Tests for host keys file permission" -Tags "CI" {
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-h $hostKeyFilePath", "-E $logPath") -NoNewWindow
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }
+            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 2; Stop-Process $_; Start-sleep 1 } }
 
             #validate file content contains unprotected info.
             $logPath | Should Contain "key_load_public: Permission denied"

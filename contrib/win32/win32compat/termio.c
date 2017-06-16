@@ -45,6 +45,7 @@
 #include "inc\utf.h"
 #include "debug.h"
 #include "tnnet.h"
+#include "misc_internal.h"
 
 #define TERM_IO_BUF_SIZE 2048
 
@@ -123,7 +124,7 @@ syncio_initiate_read(struct w32_io* pio)
 
 	read_thread = CreateThread(NULL, 0, ReadThread, pio, 0, NULL);
 	if (read_thread == NULL) {
-		errno = errno_from_Win32Error(GetLastError());
+		errno = errno_from_Win32LastError();
 		debug3("TermRead initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
 		return -1;
 	}
@@ -164,7 +165,7 @@ WriteThread(_In_ LPVOID lpParameter)
 		pio->write_details.buf[write_status.to_transfer] = '\0';
 		if (0 == in_raw_mode) {
 			wchar_t* t = utf8_to_utf16(pio->write_details.buf);
-			WriteConsoleW(WINHANDLE(pio), t, wcslen(t), 0, 0);
+			WriteConsoleW(WINHANDLE(pio), t, (DWORD)wcslen(t), 0, 0);
 			free(t);		
 		} else {
 			processBuffer(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
@@ -200,7 +201,7 @@ syncio_initiate_write(struct w32_io* pio, DWORD num_bytes)
 	write_status.to_transfer = num_bytes;
 	write_thread = CreateThread(NULL, 0, WriteThread, pio, 0, NULL);
 	if (write_thread == NULL) {
-		errno = errno_from_Win32Error(GetLastError());
+		errno = errno_from_Win32LastError();
 		debug3("TermWrite initiate - ERROR CreateThread %d, io:%p", GetLastError(), pio);
 		return -1;
 	}
@@ -215,7 +216,6 @@ int
 syncio_close(struct w32_io* pio)
 {
 	debug4("syncio_close - pio:%p", pio);
-	HANDLE h;
 	CancelIoEx(WINHANDLE(pio), NULL);
 
 	/* If io is pending, let worker threads exit. */

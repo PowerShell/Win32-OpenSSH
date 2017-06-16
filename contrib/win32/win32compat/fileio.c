@@ -116,7 +116,7 @@ fileio_connect(struct w32_io* pio, char* name)
 	wchar_t* name_w = NULL;
 	wchar_t pipe_name[PATH_MAX];
 	HANDLE h = INVALID_HANDLE_VALUE;
-	int ret = 0;
+	int ret = 0, r;
 
 	if (pio->handle != 0 && pio->handle != INVALID_HANDLE_VALUE) {
 		debug3("fileio_connect called in unexpected state, pio = %p", pio);
@@ -129,17 +129,27 @@ fileio_connect(struct w32_io* pio, char* name)
 		errno = ENOMEM;
 		return -1;
 	}
-	_snwprintf(pipe_name, PATH_MAX, L"\\\\.\\pipe\\%ls", name_w);
-	h = CreateFileW(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, 
-		NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	r = _snwprintf_s(pipe_name, PATH_MAX, PATH_MAX, L"\\\\.\\pipe\\%ls", name_w);
+	if (r < 0 || r >= PATH_MAX) {
+		debug3("cannot create pipe name with %s", name);
+		errno = EOTHER;
+		return -1;
+	}
+
+
+	do {
+		h = CreateFileW(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, 
+			NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, NULL);
 	
-	/* TODO - support nonblocking connect */
-	/* wait until we have a server pipe instance to connect */
-	while (h == INVALID_HANDLE_VALUE && GetLastError() == ERROR_PIPE_BUSY) {
+		if (h != INVALID_HANDLE_VALUE)
+			break;
+		if (GetLastError() != ERROR_PIPE_BUSY)
+			break;
+	
 		debug4("waiting for agent connection, retrying after 1 sec");
 		if ((ret = wait_for_any_event(NULL, 0, 1000) != 0) != 0)
 			goto cleanup;
-	}
+	} while(1);
 
 	if (h == INVALID_HANDLE_VALUE) {
 		debug3("unable to connect to pipe %ls, error: %d", name_w, GetLastError());
@@ -157,7 +167,7 @@ fileio_connect(struct w32_io* pio, char* name)
 	}
 	
 	pio->handle = h;
-	h = NULL;
+	h = INVALID_HANDLE_VALUE;
 
 cleanup:
 	if (name_w)
@@ -333,7 +343,8 @@ createFile_flags_setup(int flags, u_short mode, struct createFile_flags* cf_flag
 	switch (rwflags) {
 	case O_RDONLY:
 		cf_flags->dwDesiredAccess = GENERIC_READ;
-		cf_flags->dwShareMode = FILE_SHARE_READ;
+		/* refer to https://msdn.microsoft.com/en-us/library/windows/desktop/aa363874(v=vs.85).aspx */
+		cf_flags->dwShareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
 		break;
 	case O_WRONLY:
 		cf_flags->dwDesiredAccess = GENERIC_WRITE;
@@ -355,7 +366,7 @@ createFile_flags_setup(int flags, u_short mode, struct createFile_flags* cf_flag
 	if (c_s_flags & O_APPEND)
 		cf_flags->dwDesiredAccess = FILE_APPEND_DATA;
 
-	cf_flags->dwFlagsAndAttributes = FILE_FLAG_OVERLAPPED | SECURITY_IMPERSONATION | FILE_FLAG_BACKUP_SEMANTICS;
+	cf_flags->dwFlagsAndAttributes = FILE_FLAG_OVERLAPPED | FILE_FLAG_BACKUP_SEMANTICS;
 
 	/*map mode*/
 	if ((pwd = getpwuid(0)) == NULL)
@@ -526,11 +537,12 @@ fileio_ReadFileEx(struct w32_io* pio, unsigned int bytes_requested)
 
 /* read() implementation */
 int
-fileio_read(struct w32_io* pio, void *dst, unsigned int max)
+fileio_read(struct w32_io* pio, void *dst, size_t max_bytes)
 {
 	int bytes_copied;
 
 	debug5("read - io:%p remaining:%d", pio, pio->read_details.remaining);
+
 	/* if read is pending */
 	if (pio->read_details.pending) {
 		if (w32_io_is_blocking(pio)) {
@@ -550,7 +562,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max)
 			if (-1 == syncio_initiate_read(pio))
 				return -1;
 		} else {
-			if (-1 == fileio_ReadFileEx(pio, max)) {
+			if (-1 == fileio_ReadFileEx(pio, (int)max_bytes)) {
 				if ((FILETYPE(pio) == FILE_TYPE_PIPE)
 					&& (errno == ERROR_BROKEN_PIPE)) {
 					/* write end of the pipe closed */
@@ -600,7 +612,7 @@ fileio_read(struct w32_io* pio, void *dst, unsigned int max)
 		return -1;
 	}
 
-	bytes_copied = min(max, pio->read_details.remaining);
+	bytes_copied = min((DWORD)max_bytes, pio->read_details.remaining);
 	memcpy(dst, pio->read_details.buf + pio->read_details.completed, bytes_copied);
 	pio->read_details.remaining -= bytes_copied;
 	pio->read_details.completed += bytes_copied;
@@ -633,7 +645,7 @@ WriteCompletionRoutine(_In_ DWORD dwErrorCode,
 
 /* write() implementation */
 int
-fileio_write(struct w32_io* pio, const void *buf, unsigned int max)
+fileio_write(struct w32_io* pio, const void *buf, size_t max_bytes)
 {
 	int bytes_copied;
 	DWORD pipe_flags = 0, pipe_instances = 0;
@@ -673,7 +685,7 @@ fileio_write(struct w32_io* pio, const void *buf, unsigned int max)
 		pio->write_details.buf_size = WRITE_BUFFER_SIZE;
 	}
 
-	bytes_copied = min(max, pio->write_details.buf_size);
+	bytes_copied = min((int)max_bytes, pio->write_details.buf_size);
 	memcpy(pio->write_details.buf, buf, bytes_copied);
 
 	if (pio->type == NONSOCK_SYNC_FD || FILETYPE(pio) == FILE_TYPE_CHAR) {
@@ -756,7 +768,7 @@ fileio_stat(const char *path, struct _stat64 *buf)
 	}
 
 	if ((wpath = utf8_to_utf16(path)) == NULL) {
-		errno = errno_from_Win32LastError();
+		errno = ENOMEM;
 		debug3("utf8_to_utf16 failed for file:%s error:%d", path, GetLastError());
 		return -1;
 	}
@@ -767,7 +779,7 @@ fileio_stat(const char *path, struct _stat64 *buf)
 		goto cleanup;
 	}
 	
-	len = wcslen(wpath);
+	len = (int)wcslen(wpath);
 
 	buf->st_ino = 0; /* Has no meaning in the FAT, HPFS, or NTFS file systems*/
 	buf->st_gid = 0; /* UNIX - specific; has no meaning on windows */

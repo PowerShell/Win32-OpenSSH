@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-add.c,v 1.131 2017/05/05 10:42:49 naddy Exp $ */
+/* $OpenBSD: ssh-add.c,v 1.132 2017/05/30 14:16:41 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -306,7 +306,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 		goto out;
 	}
 	if ((r = sshkey_cert_copy(cert, private)) != 0) {
-		error("%s: key_cert_copy: %s", __func__, ssh_err(r));
+		error("%s: sshkey_cert_copy: %s", __func__, ssh_err(r));
 		sshkey_free(cert);
 		goto out;
 	}

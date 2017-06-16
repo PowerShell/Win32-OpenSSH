@@ -1,4 +1,4 @@
-/* $OpenBSD: kexgexc.c,v 1.24 2017/05/16 16:56:15 djm Exp $ */
+/* $OpenBSD: kexgexc.c,v 1.25 2017/05/30 14:23:52 markus Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -51,8 +51,8 @@
 #include "sshbuf.h"
 #include "misc.h"
 
-static int input_kex_dh_gex_group(int, u_int32_t, void *);
-static int input_kex_dh_gex_reply(int, u_int32_t, void *);
+static int input_kex_dh_gex_group(int, u_int32_t, struct ssh *);
+static int input_kex_dh_gex_reply(int, u_int32_t, struct ssh *);
 
 int
 kexgex_client(struct ssh *ssh)
@@ -89,9 +89,8 @@ kexgex_client(struct ssh *ssh)
 }
 
 static int
-input_kex_dh_gex_group(int type, u_int32_t seq, void *ctxt)
+input_kex_dh_gex_group(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct kex *kex = ssh->kex;
 	BIGNUM *p = NULL, *g = NULL;
 	int r, bits;
@@ -143,9 +142,8 @@ out:
 }
 
 static int
-input_kex_dh_gex_reply(int type, u_int32_t seq, void *ctxt)
+input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct kex *kex = ssh->kex;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
 	struct sshkey *server_host_key = NULL;

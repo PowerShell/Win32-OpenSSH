@@ -35,8 +35,11 @@
 #include <string.h>
 #include <windows.h>
 #include <conio.h>
+#include <io.h>
 
+#include "debug.h"
 #include "console.h"
+#include "ansiprsr.h"
 
 HANDLE	hOutputConsole = NULL;
 DWORD	dwSavedAttributes = 0;
@@ -72,15 +75,11 @@ char *consoleTitle = "OpenSSH SSH client";
 int 
 ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 {
-	OSVERSIONINFO os;
 	DWORD dwAttributes = 0;
 	DWORD dwRet = 0;
 	BOOL bRet = FALSE;
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	static bool bFirstConInit = true;
-
-	os.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	GetVersionEx(&os);
 
 	hOutputConsole = GetStdHandle(OutputHandle);
 	if (hOutputConsole == INVALID_HANDLE_VALUE) {
@@ -117,8 +116,13 @@ ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 
 	dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
-	if (NULL != getenv("SSH_TERM_CONHOST_PARSER"))
-		isConHostParserEnabled = atoi(getenv("SSH_TERM_CONHOST_PARSER"));
+	char *envValue = NULL;
+	_dupenv_s(&envValue, NULL, "SSH_TERM_CONHOST_PARSER");
+	
+	if (NULL != envValue) {
+		isConHostParserEnabled = atoi(envValue);
+		free(envValue);
+	}		
 
 	/* We use our custom ANSI parser when
 	 * a) User sets the environment variable "SSH_TERM_CONHOST_PARSER" to 0
@@ -1077,6 +1081,7 @@ ConMoveVisibleWindow(int offset)
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 	SMALL_RECT visibleWindowRect;
 
+	memset(&visibleWindowRect, 0, sizeof(SMALL_RECT));
 	if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo)) {
 		/* Check if applying the offset results in console buffer overflow.
 		* if yes, then scrolldown the console buffer.
@@ -1087,6 +1092,10 @@ ConMoveVisibleWindow(int offset)
 
 			if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
 				memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
+			else {
+				error("GetConsoleScreenBufferInfo failed with %d", GetLastError());
+				return;
+			}
 		} else {
 			memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
 			visibleWindowRect.Top += offset;
@@ -1329,6 +1338,9 @@ ConSaveScreenHandle(SCREEN_HANDLE hScreen)
 
 	if (pScreenRec == NULL) {
 		pScreenRec = (PSCREEN_RECORD)malloc(sizeof(SCREEN_RECORD));
+		if (pScreenRec == NULL)
+			fatal("out of memory");
+		
 		pScreenRec->pScreenBuf = NULL;
 	}
 
@@ -1583,10 +1595,12 @@ get_console_handle(FILE *stream, DWORD * mode)
 	if (file_num == -1) {
 		return INVALID_HANDLE_VALUE;
 	}
+
 	lHandle = _get_osfhandle(file_num);
 	if (lHandle == -1 && errno == EBADF) {
 		return INVALID_HANDLE_VALUE;
 	}
+
 	type = GetFileType((HANDLE)lHandle);
 	if (type == FILE_TYPE_CHAR && file_num >= 0 && file_num <= 2) {
 		if (file_num == 0)

@@ -110,7 +110,6 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 	DWORD dwInput = 0;
 	DWORD dwControlKeyState = 0;
 	DWORD rc = 0;
-	unsigned char szResponse[50];
 	unsigned char octets[20];
 	char aChar = 0;
 	INPUT_RECORD InputRecord;

@@ -36,6 +36,7 @@
 #include <windows.h>
 #include "ansiprsr.h"
 #include "inc\utf.h"
+#include "console.h"
 
 #define dwBuffer 4096
 
@@ -50,7 +51,6 @@ extern BOOL isAnsiParsingRequired;
 void
 processBuffer(HANDLE handle, char *buf, size_t len, unsigned char **respbuf, size_t *resplen)
 {
-	unsigned char szBuffer[dwBuffer + 8];
 	unsigned char* pszNewHead = NULL;
 	unsigned char* pszHead = NULL;
 	unsigned char* pszTail = NULL;
@@ -62,7 +62,7 @@ processBuffer(HANDLE handle, char *buf, size_t len, unsigned char **respbuf, siz
 		/* Console has the capability to parse so pass the raw buffer to console directly */
 		ConRestoreViewRect(); /* Restore the visible window, otherwise WriteConsoleW() gets messy */
 		wchar_t* t = utf8_to_utf16(buf);
-		WriteConsoleW(handle, t, wcslen(t), 0, 0);
+		WriteConsoleW(handle, t, (DWORD)wcslen(t), 0, 0);
 		free(t);		
 		ConSaveViewRect();
 		return;

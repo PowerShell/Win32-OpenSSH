@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.82 2017/05/03 21:08:09 naddy Exp $ */
+/* $OpenBSD: kex.h,v 1.83 2017/05/30 14:23:52 markus Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -181,8 +181,8 @@ int	 kex_prop2buf(struct sshbuf *, char *proposal[PROPOSAL_MAX]);
 void	 kex_prop_free(char **);
 
 int	 kex_send_kexinit(struct ssh *);
-int	 kex_input_kexinit(int, u_int32_t, void *);
-int	 kex_input_ext_info(int, u_int32_t, void *);
+int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
+int	 kex_input_ext_info(int, u_int32_t, struct ssh *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, const struct sshbuf *);
 int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int, const BIGNUM *);
 int	 kex_send_newkeys(struct ssh *);

@@ -16,3 +16,4 @@ f6ae971186ba68d066cd102e57d5b0b2c211a5ee	systrace is dead.
 1e6b51ddf767cbad0a4e63eb08026c127e654308	integrity.sh reliability
 fe5b31f69a60d47171836911f144acff77810217	Makefile.inc bits
 5781670c0578fe89663c9085ed3ba477cf7e7913	Delete sshconnect1.c
+ea80f445e819719ccdcb237022cacfac990fdc5c	Makefile.inc warning flags

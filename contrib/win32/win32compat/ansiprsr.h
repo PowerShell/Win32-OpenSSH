@@ -41,6 +41,7 @@
 unsigned char * ParseBuffer(unsigned char* pszBuffer, unsigned char* pszBufferEnd, unsigned char **respbuf, size_t *resplen);
 unsigned char * GetNextChar(unsigned char * pszBuffer, unsigned char *pszBufferEnd);
 unsigned char * ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char **respbuf, size_t *resplen);
+void GoToNextLine();
 
 #define true TRUE
 #define false FALSE

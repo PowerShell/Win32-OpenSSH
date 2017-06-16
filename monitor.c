@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.167 2017/02/03 23:05:57 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.171 2017/05/31 10:04:29 markus Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -1119,7 +1119,7 @@ mm_answer_pam_free_ctx(int sock, Buffer *m)
 int
 mm_answer_keyallowed(int sock, Buffer *m)
 {
-	Key *key;
+	struct sshkey *key;
 	char *cuser, *chost;
 	u_char *blob;
 	u_int bloblen, pubkey_auth_attempt;
@@ -1330,25 +1330,25 @@ monitor_valid_hostbasedblob(u_char *data, u_int datalen, char *cuser,
 }
 
 int
-mm_answer_keyverify(int sock, Buffer *m)
+mm_answer_keyverify(int sock, struct sshbuf *m)
 {
-	Key *key;
+	struct sshkey *key;
 	u_char *signature, *data, *blob;
-	u_int signaturelen, datalen, bloblen;
-	int verified = 0;
-	int valid_data = 0;
+	size_t signaturelen, datalen, bloblen;
+	int r, ret, valid_data = 0, encoded_ret;
 
-	blob = buffer_get_string(m, &bloblen);
-	signature = buffer_get_string(m, &signaturelen);
-	data = buffer_get_string(m, &datalen);
+	if ((r = sshbuf_get_string(m, &blob, &bloblen)) != 0 ||
+	    (r = sshbuf_get_string(m, &signature, &signaturelen)) != 0 ||
+	    (r = sshbuf_get_string(m, &data, &datalen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (hostbased_cuser == NULL || hostbased_chost == NULL ||
 	  !monitor_allowed_key(blob, bloblen))
 		fatal("%s: bad key, not previously allowed", __func__);
 
-	key = key_from_blob(blob, bloblen);
-	if (key == NULL)
-		fatal("%s: bad public key blob", __func__);
+	/* XXX use sshkey_froms here; need to change key_blob, etc. */
+	if ((r = sshkey_from_blob(blob, bloblen, &key)) != 0)
+		fatal("%s: bad public key blob: %s", __func__, ssh_err(r));
 
 	switch (key_blobtype) {
 	case MM_USERKEY:
@@ -1365,15 +1365,16 @@ mm_answer_keyverify(int sock, Buffer *m)
 	if (!valid_data)
 		fatal("%s: bad signature data blob", __func__);
 
-	verified = key_verify(key, signature, signaturelen, data, datalen);
+	ret = sshkey_verify(key, signature, signaturelen, data, datalen,
+	    active_state->compat);
 	debug3("%s: key %p signature %s",
-	    __func__, key, (verified == 1) ? "verified" : "unverified");
+	    __func__, key, (ret == 0) ? "verified" : "unverified");
 
 	/* If auth was successful then record key to ensure it isn't reused */
-	if (verified == 1 && key_blobtype == MM_USERKEY)
+	if (ret == 0 && key_blobtype == MM_USERKEY)
 		auth2_record_userkey(authctxt, key);
 	else
-		key_free(key);
+		sshkey_free(key);
 
 	free(blob);
 	free(signature);
@@ -1383,11 +1384,15 @@ mm_answer_keyverify(int sock, Buffer *m)
 
 	monitor_reset_key_state();
 
-	buffer_clear(m);
-	buffer_put_int(m, verified);
+	sshbuf_reset(m);
+
+	/* encode ret != 0 as positive integer, since we're sending u32 */
+	encoded_ret = (ret != 0);
+	if ((r = sshbuf_put_u32(m, encoded_ret)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	mm_request_send(sock, MONITOR_ANS_KEYVERIFY, m);
 
-	return (verified == 1);
+	return ret == 0;
 }
 
 static void
@@ -1579,6 +1584,17 @@ mm_answer_audit_command(int socket, Buffer *m)
 #endif /* SSH_AUDIT_EVENTS */
 
 void
+monitor_clear_keystate(struct monitor *pmonitor)
+{
+	struct ssh *ssh = active_state;	/* XXX */
+
+	ssh_clear_newkeys(ssh, MODE_IN);
+	ssh_clear_newkeys(ssh, MODE_OUT);
+	sshbuf_free(child_state);
+	child_state = NULL;
+}
+
+void
 monitor_apply_keystate(struct monitor *pmonitor)
 {
 	struct ssh *ssh = active_state;	/* XXX */
@@ -1639,9 +1655,18 @@ static void
 monitor_openfds(struct monitor *mon, int do_logfds)
 {
 	int pair[2];
+#ifdef SO_ZEROIZE
+	int on = 1;
+#endif
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == -1)
 		fatal("%s: socketpair: %s", __func__, strerror(errno));
+#ifdef SO_ZEROIZE
+	if (setsockopt(pair[0], SOL_SOCKET, SO_ZEROIZE, &on, sizeof(on)) < 0)
+		error("setsockopt SO_ZEROIZE(0): %.100s", strerror(errno));
+	if (setsockopt(pair[1], SOL_SOCKET, SO_ZEROIZE, &on, sizeof(on)) < 0)
+		error("setsockopt SO_ZEROIZE(1): %.100s", strerror(errno));
+#endif
 	FD_CLOSEONEXEC(pair[0]);
 	FD_CLOSEONEXEC(pair[1]);
 	mon->m_recvfd = pair[0];

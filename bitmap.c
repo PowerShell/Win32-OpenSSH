@@ -87,10 +87,10 @@ reserve(struct bitmap *b, u_int n)
 		return -1; /* invalid */
 	nlen = (n / BITMAP_BITS) + 1;
 	if (b->len < nlen) {
-		if ((tmp = reallocarray(b->d, nlen, BITMAP_BYTES)) == NULL)
+		if ((tmp = recallocarray(b->d, b->len,
+		    nlen, BITMAP_BYTES)) == NULL)
 			return -1;
 		b->d = tmp;
-		memset(b->d + b->len, 0, (nlen - b->len) * BITMAP_BYTES);
 		b->len = nlen;
 	}
 	return 0;
@@ -189,7 +189,7 @@ bitmap_from_string(struct bitmap *b, const void *p, size_t l)
 {
 	int r;
 	size_t i, offset, shift;
-	u_char *s = (u_char *)p;
+	const u_char *s = (const u_char *)p;
 
 	if (l > BITMAP_MAX / 8)
 		return -1;

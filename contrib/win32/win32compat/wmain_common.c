@@ -39,14 +39,15 @@ main(int, char **);
 
 int
 wmain(int argc, wchar_t **wargv) {
-        char** argv = NULL;
-        int i,r;
+	char** argv = NULL;
+	int i,r;
 
-        if (argc) {
-                if ((argv = malloc(argc * sizeof(char*))) == NULL)
-                        fatal("out of memory");
-                for (i = 0; i < argc; i++)
-                        argv[i] = utf16_to_utf8(wargv[i]);
+	if (argc) {
+		if ((argv = malloc(argc * sizeof(char*))) == NULL)
+			fatal("out of memory");
+		for (i = 0; i < argc; i++)
+			if ((argv[i] = utf16_to_utf8(wargv[i])) == NULL)
+				fatal("out of memory");
         }
 
 	if (getenv("SSH_AUTH_SOCK") == NULL)

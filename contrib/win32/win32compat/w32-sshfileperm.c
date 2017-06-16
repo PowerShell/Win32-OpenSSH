@@ -1,9 +1,6 @@
 /*
 * Author: Yanbing Wang <yawang@microsoft.com>
 *
-* Copyright (c) 2009, 2011 NoMachine
-* All rights reserved
-*
 * Support file permission check on Win32 based operating systems.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -179,3 +176,4 @@ is_sshd_account(PSID user_sid) {
 	wmemcpy(full_name + domain_name_length + 1, user_name, wcslen(user_name)+1);
 	return (wcsicmp(full_name, SSHD_ACCOUNT) == 0);
 }
+

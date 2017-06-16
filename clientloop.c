@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.296 2017/05/03 21:08:09 naddy Exp $ */
+/* $OpenBSD: clientloop.c,v 1.299 2017/05/31 09:15:42 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -459,7 +459,7 @@ client_check_window_change(void)
 }
 
 static int
-client_global_request_reply(int type, u_int32_t seq, void *ctxt)
+client_global_request_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct global_confirm *gc;
 
@@ -1171,7 +1171,7 @@ process_escapes(Channel *c, Buffer *bin, Buffer *bout, Buffer *berr,
 static void
 client_process_buffered_input_packets(void)
 {
-	dispatch_run(DISPATCH_NONBLOCK, &quit_pending, active_state);
+	ssh_dispatch_run_fatal(active_state, DISPATCH_NONBLOCK, &quit_pending);
 }
 
 /* scan buf[] for '~' before sending data to the peer */
@@ -1646,7 +1646,7 @@ client_request_tun_fwd(int tun_mode, int local_tun, int remote_tun)
 
 /* XXXX move to generic input handler */
 static int
-client_input_channel_open(int type, u_int32_t seq, void *ctxt)
+client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	char *ctype;
@@ -1702,7 +1702,7 @@ client_input_channel_open(int type, u_int32_t seq, void *ctxt)
 }
 
 static int
-client_input_channel_req(int type, u_int32_t seq, void *ctxt)
+client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	int exitval, id, reply, success = 0;
@@ -1710,7 +1710,7 @@ client_input_channel_req(int type, u_int32_t seq, void *ctxt)
 
 	id = packet_get_int();
 	c = channel_lookup(id);
-	if (channel_proxy_upstream(c, type, seq, ctxt))
+	if (channel_proxy_upstream(c, type, seq, ssh))
 		return 0;
 	rtype = packet_get_string(NULL);
 	reply = packet_get_char();
@@ -1816,9 +1816,9 @@ hostkeys_find(struct hostkey_foreach_line *l, void *_ctx)
 	/* This line contained a key that not offered by the server */
 	debug3("%s: deprecated %s key at %s:%ld", __func__,
 	    sshkey_ssh_name(l->key), l->path, l->linenum);
-	if ((tmp = reallocarray(ctx->old_keys, ctx->nold + 1,
+	if ((tmp = recallocarray(ctx->old_keys, ctx->nold, ctx->nold + 1,
 	    sizeof(*ctx->old_keys))) == NULL)
-		fatal("%s: reallocarray failed nold = %zu",
+		fatal("%s: recallocarray failed nold = %zu",
 		    __func__, ctx->nold);
 	ctx->old_keys = tmp;
 	ctx->old_keys[ctx->nold++] = l->key;
@@ -2050,9 +2050,9 @@ client_input_hostkeys(void)
 			}
 		}
 		/* Key is good, record it */
-		if ((tmp = reallocarray(ctx->keys, ctx->nkeys + 1,
+		if ((tmp = recallocarray(ctx->keys, ctx->nkeys, ctx->nkeys + 1,
 		    sizeof(*ctx->keys))) == NULL)
-			fatal("%s: reallocarray failed nkeys = %zu",
+			fatal("%s: recallocarray failed nkeys = %zu",
 			    __func__, ctx->nkeys);
 		ctx->keys = tmp;
 		ctx->keys[ctx->nkeys++] = key;
@@ -2140,7 +2140,7 @@ client_input_hostkeys(void)
 }
 
 static int
-client_input_global_request(int type, u_int32_t seq, void *ctxt)
+client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *rtype;
 	int want_reply;

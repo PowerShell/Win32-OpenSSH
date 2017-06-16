@@ -100,7 +100,6 @@ opendir(const char *name)
 	DIR *pdir;
 	wchar_t searchstr[PATH_MAX];
 	wchar_t* wname = NULL;
-	int needed;
 	size_t len;
 
 	/* Detect root dir */
@@ -250,7 +249,7 @@ readdir(void *avp)
 			return NULL;
 		}
 
-		strncpy(pdirentry.d_name, tmp, sizeof(pdirentry.d_name));
+		strncpy_s(pdirentry.d_name, PATH_MAX, tmp, strlen(tmp) + 1);		
 		free(tmp);
 
 		pdirentry.d_ino = 1; /* a fictious one like UNIX to say it is nonzero */

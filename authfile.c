@@ -1,4 +1,4 @@
-/* $OpenBSD: authfile.c,v 1.124 2017/04/30 23:10:43 djm Exp $ */
+/* $OpenBSD: authfile.c,v 1.126 2017/05/31 09:15:42 deraadt Exp $ */
 /*
  * Copyright (c) 2000, 2013 Markus Friedl.  All rights reserved.
  *
@@ -101,25 +101,13 @@ sshkey_load_file(int fd, struct sshbuf *blob)
 	u_char buf[1024];
 	size_t len;
 	struct stat st;
-	int r, dontmax = 0;
+	int r;
 
 	if (fstat(fd, &st) < 0)
 		return SSH_ERR_SYSTEM_ERROR;
 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
 	    st.st_size > MAX_KEY_FILE_SIZE)
 		return SSH_ERR_INVALID_FORMAT;
-	/*
-	 * Pre-allocate the buffer used for the key contents and clamp its
-	 * maximum size. This ensures that key contents are never leaked via
-	 * implicit realloc() in the sshbuf code.
-	 */
-	if ((st.st_mode & S_IFREG) == 0 || st.st_size <= 0) {
-		st.st_size = 64*1024; /* 64k ought to be enough for anybody. :) */
-		dontmax = 1;
-	}
-	if ((r = sshbuf_allocate(blob, st.st_size)) != 0 ||
-	    (dontmax && (r = sshbuf_set_max_size(blob, st.st_size)) != 0))
-		return r;
 	for (;;) {
 		if ((len = atomicio(read, fd, buf, sizeof(buf))) == 0) {
 			if (errno == EPIPE)
@@ -326,50 +314,48 @@ sshkey_try_load_public(struct sshkey *k, const char *filename, char **commentp)
 	return SSH_ERR_INVALID_FORMAT;
 }
 
-/* load public key from ssh v1 private or any pubkey file */
+/* load public key from any pubkey file */
 int
 sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 {
 	struct sshkey *pub = NULL;
-	char file[PATH_MAX];
-	int r, fd;
+	char *file = NULL;
+	int r;
 
 	if (keyp != NULL)
 		*keyp = NULL;
 	if (commentp != NULL)
 		*commentp = NULL;
 
-	/* XXX should load file once and attempt to parse each format */
-
-	if ((fd = open(filename, O_RDONLY)) < 0)
-		goto skip;
-	close(fd);
-
-	/* try ssh2 public key */
 	if ((pub = sshkey_new(KEY_UNSPEC)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if ((r = sshkey_try_load_public(pub, filename, commentp)) == 0) {
-		if (keyp != NULL)
+		if (keyp != NULL) {
 			*keyp = pub;
-		return 0;
+			pub = NULL;
+		}
+		r = 0;
+		goto out;
 	}
 	sshkey_free(pub);
 
-
- skip:
 	/* try .pub suffix */
-	if ((pub = sshkey_new(KEY_UNSPEC)) == NULL)
+	if (asprintf(&file, "%s.pub", filename) == -1)
 		return SSH_ERR_ALLOC_FAIL;
-	r = SSH_ERR_ALLOC_FAIL;	/* in case strlcpy or strlcat fail */
-	if ((strlcpy(file, filename, sizeof file) < sizeof(file)) &&
-	    (strlcat(file, ".pub", sizeof file) < sizeof(file)) &&
-	    (r = sshkey_try_load_public(pub, file, commentp)) == 0) {
-		if (keyp != NULL)
-			*keyp = pub;
-		return 0;
+	if ((pub = sshkey_new(KEY_UNSPEC)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
 	}
+	if ((r = sshkey_try_load_public(pub, file, commentp)) == 0) {
+		if (keyp != NULL) {
+			*keyp = pub;
+			pub = NULL;
+		}
+		r = 0;
+	}
+ out:
+	free(file);
 	sshkey_free(pub);
-
 	return r;
 }
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.120 2017/05/17 01:24:17 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.121 2017/05/30 08:52:19 markus Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -429,7 +429,7 @@ authorized_principals_file(struct passwd *pw)
 
 /* return ok if key exists in sysfile or userfile */
 HostStatus
-check_key_in_hostfiles(struct passwd *pw, Key *key, const char *host,
+check_key_in_hostfiles(struct passwd *pw, struct sshkey *key, const char *host,
     const char *sysfile, const char *userfile)
 {
 	char *user_hostfile;
@@ -711,7 +711,7 @@ getpwnamallow(const char *user)
 
 /* Returns 1 if key is revoked by revoked_keys_file, 0 otherwise */
 int
-auth_key_is_revoked(Key *key)
+auth_key_is_revoked(struct sshkey *key)
 {
 	char *fp = NULL;
 	int r;

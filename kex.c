@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.132 2017/04/30 23:10:43 djm Exp $ */
+/* $OpenBSD: kex.c,v 1.133 2017/05/30 14:23:52 markus Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -56,7 +56,7 @@
 
 /* prototype */
 static int kex_choose_conf(struct ssh *);
-static int kex_input_newkeys(int, u_int32_t, void *);
+static int kex_input_newkeys(int, u_int32_t, struct ssh *);
 
 static const char *proposal_names[PROPOSAL_MAX] = {
 	"KEX algorithms",
@@ -315,9 +315,8 @@ kex_prop_free(char **proposal)
 
 /* ARGSUSED */
 static int
-kex_protocol_error(int type, u_int32_t seq, void *ctxt)
+kex_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	int r;
 
 	error("kex protocol error: type %d seq %u", type, seq);
@@ -375,9 +374,8 @@ kex_send_newkeys(struct ssh *ssh)
 }
 
 int
-kex_input_ext_info(int type, u_int32_t seq, void *ctxt)
+kex_input_ext_info(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct kex *kex = ssh->kex;
 	u_int32_t i, ninfo;
 	char *name, *val, *found;
@@ -414,9 +412,8 @@ kex_input_ext_info(int type, u_int32_t seq, void *ctxt)
 }
 
 static int
-kex_input_newkeys(int type, u_int32_t seq, void *ctxt)
+kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct kex *kex = ssh->kex;
 	int r;
 
@@ -467,9 +464,8 @@ kex_send_kexinit(struct ssh *ssh)
 
 /* ARGSUSED */
 int
-kex_input_kexinit(int type, u_int32_t seq, void *ctxt)
+kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct kex *kex = ssh->kex;
 	const u_char *ptr;
 	u_int i;

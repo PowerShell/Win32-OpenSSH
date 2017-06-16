@@ -237,6 +237,7 @@ int sys_auth_passwd(Authctxt *authctxt, const char *password)
 	DWORD token = 0;
 	extern int auth_sock;
 	int r = 0;
+	int ssh_request_reply(int, struct sshbuf *, struct sshbuf *);
 
 	msg = sshbuf_new();
 	if (!msg)

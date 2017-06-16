@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.256 2017/05/08 06:03:39 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.260 2017/06/06 09:12:17 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -559,8 +559,8 @@ ssh_local_port(struct ssh *ssh)
 
 /* Closes the connection and clears and frees internal data structures. */
 
-void
-ssh_packet_close(struct ssh *ssh)
+static void
+ssh_packet_close_internal(struct ssh *ssh, int do_close)
 {
 	struct session_state *state = ssh->state;
 	u_int mode;
@@ -568,20 +568,25 @@ ssh_packet_close(struct ssh *ssh)
 	if (!state->initialized)
 		return;
 	state->initialized = 0;
-	if (state->connection_in == state->connection_out) {
-		shutdown(state->connection_out, SHUT_RDWR);
-		close(state->connection_out);
-	} else {
-		close(state->connection_in);
-		close(state->connection_out);
+	if (do_close) {
+		if (state->connection_in == state->connection_out) {
+			close(state->connection_out);
+		} else {
+			close(state->connection_in);
+			close(state->connection_out);
+		}
 	}
 	sshbuf_free(state->input);
 	sshbuf_free(state->output);
 	sshbuf_free(state->outgoing_packet);
 	sshbuf_free(state->incoming_packet);
-	for (mode = 0; mode < MODE_MAX; mode++)
-		kex_free_newkeys(state->newkeys[mode]);
-	if (state->compression_buffer) {
+	for (mode = 0; mode < MODE_MAX; mode++) {
+		kex_free_newkeys(state->newkeys[mode]);	/* current keys */
+		state->newkeys[mode] = NULL;
+		ssh_clear_newkeys(ssh, mode);		/* next keys */
+	}
+	/* comression state is in shared mem, so we can only release it once */
+	if (do_close && state->compression_buffer) {
 		sshbuf_free(state->compression_buffer);
 		if (state->compression_out_started) {
 			z_streamp stream = &state->compression_out_stream;
@@ -595,7 +600,7 @@ ssh_packet_close(struct ssh *ssh)
 				deflateEnd(stream);
 		}
 		if (state->compression_in_started) {
-			z_streamp stream = &state->compression_out_stream;
+			z_streamp stream = &state->compression_in_stream;
 			debug("compress incoming: "
 			    "raw data %llu, compressed %llu, factor %.2f",
 			    (unsigned long long)stream->total_out,
@@ -609,10 +614,24 @@ ssh_packet_close(struct ssh *ssh)
 	cipher_free(state->send_context);
 	cipher_free(state->receive_context);
 	state->send_context = state->receive_context = NULL;
-	free(ssh->remote_ipaddr);
-	ssh->remote_ipaddr = NULL;
-	free(ssh->state);
-	ssh->state = NULL;
+	if (do_close) {
+		free(ssh->remote_ipaddr);
+		ssh->remote_ipaddr = NULL;
+		free(ssh->state);
+		ssh->state = NULL;
+	}
+}
+
+void
+ssh_packet_close(struct ssh *ssh)
+{
+	ssh_packet_close_internal(ssh, 1);
+}
+
+void
+ssh_packet_clear_keys(struct ssh *ssh)
+{
+	ssh_packet_close_internal(ssh, 0);
 }
 
 /* Sets remote side protocol flags. */
@@ -791,6 +810,15 @@ uncompress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
 	/* NOTREACHED */
 }
 
+void
+ssh_clear_newkeys(struct ssh *ssh, int mode)
+{
+	if (ssh->kex && ssh->kex->newkeys[mode]) {
+		kex_free_newkeys(ssh->kex->newkeys[mode]);
+		ssh->kex->newkeys[mode] = NULL;
+	}
+}
+
 int
 ssh_set_newkeys(struct ssh *ssh, int mode)
 {
@@ -801,45 +829,33 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	struct sshcipher_ctx **ccp;
 	struct packet_state *ps;
 	u_int64_t *max_blocks;
-	const char *wmsg, *dir;
+	const char *wmsg;
 	int r, crypt_type;
 
 	debug2("set_newkeys: mode %d", mode);
 
 	if (mode == MODE_OUT) {
-		dir = "output";
 		ccp = &state->send_context;
 		crypt_type = CIPHER_ENCRYPT;
 		ps = &state->p_send;
 		max_blocks = &state->max_blocks_out;
 	} else {
-		dir = "input";
 		ccp = &state->receive_context;
 		crypt_type = CIPHER_DECRYPT;
 		ps = &state->p_read;
 		max_blocks = &state->max_blocks_in;
 	}
 	if (state->newkeys[mode] != NULL) {
-		debug("%s: rekeying after %llu %s blocks"
-		    " (%llu bytes total)", __func__,
-		    (unsigned long long)ps->blocks, dir,
-		    (unsigned long long)ps->bytes);
+		debug("set_newkeys: rekeying, input %llu bytes %llu blocks, "
+		   "output %llu bytes %llu blocks",
+		   (unsigned long long)state->p_read.bytes,
+		   (unsigned long long)state->p_read.blocks,
+		   (unsigned long long)state->p_send.bytes,
+		   (unsigned long long)state->p_send.blocks);
 		cipher_free(*ccp);
 		*ccp = NULL;
-		enc  = &state->newkeys[mode]->enc;
-		mac  = &state->newkeys[mode]->mac;
-		comp = &state->newkeys[mode]->comp;
-		mac_clear(mac);
-		explicit_bzero(enc->iv,  enc->iv_len);
-		explicit_bzero(enc->key, enc->key_len);
-		explicit_bzero(mac->key, mac->key_len);
-		free(enc->name);
-		free(enc->iv);
-		free(enc->key);
-		free(mac->name);
-		free(mac->key);
-		free(comp->name);
-		free(state->newkeys[mode]);
+		kex_free_newkeys(state->newkeys[mode]);
+		state->newkeys[mode] = NULL;
 	}
 	/* note that both bytes and the seqnr are not reset */
 	ps->packets = ps->blocks = 0;
@@ -1784,15 +1800,20 @@ sshpkt_fatal(struct ssh *ssh, const char *tag, int r)
 
 	switch (r) {
 	case SSH_ERR_CONN_CLOSED:
+		ssh_packet_clear_keys(ssh);
 		logdie("Connection closed by %s", remote_id);
 	case SSH_ERR_CONN_TIMEOUT:
+		ssh_packet_clear_keys(ssh);
 		logdie("Connection %s %s timed out",
 		    ssh->state->server_side ? "from" : "to", remote_id);
 	case SSH_ERR_DISCONNECTED:
+		ssh_packet_clear_keys(ssh);
 		logdie("Disconnected from %s", remote_id);
 	case SSH_ERR_SYSTEM_ERROR:
-		if (errno == ECONNRESET)
+		if (errno == ECONNRESET) {
+			ssh_packet_clear_keys(ssh);
 			logdie("Connection reset by %s", remote_id);
+		}
 		/* FALLTHROUGH */
 	case SSH_ERR_NO_CIPHER_ALG_MATCH:
 	case SSH_ERR_NO_MAC_ALG_MATCH:
@@ -1800,12 +1821,14 @@ sshpkt_fatal(struct ssh *ssh, const char *tag, int r)
 	case SSH_ERR_NO_KEX_ALG_MATCH:
 	case SSH_ERR_NO_HOSTKEY_ALG_MATCH:
 		if (ssh && ssh->kex && ssh->kex->failed_choice) {
+			ssh_packet_clear_keys(ssh);
 			logdie("Unable to negotiate with %s: %s. "
 			    "Their offer: %s", remote_id, ssh_err(r),
 			    ssh->kex->failed_choice);
 		}
 		/* FALLTHROUGH */
 	default:
+		ssh_packet_clear_keys(ssh);
 		logdie("%s%sConnection %s %s: %s",
 		    tag != NULL ? tag : "", tag != NULL ? ": " : "",
 		    ssh->state->server_side ? "from" : "to",

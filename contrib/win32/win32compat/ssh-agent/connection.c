@@ -137,115 +137,11 @@ con_type_to_string(struct agent_connection* con) {
 }
 
 static int
-get_con_client_type(struct agent_connection* con) 
-{
-	int r = -1;
-	char sid[SECURITY_MAX_SID_SIZE];
-	wchar_t *sshd_act = L"NT SERVICE\\SSHD", *ref_dom = NULL;
-	DWORD reg_dom_len = 0, info_len = 0, sid_size;
-	DWORD sshd_sid_len = 0;
-	PSID sshd_sid = NULL;
-	SID_NAME_USE nuse;
-	HANDLE token;
-	TOKEN_USER* info = NULL;
-	BOOL isMember = FALSE;
-
-	if (ImpersonateNamedPipeClient(con->pipe_handle) == FALSE)
-		return -1;
-
-	if (OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, FALSE, &token) == FALSE ||
-	    GetTokenInformation(token, TokenUser, NULL, 0, &info_len) == TRUE ||
-	    (info = (TOKEN_USER*)malloc(info_len)) == NULL ||
-	    GetTokenInformation(token, TokenUser, info, info_len, &info_len) == FALSE)
-		goto done;
-
-	/* check if its localsystem */
-	if (IsWellKnownSid(info->User.Sid, WinLocalSystemSid)) {
-		con->client_type = SYSTEM;
-		r = 0;
-		goto done;
-	}
-
-	/* check if its SSHD service */
-	{
-		/* Does NT Service/SSHD exist */
-		LookupAccountNameW(NULL, sshd_act, NULL, &sshd_sid_len, NULL, &reg_dom_len, &nuse);
-		
-		if (GetLastError() == ERROR_NONE_MAPPED)
-			debug3("Cannot look up SSHD account, its likely not installed");
-		else if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-			error("LookupAccountNameW on SSHD account failed with %d", GetLastError());
-			goto done;
-		} else {
-			if ((sshd_sid = malloc(sshd_sid_len)) == NULL ||
-			    (ref_dom = (wchar_t*)malloc(reg_dom_len * 2)) == NULL ||
-			    LookupAccountNameW(NULL, sshd_act, sshd_sid, &sshd_sid_len, ref_dom, &reg_dom_len, &nuse) == FALSE)
-				goto done;
-
-			if (EqualSid(info->User.Sid, sshd_sid)) {
-				con->client_type = SSHD_SERVICE;
-				r = 0;
-				goto done;
-			}
-			if (CheckTokenMembership(token, sshd_sid, &isMember) == FALSE)
-				goto done;
-			if (isMember) {
-				con->client_type = SSHD_SERVICE;
-				r = 0;
-				goto done;
-			}
-		}
-	}
-
-	/* check if its LS or NS */
-	if (IsWellKnownSid(info->User.Sid, WinNetworkServiceSid) ||
-	    IsWellKnownSid(info->User.Sid, WinLocalServiceSid)) {
-		con->client_type = SERVICE;
-		r = 0;
-		goto done;
-	}
-
-	/* check if its admin */
-	{
-		sid_size = SECURITY_MAX_SID_SIZE;
-		if (CreateWellKnownSid(WinBuiltinAdministratorsSid, NULL, sid, &sid_size) == FALSE)
-			goto done;
-		if (CheckTokenMembership(token, sid, &isMember) == FALSE)
-			goto done;
-		if (isMember) {
-			con->client_type = ADMIN_USER;
-			r = 0;
-			goto done;
-		}
-	}
-	
-	/* none of above */
-	con->client_type = NONADMIN_USER;
-	r = 0;
-done:
-	debug("client type: %s", con_type_to_string(con));
-
-	if (sshd_sid)
-		free(sshd_sid);
-	if (ref_dom)
-		free(ref_dom);
-	if (info)
-		free(info);
-	RevertToSelf();
-	return r;
-}
-
-static int
 process_request(struct agent_connection* con) 
 {
 	int r = -1;
 	struct sshbuf *request = NULL, *response = NULL;
 	u_char type;
-
-	if (con->client_type == UNKNOWN && get_con_client_type(con) == -1) {
-		debug("unable to get client process type");
-		goto done;
-	}
 
 	request = sshbuf_from(con->io_buf.buf, con->io_buf.num_bytes);
 	response = sshbuf_new();

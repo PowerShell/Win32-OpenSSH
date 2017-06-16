@@ -1,4 +1,4 @@
-/* $OpenBSD: hostfile.c,v 1.70 2017/04/30 23:18:44 djm Exp $ */
+/* $OpenBSD: hostfile.c,v 1.71 2017/05/31 09:15:42 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -251,7 +251,7 @@ record_hostkey(struct hostkey_foreach_line *l, void *_ctx)
 	    l->marker == MRK_NONE ? "" :
 	    (l->marker == MRK_CA ? "ca " : "revoked "),
 	    sshkey_type(l->key), l->path, l->linenum);
-	if ((tmp = reallocarray(hostkeys->entries,
+	if ((tmp = recallocarray(hostkeys->entries, hostkeys->num_entries,
 	    hostkeys->num_entries + 1, sizeof(*hostkeys->entries))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	hostkeys->entries = tmp;

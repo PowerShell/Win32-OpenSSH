@@ -71,8 +71,8 @@ w32_alarm(unsigned int sec)
 	/* if timer was already ative, return when it was due */
 	if (timer_info.ticks_at_start) {
 		sec_passed = (GetTickCount64() - timer_info.ticks_at_start) / 1000;
-		if (sec_passed < timer_info.run_time_sec)
-			ret = timer_info.run_time_sec - sec_passed;
+		if (sec_passed < (ULONGLONG)timer_info.run_time_sec)
+			ret = (int) (timer_info.run_time_sec - sec_passed);
 	}
 	timer_info.ticks_at_start = GetTickCount64();
 	timer_info.run_time_sec = sec;

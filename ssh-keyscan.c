@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.113 2017/04/30 23:28:42 djm Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.114 2017/05/31 07:00:13 markus Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -276,7 +276,7 @@ keygrab_ssh2(con *c)
 	 * do the key-exchange until an error occurs or until
 	 * the key_print_wrapper() callback sets c_done.
 	 */
-	ssh_dispatch_run(c->c_ssh, DISPATCH_BLOCK, &c->c_done, c->c_ssh);
+	ssh_dispatch_run(c->c_ssh, DISPATCH_BLOCK, &c->c_done);
 }
 
 static void

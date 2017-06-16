@@ -1,4 +1,4 @@
-/* $OpenBSD: sshkey.c,v 1.50 2017/05/08 06:11:06 djm Exp $ */
+/* $OpenBSD: sshkey.c,v 1.51 2017/05/31 09:15:42 deraadt Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -1764,8 +1764,9 @@ cert_parse(struct sshbuf *b, struct sshkey *key, struct sshbuf *certbuf)
 			goto out;
 		}
 		oprincipals = key->cert->principals;
-		key->cert->principals = reallocarray(key->cert->principals,
-		    key->cert->nprincipals + 1, sizeof(*key->cert->principals));
+		key->cert->principals = recallocarray(key->cert->principals,
+		    key->cert->nprincipals, key->cert->nprincipals + 1,
+		    sizeof(*key->cert->principals));
 		if (key->cert->principals == NULL) {
 			free(principal);
 			key->cert->principals = oprincipals;

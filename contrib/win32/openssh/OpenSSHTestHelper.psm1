@@ -158,6 +158,8 @@ WARNING: Following changes will be made to OpenSSH configuration
     # copy new sshd_config
     Copy-Item (Join-Path $Script:E2ETestDirectory sshd_config) (Join-Path $script:OpenSSHBinPath sshd_config) -Force
     
+    Start-Service ssh-agent
+
     #copy sshtest keys
     Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force    
     Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*"| % {
@@ -165,17 +167,11 @@ WARNING: Following changes will be made to OpenSSH configuration
         (Get-Content $_.FullName -Raw).Replace("`r`n","`n") | Set-Content $_.FullName -Force
         Adjust-HostKeyFileACL -FilePath $_.FullName
         if (-not ($_.Name.EndsWith(".pub"))) {
-            Add-PermissionToFileACL -FilePath $_.FullName -User "NT Service\sshd" -Perm "Read"
+            #register private key with agent
+            ssh-add-hostkey.ps1 $_.FullName
         }
     }
 
-    #register host keys with agent
-    <#Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*"| % {
-        if (-not ($_.Name.EndsWith(".pub"))) {
-            & "$env:ProgramData\chocolatey\lib\sysinternals\tools\psexec" -accepteula -nobanner -i -s -w $($script:OpenSSHBinPath) cmd.exe /c "ssh-add $_"
-            Add-PermissionToFileACL -FilePath $_.FullName -User "NT Service\sshd" -Perm "Read"
-        }
-    }#>
     Restart-Service sshd -Force
    
     #Backup existing known_hosts and replace with test version
@@ -255,7 +251,6 @@ function Get-LocalUserProfile
       .SYNOPSIS
       This function installs the tools required by our tests
       1) Pester for running the tests  
-      2) sysinternals required by the tests on windows.
 #>
 function Install-OpenSSHTestDependencies
 {
@@ -274,11 +269,6 @@ function Install-OpenSSHTestDependencies
     {      
       Write-Log -Message "Installing Pester..." 
       choco install Pester -y --force --limitoutput 2>&1 >> $Script:TestSetupLogFile
-    }
-
-    if ( -not (Test-Path "$env:ProgramData\chocolatey\lib\sysinternals\tools" ) ) {        
-        Write-Log -Message "sysinternals not present. Installing sysinternals."
-        choco install sysinternals -y --force --limitoutput 2>&1 >> $Script:TestSetupLogFile
     }
 }
 <#
@@ -309,26 +299,30 @@ function Get-UserSID
     Cleanup-OpenSSHTestEnvironment
 #>
 function Cleanup-OpenSSHTestEnvironment
-{    
+{   
+    if($Global:OpenSSHTestInfo -eq $null) {
+        throw "OpenSSHTestInfo is not set. Did you run Setup-OpenSShTestEnvironment?"
+    }
+
+    $sshBinPath = $Global:OpenSSHTestInfo["OpenSSHBinPath"]
+
     # .exe - Windows specific. TODO - PAL 
-    if (-not (Test-Path (Join-Path $script:OpenSSHBinPath ssh.exe) -PathType Leaf))
+    if (-not (Test-Path (Join-Path $sshBinPath ssh.exe) -PathType Leaf))
     {
         Throw "Cannot find OpenSSH binaries under $script:OpenSSHBinPath. "
     }
-
+    
     #unregister test host keys from agent
-    Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*.pub"| % {
-            $cmd = "cmd /c `"$env:ProgramData\chocolatey\lib\sysinternals\tools\psexec -accepteula -nobanner -s -w $($script:OpenSSHBinPath) ssh-add -d $_ 2> tmp.txt`""
-            iex $cmd
+    Get-ChildItem "$sshBinPath\sshtest*hostkey*.pub"| % {
+        ssh-add-hostkey.ps1 -Delete_key $_.FullName
     }
     
-
+    Remove-Item $sshBinPath\sshtest*hostkey* -Force -ErrorAction SilentlyContinue    
     #Restore sshd_config
-    $backupConfigPath = Join-Path $Script:OpenSSHBinPath sshd_config.ori
+    $backupConfigPath = Join-Path $sshBinPath sshd_config.ori
     if (Test-Path $backupConfigPath -PathType Leaf) {        
-        Copy-Item $backupConfigPath (Join-Path $Script:OpenSSHBinPath sshd_config) -Force -ErrorAction SilentlyContinue
-        Remove-Item (Join-Path $Script:OpenSSHBinPath sshd_config.ori) -Force -ErrorAction SilentlyContinue
-        Remove-Item $Script:OpenSSHBinPath\sshtest*hostkey* -Force -ErrorAction SilentlyContinue
+        Copy-Item $backupConfigPath (Join-Path $sshBinPath sshd_config) -Force -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $sshBinPath sshd_config.ori) -Force -ErrorAction SilentlyContinue
         Restart-Service sshd
     }
     

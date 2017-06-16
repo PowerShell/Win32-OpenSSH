@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.275 2017/04/30 23:18:22 djm Exp $ */
+/* $OpenBSD: readconf.c,v 1.277 2017/05/30 18:58:37 bluhm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -164,7 +164,8 @@ typedef enum {
 	oServerAliveInterval, oServerAliveCountMax, oIdentitiesOnly,
 	oSendEnv, oControlPath, oControlMaster, oControlPersist,
 	oHashKnownHosts,
-	oTunnel, oTunnelDevice, oLocalCommand, oPermitLocalCommand,
+	oTunnel, oTunnelDevice,
+	oLocalCommand, oPermitLocalCommand, oRemoteCommand,
 	oVisualHostKey,
 	oKexAlgorithms, oIPQoS, oRequestTTY, oIgnoreUnknown, oProxyUseFdpass,
 	oCanonicalDomains, oCanonicalizeHostname, oCanonicalizeMaxDots,
@@ -285,6 +286,7 @@ static struct {
 	{ "tunneldevice", oTunnelDevice },
 	{ "localcommand", oLocalCommand },
 	{ "permitlocalcommand", oPermitLocalCommand },
+	{ "remotecommand", oRemoteCommand },
 	{ "visualhostkey", oVisualHostKey },
 	{ "kexalgorithms", oKexAlgorithms },
 	{ "ipqos", oIPQoS },
@@ -439,8 +441,8 @@ add_identity_file(Options *options, const char *dir, const char *filename,
 
 	if (dir == NULL) /* no dir, filename is absolute */
 		path = xstrdup(filename);
-	else
-		(void)xasprintf(&path, "%.100s%.100s", dir, filename);
+	else if (xasprintf(&path, "%s%s", dir, filename) >= PATH_MAX)
+		fatal("Identity file path %s too long", path);
 
 	/* Avoid registering duplicates */
 	for (i = 0; i < options->num_identity_files; i++) {
@@ -1446,6 +1448,10 @@ parse_keytypes:
 		intptr = &options->permit_local_command;
 		goto parse_flag;
 
+	case oRemoteCommand:
+		charptr = &options->remote_command;
+		goto parse_command;
+
 	case oVisualHostKey:
 		intptr = &options->visual_host_key;
 		goto parse_flag;
@@ -1845,6 +1851,7 @@ initialize_options(Options * options)
 	options->tun_remote = -1;
 	options->local_command = NULL;
 	options->permit_local_command = -1;
+	options->remote_command = NULL;
 	options->add_keys_to_agent = -1;
 	options->identity_agent = NULL;
 	options->visual_host_key = -1;
@@ -2049,6 +2056,7 @@ fill_default_options(Options * options)
 		} \
 	} while(0)
 	CLEAR_ON_NONE(options->local_command);
+	CLEAR_ON_NONE(options->remote_command);
 	CLEAR_ON_NONE(options->proxy_command);
 	CLEAR_ON_NONE(options->control_path);
 	CLEAR_ON_NONE(options->revoked_host_keys);
@@ -2526,6 +2534,7 @@ dump_client_config(Options *o, const char *host)
 	dump_cfg_string(oKbdInteractiveDevices, o->kbd_interactive_devices);
 	dump_cfg_string(oKexAlgorithms, o->kex_algorithms ? o->kex_algorithms : KEX_CLIENT_KEX);
 	dump_cfg_string(oLocalCommand, o->local_command);
+	dump_cfg_string(oRemoteCommand, o->remote_command);
 	dump_cfg_string(oLogLevel, log_level_name(o->log_level));
 	dump_cfg_string(oMacs, o->macs ? o->macs : KEX_CLIENT_MAC);
 #ifdef ENABLE_PKCS11

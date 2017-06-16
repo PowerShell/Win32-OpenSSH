@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.h,v 1.123 2017/04/30 23:28:41 djm Exp $ */
+/* $OpenBSD: channels.h,v 1.126 2017/05/30 14:23:52 markus Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -46,8 +46,6 @@
 #define SSH_CHANNEL_CLOSED		5	/* waiting for close confirmation */
 #define SSH_CHANNEL_AUTH_SOCKET		6	/* authentication socket */
 #define SSH_CHANNEL_X11_OPEN		7	/* reading first X11 packet */
-#define SSH_CHANNEL_INPUT_DRAINING	8	/* sending remaining data to conn */
-#define SSH_CHANNEL_OUTPUT_DRAINING	9	/* sending remaining data to app */
 #define SSH_CHANNEL_LARVAL		10	/* larval session */
 #define SSH_CHANNEL_RPORT_LISTENER	11	/* Listening to a R-style port  */
 #define SSH_CHANNEL_CONNECTING		12
@@ -63,6 +61,7 @@
 
 #define CHANNEL_CANCEL_PORT_STATIC	-1
 
+struct ssh;
 struct Channel;
 typedef struct Channel Channel;
 
@@ -234,19 +233,19 @@ void	 channel_send_window_changes(void);
 /* mux proxy support */
 
 int	 channel_proxy_downstream(Channel *mc);
-int	 channel_proxy_upstream(Channel *, int, u_int32_t, void *);
+int	 channel_proxy_upstream(Channel *, int, u_int32_t, struct ssh *);
 
 /* protocol handler */
 
-int	 channel_input_close_confirmation(int, u_int32_t, void *);
-int	 channel_input_data(int, u_int32_t, void *);
-int	 channel_input_extended_data(int, u_int32_t, void *);
-int	 channel_input_ieof(int, u_int32_t, void *);
-int	 channel_input_oclose(int, u_int32_t, void *);
-int	 channel_input_open_confirmation(int, u_int32_t, void *);
-int	 channel_input_open_failure(int, u_int32_t, void *);
-int	 channel_input_window_adjust(int, u_int32_t, void *);
-int	 channel_input_status_confirm(int, u_int32_t, void *);
+int	 channel_input_data(int, u_int32_t, struct ssh *);
+int	 channel_input_extended_data(int, u_int32_t, struct ssh *);
+int	 channel_input_ieof(int, u_int32_t, struct ssh *);
+int	 channel_input_oclose(int, u_int32_t, struct ssh *);
+int	 channel_input_open_confirmation(int, u_int32_t, struct ssh *);
+int	 channel_input_open_failure(int, u_int32_t, struct ssh *);
+int	 channel_input_port_open(int, u_int32_t, struct ssh *);
+int	 channel_input_window_adjust(int, u_int32_t, struct ssh *);
+int	 channel_input_status_confirm(int, u_int32_t, struct ssh *);
 
 /* file descriptor handling (read/write) */
 

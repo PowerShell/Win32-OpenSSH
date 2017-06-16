@@ -4,11 +4,9 @@
     <OpenSSH-Src-Path>$(SolutionDir)..\..\..\</OpenSSH-Src-Path> 
     <OpenSSH-Bin-Path>$(SolutionDir)..\..\..\bin\</OpenSSH-Bin-Path>
     <OpenSSH-Lib-Path>$(SolutionDir)lib\</OpenSSH-Lib-Path>
-    <OpenSSL-Path>$(SolutionDir)\OpenSSLSDK\1.0.2d</OpenSSL-Path>
-    <OpenSSL-Win32-Release-Path>$(SolutionDir)\OpenSSLSDK\1.0.2d\Win32\Release\</OpenSSL-Win32-Release-Path>
-    <OpenSSL-Win32-Debug-Path>$(SolutionDir)\OpenSSLSDK\1.0.2d\Win32\Debug\</OpenSSL-Win32-Debug-Path>
-    <OpenSSL-x64-Release-Path>$(SolutionDir)\OpenSSLSDK\1.0.2d\x64\Release\</OpenSSL-x64-Release-Path>
-    <OpenSSL-x64-Debug-Path>$(SolutionDir)\OpenSSLSDK\1.0.2d\x64\Debug\</OpenSSL-x64-Debug-Path>
-	<!-- <UseOpenSSL>false</UseOpenSSL> -->
+    <LibreSSL-Path>$(SolutionDir)\LibreSSLSDK\</LibreSSL-Path>
+    <LibreSSL-x86-Path>$(SolutionDir)\LibreSSLSDK\x86\</LibreSSL-x86-Path>
+    <LibreSSL-x64-Path>$(SolutionDir)\LibreSSLSDK\x64\</LibreSSL-x64-Path>
+    <!-- <UseOpenSSL>false</UseOpenSSL> -->
   </PropertyGroup>
 </Project>

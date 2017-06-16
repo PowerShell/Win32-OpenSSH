@@ -102,14 +102,14 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_WIN32_WINNT=0x501;WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-Win32-Debug-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(LibreSSL-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Win32-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libcrypto-41.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x86-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
@@ -120,10 +120,11 @@
     <PostBuildEvent>
       <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
 copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.psm1 $(OutDir)
+copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
 copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
+copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
 If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
-      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1, and sshd_config (if not already present) to build directory</Message>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -134,14 +135,14 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_WIN32_WINNT=0x501;WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-x64-Debug-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(LibreSSL-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-x64-Debug-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libcrypto-41.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x64-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
@@ -152,10 +153,11 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
     <PostBuildEvent>
       <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
 copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.psm1 $(OutDir)
+copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
 copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
+copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
 If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
-      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1, and sshd_config (if not already present) to build directory</Message>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -168,7 +170,7 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_WIN32_WINNT=0x501;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-Win32-Release-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(LibreSSL-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -176,8 +178,8 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-Win32-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libcrypto-41.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x86-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
@@ -188,10 +190,11 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
     <PostBuildEvent>
       <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
 copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.psm1 $(OutDir)
+copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
 copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
+copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
 If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
-      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1, and sshd_config (if not already present) to build directory</Message>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -204,7 +207,7 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_WIN32_WINNT=0x501;_LIB;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(OpenSSL-x64-Release-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir);$(LibreSSL-Path)include;$(OpenSSH-Src-Path)includes;$(OpenSSH-Src-Path);$(OpenSSH-Src-Path)contrib\win32\win32compat\includes;$(OpenSSH-Src-Path)contrib\win32\win32compat;$(OpenSSH-Src-Path)libkrb;$(OpenSSH-Src-Path)libkrb\libKrb5;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -212,8 +215,8 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <GenerateDebugInformation>No</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libeay32.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(OpenSSL-x64-Release-Path)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>bcrypt.lib;Userenv.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;openbsd_compat.lib;libssh.lib;libcrypto-41.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x64-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
       <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
@@ -224,10 +227,11 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
     <PostBuildEvent>
       <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
 copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.psm1 $(OutDir)
+copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
 copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
+copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
 If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
-      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1, and sshd_config (if not already present) to build directory</Message>
+      <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

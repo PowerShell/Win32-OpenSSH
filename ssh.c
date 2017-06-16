@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.459 2017/05/02 08:06:33 jmc Exp $ */
+/* $OpenBSD: ssh.c,v 1.461 2017/05/30 18:58:37 bluhm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -973,12 +973,6 @@ main(int ac, char **av)
 		}
 	}
 
-	/* Cannot fork to background if no command. */
-	if (fork_after_authentication_flag && buffer_len(&command) == 0 &&
-	    !no_shell_flag)
-		fatal("Cannot fork into background without a command "
-		    "to execute.");
-
 	/*
 	 * Initialize "log" output.  Since we are the client all output
 	 * goes to stderr unless otherwise specified by -y or -E.
@@ -1133,6 +1127,15 @@ main(int ac, char **av)
 		options.use_privileged_port = 0;
 #endif
 
+	if (buffer_len(&command) != 0 && options.remote_command != NULL)
+		fatal("Cannot execute command-line and remote command.");
+
+	/* Cannot fork to background if no command. */
+	if (fork_after_authentication_flag && buffer_len(&command) == 0 &&
+	    options.remote_command == NULL && !no_shell_flag)
+		fatal("Cannot fork into background without a command "
+		    "to execute.");
+
 	/* reinit */
 	log_init(argv0, options.log_level, options.log_facility, !use_syslog);
 
@@ -1141,7 +1144,7 @@ main(int ac, char **av)
 		tty_flag = 1;
 
 	/* Allocate a tty by default if no command specified. */
-	if (buffer_len(&command) == 0)
+	if (buffer_len(&command) == 0 && options.remote_command == NULL)
 		tty_flag = options.request_tty != REQUEST_TTY_NO;
 
 	/* Force no tty */
@@ -1195,6 +1198,27 @@ main(int ac, char **av)
 		    (char *)NULL);
 		debug3("expanded LocalCommand: %s", options.local_command);
 		free(cp);
+	}
+
+	if (options.remote_command != NULL) {
+		debug3("expanding RemoteCommand: %s", options.remote_command);
+		cp = options.remote_command;
+		options.remote_command = percent_expand(cp,
+		    "C", conn_hash_hex,
+		    "L", shorthost,
+		    "d", pw->pw_dir,
+		    "h", host,
+		    "l", thishost,
+		    "n", host_arg,
+		    "p", portstr,
+		    "r", options.user,
+		    "u", pw->pw_name,
+		    (char *)NULL);
+		debug3("expanded RemoteCommand: %s", options.remote_command);
+		free(cp);
+		buffer_append(&command, options.remote_command,
+		    strlen(options.remote_command));
+
 	}
 
 	if (options.control_path != NULL) {
@@ -1278,7 +1302,7 @@ main(int ac, char **av)
 	if (options.hostbased_authentication) {
 		sensitive_data.nkeys = 9;
 		sensitive_data.keys = xcalloc(sensitive_data.nkeys,
-		    sizeof(Key));
+		    sizeof(struct sshkey));	/* XXX */
 		for (i = 0; i < sensitive_data.nkeys; i++)
 			sensitive_data.keys[i] = NULL;
 
@@ -1858,16 +1882,16 @@ load_public_identity_files(void)
 {
 	char *filename, *cp, thishost[NI_MAXHOST];
 	char *pwdir = NULL, *pwname = NULL;
-	Key *public;
+	struct sshkey *public;
 	struct passwd *pw;
 	int i;
 	u_int n_ids, n_certs;
 	char *identity_files[SSH_MAX_IDENTITY_FILES];
-	Key *identity_keys[SSH_MAX_IDENTITY_FILES];
+	struct sshkey *identity_keys[SSH_MAX_IDENTITY_FILES];
 	char *certificate_files[SSH_MAX_CERTIFICATE_FILES];
 	struct sshkey *certificates[SSH_MAX_CERTIFICATE_FILES];
 #ifdef ENABLE_PKCS11
-	Key **keys;
+	struct sshkey **keys;
 	int nkeys;
 #endif /* PKCS11 */
 

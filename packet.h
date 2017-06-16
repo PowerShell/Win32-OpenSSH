@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.h,v 1.79 2017/05/03 21:08:09 naddy Exp $ */
+/* $OpenBSD: packet.h,v 1.81 2017/05/31 08:09:45 markus Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -77,6 +77,9 @@ struct ssh {
 	TAILQ_HEAD(, key_entry) private_keys;
 	TAILQ_HEAD(, key_entry) public_keys;
 
+	/* Client/Server authentication context */
+	void *authctxt;
+
 	/* APP data */
 	void *app_data;
 };
@@ -94,6 +97,8 @@ int      ssh_packet_get_connection_in(struct ssh *);
 int      ssh_packet_get_connection_out(struct ssh *);
 void     ssh_packet_close(struct ssh *);
 void	 ssh_packet_set_input_hook(struct ssh *, ssh_packet_hook_fn *, void *);
+void	 ssh_packet_clear_keys(struct ssh *);
+void	 ssh_clear_newkeys(struct ssh *, int);
 
 int	 ssh_packet_is_rekeying(struct ssh *);
 void     ssh_packet_set_protocol_flags(struct ssh *, u_int);

@@ -14,6 +14,7 @@
 struct agent_connection {
 	OVERLAPPED ol;
 	HANDLE pipe_handle;
+        HANDLE client_impersonation_token;
 	struct {
 		DWORD num_bytes;
 		DWORD transferred;

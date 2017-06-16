@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <Shlwapi.h>
+#include <conio.h>
 
 #include "inc\unistd.h"
 #include "inc\sys\stat.h"
@@ -46,6 +47,8 @@
 #include "inc\utf.h"
 #include "signal_internal.h"
 #include "debug.h"
+#include "w32fd.h"
+#include "inc\string.h"
 
 static char* s_programdir = NULL;
 
@@ -266,22 +269,24 @@ w32_fopen_utf8(const char *path, const char *mode)
 		return NULL;
 	}
 
-	f = _wfopen(wpath, wmode);
-	if (f) {
-		/* BOM adjustments for file streams*/
-		if (mode[0] == 'w' && fseek(f, 0, SEEK_SET) != EBADF) {
-			/* write UTF-8 BOM - should we ?*/
-			/*if (fwrite(utf8_bom, sizeof(utf8_bom), 1, f) != 1) {
-				fclose(f);
-				return NULL;
-			}*/
+	if ((_wfopen_s(&f, wpath, wmode) != 0) || (f == NULL)) {
+		debug3("Failed to open file:%s error:%d", path, errno);
+		return NULL;
+	}		
 
-		} else if (mode[0] == 'r' && fseek(f, 0, SEEK_SET) != EBADF) {
-			/* read out UTF-8 BOM if present*/
-			if (fread(first3_bytes, 3, 1, f) != 1 ||
-			    memcmp(first3_bytes, utf8_bom, 3) != 0) {
-				fseek(f, 0, SEEK_SET);
-			}
+	/* BOM adjustments for file streams*/
+	if (mode[0] == 'w' && fseek(f, 0, SEEK_SET) != EBADF) {
+		/* write UTF-8 BOM - should we ?*/
+		/*if (fwrite(utf8_bom, sizeof(utf8_bom), 1, f) != 1) {
+			fclose(f);
+			return NULL;
+		}*/
+
+	} else if (mode[0] == 'r' && fseek(f, 0, SEEK_SET) != EBADF) {
+		/* read out UTF-8 BOM if present*/
+		if (fread(first3_bytes, 3, 1, f) != 1 ||
+			memcmp(first3_bytes, utf8_bom, 3) != 0) {
+			fseek(f, 0, SEEK_SET);
 		}
 	}
 
@@ -334,7 +339,7 @@ char*
 			if((actual_read + strlen(str_tmp)) >= n)
 				break;
 			memcpy(cp, str_tmp, strlen(str_tmp));
-			actual_read += strlen(str_tmp);
+			actual_read += (int)strlen(str_tmp);
 			cp += strlen(str_tmp);
 			
 		} while ((actual_read < n - 1) && *str_tmp != '\n');
@@ -386,10 +391,15 @@ w32_setvbuf(FILE *stream, char *buffer, int mode, size_t size) {
 char *
 w32_programdir()
 {
+	wchar_t* wpgmptr;
+
 	if (s_programdir != NULL)
 		return s_programdir;
 
-	if ((s_programdir = utf16_to_utf8(_wpgmptr)) == NULL)
+	if (_get_wpgmptr(&wpgmptr) != 0)
+		return NULL;
+
+	if ((s_programdir = utf16_to_utf8(wpgmptr)) == NULL)
 		return NULL;
 
 	/* null terminate after directory path */
@@ -440,6 +450,7 @@ w32_ioctl(int d, int request, ...)
 	}
 }
 
+/* p should be at least 12 bytes long*/
 void
 strmode(mode_t mode, char *p)
 {
@@ -468,76 +479,13 @@ strmode(mode_t mode, char *p)
 	}
 
 	/* The below code is commented as the group, other is not applicable on the windows.
-	 * This will be properly fixed in next releases.
 	 * As of now we are keeping "*" for everything.
+	 * TODO - figure out if there is a better option
 	 */
-	const char *permissions = "********* ";
-	strncpy(p, permissions, strlen(permissions) + 1);
-	p = p + strlen(p);
-	/* //usr
-	if (mode & S_IRUSR)
-		*p++ = 'r';
-	else
-		*p++ = '-';
-	if (mode & S_IWUSR)
-		*p++ = 'w';
-	else
-		*p++ = '-';
-	switch (mode & (S_IXUSR)) {
-	case 0:
-		*p++ = '-';
-		break;
-	case S_IXUSR:
-		*p++ = 'x';
-		break;
-		//case S_ISUID:
-		//		*p++ = 'S';
-		//		break;
-		//case S_IXUSR | S_ISUID:
-		//		*p++ = 's';
-		//		break;
-	}
-	// group
-	if (mode & S_IRGRP)
-		*p++ = 'r';
-	else
-		*p++ = '-';
-	if (mode & S_IWGRP)
-		*p++ = 'w';
-	else
-		*p++ = '-';
-	switch (mode & (S_IXGRP)) {
-	case 0:
-		*p++ = '-';
-		break;
-	case S_IXGRP:
-		*p++ = 'x';
-		break;
-		//case S_ISGID:
-		//		*p++ = 'S';
-		//		break;
-		//case S_IXGRP | S_ISGID:
-		//		*p++ = 's';
-		//		break;
-	}
-	// other
-	if (mode & S_IROTH)
-		*p++ = 'r';
-	else
-		*p++ = '-';
-	if (mode & S_IWOTH)
-		*p++ = 'w';
-	else
-		*p++ = '-';
-	switch (mode & (S_IXOTH)) {
-	case 0:
-		*p++ = '-';
-		break;
-	case S_IXOTH:
-		*p++ = 'x';
-		break;
-	}
-	*p++ = ' ';		//  will be a '+' if ACL's implemented */
+	const char *permissions = "********* ";	
+	for(int i = 0; i < strlen(permissions); i++)
+		*p++ = permissions[i];
+	
 	*p = '\0';
 }
 
@@ -587,11 +535,10 @@ static BOOL
 is_root_or_empty(wchar_t * path)
 {
 	wchar_t * path_start;
-	BOOL has_drive_letter_and_colon;
 	int len;
 	if (!path) 
 		return FALSE;
-	len = wcslen(path);
+	len = (int)wcslen(path);
 	if((len > 1) && __ascii_iswalpha(path[0]) && path[1] == L':')
 		path_start = path + 2;
 	else
@@ -713,7 +660,7 @@ w32_rename(const char *old_name, const char *new_name)
 	}
 
 	/*
-	 * To be consistent with linux rename(),
+	 * To be consistent with POSIX rename(),
 	 * 1) if the new_name is file, then delete it so that _wrename will succeed.
 	 * 2) if the new_name is directory and it is empty then delete it so that _wrename will succeed.
 	 */
@@ -793,11 +740,21 @@ w32_getcwd(char *buffer, int maxlen)
 	wchar_t wdirname[PATH_MAX];
 	char* putf8 = NULL;
 
-	_wgetcwd(&wdirname[0], PATH_MAX);
+	if (_wgetcwd(wdirname, PATH_MAX) == NULL)
+		return NULL;
 
-	if ((putf8 = utf16_to_utf8(&wdirname[0])) == NULL)
-		fatal("failed to convert input arguments");
-	strcpy(buffer, putf8);
+	if ((putf8 = utf16_to_utf8(wdirname)) == NULL) {
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	if (strlen(putf8) >= maxlen) {
+		errno = ERANGE;
+		free(putf8);
+		return NULL;
+	}
+
+	strcpy_s(buffer, maxlen, putf8);
 	free(putf8);
 
 	return buffer;
@@ -806,6 +763,7 @@ w32_getcwd(char *buffer, int maxlen)
 int
 w32_mkdir(const char *path_utf8, unsigned short mode)
 {
+	int curmask;
 	wchar_t *path_utf16 = utf8_to_utf16(sanitized_path(path_utf8));
 	if (path_utf16 == NULL) {
 		errno = ENOMEM;
@@ -817,8 +775,9 @@ w32_mkdir(const char *path_utf8, unsigned short mode)
 		return -1;
 	}
 
-	mode_t curmask = _umask(0);
-	_umask(curmask);
+	errno_t error = _umask_s(0, &curmask);
+	if(!error)
+		_umask_s(curmask, &curmask);
 
 	returnStatus = _wchmod(path_utf16, mode & ~curmask & (_S_IREAD | _S_IWRITE));
 	free(path_utf16);
@@ -882,11 +841,17 @@ realpath(const char *path, char resolved[PATH_MAX])
 	if (!path || !resolved) return NULL;
 
 	char tempPath[PATH_MAX];
+	size_t path_len = strlen(path);
 
-	if ((path[0] == '/') && path[1] && (path[2] == ':'))
-		strncpy(resolved, path + 1, PATH_MAX); /* skip the first '/' */
+	if (path_len > PATH_MAX - 1) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	if ((path_len >= 2) && (path[0] == '/') && path[1] && (path[2] == ':'))
+		strncpy_s(resolved, PATH_MAX, path + 1, path_len); /* skip the first '/' */
 	else
-		strncpy(resolved, path, PATH_MAX);
+		strncpy_s(resolved, PATH_MAX, path, path_len + 1);
 
 	if ((resolved[0]) && (resolved[1] == ':') && (resolved[2] == '\0')) { /* make "x:" as "x:\\" */
 		resolved[2] = '\\';
@@ -899,7 +864,8 @@ realpath(const char *path, char resolved[PATH_MAX])
 	convertToForwardslash(tempPath);
 
 	resolved[0] = '/'; /* will be our first slash in /x:/users/test1 format */
-	strncpy(resolved + 1, tempPath, PATH_MAX - 1);
+	if (strncpy_s(resolved+1, PATH_MAX - 1, tempPath, sizeof(tempPath) - 1) != 0)
+		return NULL;
 	return resolved;
 }
 
@@ -913,7 +879,7 @@ sanitized_path(const char *path)
 	if (path[0] == '/' && path[1]) {
 		if (path[2] == ':') {
 			if (path[3] == '\0') { /* make "/x:" as "x:\\" */
-				strncpy(newPath, path + 1, strlen(path) - 1);
+				strncpy_s(newPath, sizeof(PATH_MAX), path + 1, strlen(path) - 1);
 				newPath[2] = '\\';
 				newPath[3] = '\0';
 
@@ -924,70 +890,6 @@ sanitized_path(const char *path)
 	}
 
 	return (char *)path;
-}
-
-
-BOOL
-ResolveLink(wchar_t * tLink, wchar_t *ret, DWORD * plen, DWORD Flags)
-{
-	HANDLE fileHandle;
-	BYTE reparseBuffer[MAX_REPARSE_SIZE];
-	PBYTE reparseData;
-	PREPARSE_GUID_DATA_BUFFER reparseInfo = (PREPARSE_GUID_DATA_BUFFER)reparseBuffer;
-	PREPARSE_DATA_BUFFER msReparseInfo = (PREPARSE_DATA_BUFFER)reparseBuffer;
-	DWORD   returnedLength;
-
-	if (Flags & FILE_ATTRIBUTE_DIRECTORY) {
-		fileHandle = CreateFileW(tLink, 0,
-			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-			OPEN_EXISTING,
-			FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
-
-	} else {
-		/* Open the file */
-		fileHandle = CreateFileW(tLink, 0,
-			FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-			OPEN_EXISTING,
-			FILE_FLAG_OPEN_REPARSE_POINT, 0);
-	}
-
-	if (fileHandle == INVALID_HANDLE_VALUE)	{
-		swprintf_s(ret, *plen, L"%ls", tLink);
-		return TRUE;
-	}
-
-	if (GetFileAttributesW(tLink) & FILE_ATTRIBUTE_REPARSE_POINT) {
-		if (DeviceIoControl(fileHandle, FSCTL_GET_REPARSE_POINT,
-			NULL, 0, reparseInfo, sizeof(reparseBuffer),
-			&returnedLength, NULL)) {
-			if (IsReparseTagMicrosoft(reparseInfo->ReparseTag)) {
-				switch (reparseInfo->ReparseTag) {
-				case 0x80000000 | IO_REPARSE_TAG_SYMBOLIC_LINK:
-				case IO_REPARSE_TAG_MOUNT_POINT:
-					if (*plen >= msReparseInfo->MountPointReparseBuffer.SubstituteNameLength) {
-						reparseData = (PBYTE)&msReparseInfo->SymbolicLinkReparseBuffer.PathBuffer;
-						WCHAR temp[1024];
-						wcsncpy_s(temp, 1024,
-							(PWCHAR)(reparseData + msReparseInfo->MountPointReparseBuffer.SubstituteNameOffset),
-							(size_t)msReparseInfo->MountPointReparseBuffer.SubstituteNameLength);
-						temp[msReparseInfo->MountPointReparseBuffer.SubstituteNameLength] = 0;
-						swprintf_s(ret, *plen, L"%ls", &temp[4]);
-					} else {
-						swprintf_s(ret, *plen, L"%ls", tLink);
-						return FALSE;
-					}
-
-					break;
-				default:
-					break;
-				}
-			}
-		}
-	} else
-		swprintf_s(ret, *plen, L"%ls", tLink);
-
-	CloseHandle(fileHandle);
-	return TRUE;
 }
 
 int
@@ -1042,60 +944,67 @@ w32_strerror(int errnum)
 {
 	if (errnum >= EADDRINUSE  && errnum <= EWOULDBLOCK)
 		return _sys_errlist_ext[errnum - EADDRINUSE];
-	return strerror(errnum);
+	
+	strerror_s(errorBuf, ERROR_MSG_MAXLEN, errnum);
+	return errorBuf;
 }
-/* 
- * Temporary implementation of readpassphrase. 
- * TODO - this needs to be reimplemented as per 
- * https://linux.die.net/man/3/readpassphrase
- */
-char * 
-readpassphrase(const char *prompt, char *out, size_t out_len, int flags) {
-	char *askpass = NULL;
-	char *ret = NULL;
 
-	DWORD mode;
-	size_t len = 0;
-	int retr = 0;
+char *
+readpassphrase(const char *prompt, char *outBuf, size_t outBufLen, int flags) {
+	int current_index = 0;
+	char ch;
+	wchar_t* wtmp = NULL;
 
-	/* prompt user */
-	wchar_t* wtmp = utf8_to_utf16(prompt);
+	if (outBufLen == 0) {
+		errno = EINVAL;
+		return NULL;
+	}
+
+	while (_kbhit()) _getch();
+
+	wtmp = utf8_to_utf16(prompt);
 	if (wtmp == NULL)
 		fatal("unable to alloc memory");
+
 	_cputws(wtmp);
 	free(wtmp);
 
-	len = retr = 0;
-
-	while (_kbhit())
-		_getch();
-
-	while (len < out_len) {
-		out[len] = (unsigned char)_getch();
-
-		if (out[len] == '\r') {
-			if (_kbhit()) /* read linefeed if its there */
-				_getch();
+	while (current_index < outBufLen - 1) {
+		ch = _getch();
+		
+		if (ch == '\r') {
+			if (_kbhit()) _getch(); /* read linefeed if its there */
 			break;
-		}
-		else if (out[len] == '\n') {
+		} else if (ch == '\n') {
 			break;
-		}
-		else if (out[len] == '\b') { /* backspace */
-			if (len > 0)
-				len--; /* overwrite last character */
-		}
-		else if (out[len] == '\003') {
-			/* exit on Ctrl+C */
+		} else if (ch == '\b') { /* backspace */
+			if (current_index > 0) {
+				if (flags & RPP_ECHO_ON)
+					printf("%c \b", ch);
+
+				current_index--; /* overwrite last character */
+			}
+		} else if (ch == '\003') { /* exit on Ctrl+C */
 			fatal("");
-		}
-		else {
-			len++; /* keep reading in the loop */
+		} else {
+			if (flags & RPP_SEVENBIT)
+				ch &= 0x7f;
+
+			if (isalpha((unsigned char)ch)) {
+				if(flags & RPP_FORCELOWER)
+					ch = tolower((unsigned char)ch);
+				if(flags & RPP_FORCEUPPER)
+					ch = toupper((unsigned char)ch);
+			}
+
+			outBuf[current_index++] = ch;
+			if(flags & RPP_ECHO_ON)
+				printf("%c", ch);
 		}
 	}
 
-	out[len] = '\0'; /* get rid of the cr/lf */
-	_cputs("\n"); /*show a newline as we do not echo password or the line */
+	outBuf[current_index] = '\0';
+	_cputs("\n");
 
-	return out;
+	return outBuf;
 }

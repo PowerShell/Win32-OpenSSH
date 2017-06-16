@@ -33,8 +33,8 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: ssh_config.5,v 1.248 2017/05/07 23:12:57 djm Exp $
-.Dd $Mdocdate: May 7 2017 $
+.\" $OpenBSD: ssh_config.5,v 1.250 2017/05/30 19:38:17 jmc Exp $
+.Dd $Mdocdate: May 30 2017 $
 .Dt SSH_CONFIG 5
 .Os
 .Sh NAME
@@ -1287,6 +1287,16 @@ is
 .Cm default none ,
 which means that rekeying is performed after the cipher's default amount
 of data has been sent or received and no time based rekeying is done.
+.It Cm RemoteCommand
+Specifies a command to execute on the remote machine after successfully
+connecting to the server.
+The command string extends to the end of the line, and is executed with
+the user's shell.
+Arguments to
+.Cm RemoteCommand
+accept the tokens described in the
+.Sx TOKENS
+section.
 .It Cm RemoteForward
 Specifies that a TCP port on the remote machine be forwarded over
 the secure channel to the specified host and port from the local machine.
@@ -1702,6 +1712,9 @@ accepts the tokens %%, %C, %d, %h, %l, %n, %p, %r, and %u.
 .Pp
 .Cm ProxyCommand
 accepts the tokens %%, %h, %p, and %r.
+.Pp
+.Cm RemoteCommand
+accepts the tokens %%, %C, %d, %h, %l, %n, %p, %r, and %u.
 .Sh FILES
 .Bl -tag -width Ds
 .It Pa ~/.ssh/config

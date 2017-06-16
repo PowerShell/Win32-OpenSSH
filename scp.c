@@ -1,4 +1,4 @@
-/* $OpenBSD: scp.c,v 1.191 2017/05/02 08:06:33 jmc Exp $ */
+/* $OpenBSD: scp.c,v 1.192 2017/05/31 09:15:42 deraadt Exp $ */
 /*
  * scp - secure remote copy.  This is basically patched BSD rcp which
  * uses ssh to do the data transfer (instead of using rcmd).
@@ -1475,11 +1475,7 @@ allocbuf(BUF *bp, int fd, int blksize)
 #endif /* HAVE_STRUCT_STAT_ST_BLKSIZE */
 	if (bp->cnt >= size)
 		return (bp);
-	if (bp->buf == NULL)
-		bp->buf = xmalloc(size);
-	else
-		bp->buf = xreallocarray(bp->buf, 1, size);
-	memset(bp->buf, 0, size);
+	bp->buf = xrecallocarray(bp->buf, bp->cnt, size, 1);
 	bp->cnt = size;
 	return (bp);
 }

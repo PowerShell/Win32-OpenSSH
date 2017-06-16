@@ -155,9 +155,13 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 
 	/* if one of below fails, set profile path to Windows directory */
 	if (swprintf(reg_path, PATH_MAX, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", user_sid) == PATH_MAX ||
-		RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
-		RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, (LPBYTE)profile_home, &tmp_len) != 0)
-		GetWindowsDirectoryW(profile_home, PATH_MAX);
+	    RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
+	    RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, (LPBYTE)profile_home, &tmp_len) != 0) 
+		if (GetWindowsDirectoryW(profile_home, PATH_MAX) == 0) {
+			debug3("GetWindowsDirectoryW failed with %d", GetLastError());
+			errno = EOTHER;
+			goto done;
+		}
 
 	if ((uname_utf8 = utf16_to_utf8(uname_utf16)) == NULL ||
 	    (udom_utf16 && (udom_utf8 = utf16_to_utf8(udom_utf16)) == NULL) ||
@@ -167,9 +171,9 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 		goto done;
 	}
 
-	uname_upn_len = strlen(uname_utf8) + 1;
+	uname_upn_len = (DWORD) strlen(uname_utf8) + 1;
 	if (udom_utf8)
-		uname_upn_len += strlen(udom_utf8) + 1;
+		uname_upn_len += (DWORD)strlen(udom_utf8) + 1;
 
 	if ((uname_upn = malloc(uname_upn_len)) == NULL) {
 		errno = ENOMEM;

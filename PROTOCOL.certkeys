@@ -224,6 +224,9 @@ option-specific information (see below). All options are
 "critical", if an implementation does not recognise a option
 then the validating party should refuse to accept the certificate.
 
+Custom options should append the originating author or organisation's
+domain name to the option name, e.g. "my-option@example.com".
+
 No critical options are defined for host certificates at present. The
 supported user certificate options and the contents and structure of
 their data fields are:
@@ -255,6 +258,9 @@ as is the requirement that each name appear only once.
 If an implementation does not recognise an extension, then it should
 ignore it.
 
+Custom options should append the originating author or organisation's
+domain name to the option name, e.g. "my-option@example.com".
+
 No extensions are defined for host certificates at present. The
 supported user certificate extensions and the contents and structure of
 their data fields are:
@@ -285,4 +291,4 @@ permit-user-rc          empty         Flag indicating that execution of
                                       of this script will not be permitted if
                                       this option is not present.
 
-$OpenBSD: PROTOCOL.certkeys,v 1.11 2017/05/16 16:54:05 djm Exp $
+$OpenBSD: PROTOCOL.certkeys,v 1.12 2017/05/31 04:29:44 djm Exp $

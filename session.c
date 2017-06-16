@@ -1,4 +1,4 @@
-/* $OpenBSD: session.c,v 1.286 2016/11/30 03:00:05 djm Exp $ */
+/* $OpenBSD: session.c,v 1.288 2017/05/31 09:15:42 deraadt Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -367,11 +367,18 @@ int register_child(void* child, unsigned long pid);
 
 int do_exec_windows(Session *s, const char *command, int pty) {
 	int pipein[2], pipeout[2], pipeerr[2], r;
-	char *exec_command = NULL, *progdir = w32_programdir();
+	char *exec_command = NULL, *progdir = w32_programdir(), *cmd = NULL, *shell_host = NULL, *command_b64 = NULL;
 	wchar_t *exec_command_w = NULL, *pw_dir_w;
+	const char *sftp_exe = "sftp-server.exe", *argp = NULL;
+	size_t command_b64_len = 0;
+	PROCESS_INFORMATION pi;
+	STARTUPINFOW si;
+	BOOL create_process_ret_val;
+	HANDLE hToken = INVALID_HANDLE_VALUE;
+	extern int debug_flag;
 
 	if (s->is_subsystem >= SUBSYSTEM_INT_SFTP_ERROR) {
-		error("sub system not supported, exiting");
+		error("This service allows sftp connections only.\n");
 		fflush(NULL);
 		exit(1);
 	}
@@ -382,7 +389,6 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 
 	if ((pw_dir_w = utf8_to_utf16(s->pw->pw_dir)) == NULL)
 		fatal("%s: out of memory", __func__);
-
 
 	set_nonblock(pipein[0]);
 	set_nonblock(pipein[1]);
@@ -407,12 +413,39 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		if (command[1] == ':') /* absolute */
 			exec_command = xstrdup(command);
 		else {/*relative*/
-			exec_command = malloc(strlen(progdir) + 1 + strlen(command));
+			const int command_len = strlen(progdir) + 1 + strlen(command) + (strlen(sftp_exe) - strlen(INTERNAL_SFTP_NAME));
+			exec_command = malloc(command_len);
 			if (exec_command == NULL)
 				fatal("%s, out of memory", __func__);
-			memcpy(exec_command, progdir, strlen(progdir));
-			exec_command[strlen(progdir)] = '\\';
-			memcpy(exec_command + strlen(progdir) + 1, command, strlen(command) + 1);
+						
+			cmd = exec_command;
+			memcpy(cmd, progdir, strlen(progdir));
+			cmd += strlen(progdir);
+			*cmd++ = '\\';
+
+			/* In windows, INTERNAL_SFTP is supported via sftp-server.exe.
+			 * This is a deviation from the UNIX implementation that hosts sftp-server within sshd.
+			 * If sftp-server were to be hosted within sshd for Windows, following would be needed
+			 *  - Impersonate client user
+			 *  - call sftp-server-main
+			 *
+			 * SSHD service account would need impersonate privilege to impersonate client user, 
+			 * thereby needing elevation of SSHD account privileges
+			 * Apart from slight performance gain (by hosting sftp in process), there isn't a clear 
+			 * gain with this option over using and spawning sftp-server.exe.
+			 * Hence going with the later option. 
+			 */
+			if(IS_INTERNAL_SFTP(command)) {
+				memcpy(cmd, sftp_exe, strlen(sftp_exe) + 1);
+				cmd += strlen(sftp_exe);
+				
+				// copy the arguments (if any).
+				if(strlen(command) > strlen(INTERNAL_SFTP_NAME)) {
+					argp = (char*)command + strlen(INTERNAL_SFTP_NAME);
+					memcpy(cmd, argp, strlen(argp)+1);
+				}
+			} else
+				memcpy(cmd, command, strlen(command) + 1);
 		}
 	} else {
 		/* 
@@ -420,9 +453,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		 * command is base64 encoded to preserve original special charecters like '"'
 		 * else they will get lost in CreateProcess translation
 		 */
-		char *shell_host = pty ? "ssh-shellhost.exe " : "ssh-shellhost.exe -nopty ", *c;
-		char *command_b64 = NULL;
-		size_t command_b64_len = 0;
+		shell_host = pty ? "ssh-shellhost.exe " : "ssh-shellhost.exe -nopty ";
 		if (command) {
 			/* accomodate bas64 encoding bloat and null terminator */
 			command_b64_len = ((strlen(command) + 2) / 3) * 4 + 1;
@@ -433,27 +464,21 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		exec_command = malloc(strlen(progdir) + 1 + strlen(shell_host) + (command_b64 ? strlen(command_b64): 0) + 1);
 		if (exec_command == NULL)
 			fatal("%s, out of memory", __func__);
-		c = exec_command;
-		memcpy(c, progdir, strlen(progdir));
-		c += strlen(progdir);
-		*c++ = '\\';
-		memcpy(c, shell_host, strlen(shell_host));
-		c += strlen(shell_host);
+		cmd = exec_command;
+		memcpy(cmd, progdir, strlen(progdir));
+		cmd += strlen(progdir);
+		*cmd++ = '\\';
+		memcpy(cmd, shell_host, strlen(shell_host));
+		cmd += strlen(shell_host);
 		if (command_b64) {
-			memcpy(c, command_b64, strlen(command_b64));
-			c += strlen(command_b64);
+			memcpy(cmd, command_b64, strlen(command_b64));
+			cmd += strlen(command_b64);
 		}
-		*c = '\0';
+		*cmd = '\0';
 	}
 
 	/* start the process */
 	{
-		PROCESS_INFORMATION pi;
-		STARTUPINFOW si;
-		BOOL b;
-		HANDLE hToken = INVALID_HANDLE_VALUE;
-		extern int debug_flag;
-
 		memset(&si, 0, sizeof(STARTUPINFO));
 		si.cb = sizeof(STARTUPINFO);
 		si.dwXSize = 5;
@@ -478,11 +503,11 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 
 		/* in debug mode launch using sshd.exe user context */
 		if (debug_flag)
-			b = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
+			create_process_ret_val = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
 				DETACHED_PROCESS, NULL, pw_dir_w,
 				&si, &pi);
 		else /* launch as client user context */
-			b = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
+			create_process_ret_val = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
 				DETACHED_PROCESS , NULL, pw_dir_w,
 				&si, &pi);
 
@@ -490,7 +515,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		_putenv_s("SSH_ASYNC_STDOUT", "");
 		_putenv_s("SSH_ASYNC_STDERR", "");
 
-		if (!b)
+		if (!create_process_ret_val)
 			fatal("ERROR. Cannot create process (%u).\n", GetLastError());
 
 		CloseHandle(pi.hThread);
@@ -1740,6 +1765,7 @@ do_child(Session *s, const char *command)
 
 	/* remove hostkey from the child's memory */
 	destroy_sensitive_data();
+	packet_clear_keys();
 
 	/* Force a password change */
 	if (s->authctxt->force_pwchange) {
@@ -1965,8 +1991,8 @@ session_new(void)
 			return NULL;
 		debug2("%s: allocate (allocated %d max %d)",
 		    __func__, sessions_nalloc, options.max_sessions);
-		tmp = xreallocarray(sessions, sessions_nalloc + 1,
-		    sizeof(*sessions));
+		tmp = xrecallocarray(sessions, sessions_nalloc,
+		    sessions_nalloc + 1, sizeof(*sessions));
 		if (tmp == NULL) {
 			error("%s: cannot allocate %d sessions",
 			    __func__, sessions_nalloc + 1);
@@ -2290,8 +2316,8 @@ session_env_req(Session *s)
 	for (i = 0; i < options.num_accept_env; i++) {
 		if (match_pattern(name, options.accept_env[i])) {
 			debug2("Setting env %d: %s=%s", s->num_env, name, val);
-			s->env = xreallocarray(s->env, s->num_env + 1,
-			    sizeof(*s->env));
+			s->env = xrecallocarray(s->env, s->num_env,
+			    s->num_env + 1, sizeof(*s->env));
 			s->env[s->num_env].name = name;
 			s->env[s->num_env].val = val;
 			s->num_env++;

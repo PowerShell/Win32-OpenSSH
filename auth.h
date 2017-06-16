@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.h,v 1.89 2016/08/13 17:47:41 markus Exp $ */
+/* $OpenBSD: auth.h,v 1.91 2017/05/30 14:29:59 markus Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -91,7 +91,7 @@ struct Authctxt {
 
 struct Authmethod {
 	char	*name;
-	int	(*userauth)(Authctxt *authctxt);
+	int	(*userauth)(struct ssh *);
 	int	*enabled;
 };
 
@@ -117,9 +117,10 @@ auth_rhosts2(struct passwd *, const char *, const char *, const char *);
 
 int      auth_password(Authctxt *, const char *);
 
-int	 hostbased_key_allowed(struct passwd *, const char *, char *, Key *);
-int	 user_key_allowed(struct passwd *, Key *, int);
-void	 pubkey_auth_info(Authctxt *, const Key *, const char *, ...)
+int	 hostbased_key_allowed(struct passwd *, const char *, char *,
+	    struct sshkey *);
+int	 user_key_allowed(struct passwd *, struct sshkey *, int);
+void	 pubkey_auth_info(Authctxt *, const struct sshkey *, const char *, ...)
 	    __attribute__((__format__ (printf, 3, 4)));
 void	 auth2_record_userkey(Authctxt *, struct sshkey *);
 int	 auth2_userkey_already_used(Authctxt *, struct sshkey *);
@@ -154,7 +155,7 @@ void	auth_info(Authctxt *authctxt, const char *, ...)
 	    __attribute__((__nonnull__ (2)));
 void	auth_log(Authctxt *, int, int, const char *, const char *);
 void	auth_maxtries_exceeded(Authctxt *) __attribute__((noreturn));
-void	userauth_finish(Authctxt *, int, const char *, const char *);
+void	userauth_finish(struct ssh *, int, const char *, const char *);
 int	auth_root_allowed(const char *);
 
 void	userauth_send_banner(const char *);
@@ -167,8 +168,8 @@ int	 auth2_method_allowed(Authctxt *, const char *, const char *);
 
 void	privsep_challenge_enable(void);
 
-int	auth2_challenge(Authctxt *, char *);
-void	auth2_challenge_stop(Authctxt *);
+int	auth2_challenge(struct ssh *, char *);
+void	auth2_challenge_stop(struct ssh *);
 int	bsdauth_query(void *, char **, char **, u_int *, char ***, u_int **);
 int	bsdauth_respond(void *, u_int, char **);
 int	skey_query(void *, char **, char **, u_int *, char ***, u_int **);
@@ -182,22 +183,22 @@ char	*authorized_principals_file(struct passwd *);
 
 FILE	*auth_openkeyfile(const char *, struct passwd *, int);
 FILE	*auth_openprincipals(const char *, struct passwd *, int);
-int	 auth_key_is_revoked(Key *);
+int	 auth_key_is_revoked(struct sshkey *);
 
 const char	*auth_get_canonical_hostname(struct ssh *, int);
 
 HostStatus
-check_key_in_hostfiles(struct passwd *, Key *, const char *,
+check_key_in_hostfiles(struct passwd *, struct sshkey *, const char *,
     const char *, const char *);
 
 /* hostkey handling */
-Key	*get_hostkey_by_index(int);
-Key	*get_hostkey_public_by_index(int, struct ssh *);
-Key	*get_hostkey_public_by_type(int, int, struct ssh *);
-Key	*get_hostkey_private_by_type(int, int, struct ssh *);
-int	 get_hostkey_index(Key *, int, struct ssh *);
-int	 sshd_hostkey_sign(Key *, Key *, u_char **, size_t *,
-	     const u_char *, size_t, const char *, u_int);
+struct sshkey	*get_hostkey_by_index(int);
+struct sshkey	*get_hostkey_public_by_index(int, struct ssh *);
+struct sshkey	*get_hostkey_public_by_type(int, int, struct ssh *);
+struct sshkey	*get_hostkey_private_by_type(int, int, struct ssh *);
+int	 get_hostkey_index(struct sshkey *, int, struct ssh *);
+int	 sshd_hostkey_sign(struct sshkey *, struct sshkey *, u_char **,
+	     size_t *, const u_char *, size_t, const char *, u_int);
 
 /* debug messages during authentication */
 void	 auth_debug_add(const char *fmt,...) __attribute__((format(printf, 1, 2)));
