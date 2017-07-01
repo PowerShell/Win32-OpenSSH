@@ -72,6 +72,12 @@ mm_user_key_allowed(struct passwd *pw, Key *k, int i)
 	return 0;
 }
 
+void* mm_auth_pubkey(const char* user_name, const struct sshkey *key,
+	const u_char *sig, size_t slen, struct sshbuf* b)
+{
+	return NULL;
+}
+
 int
 kexgex_server(struct ssh * sh) {
 	return -1;

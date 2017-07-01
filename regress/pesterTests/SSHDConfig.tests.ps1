@@ -50,7 +50,7 @@
             $client.AddPasswordSetting($password)
         }        
         AfterEach {
-            Remove-Item -Path $filePath -Force -ea ignore
+            Remove-Item -Path $filePath -Force -ea SilentlyContinue
         }
 
         AfterAll {

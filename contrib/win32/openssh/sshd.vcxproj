@@ -246,6 +246,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)sshlogin.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\win32_sshpty.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_sshd.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\win32_monitor_wrap.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />

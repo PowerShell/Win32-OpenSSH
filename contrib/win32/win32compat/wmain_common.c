@@ -51,7 +51,7 @@ wmain(int argc, wchar_t **wargv) {
         }
 
 	if (getenv("SSH_AUTH_SOCK") == NULL)
-		_putenv("SSH_AUTH_SOCK=ssh-agent");
+		_putenv("SSH_AUTH_SOCK=\\\\.\\pipe\\openssh-ssh-agent");
 
 	w32posix_initialize();
 	

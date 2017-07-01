@@ -200,54 +200,14 @@ userauth_pubkey(struct ssh *ssh)
 		/* test for correct signature */
 		authenticated = 0;
 
-#ifdef WINDOWS
-		/* Pass key challenge material to ssh-agent to retrieve token upon successful authentication */
-		{
-			struct sshbuf *msg = NULL; 
-			u_char *blob = NULL;
-			size_t blen = 0;
-			DWORD token = 0;
-			extern int auth_sock;
-			int r = 0;
-			int ssh_request_reply(int , struct sshbuf *, struct sshbuf *);
-
-			while (1) {
-				msg = sshbuf_new();
-				if (!msg)
-					fatal("%s: out of memory", __func__);
-				if ((r = sshbuf_put_u8(msg, SSH_AGENT_AUTHENTICATE)) != 0 ||
-				    (r = sshbuf_put_cstring(msg, PUBKEY_AUTH_REQUEST)) != 0 ||
-				    (r = sshkey_to_blob(key, &blob, &blen)) != 0 ||
-				    (r = sshbuf_put_string(msg, blob, blen)) != 0 ||
-				    (r = sshbuf_put_cstring(msg, authctxt->pw->pw_name)) != 0 ||
-				    (r = sshbuf_put_string(msg, sig, slen)) != 0 ||
-				    (r = sshbuf_put_string(msg, sshbuf_ptr(b), sshbuf_len(b))) != 0 ||
-				    (r = ssh_request_reply(auth_sock, msg, msg)) != 0 ||
-				    (r = sshbuf_get_u32(msg, &token)) != 0) {
-					debug("auth agent did not authorize client %s", authctxt->user);
-					break;
-				}
-
-				debug3("auth agent authenticated %s", authctxt->user);
-				break;
-				
-			}
-			if (blob)
-				free(blob);
-			if (msg)
-				sshbuf_free(msg);
-
-			if (token) {
-				authenticated = 1;                              
-				authctxt->methoddata = (void*)(INT_PTR)token;
-			}
-				
-		}
-
-#else  /* !WINDOWS */
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 1)) &&
+#ifdef WINDOWS
+		    (authctxt->auth_token = mm_auth_pubkey(authctxt->pw->pw_name, 
+		    key, sig, slen, b)) != NULL) {
+#else
 		    PRIVSEP(sshkey_verify(key, sig, slen, sshbuf_ptr(b),
 		    sshbuf_len(b), ssh->compat)) == 0) {
+#endif
 			authenticated = 1;
 			/* Record the successful key to prevent reuse */
 			auth2_record_userkey(authctxt, key);
@@ -255,7 +215,6 @@ userauth_pubkey(struct ssh *ssh)
 		}
 		sshbuf_free(b);
 		free(sig);
-#endif  /* !WINDOWS */
 
 	} else {
 		debug("%s: test whether pkalg/pkblob are acceptable for %s %s",

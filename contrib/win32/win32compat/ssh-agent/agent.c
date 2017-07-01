@@ -37,7 +37,7 @@
 static HANDLE ioc_port = NULL;
 static BOOL debug_mode = FALSE;
 
-#define AGENT_PIPE_ID L"\\\\.\\pipe\\ssh-agent"
+#define AGENT_PIPE_ID L"\\\\.\\pipe\\openssh-ssh-agent"
 
 static HANDLE event_stop_agent;
 static OVERLAPPED ol;
@@ -168,12 +168,14 @@ agent_cleanup_connection(struct agent_connection* con)
 {
 	debug("connection %p clean up", con);
 	CloseHandle(con->pipe_handle);
-        if (con->hProfile)
-                UnloadUserProfile(con->auth_token, con->hProfile);
-        if (con->auth_token)
-                CloseHandle(con->auth_token);
+        if (con->profile_handle)
+                UnloadUserProfile(con->profile_token, con->profile_handle);
+        if (con->profile_token)
+                CloseHandle(con->profile_token);
         if (con->client_impersonation_token)
                 CloseHandle(con->client_impersonation_token);
+	if (con->client_process_handle)
+		CloseHandle(con->client_process_handle);
 	free(con);
 	CloseHandle(ioc_port);
 	ioc_port = NULL;
@@ -251,13 +253,13 @@ get_con_client_info(struct agent_connection* con)
 	DWORD sshd_sid_len = 0;
 	PSID sshd_sid = NULL;
 	SID_NAME_USE nuse;
-	HANDLE client_primary_token = NULL, client_impersonation_token = NULL,  client_proc_handle = NULL;
+	HANDLE client_primary_token = NULL, client_impersonation_token = NULL, client_process_handle = NULL;
 	TOKEN_USER* info = NULL;
 	BOOL isMember = FALSE;
 
 	if (GetNamedPipeClientProcessId(con->pipe_handle, &client_pid) == FALSE ||
-	    (client_proc_handle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, client_pid)) == NULL ||
-	    OpenProcessToken(client_proc_handle, TOKEN_QUERY | TOKEN_DUPLICATE, &client_primary_token) == FALSE ||
+	    (client_process_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL ||
+	    OpenProcessToken(client_process_handle, TOKEN_QUERY | TOKEN_DUPLICATE, &client_primary_token) == FALSE ||
 	    DuplicateToken(client_primary_token, SecurityImpersonation, &client_impersonation_token) == FALSE) {
 		error("cannot retrieve client impersonatin token");
 		goto done;
@@ -341,15 +343,19 @@ done:
 		free(ref_dom);
 	if (info)
 		free(info);
-	if (client_proc_handle)
-		CloseHandle(client_proc_handle);
 	if (client_primary_token)
 		CloseHandle(client_primary_token);
 
-	if (r == 0)
+	if (r == 0) {
+		con->client_process_handle = client_process_handle;
 		con->client_impersonation_token = client_impersonation_token;
-	else if (client_impersonation_token)
-		CloseHandle(client_impersonation_token);
+	}
+	else {
+		if (client_process_handle)
+			CloseHandle(client_process_handle);
+		if (client_impersonation_token)
+			CloseHandle(client_impersonation_token);
+	}	
 
 	return r;
 }

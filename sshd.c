@@ -1765,9 +1765,7 @@ main(int ac, char **av)
 			error("Could not connect to agent \"%s\": %s",
 			    options.host_key_agent, ssh_err(r));
 	}
-#ifdef WINDOWS /* Windows version always needs and has agent running */  
-	have_agent = 1;
-#endif  
+
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if (options.host_key_files[i] == NULL)
 			continue;

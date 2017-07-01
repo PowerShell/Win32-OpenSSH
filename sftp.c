@@ -296,9 +296,14 @@ static void
 local_do_shell(const char *args)
 {
   #ifdef WINDOWS
-    /* execute via system call in Windows*/
-	if (!*args) {        
-		args = (char *)	getenv("ComSpec"); // get name of Windows cmd shell
+	/* execute via system call in Windows*/
+	char cmd_path[PATH_MAX] = { 0, };
+	if (!*args){
+		if (!GetSystemDirectory(cmd_path, sizeof(cmd_path)))
+			fatal("GetSystemDirectory failed");
+
+		strcat_s(cmd_path, PATH_MAX, "\\cmd.exe");
+		args = cmd_path;
 	} else {
 		convertToBackslash((char *) args);
 	}

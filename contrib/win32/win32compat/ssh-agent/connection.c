@@ -30,6 +30,7 @@
  */
 #include "agent.h"
 #include "agent-request.h"
+#include "..\priv-agent.h"
 
 #pragma warning(push, 3)
 
@@ -168,8 +169,8 @@ process_request(struct agent_connection* con)
 	case SSH2_AGENTC_REMOVE_ALL_IDENTITIES:
 		r = process_remove_all(request, response, con);
 		break;
-	case SSH_AGENT_AUTHENTICATE:
-		r = process_authagent_request(request, response, con);
+	case SSH_PRIV_AGENT_MSG_ID:
+		r = process_privagent_request(request, response, con);
 		break;
 	default:
 		debug("unknown agent request %d", type);

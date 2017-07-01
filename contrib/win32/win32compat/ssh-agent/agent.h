@@ -4,17 +4,18 @@
 #include "log.h"
 #define MAX_MESSAGE_SIZE 256 * 1024
 
-#define SSH_ROOT L"SOFTWARE\\SSH"
+#define SSH_ROOT L"SOFTWARE\\OpenSSH"
 #define SSH_AGENT_ROOT SSH_ROOT L"\\Agent"
 #define SSH_KEYS_KEY L"Keys"
-#define SSH_KEYS_ROOT SSH_ROOT L"\\" SSH_KEYS_KEY
+#define SSH_KEYS_ROOT SSH_AGENT_ROOT L"\\" SSH_KEYS_KEY
 
 #define HEADER_SIZE 4
 
 struct agent_connection {
 	OVERLAPPED ol;
 	HANDLE pipe_handle;
-        HANDLE client_impersonation_token;
+	HANDLE client_impersonation_token;
+	HANDLE client_process_handle;
 	struct {
 		DWORD num_bytes;
 		DWORD transferred;
@@ -36,8 +37,9 @@ struct agent_connection {
 		SYSTEM, /* client is running as System */
 		SERVICE, /* client is running as LS or NS */
 	} client_type;
-        HANDLE auth_token;
-        HANDLE hProfile;
+	/* user profile related members */
+	HANDLE profile_token;
+	HANDLE profile_handle;
 };
 
 void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);

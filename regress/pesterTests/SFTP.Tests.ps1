@@ -1,9 +1,12 @@
-﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force -DisableNameChecking
+﻿If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
 Describe "SFTP Test Cases" -Tags "CI" {
     BeforeAll {
+        $serverDirectory = $null
+        $clientDirectory = $null
         if($OpenSSHTestInfo -eq $null)
         {
-            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+            Throw "`$OpenSSHTestInfo is null. Please run Set-OpenSSHTestEnvironment to set test environments."
         }
 
         $rootDirectory = "$($OpenSSHTestInfo["TestDataPath"])\SFTP"
@@ -29,8 +32,11 @@ Describe "SFTP Test Cases" -Tags "CI" {
         $ssouser = $OpenSSHTestInfo["SSOUser"]
         $script:testId = 1
 
-        Remove-item (Join-Path $rootDirectory "*.$outputFileName") -Force -ErrorAction Ignore                
-        Remove-item (Join-Path $rootDirectory "*.$batchFileName") -Force -ErrorAction Ignore
+        Remove-item (Join-Path $rootDirectory "*.$outputFileName") -Force -ErrorAction SilentlyContinue                
+        Remove-item (Join-Path $rootDirectory "*.$batchFileName") -Force -ErrorAction SilentlyContinue
+        
+        $platform = Get-Platform
+        $skip = ($platform -eq [PlatformType]::Windows) -and ($PSVersionTable.PSVersion.Major -le 2)
 
         $testData1 = @(
              @{
@@ -162,9 +168,9 @@ Describe "SFTP Test Cases" -Tags "CI" {
         # for the first time, delete the existing log files.
         if ($OpenSSHTestInfo['DebugMode'])
         {
-            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore
-            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction ignore
-            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" -Force -ErrorAction ignore
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction SilentlyContinue
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction SilentlyContinue
+            Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" -Force -ErrorAction SilentlyContinue
         }
 
         function CopyDebugLogs {
@@ -175,21 +181,21 @@ Describe "SFTP Test Cases" -Tags "CI" {
                 Copy-Item "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server_$script:testId.log" -Force
                 
                 # clear the ssh-agent, sshd logs so that next testcase will get fresh logs.
-                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction ignore
-                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction ignore
-                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" -Force -ErrorAction ignore
+                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\ssh-agent.log" -Force -ErrorAction SilentlyContinue
+                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sshd.log" -Force -ErrorAction SilentlyContinue
+                Clear-Content "$($OpenSSHTestInfo['OpenSSHBinPath'])\logs\sftp-server.log" -Force -ErrorAction SilentlyContinue
             }
         }
     }
 
     AfterAll {
-       Get-ChildItem $serverDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-       Get-ChildItem $clientDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+       if($serverDirectory) { Get-ChildItem $serverDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
+       if($clientDirectory) { Get-ChildItem $clientDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
     }
 
     BeforeEach {
-       Get-ChildItem $serverDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-       Get-ChildItem $clientDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue       
+       if($serverDirectory) { Get-ChildItem $serverDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
+       if($clientDirectory) { Get-ChildItem $clientDirectory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
        $outputFilePath = Join-Path $rootDirectory "$($script:testId).$outputFileName"
        $batchFilePath = Join-Path $rootDirectory "$($script:testId).$batchFileName"
     }
@@ -212,6 +218,7 @@ Describe "SFTP Test Cases" -Tags "CI" {
 
     It '<Title>' -TestCases:$testData2 {
        param([string]$Title, $Options, $tmpFileName1, $tmpFilePath1, $tmpFileName2, $tmpFilePath2, $tmpDirectoryName1, $tmpDirectoryPath1, $tmpDirectoryName2, $tmpDirectoryPath2)
+       if($skip) { return }
 
        #rm (remove file)
        $commands = "mkdir $tmpDirectoryPath1
@@ -263,16 +270,19 @@ Describe "SFTP Test Cases" -Tags "CI" {
     }
 
     It "$script:testId-ls lists items the user has no read permission" {
+       $adminsSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid)                        
+       $currentUserSid = Get-UserSID -User "$($env:USERDOMAIN)\$($env:USERNAME)"
+            
        $permTestHasAccessFile = "permTestHasAccessFile.txt"
        $permTestHasAccessFilePath = Join-Path $serverDirectory $permTestHasAccessFile
-       Remove-Item $permTestHasAccessFilePath -Force -ErrorAction Ignore
+       Remove-Item $permTestHasAccessFilePath -Force -ErrorAction SilentlyContinue
        New-Item $permTestHasAccessFilePath -ItemType file -Force -value "perm test has access file data" | Out-Null
 
        $permTestNoAccessFile = "permTestNoAccessFile.txt"
        $permTestNoAccessFilePath = Join-Path $serverDirectory $permTestNoAccessFile
-       Remove-Item $permTestNoAccessFilePath -Force -ErrorAction Ignore
+       Remove-Item $permTestNoAccessFilePath -Force -ErrorAction SilentlyContinue
        New-Item $permTestNoAccessFilePath -ItemType file -Force -value "perm test no access file data" | Out-Null
-       Set-FileOwnerAndACL -Filepath $permTestNoAccessFilePath -OwnerPerms "Read","Write"
+       Repair-FilePermission -Filepath $permTestNoAccessFilePath -Owners $currentUserSid -FullAccessNeeded $adminsSid,$currentUserSid -confirm:$false
 
        $Commands = "ls $serverDirectory"
        Set-Content $batchFilePath -Encoding UTF8 -value $Commands
@@ -282,11 +292,11 @@ Describe "SFTP Test Cases" -Tags "CI" {
        
        #cleanup
        $HasAccessPattern = $permTestHasAccessFilePath.Replace("\", "[/\\]")
-       $matches = $content | select-string -Pattern "^/$HasAccessPattern\s{0,}$"
+       $matches = @($content | select-string -Pattern "^/$HasAccessPattern\s{0,}$")
        $matches.count | Should be 1
 
        $NoAccessPattern = $permTestNoAccessFilePath.Replace("\", "[/\\]")
-       $matches = $content | select-string -Pattern "^/$NoAccessPattern\s{0,}$"
+       $matches = @($content | select-string -Pattern "^/$NoAccessPattern\s{0,}$")
        $matches.count | Should be 1
     }
 }

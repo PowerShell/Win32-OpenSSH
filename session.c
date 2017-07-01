@@ -477,6 +477,9 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		*cmd = '\0';
 	}
 
+	/* load user profile */
+	mm_load_profile(s->pw->pw_name, ((INT_PTR)s->authctxt->auth_token) & 0xffffffff);
+
 	/* start the process */
 	{
 		memset(&si, 0, sizeof(STARTUPINFO));
@@ -492,7 +495,7 @@ int do_exec_windows(Session *s, const char *command, int pty) {
 		si.hStdError = (HANDLE)w32_fd_to_handle(pipeerr[1]);
 		si.lpDesktop = NULL;
 
-		hToken = s->authctxt->methoddata;
+		hToken = s->authctxt->auth_token;
 
 		debug("Executing command: %s", exec_command);
 		UTF8_TO_UTF16_FATAL(exec_command_w, exec_command);

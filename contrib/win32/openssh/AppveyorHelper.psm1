@@ -1,12 +1,14 @@
 ﻿$ErrorActionPreference = 'Stop'
-Import-Module $PSScriptRoot\OpenSSHCommonUtils.psm1 -Force -DisableNameChecking
-Import-Module $PSScriptRoot\OpenSSHBuildHelper.psm1 -Force -DisableNameChecking
-Import-Module $PSScriptRoot\OpenSSHTestHelper.psm1 -Force -DisableNameChecking
+Set-StrictMode -Version 2.0
+If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\OpenSSHCommonUtils.psm1 -Force
+Import-Module $PSScriptRoot\OpenSSHBuildHelper.psm1 -Force
+Import-Module $PSScriptRoot\OpenSSHTestHelper.psm1 -Force
 
 $repoRoot = Get-RepositoryRoot
 $script:messageFile = join-path $repoRoot.FullName "BuildMessage.log"
 
-# Sets a build variable
+# Write the build message
 Function Write-BuildMessage
 {
     param(
@@ -77,12 +79,11 @@ function Invoke-AppVeyorFull
     {
         $env:APPVEYOR_SCHEDULED_BUILD = 'True'
     }
-    try {
-        Set-OpenSSHTestParams
+    try {        
         Invoke-AppVeyorBuild
         Install-OpenSSH
-        Setup-OpenSSHTestEnvironment
-        Run-OpenSSHTests
+        Set-OpenSSHTestEnvironment -confirm:$false
+        Invoke-OpenSSHTests
         Publish-Artifact
     }
     finally {
@@ -97,8 +98,8 @@ function Invoke-AppVeyorFull
 function Invoke-AppVeyorBuild
 {
       Set-BuildVariable TestPassed True
-      Build-OpenSSH -Configuration Release -NativeHostArch x64
-      Build-OpenSSH -Configuration Debug -NativeHostArch x86
+      Start-OpenSSHBuild -Configuration Release -NativeHostArch x64
+      Start-OpenSSHBuild -Configuration Release -NativeHostArch x86
       Write-BuildMessage -Message "OpenSSH binaries build success!" -Category Information
 }
 
@@ -138,6 +139,100 @@ function Add-BuildLog
 
 <#
     .Synopsis
+    Deploy all required files to a location and install the binaries
+#>
+function Install-OpenSSH
+{
+    [CmdletBinding()]
+    param
+    ( 
+        [ValidateSet('Debug', 'Release')]
+        [string]$Configuration = "Release",
+
+        [ValidateSet('x86', 'x64', '')]
+        [string]$NativeHostArch = "",
+
+        [string]$OpenSSHDir = "$env:SystemDrive\OpenSSH"
+    )
+
+    if ($NativeHostArch -eq "") 
+    {
+        $NativeHostArch = 'x64'
+        if ($env:PROCESSOR_ARCHITECTURE  -eq 'x86') {
+            $NativeHostArch = 'x86'
+        }
+    }
+
+    Start-OpenSSHPackage -NativeHostArch $NativeHostArch -Configuration $Configuration -DestinationPath $OpenSSHDir
+
+    Push-Location $OpenSSHDir 
+    & "$OpenSSHDir\install-sshd.ps1"
+    & "$OpenSSHDir\ssh-keygen.exe" -A    
+    & "$OpenSSHDir\FixHostFilePermissions.ps1" -Confirm:$false
+
+    #machine will be reboot after Install-openssh anyway
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')
+    $newMachineEnvironmentPath = $machinePath
+    if (-not ($machinePath.ToLower().Contains($OpenSSHDir.ToLower())))
+    {
+        $newMachineEnvironmentPath = "$OpenSSHDir;$newMachineEnvironmentPath"
+        $env:Path = "$OpenSSHDir;$env:Path"
+    }
+    # Update machine environment path
+    if ($newMachineEnvironmentPath -ne $machinePath)
+    {
+        [Environment]::SetEnvironmentVariable('Path', $newMachineEnvironmentPath, 'MACHINE')
+    }
+    
+    Set-Service sshd -StartupType Automatic 
+    Set-Service ssh-agent -StartupType Automatic
+
+    Pop-Location
+    Write-BuildMessage -Message "OpenSSH installed!" -Category Information
+}
+
+<#
+    .Synopsis
+    uninstalled sshd
+#>
+function UnInstall-OpenSSH
+{
+    [CmdletBinding()]
+    param
+    ( 
+        [string]$OpenSSHDir = "$env:SystemDrive\OpenSSH"
+    )
+
+    if (-not (Test-Path $OpenSSHDir -PathType Container))
+    {
+        return
+    }
+
+    Push-Location $OpenSSHDir
+    if((Get-Service ssh-agent -ErrorAction SilentlyContinue) -ne $null) {
+        Stop-Service ssh-agent -Force
+    }
+    & "$OpenSSHDir\uninstall-sshd.ps1"
+        
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')
+    $newMachineEnvironmentPath = $machinePath
+    if ($machinePath.ToLower().Contains($OpenSSHDir.ToLower()))
+    {        
+        $newMachineEnvironmentPath = $newMachineEnvironmentPath.Replace("$OpenSSHDir;", '')
+        $env:Path = $env:Path.Replace("$OpenSSHDir;", '')
+    }
+    
+    if ($newMachineEnvironmentPath -ne $machinePath)
+    {
+        [Environment]::SetEnvironmentVariable('Path', $newMachineEnvironmentPath, 'MACHINE')
+    }
+    
+    Pop-Location
+    Remove-Item -Path $OpenSSHDir -Recurse -Force -ErrorAction SilentlyContinue    
+}
+
+<#
+    .Synopsis
     Publishes package build artifacts.    
     .Parameter artifacts
     An array list to add the fully qualified build log path
@@ -170,11 +265,11 @@ function Add-Artifact
 function Publish-Artifact
 {
     Write-Host -ForegroundColor Yellow "Publishing project artifacts"
-    [System.Collections.ArrayList] $artifacts = [System.Collections.ArrayList]::new()   
+    [System.Collections.ArrayList] $artifacts = new-object System.Collections.ArrayList
     
     # Get the build.log file for each build configuration        
     Add-BuildLog -artifacts $artifacts -buildLog (Get-BuildLogFile -root $repoRoot.FullName -Configuration Release -NativeHostArch x64)
-    Add-BuildLog -artifacts $artifacts -buildLog (Get-BuildLogFile -root $repoRoot.FullName -Configuration Debug -NativeHostArch x86)
+    Add-BuildLog -artifacts $artifacts -buildLog (Get-BuildLogFile -root $repoRoot.FullName -Configuration Release -NativeHostArch x86)
 
     if($Global:OpenSSHTestInfo)
     {
@@ -186,7 +281,6 @@ function Publish-Artifact
     foreach ($artifact in $artifacts)
     {
         Write-Host "Publishing $artifact as Appveyor artifact"
-        # NOTE: attempt to publish subsequent artifacts even if the current one fails        
         Push-AppveyorArtifact $artifact -ErrorAction Continue
     }
 }
@@ -195,10 +289,10 @@ function Publish-Artifact
       .Synopsis
       Runs the tests for this repo
 #>
-function Run-OpenSSHTests
+function Invoke-OpenSSHTests
 {
     Write-Host "Start running unit tests"
-    $unitTestFailed = Run-OpenSSHUnitTest
+    $unitTestFailed = Invoke-OpenSSHUnitTest
 
     if($unitTestFailed)
     {
@@ -212,14 +306,14 @@ function Run-OpenSSHTests
         Write-BuildMessage -Message "All Unit tests passed!" -Category Information    
     }
     # Run all E2E tests.
-    Run-OpenSSHE2ETest
+    Invoke-OpenSSHE2ETest
     if (($OpenSSHTestInfo -eq $null) -or (-not (Test-Path $OpenSSHTestInfo["E2ETestResultsFile"])))
     {
         Write-Warning "Test result file $OpenSSHTestInfo["E2ETestResultsFile"] not found after tests."
         Write-BuildMessage -Message "Test result file $OpenSSHTestInfo["E2ETestResultsFile"] not found after tests." -Category Error
         Set-BuildVariable TestPassed False
     }
-    $xml = [xml](Get-Content -raw $OpenSSHTestInfo["E2ETestResultsFile"])
+    $xml = [xml](Get-Content $OpenSSHTestInfo["E2ETestResultsFile"] | out-string)
     if ([int]$xml.'test-results'.failures -gt 0) 
     {
         $errorMessage = "$($xml.'test-results'.failures) tests in regress\pesterTests failed. Detail test log is at $($OpenSSHTestInfo["E2ETestResultsFile"])."
@@ -239,7 +333,7 @@ function Run-OpenSSHTests
       .Synopsis
       upload OpenSSH pester test results.
 #>
-function Upload-OpenSSHTestResults
+function Publish-OpenSSHTestResults
 { 
     if ($env:APPVEYOR_JOB_ID)
     {

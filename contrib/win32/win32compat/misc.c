@@ -478,11 +478,23 @@ strmode(mode_t mode, char *p)
 		break;
 	}
 
-	/* The below code is commented as the group, other is not applicable on the windows.
-	 * As of now we are keeping "*" for everything.
-	 * TODO - figure out if there is a better option
-	 */
-	const char *permissions = "********* ";	
+	/* group, other are not applicable on the windows */
+
+	/* usr */
+	if (mode & S_IREAD)
+		*p++ = 'r';
+	else
+		*p++ = '-';
+	if (mode & S_IWRITE)
+		*p++ = 'w';
+	else
+		*p++ = '-';
+	if (mode & S_IEXEC)
+		*p++ = 'x';
+	else
+		*p++ = '-';
+
+	const char *permissions = "****** ";	
 	for(int i = 0; i < strlen(permissions); i++)
 		*p++ = permissions[i];
 	
@@ -950,7 +962,8 @@ w32_strerror(int errnum)
 }
 
 char *
-readpassphrase(const char *prompt, char *outBuf, size_t outBufLen, int flags) {
+readpassphrase(const char *prompt, char *outBuf, size_t outBufLen, int flags)
+{
 	int current_index = 0;
 	char ch;
 	wchar_t* wtmp = NULL;

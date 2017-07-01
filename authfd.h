@@ -43,6 +43,7 @@ int	ssh_agent_sign(int sock, struct sshkey *key,
 	    const u_char *data, size_t datalen, const char *alg, u_int compat);
 
 /* Messages for the authentication agent connection. */
+/* Message Id 0 is reserved */
 #define SSH_AGENTC_REQUEST_RSA_IDENTITIES	1
 #define SSH_AGENT_RSA_IDENTITIES_ANSWER		2
 #define SSH_AGENTC_RSA_CHALLENGE		3
@@ -87,13 +88,5 @@ int	ssh_agent_sign(int sock, struct sshkey *key,
 #define	SSH_AGENT_OLD_SIGNATURE			0x01
 #define	SSH_AGENT_RSA_SHA2_256			0x02
 #define	SSH_AGENT_RSA_SHA2_512			0x04
-
-/* 
-* Following are used in Windows implementation
-* ssh-agent in Windows also serves user authentication
-*/
-#define SSH_AGENT_AUTHENTICATE			200
-#define PUBKEY_AUTH_REQUEST			"pubkey"
-#define PASSWD_AUTH_REQUEST			"password"
 
 #endif				/* AUTHFD_H */

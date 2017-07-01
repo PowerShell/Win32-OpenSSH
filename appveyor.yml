@@ -1,40 +1,39 @@
-version: 0.0.16.0.{build}
+version: 0.0.17.0.{build}
 image: Visual Studio 2015
 
 branches:
   only:
     - latestw_all
-    - latestw_all_openssl
 
 init:
   - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 build_script:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1 -DisableNameChecking
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1
       Invoke-AppVeyorBuild
 
 after_build:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1 -DisableNameChecking
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1
       Install-OpenSSH
 
 before_test:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1 -DisableNameChecking
-      Setup-OpenSSHTestEnvironment -Quiet
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1
+      Set-OpenSSHTestEnvironment -Confirm:$false
 
 test_script:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1 -DisableNameChecking
-      Run-OpenSSHTests
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1
+      Invoke-OpenSSHTests
 
 after_test:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1 -DisableNameChecking
-      Upload-OpenSSHTestResults
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1
+      Publish-OpenSSHTestResults
       
 on_finish:
   - ps: |
-      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1 -DisableNameChecking
+      Import-Module $env:APPVEYOR_BUILD_FOLDER\contrib\win32\openssh\AppveyorHelper.psm1
       Publish-Artifact

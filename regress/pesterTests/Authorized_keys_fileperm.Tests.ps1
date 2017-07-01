@@ -1,4 +1,6 @@
-﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force -DisableNameChecking
+﻿If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
+Import-Module OpenSSHUtils -Force
 $tC = 1
 $tI = 0
 $suite = "authorized_keys_fileperm"
@@ -6,7 +8,7 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
     BeforeAll {    
         if($OpenSSHTestInfo -eq $null)
         {
-            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+            Throw "`$OpenSSHTestInfo is null. Please run Set-OpenSSHTestEnvironment to set test environments."
         }
         
         $testDir = "$($OpenSSHTestInfo["TestDataPath"])\$suite"
@@ -22,17 +24,31 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
         $ssouser = $OpenSSHTestInfo["SSOUser"]
         $PwdUser = $OpenSSHTestInfo["PasswdUser"]
         $ssouserProfile = $OpenSSHTestInfo["SSOUserProfile"]
-        Remove-Item -Path (Join-Path $testDir "*$fileName") -Force -ErrorAction ignore
+        Remove-Item -Path (Join-Path $testDir "*$fileName") -Force -ErrorAction SilentlyContinue
+        $platform = Get-Platform
+        $skip = ($platform -eq [PlatformType]::Windows) -and ($PSVersionTable.PSVersion.Major -le 2)
+        if(($platform -eq [PlatformType]::Windows) -and ($psversiontable.BuildVersion.Major -le 6))
+        {
+            #suppress the firewall blocking dialogue on win7
+            netsh advfirewall firewall add rule name="sshd" program="$($OpenSSHTestInfo['OpenSSHBinPath'])\sshd.exe" protocol=any action=allow dir=in
+        }
     }
 
     AfterEach { $tI++ }
+    
+    AfterAll {
+        if(($platform -eq [PlatformType]::Windows) -and ($psversiontable.BuildVersion.Major -le 6))
+        {            
+            netsh advfirewall firewall delete rule name="sshd" program="$($OpenSSHTestInfo['OpenSSHBinPath'])\sshd.exe" protocol=any dir=in
+        }    
+    }
 
     Context "Authorized key file permission" {
         BeforeAll {
-            $systemAccount = New-Object System.Security.Principal.NTAccount("NT AUTHORITY", "SYSTEM")
-            $adminAccount = New-Object System.Security.Principal.NTAccount("BUILTIN","Administrators")
-            $objUser = New-Object System.Security.Principal.NTAccount($ssouser)
-            $currentUser = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
+            $systemSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::LocalSystemSid)
+            $adminsSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid)                        
+            $currentUserSid = Get-UserSID -User "$($env:USERDOMAIN)\$($env:USERNAME)"
+            $objUserSid = Get-UserSID -User $ssouser
 
             $ssouserSSHProfilePath = Join-Path $ssouserProfile .testssh
             if(-not (Test-Path $ssouserSSHProfilePath -PathType Container)) {
@@ -43,21 +59,22 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $testknownhosts = Join-path $PSScriptRoot testdata\test_known_hosts
             Copy-Item $Source $ssouserSSHProfilePath -Force -ErrorAction Stop
 
-            Adjust-UserKeyFileACL -Filepath $authorizedkeyPath -Owner $objUser -OwnerPerms "Read, Write"
+            Repair-AuthorizedKeyPermission -Filepath $authorizedkeyPath -confirm:$false
 
-            Get-Process -Name sshd | Where-Object {$_.SI -ne 0} | Stop-process
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
             #add wrong password so ssh does not prompt password if failed with authorized keys
             Add-PasswordSetting -Pass "WrongPass"
             $tI=1
         }
 
         AfterAll {
+            Repair-AuthorizedKeyPermission -Filepath $authorizedkeyPath -confirm:$false
             if(Test-Path $authorizedkeyPath) {
-                Adjust-UserKeyFileACL -Filepath $authorizedkeyPath -Owner $objUser -OwnerPerms "Read, Write"
-                Remove-Item $authorizedkeyPath -Force -ErrorAction Ignore
+                Repair-AuthorizedKeyPermission -Filepath $authorizedkeyPath -confirm:$false
+                Remove-Item $authorizedkeyPath -Force -ErrorAction SilentlyContinue
             }
             if(Test-Path $ssouserSSHProfilePath) {            
-                Remove-Item $ssouserSSHProfilePath -Force -ErrorAction Ignore -Recurse
+                Remove-Item $ssouserSSHProfilePath -Force -ErrorAction SilentlyContinue -Recurse
             }
             Remove-PasswordSetting
             $tC++
@@ -66,11 +83,12 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
         BeforeEach {
             $filePath = Join-Path $testDir "$tC.$tI.$fileName"            
             $logPath = Join-Path $testDir "$tC.$tI.$logName"
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }       
 
         It "$tC.$tI-authorized_keys-positive(pwd user is the owner and running process can access to the file)" {
             #setup to have ssouser as owner and grant ssouser read and write, admins group, and local system full control            
-            Adjust-UserKeyFileACL -Filepath $authorizedkeyPath -Owner $objUser -OwnerPerms "Read, Write"
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owners $objUserSid -FullAccessNeeded  $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -78,14 +96,12 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $o | Should Be "1234"
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by local system)" {
             #setup to have system as owner and grant it full control            
-            Set-FileOwnerAndACL -Filepath $authorizedkeyPath -Owner $systemAccount -OwnerPerms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $adminAccount -Perms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $objUser -Perms "Read, Write"
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $systemSid -FullAccessNeeded  $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -93,14 +109,12 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $o | Should Be "1234"
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd does not have explict ACE)" {
-            #setup to have admin group as owner and grant it full control
-            
-            Set-FileOwnerAndACL -Filepath $authorizedkeyPath -Owner $adminAccount -OwnerPerms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $systemAccount -Perms "FullControl"            
+            #setup to have admin group as owner and grant it full control            
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $adminsSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -108,15 +122,12 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $o | Should Be "1234"
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd have explict ACE)" {
             #setup to have admin group as owner and grant it full control
-            
-            Set-FileOwnerAndACL -Filepath $authorizedkeyPath -Owner $adminAccount -OwnerPerms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $systemAccount -Perms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $objUser -Perms "Read, Write"
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $adminsSid -FullAccessNeeded $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -124,14 +135,12 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $o | Should Be "1234"
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other admin user)" {
             #setup to have current user (admin user) as owner and grant it full control
-            Set-FileOwnerAndACL -Filepath $authorizedkeyPath -Owner $currentUser -OwnerPerms "Read","Write"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $systemAccount -Perms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $adminAccount -Perms "FullControl"
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $currentUserSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -141,18 +150,16 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-negative(other account can access private key file)" {
-            #setup to have current user as owner and grant it full control
-            Set-FileOwnerAndACL -Filepath $authorizedkeyPath -Owner $objUser -OwnerPerms "Read","Write"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $systemAccount -Perms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $adminAccount -Perms "FullControl"
+            #setup to have current user as owner and grant it full control            
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $objUserSid -FullAccessNeeded $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #add $PwdUser to access the file authorized_keys
-            $objPwdUser = New-Object System.Security.Principal.NTAccount($PwdUser)
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $objPwdUser -Perm "Read"
+            $objPwdUserSid = Get-UserSid -User $PwdUser
+            Set-FilePermission -FilePath $authorizedkeyPath -User $objPwdUserSid -Perm "Read"
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -162,15 +169,13 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }            
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue  
         }
 
         It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other non-admin user)" {
-            #setup to have PwdUser as owner and grant it full control
-            $objPwdUser = New-Object System.Security.Principal.NTAccount($PwdUser)
-            Set-FileOwnerAndACL -Filepath $authorizedkeyPath -owner $objPwdUser -OwnerPerms "Read","Write"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $systemAccount -Perms "FullControl"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $adminAccount -Perms "FullControl"
+            #setup to have PwdUser as owner and grant it full control            
+            $objPwdUserSid = Get-UserSid -User $PwdUser
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $objPwdUserSid -FullAccessNeeded $adminsSid,$systemSid,$objPwdUser -confirm:$false
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -180,12 +185,12 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } }  
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue 
         }
-        It "$tC.$tI-authorized_keys-negative(the running process does not have read access to the authorized_keys)" {
+        It "$tC.$tI-authorized_keys-negative(the running process does not have read access to the authorized_keys)" -skip:$skip {
             #setup to have ssouser as owner and grant it full control            
-            Set-FileOwnerAndACL -Filepath $authorizedkeyPath -Owner $objUser -OwnerPerms "Read","Write"
-            Add-PermissionToFileACL -FilePath $authorizedkeyPath -User $systemAccount -Perms "FullControl"
+            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $objUserSid -FullAccessNeeded $systemSid,$objUserSid -confirm:$false
+            Set-FilePermission -Filepath $authorizedkeyPath -UserSid $adminsSid -Action Delete
 
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
@@ -196,7 +201,7 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Start-sleep 1; Stop-Process $_; Start-sleep 1 } } 
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
     }
 }

@@ -226,38 +226,45 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 
 #elif defined(WINDOWS)
 /*
-* Authenticate on Windows - Pass credentials to ssh-agent and retrieve token
-* upon successful authentication
-* TODO - password is sent in plain text over IPC. Consider implications. 
+* Authenticate on Windows - Call LogonUser and retrieve user token
 */
 int sys_auth_passwd(Authctxt *authctxt, const char *password)
 {
-	struct sshbuf *msg = NULL;
-	size_t blen = 0;
-	DWORD token = 0;
-	extern int auth_sock;
+	wchar_t *user_utf16 = NULL, *udom_utf16 = NULL, *pwd_utf16 = NULL, *tmp;
+	HANDLE token = NULL;
 	int r = 0;
-	int ssh_request_reply(int, struct sshbuf *, struct sshbuf *);
 
-	msg = sshbuf_new();
-	if (!msg)
-		fatal("%s: out of memory", __func__);
-
-	if (sshbuf_put_u8(msg, SSH_AGENT_AUTHENTICATE) != 0 ||
-	    sshbuf_put_cstring(msg, PASSWD_AUTH_REQUEST) != 0 ||
-	    sshbuf_put_cstring(msg, authctxt->pw->pw_name) != 0 ||
-	    sshbuf_put_cstring(msg, password) != 0 ||
-	    ssh_request_reply(auth_sock, msg, msg) != 0 ||
-	    sshbuf_get_u32(msg, &token) != 0) {
-		debug("auth agent did not authorize client %s", authctxt->user);
-		r = 0;
+	if ((user_utf16 = utf8_to_utf16(authctxt->pw->pw_name)) == NULL ||
+	    (pwd_utf16 = utf8_to_utf16(password)) == NULL) {
+		fatal("out of memory");
 		goto done;
 	}
-	authctxt->methoddata = (void*)(INT_PTR)token;
+
+	if ((tmp = wcschr(user_utf16, L'@')) != NULL) {
+		udom_utf16 = tmp + 1;
+		*tmp = L'\0';
+	}
+
+	if (LogonUserW(user_utf16, udom_utf16, pwd_utf16, LOGON32_LOGON_NETWORK_CLEARTEXT, 
+	    LOGON32_PROVIDER_DEFAULT, &token) == FALSE) {
+		if (GetLastError() == ERROR_PASSWORD_MUST_CHANGE) 
+			/* 
+			 * TODO - need to add support to force password change
+			 * by sending back SSH_MSG_USERAUTH_PASSWD_CHANGEREQ
+			 */
+			error("password for user %s has expired", authctxt->pw->pw_name);
+		else
+			debug("failed to logon user: %ls domain: %ls error:%d", user_utf16, udom_utf16, GetLastError());
+		goto done;
+	}
+
+	authctxt->auth_token = (void*)(INT_PTR)token;
 	r = 1;
 done:
-	if (msg)
-		sshbuf_free(msg);
+	if (user_utf16)
+		free(user_utf16);
+	if (pwd_utf16)
+		SecureZeroMemory(pwd_utf16, sizeof(wchar_t) * wcslen(pwd_utf16));
 	return r;
 }
 #endif   /* WINDOWS */

@@ -1,4 +1,5 @@
-﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force -DisableNameChecking
+﻿If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
 
 $tC = 1
 $tI = 0
@@ -8,7 +9,7 @@ Describe "Tests for user Key file permission" -Tags "CI" {
     BeforeAll {    
         if($OpenSSHTestInfo -eq $null)
         {
-            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+            Throw "`$OpenSSHTestInfo is null. Please run Set-OpenSSHTestEnvironment to setup test environment."
         }
         $testDir = "$($OpenSSHTestInfo["TestDataPath"])\$suite"
         if( -not (Test-path $testDir -PathType Container))
@@ -24,13 +25,13 @@ Describe "Tests for user Key file permission" -Tags "CI" {
         $server = $OpenSSHTestInfo["Target"]
         $userName = "$env:USERNAME@$env:USERDOMAIN"
         $keypassphrase = "testpassword"
-
-        $systemAccount = New-Object System.Security.Principal.NTAccount("NT AUTHORITY", "SYSTEM")
-        $adminsAccount = New-Object System.Security.Principal.NTAccount("BUILTIN","Administrators")
-        $objUser = New-Object System.Security.Principal.NTAccount($ssouser)
-        $pubKeyUserAccount = New-Object System.Security.Principal.NTAccount($pubKeyUser)
-        $currentUser = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
-        $everyone =  New-Object System.Security.Principal.NTAccount("EveryOne")
+        
+        $systemSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::LocalSystemSid)
+        $adminsSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid)                        
+        $currentUserSid = Get-UserSID -User "$($env:USERDOMAIN)\$($env:USERNAME)"
+        $objUserSid = Get-UserSID -User $ssouser
+        $everyoneSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::WorldSid)        
+        $pubKeyUserAccountSid = Get-UserSID -User $pubKeyUser        
                 
         Add-PasswordSetting -Pass $keypassphrase
     }
@@ -48,7 +49,7 @@ Describe "Tests for user Key file permission" -Tags "CI" {
         BeforeAll {            
             $keyFileName = "sshtest_userPermTestkey_ed25519"
             $keyFilePath = Join-Path $testDir $keyFileName
-            Remove-Item -path "$keyFilePath*" -Force -ErrorAction Ignore
+            Remove-Item -path "$keyFilePath*" -Force -ErrorAction SilentlyContinue
             ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase 
 
             $pubKeyUserProfilePath = Join-Path $pubKeyUserProfile .ssh
@@ -58,22 +59,22 @@ Describe "Tests for user Key file permission" -Tags "CI" {
             
             $testAuthorizedKeyPath = Join-Path $pubKeyUserProfilePath authorized_keys
             Copy-Item "$keyFilePath.pub" $testAuthorizedKeyPath -Force -ErrorAction SilentlyContinue
-            Adjust-UserKeyFileACL -FilePath $testAuthorizedKeyPath -Owner $pubKeyUserAccount -OwnerPerms "Read, Write"
-            Add-PermissionToFileACL -FilePath $testAuthorizedKeyPath -User "NT Service\sshd" -Perm "Read"
+            Repair-AuthorizedKeyPermission -FilePath $testAuthorizedKeyPath -confirm:$false
             $tI=1
         }
         AfterAll {
             if(Test-Path $testAuthorizedKeyPath) {                
-                Remove-Item $testAuthorizedKeyPath -Force -ErrorAction Ignore
+                Remove-Item $testAuthorizedKeyPath -Force -ErrorAction SilentlyContinue
             }
             if(Test-Path $pubKeyUserProfilePath) {            
-                Remove-Item $pubKeyUserProfilePath -Recurse -Force -ErrorAction Ignore
+                Remove-Item $pubKeyUserProfilePath -Recurse -Force -ErrorAction SilentlyContinue
             }
             $tC++
         }        
 
         It "$tC.$tI-ssh with private key file -- positive (Secured private key owned by current user)" {
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $currentUser -OwnerPerms "Read, Write"
+            Repair-FilePermission -FilePath $keyFilePath -Owners $currentUserSid -FullAccessNeeded $adminsSid,$systemSid,$currentUserSid -confirm:$false
+            
             #Run
             $o = ssh -p $port -i $keyFilePath $pubKeyUser@$server echo 1234
             $o | Should Be "1234"
@@ -81,7 +82,7 @@ Describe "Tests for user Key file permission" -Tags "CI" {
 
         It "$tC.$tI-ssh with private key file -- positive(Secured private key owned by Administrators group and current user has no explicit ACE)" {
             #setup to have local admin group as owner and grant it full control
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $adminsAccount -OwnerPerms "FullControl"
+            Repair-FilePermission -FilePath $keyFilePath -Owners $adminsSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
             $o = ssh -p $port -i $keyFilePath $pubKeyUser@$server echo 1234
@@ -90,8 +91,7 @@ Describe "Tests for user Key file permission" -Tags "CI" {
 
         It "$tC.$tI-ssh with private key file -- positive(Secured private key owned by Administrators group and current user has explicit ACE)" {
             #setup to have local admin group as owner and grant it full control
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $adminsAccount -OwnerPerms "FullControl"
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $currentUser -Perm "Read"
+            Repair-FilePermission -FilePath $keyFilePath -Owners $adminsSid -FullAccessNeeded $adminsSid,$systemSid -ReadAccessNeeded $currentUserSid -confirm:$false
 
             #Run
             $o = ssh -p $port -i $keyFilePath $pubKeyUser@$server echo 1234
@@ -100,8 +100,7 @@ Describe "Tests for user Key file permission" -Tags "CI" {
 
         It "$tC.$tI-ssh with private key file -- positive (Secured private key owned by local system)" {
             #setup to have local system as owner and grant it full control
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $systemAccount -OwnerPerms "FullControl"
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $adminsAccount -Perm "Read"
+            Repair-FilePermission -FilePath $keyFilePath -Owners $systemSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
             $o = ssh -p $port -i $keyFilePath $pubKeyUser@$server echo 1234
@@ -109,11 +108,8 @@ Describe "Tests for user Key file permission" -Tags "CI" {
         }
         
         It "$tC.$tI-ssh with private key file -- negative(other account can access private key file)" {
-            #setup to have current user as owner and grant it full control        
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $currentUser -OwnerPerms "Read, Write"
-
-            #add ssouser to access the private key            
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $objUser -Perm "Read"
+            #setup to have current user as owner and grant it full control
+            Repair-FilePermission -FilePath $keyFilePath -Owners $currentUserSid -FullAccessNeeded $currentUser,$adminsSid,$systemSid -ReadAccessNeeded $objUserSid -confirm:$false
 
             #Run
             $o = ssh -p $port -i $keyFilePath -E $logPath $pubKeyUser@$server echo 1234
@@ -123,9 +119,8 @@ Describe "Tests for user Key file permission" -Tags "CI" {
         }
 
         It "$tC.$tI-ssh with private key file -- negative(the private key has wrong owner)" {
-            #setup to have ssouser as owner and grant it full control            
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $objUser -OwnerPerms "Read, Write"            
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $adminsAccount -Perm "FullControl"
+            #setup to have ssouser as owner and grant it full control
+            Repair-FilePermission -FilePath $keyFilePath -Owners $objUserSid -FullAccessNeeded $objUserSid,$adminsSid,$systemSid -ReadAccessNeeded $objUserSid -confirm:$false
 
             $o = ssh -p $port -i $keyFilePath -E $logPath $pubKeyUser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0

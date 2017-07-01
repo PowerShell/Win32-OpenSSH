@@ -1,4 +1,5 @@
-﻿Import-Module $PSScriptRoot\CommonUtils.psm1 -Force -DisableNameChecking
+﻿If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
 $tC = 1
 $tI = 0
 $suite = "keyutils"
@@ -7,7 +8,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
     BeforeAll {
         if($OpenSSHTestInfo -eq $null)
         {
-            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+            Throw "`$OpenSSHTestInfo is null. Please run Set-OpenSSHTestEnvironment to set test environments."
         }
         
         $testDir = "$($OpenSSHTestInfo["TestDataPath"])\$suite"
@@ -20,48 +21,58 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         $keytypes = @("rsa","dsa","ecdsa","ed25519")
         
         $ssouser = $OpenSSHTestInfo["SSOUser"]
-
-        $systemAccount = New-Object System.Security.Principal.NTAccount("NT AUTHORITY", "SYSTEM")
-        $adminsAccount = New-Object System.Security.Principal.NTAccount("BUILTIN","Administrators")            
-        $currentUser = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
-        $everyone =  New-Object System.Security.Principal.NTAccount("EveryOne")
-        $objUser = New-Object System.Security.Principal.NTAccount($ssouser)
+        
+        $systemSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::LocalSystemSid)
+        $adminsSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid)                        
+        $currentUserSid = Get-UserSID -User "$($env:USERDOMAIN)\$($env:USERNAME)"
+        $objUserSid = Get-UserSID -User $ssouser
+        $everyoneSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::WorldSid)
 
         #only validate owner and ACEs of the file
         function ValidateKeyFile {
             param([string]$FilePath)
 
             $myACL = Get-ACL $FilePath
-            $myACL.Owner.Equals($currentUser.Value) | Should Be $true
+            $currentOwnerSid = Get-UserSid -User $myACL.Owner
+            $currentOwnerSid.Equals($currentUserSid) | Should Be $true
             $myACL.Access | Should Not Be $null
+            
+            $ReadAccessPerm = ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Read.value__) -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Synchronize.value__)
+            $ReadWriteAccessPerm = ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Read.value__) -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Write.value__)  -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Synchronize.value__)
+            $FullControlPerm = [System.UInt32] [System.Security.AccessControl.FileSystemRights]::FullControl.value__
+    
             if($FilePath.EndsWith(".pub")) {
                 $myACL.Access.Count | Should Be 4
-                $identities = @($systemAccount.Value, $adminsAccount.Value, $currentUser.Value, $everyone.Value)
+                $identities = @($systemSid, $adminsSid, $currentUserSid, $everyoneSid)
             }
             else {
                 $myACL.Access.Count | Should Be 3
-                $identities = @($systemAccount.Value, $adminsAccount.Value, $currentUser.Value)
+                $identities = @($systemSid, $adminsSid, $currentUserSid)
             }
 
             foreach ($a in $myACL.Access) {
-                $a.IdentityReference.Value -in $identities | Should Be $true           
+                $id = Get-UserSid -User $a.IdentityReference
+                $identities -contains $id | Should Be $true           
 
-                switch ($a.IdentityReference.Value)
+                switch ($id)
                 {
-                    {$_ -in @($systemAccount.Value, $adminsAccount.Value)}
+                    {@($systemSid, $adminsSid) -contains $_}
                     {
-                        $a.FileSystemRights | Should Be "FullControl"
+                        ([System.UInt32]$a.FileSystemRights.value__) | Should Be $FullControlPerm
                         break;
                     }
 
-                    $currentUser.Value
+                    $currentUserSid
                     {
-                        $a.FileSystemRights | Should Be "Write, Read, Synchronize"
+                        ([System.UInt32]$a.FileSystemRights.value__) | Should Be $ReadWriteAccessPerm
                         break;
                     }
-                    $everyone.Value
+                    $everyoneSid
                     {
-                        $a.FileSystemRights | Should Be "Read, Synchronize"
+                        ([System.UInt32]$a.FileSystemRights.value__) | Should Be $ReadAccessPerm
                         break;
                     }
                 }
@@ -106,7 +117,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             foreach($type in $keytypes)
             {
                 $keyPath = Join-Path $testDir "id_$type"
-                remove-item $keyPath -ErrorAction ignore             
+                remove-item $keyPath -ErrorAction SilentlyContinue             
                 ssh-keygen -t $type -P $keypassphrase -f $keyPath
                 ValidateKeyFile -FilePath $keyPath
                 ValidateKeyFile -FilePath "$keyPath.pub"
@@ -116,7 +127,17 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
 
     # This uses keys generated in above context
     Context "$tC -ssh-add test cases" {
-        BeforeAll {$tI=1}
+        BeforeAll {
+            $tI=1
+            function WaitForStatus
+            {
+                param([string]$ServiceName, [string]$Status)
+                while((((Get-Service $ServiceName).Status) -ine $Status) -and ($num++ -lt 4))
+                {
+                    Start-Sleep -Milliseconds 1000
+                }
+            }
+        }
         AfterAll{$tC++}
 
         # Executing ssh-agent will start agent service
@@ -131,16 +152,21 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             (Get-Service sshd).Status | Should Be "Stopped"
 
             ssh-agent
+            WaitForStatus -ServiceName ssh-agent -Status "Running"
 
             (Get-Service ssh-agent).Status | Should Be "Running"
 
             Stop-Service ssh-agent -Force
+            
+            WaitForStatus -ServiceName ssh-agent -Status "Stopped"
 
             (Get-Service ssh-agent).Status | Should Be "Stopped"
             (Get-Service sshd).Status | Should Be "Stopped"
 
             # this should automatically start both the services
             Start-Service sshd
+            
+            WaitForStatus -ServiceName sshd -Status "Running"
             (Get-Service ssh-agent).Status | Should Be "Running"
             (Get-Service sshd).Status | Should Be "Running"
         }
@@ -170,7 +196,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             {
                 $keyPath = Join-Path $testDir "id_$type"
                 $pubkeyraw = ((Get-Content "$keyPath.pub").Split(' '))[1]
-                ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
+                @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
             }
 
             #delete added keys
@@ -188,7 +214,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             {
                 $keyPath = Join-Path $testDir "id_$type"
                 $pubkeyraw = ((Get-Content "$keyPath.pub").Split(' '))[1]
-                ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 0
+                @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 0
             }            
         }        
     }
@@ -197,7 +223,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         BeforeAll {
             $keyFileName = "sshadd_userPermTestkey_ed25519"
             $keyFilePath = Join-Path $testDir $keyFileName
-            Remove-Item -path "$keyFilePath*" -Force -ErrorAction Ignore
+            Remove-Item -path "$keyFilePath*" -Force -ErrorAction SilentlyContinue
             ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase
             #set up SSH_ASKPASS
             Add-PasswordSetting -Pass $keypassphrase
@@ -209,7 +235,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         }
         AfterEach {
             if(Test-Path $keyFilePath) {
-                Adjust-UserKeyFileACL -FilePath $keyFilePath -Owner $currentUser -OwnerPerms "Read, Write"
+                Repair-FilePermission -FilePath $keyFilePath -Owner $currentUserSid -FullAccessNeeded $currentUserSid,$systemSid,$adminsSid -confirm:$false
             }            
         }
 
@@ -220,30 +246,30 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         }
 
         It "$tC.$tI-  ssh-add - positive (Secured private key owned by current user)" {
-            #setup to have current user as owner and grant it full control        
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $currentUser -OwnerPerms "FullControl"
+            #setup to have current user as owner and grant it full control                    
+            Repair-FilePermission -FilePath $keyFilePath -Owner $currentUserSid -FullAccessNeeded $currentUserSid,$systemSid,$adminsSid -confirm:$false
 
             # for ssh-add to consume SSh_ASKPASS, stdin should not be TTY
             cmd /c "ssh-add $keyFilePath < $nullFile 2> nul"
             $LASTEXITCODE | Should Be 0
             $allkeys = ssh-add -L
             $pubkeyraw = ((Get-Content "$keyFilePath.pub").Split(' '))[1]            
-            ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
+            @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
             
             #clean up
             cmd /c "ssh-add -d $keyFilePath 2> nul "
         }
 
         It "$tC.$tI - ssh-add - positive (Secured private key owned by Administrators group and the current user has no explicit ACE)" {
-            #setup to have local admin group as owner and grant it full control
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $adminsAccount -OwnerPerms "FullControl"
+            #setup to have local admin group as owner and grant it full control            
+            Repair-FilePermission -FilePath $keyFilePath -Owner $adminsSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             # for ssh-add to consume SSh_ASKPASS, stdin should not be TTY
             cmd /c "ssh-add $keyFilePath < $nullFile 2> nul "
             $LASTEXITCODE | Should Be 0
             $allkeys = ssh-add -L
             $pubkeyraw = ((Get-Content "$keyFilePath.pub").Split(' '))[1]
-            ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
+            @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
             
             #clean up
             cmd /c "ssh-add -d $keyFilePath 2> nul "
@@ -251,62 +277,56 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
 
         It "$tC.$tI - ssh-add - positive (Secured private key owned by Administrators group and the current user has explicit ACE)" {
             #setup to have local admin group as owner and grant it full control
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $adminsAccount -OwnerPerms "FullControl"
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $currentUser -Perm "Read, Write"
+            Repair-FilePermission -FilePath $keyFilePath -Owners $adminsSid -FullAccessNeeded $currentUserSid,$adminsSid,$systemSid -confirm:$false
 
             # for ssh-add to consume SSh_ASKPASS, stdin should not be TTY
             cmd /c "ssh-add $keyFilePath < $nullFile 2> nul "
             $LASTEXITCODE | Should Be 0
             $allkeys = ssh-add -L
             $pubkeyraw = ((Get-Content "$keyFilePath.pub").Split(' '))[1]
-            ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
+            @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
             
             #clean up
             cmd /c "ssh-add -d $keyFilePath 2> nul "
         }
 
         It "$tC.$tI - ssh-add - positive (Secured private key owned by local system group)" {
-            #setup to have local admin group as owner and grant it full control
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $systemAccount -OwnerPerms "FullControl"
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $adminsAccount -Perm "FullControl"
+            #setup to have local admin group as owner and grant it full control            
+            Repair-FilePermission -FilePath $keyFilePath -Owners $systemSid -FullAccessNeeded $systemSid,$adminsSid -confirm:$false
 
             # for ssh-add to consume SSh_ASKPASS, stdin should not be TTY
             cmd /c "ssh-add $keyFilePath < $nullFile 2> nul "
             $LASTEXITCODE | Should Be 0
             $allkeys = ssh-add -L
             $pubkeyraw = ((Get-Content "$keyFilePath.pub").Split(' '))[1]
-            ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
+            @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 1
             
             #clean up
             cmd /c "ssh-add -d $keyFilePath 2> nul "
         }
         
         It "$tC.$tI-  ssh-add - negative (other account can access private key file)" {
-            #setup to have current user as owner and grant it full control        
-            Set-FileOwnerAndACL -FilePath $keyFilePath -Owner $currentUser -OwnerPerms "FullControl"         
-
-            #add ssouser to access the private key            
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $objUser -Perm "Read"
+            #setup to have current user as owner and grant it full control
+            Repair-FilePermission -FilePath $keyFilePath -Owners $currentUserSid -FullAccessNeeded $currentUserSid,$adminsSid, $systemSid -ReadAccessNeeded $objUserSid -confirm:$false
 
             cmd /c "ssh-add $keyFilePath < $nullFile 2> nul "
             $LASTEXITCODE | Should Not Be 0
 
             $allkeys = ssh-add -L
             $pubkeyraw = ((Get-Content "$keyFilePath.pub").Split(' '))[1]            
-            ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 0
+            @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 0
         }
 
         It "$tC.$tI - ssh-add - negative (the private key has wrong owner)" {
             #setup to have ssouser as owner and grant it full control
-            Set-FileOwnerAndACL -FilePath $keyFilePath -owner $objUser -OwnerPerms "Read, Write"
-            Add-PermissionToFileACL -FilePath $keyFilePath -User $adminsAccount -Perm "FullControl"
+            Repair-FilePermission -FilePath $keyFilePath -Owners $objUserSid -FullAccessNeeded $objUserSid,$adminsSid, $systemSid -confirm:$false
 
             cmd /c "ssh-add $keyFilePath < $nullFile 2> nul "
             $LASTEXITCODE | Should Not Be 0
 
             $allkeys = ssh-add -L
             $pubkeyraw = ((Get-Content "$keyFilePath.pub").Split(' '))[1]            
-            ($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 0
+            @($allkeys | where { $_.contains($pubkeyraw) }).count | Should Be 0
         }
     }
 		
@@ -314,7 +334,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         BeforeAll {
             $tI=1
             $port = $OpenSSHTestInfo["Port"]
-            Remove-item (join-path $testDir "$tC.$tI.out.txt") -force -ErrorAction Ignore
+            Remove-item (join-path $testDir "$tC.$tI.out.txt") -force -ErrorAction SilentlyContinue
         }
         BeforeEach {
             $outputFile = join-path $testDir "$tC.$tI.out.txt"

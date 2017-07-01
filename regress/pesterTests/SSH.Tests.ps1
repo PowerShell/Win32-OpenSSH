@@ -1,4 +1,6 @@
-﻿#todo: -i -q -v -l -c -C
+﻿If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
+#todo: -i -q -v -l -c -C
 #todo: -S -F -V -e
 $tC = 1
 $tI = 0
@@ -8,7 +10,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
     BeforeAll {        
         if($OpenSSHTestInfo -eq $null)
         {
-            Throw "`$OpenSSHTestInfo is null. Please run Setup-OpenSSHTestEnvironment to setup test environment."
+            Throw "`$OpenSSHTestInfo is null. Please run Set-OpenSSHTestEnvironment to set test environments."
         }
 
         $server = $OpenSSHTestInfo["Target"]
@@ -20,6 +22,8 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
         {
             $null = New-Item $testDir -ItemType directory -Force -ErrorAction SilentlyContinue
         }
+        $platform = Get-Platform
+        $skip = ($platform -eq [PlatformType]::Windows) -and ($PSVersionTable.PSVersion.Major -le 2)
 
         <#$testData = @(
             @{
@@ -112,7 +116,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
         BeforeAll {$tI=1}
         AfterAll{$tC++}
 
-        It "$tC.$tI - stdout to file" {
+        It "$tC.$tI - stdout to file" -skip:$skip {
             ssh test_target powershell get-process > $stdoutFile
             $stdoutFile | Should Contain "ProcessName"
         }

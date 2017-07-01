@@ -39,6 +39,7 @@
 #include "agent-request.h"
 #include "key.h"
 #include "inc\utf.h"
+#include "..\priv-agent.h"
 
 #pragma warning(push, 3)
 
@@ -83,9 +84,11 @@ done:
 }
 
 
-void
-LoadProfile(struct agent_connection* con, wchar_t* user, wchar_t* domain) {
+static HANDLE
+LoadProfile(HANDLE user_token, wchar_t* user, wchar_t* domain) {
 	PROFILEINFOW profileInfo;
+	HANDLE ret = NULL;
+
 	profileInfo.dwFlags = PI_NOUI;
 	profileInfo.lpProfilePath = NULL;
 	profileInfo.lpUserName = user;
@@ -96,12 +99,16 @@ LoadProfile(struct agent_connection* con, wchar_t* user, wchar_t* domain) {
 	profileInfo.dwSize = sizeof(profileInfo);
 	EnablePrivilege("SeBackupPrivilege", 1);
 	EnablePrivilege("SeRestorePrivilege", 1);
-	if (LoadUserProfileW(con->auth_token, &profileInfo) == FALSE)
+	if (LoadUserProfileW(user_token, &profileInfo) == FALSE) {
 		debug("Loading user (%ls,%ls) profile failed ERROR: %d", user, domain, GetLastError());
+		goto done;
+	}
 	else
-		con->hProfile = profileInfo.hProfile;
+		ret = profileInfo.hProfile;
+done:
 	EnablePrivilege("SeBackupPrivilege", 0);
 	EnablePrivilege("SeRestorePrivilege", 0);
+	return ret;
 }
 
 #define MAX_USER_LEN 64
@@ -238,73 +245,13 @@ done:
 	return dup_t;
 }
 
-/* TODO - SecureZeroMemory password */
-int process_passwordauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
-	char *user = NULL, *domain = NULL, *pwd = NULL;
-	size_t user_len, pwd_len;
-	wchar_t *user_utf16 = NULL, *udom_utf16 = NULL, *pwd_utf16 = NULL, *tmp;
-	int r = -1;
-	HANDLE token = 0, dup_token;
-
-	if (sshbuf_get_cstring(request, &user, &user_len) != 0 ||
-	    sshbuf_get_cstring(request, &pwd, &pwd_len) != 0 ||
-	    user_len == 0 ||
-	    pwd_len == 0 ||
-	    user_len > MAX_USER_LEN + MAX_FQDN_LEN ||
-	    pwd_len > MAX_PW_LEN) {
-		debug("bad password auth request");
-		goto done;
-	}
-
-	if ((user_utf16 = utf8_to_utf16(user)) == NULL ||
-	    (pwd_utf16 = utf8_to_utf16(pwd)) == NULL) {
-		debug("out of memory");
-		goto done;
-	}
-
-	if ((tmp = wcschr(user_utf16, L'@') ) != NULL ) {
-		udom_utf16 = tmp + 1;
-		*tmp = L'\0';
-	}
-
-	if (LogonUserW(user_utf16, udom_utf16, pwd_utf16, LOGON32_LOGON_NETWORK_CLEARTEXT, LOGON32_PROVIDER_DEFAULT, &token) == FALSE) {
-		debug("failed to logon user: %ls domain: %ls", user_utf16, udom_utf16);
-		goto done;
-	}
-
-	if ((dup_token = duplicate_token_for_client(con, token)) == NULL)
-		goto done;
-
-	if (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)
-		goto done;
-
-	con->auth_token = token;
-	LoadProfile(con, user_utf16, udom_utf16);
-	r = 0;
-done:
-	/* TODO Fix this hacky protocol*/
-	if ((r == -1) && (sshbuf_put_u8(response, SSH_AGENT_FAILURE) == 0))
-		r = 0;
-
-	if (user)
-		free(user);
-	if (pwd)
-		free(pwd);
-	if (user_utf16)
-		free(user_utf16);
-	if (pwd_utf16)
-		free(pwd_utf16);
-
-	return r;
-}
-
 int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	int r = -1;
 	char *key_blob, *user, *sig, *blob;
 	size_t key_blob_len, user_len, sig_len, blob_len;
 	struct sshkey *key = NULL;
 	HANDLE token = NULL, dup_token = NULL;
-	wchar_t *user_utf16 = NULL, *udom_utf16 = NULL, *tmp;
+	wchar_t *user_utf16 = NULL;
 	PWSTR wuser_home = NULL;
 	
 
@@ -346,14 +293,6 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 	if (sshbuf_put_u32(response, (int)(intptr_t)dup_token) != 0)
 		goto done;
 
-	con->auth_token = token; 
-	token = NULL;
-	if ((tmp = wcschr(user_utf16, L'@')) != NULL) {
-		udom_utf16 = tmp + 1;
-		*tmp = L'\0';
-	}
-	LoadProfile(con, user_utf16, udom_utf16);
-
 	r = 0;
 done:
 	/* TODO Fix this hacky protocol*/
@@ -373,7 +312,60 @@ done:
 	return r;
 }
 
-int process_authagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+int process_loadprofile_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
+	int r = 0, success = 0;
+	char *user;
+	size_t user_len;
+	u_int32_t user_token_int = 0;
+	HANDLE user_token = NULL;
+	wchar_t *user_utf16 = NULL, *dom_utf16 = NULL, *tmp;
+
+	/* is profile already loaded */
+	if (con->profile_handle) {
+		success = 1;
+		goto done;
+	}
+	
+	if (sshbuf_get_cstring(request, &user, &user_len) != 0 ||
+	    user_len > MAX_USER_LEN ||
+	    sshbuf_get_u32(request, &user_token_int) != 0){
+		debug("invalid loadprofile request");
+		goto done;
+	}
+	
+	if (DuplicateHandle(con->client_process_handle, (HANDLE)(INT_PTR)user_token_int, GetCurrentProcess(),
+		&user_token, TOKEN_QUERY | TOKEN_IMPERSONATE | TOKEN_DUPLICATE, FALSE, 0) == FALSE) {
+		debug("cannot duplicate user token, error: %d", GetLastError());
+		goto done;
+	}
+	
+	if ((user_utf16 = utf8_to_utf16(user)) == NULL) {
+		debug("out of memory");
+		goto done;
+	}
+
+	/* split user and domain */
+	if ((tmp = wcschr(user_utf16, L'@')) != NULL) {
+		dom_utf16 = tmp + 1;
+		*tmp = L'\0';
+	}
+
+	if ((con->profile_handle = LoadProfile(user_token, user_utf16, dom_utf16)) == NULL)
+		goto done;
+	
+	con->profile_token = user_token;
+	user_token = NULL;
+	success = 1;
+done:
+	if (sshbuf_put_u8(response, success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE) != 0)
+		r = -1;
+
+	if (user_token)
+		CloseHandle(user_token);
+	return r;
+}
+
+int process_privagent_request(struct sshbuf* request, struct sshbuf* response, struct agent_connection* con) {
 	char *opn;
 	size_t opn_len;
 	if (sshbuf_get_string_direct(request, &opn, &opn_len) != 0) {
@@ -383,14 +375,14 @@ int process_authagent_request(struct sshbuf* request, struct sshbuf* response, s
 
 	/* allow only admins and NT Service\sshd to send auth requests */
 	if (con->client_type != SSHD_SERVICE && con->client_type != ADMIN_USER) {
-		error("cannot authenticate: client process is not admin or sshd");
+		error("cannot process request: client process is not admin or sshd");
 		return -1;
 	}
 		
 	if (memcmp(opn, PUBKEY_AUTH_REQUEST, opn_len) == 0)
 		return process_pubkeyauth_request(request, response, con);
-	else if (memcmp(opn, PASSWD_AUTH_REQUEST, opn_len) == 0)
-		return process_passwordauth_request(request, response, con);
+	else if (memcmp(opn, LOAD_USER_PROFILE_REQUEST, opn_len) == 0)
+		return process_loadprofile_request(request, response, con);
 	else {
 		debug("unknown auth request: %s", opn);
 		return -1;

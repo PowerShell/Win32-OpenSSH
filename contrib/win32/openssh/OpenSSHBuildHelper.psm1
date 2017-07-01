@@ -1,7 +1,7 @@
-﻿Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version 2.0
+If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\OpenSSHCommonUtils.psm1 -Force
 
-Import-Module $PSScriptRoot\OpenSSHCommonUtils.psm1 -force -DisableNameChecking
-[string] $script:platform = $env:PROCESSOR_ARCHITECTURE
 [string] $script:vcPath = $null
 [System.IO.DirectoryInfo] $script:OpenSSHRoot = $null
 [System.IO.DirectoryInfo] $script:gitRoot = $null
@@ -83,7 +83,7 @@ function Write-BuildMsg
         [switch] $Silent
     )
 
-    if ($AsVerbose)
+    if($PSBoundParameters.ContainsKey("AsVerbose"))
     {
         if ($script:Verbose)
         {
@@ -96,17 +96,24 @@ function Write-BuildMsg
         return
     }
 
-    if ($AsInfo)
+    if($PSBoundParameters.ContainsKey("AsInfo"))    
     {
         Write-Log -Message "INFO: $message"
         if (-not $Silent)
         {
-            Write-Information -MessageData $message -InformationAction Continue
+            if(Get-Command "Write-Information" -ErrorAction SilentlyContinue )
+            {
+                Write-Information -MessageData $message -InformationAction Continue
+            }
+            else
+            {
+                Write-Verbose -Message $message -Verbose
+            }
         }
         return
     }
 
-    if ($AsWarning)
+    if($PSBoundParameters.ContainsKey("AsWarning"))
     {
         Write-Log -Message "WARNING: $message"
         if (-not $Silent)
@@ -116,7 +123,7 @@ function Write-BuildMsg
         return
     }
 
-    if ($AsError)
+    if($PSBoundParameters.ContainsKey("AsError"))
     {
         Write-Log -Message "ERROR: $message"
         if (-not $Silent)
@@ -137,8 +144,6 @@ function Write-BuildMsg
 function Start-OpenSSHBootstrap
 {    
     [bool] $silent = -not $script:Verbose
-
-    Set-StrictMode -Version Latest
     Write-BuildMsg -AsInfo -Message "Checking tools and dependencies" -Silent:$silent
 
     $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')
@@ -146,7 +151,7 @@ function Start-OpenSSHBootstrap
 
     # Install chocolatey
     $chocolateyPath = "$env:AllUsersProfile\chocolatey\bin"
-    if(Get-Command "choco" -ErrorAction SilentlyContinue)
+    if(Get-Command choco -ErrorAction SilentlyContinue)
     {
         Write-BuildMsg -AsVerbose -Message "Chocolatey is already installed. Skipping installation." -Silent:$silent
     }
@@ -156,20 +161,38 @@ function Start-OpenSSHBootstrap
         Invoke-Expression ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1')) 2>&1 >> $script:BuildLogFile
     }
 
+    if (-not ($machinePath.ToLower().Contains($chocolateyPath.ToLower())))
+    {
+        Write-BuildMsg -AsVerbose -Message "Adding $chocolateyPath to Path environment variable" -Silent:$silent
+        $newMachineEnvironmentPath = "$chocolateyPath;$newMachineEnvironmentPath"
+        if(-not ($env:Path.ToLower().Contains($chocolateyPath.ToLower())))
+        {
+            $env:Path = "$chocolateyPath;$env:Path"
+        }
+    }
+    else
+    {
+        Write-BuildMsg -AsVerbose -Message "$chocolateyPath already present in Path environment variable" -Silent:$silent
+    }
+
     # Add git\cmd to the path
     $gitCmdPath = "$env:ProgramFiles\git\cmd"
     if (-not ($machinePath.ToLower().Contains($gitCmdPath.ToLower())))
     {
         Write-BuildMsg -AsVerbose -Message "Adding $gitCmdPath to Path environment variable" -Silent:$silent
         $newMachineEnvironmentPath = "$gitCmdPath;$newMachineEnvironmentPath"
+        if(-not ($env:Path.ToLower().Contains($gitCmdPath.ToLower())))
+        {
+            $env:Path = "$gitCmdPath;$env:Path"
+        }
     }
     else
     {
         Write-BuildMsg -AsVerbose -Message "$gitCmdPath already present in Path environment variable" -Silent:$silent
     }
-
-    $nativeMSBuildPath = "${env:ProgramFiles(x86)}\MSBuild\14.0\bin"
-    if($script:platform -ieq "AMD64")
+        
+    $nativeMSBuildPath = "${env:ProgramFiles(x86)}\MSBuild\14.0\bin"    
+    if($env:PROCESSOR_ARCHITECTURE -ieq "AMD64")
     {
         $nativeMSBuildPath += "\amd64"
     }
@@ -178,12 +201,15 @@ function Start-OpenSSHBootstrap
     {
         Write-BuildMsg -AsVerbose -Message "Adding $nativeMSBuildPath to Path environment variable" -Silent:$silent
         $newMachineEnvironmentPath += ";$nativeMSBuildPath"
-        $env:Path += ";$nativeMSBuildPath"
+        if(-not ($env:Path.ToLower().Contains($nativeMSBuildPath.ToLower())))
+        {
+            $env:Path += ";$nativeMSBuildPath"
+        }
     }
     else
     {
         Write-BuildMsg -AsVerbose -Message "$nativeMSBuildPath already present in Path environment variable" -Silent:$silent
-    }
+    } 
 
     # Update machine environment path
     if ($newMachineEnvironmentPath -ne $machinePath)
@@ -191,42 +217,53 @@ function Start-OpenSSHBootstrap
         [Environment]::SetEnvironmentVariable('Path', $newMachineEnvironmentPath, 'MACHINE')
     }
 
-    # Install Visual Studio 2015 Community
-    $packageName = "VisualStudio2015Community"
-    $VSPackageInstalled = Get-ItemProperty "HKLM:\software\WOW6432Node\Microsoft\VisualStudio\14.0\setup\vs" -ErrorAction SilentlyContinue
-
-    if ($null -eq $VSPackageInstalled)
+    $VCTargetsPath = "${env:ProgramFiles(x86)}\MSBuild\Microsoft.Cpp\v4.0\V140"
+    if([Environment]::GetEnvironmentVariable('VCTargetsPath', 'MACHINE') -eq $null)
     {
-        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName."
-        $adminFilePath = "$script:OpenSSHRoot\contrib\win32\openssh\VSWithBuildTools.xml"
-        choco install $packageName -packageParameters "--AdminFile $adminFilePath" -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
+        [Environment]::SetEnvironmentVariable('VCTargetsPath', $VCTargetsPath, 'MACHINE')
     }
-    else
+    if ($env:VCTargetsPath -eq $null)
     {
-        Write-BuildMsg -AsVerbose -Message "$packageName present. Skipping installation." -Silent:$silent
+        $env:VCTargetsPath = $VCTargetsPath
     }
 
-    # Install Windows 8.1 SDK
-    $packageName = "windows-sdk-8.1"
+    $vcVars = "${env:ProgramFiles(x86)}\Microsoft Visual Studio 14.0\Common7\Tools\vsvars32.bat"
     $sdkPath = "${env:ProgramFiles(x86)}\Windows Kits\8.1\bin\x86\register_app.vbs"
-
-    if (-not (Test-Path -Path $sdkPath))
-    {
-        Write-BuildMsg -AsInfo  -Message "Windows 8.1 SDK not present. Installing $packageName."
-        choco install $packageName -y --limitoutput --force 2>&1 >> $script:BuildLogFile
+    $packageName = "vcbuildtools"
+    If ((-not (Test-Path $nativeMSBuildPath)) -or (-not (Test-Path $VcVars)) -or (-not (Test-Path $sdkPath))) {
+        Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName ..."
+        choco install $packageName -ia "/InstallSelectableItems VisualCppBuildTools_ATLMFC_SDK;VisualCppBuildTools_NETFX_SDK;Win81SDK_CppBuildSKUV1" -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
+        $errorCode = $LASTEXITCODE
+        if ($errorCode -eq 3010)
+        {
+            Write-Host "The recent package changes indicate a reboot is necessary. please reboot the machine, open a new powershell window and call Start-SSHBuild or Start-OpenSSHBootstrap again." -ForegroundColor Black -BackgroundColor Yellow
+            Do {
+                $input = Read-Host -Prompt "Reboot the machine? [Yes] Y; [No] N (default is `"Y`")"
+                if([string]::IsNullOrEmpty($input))
+                {
+                    $input = 'Y'
+                }
+            } until ($input -match "^(y(es)?|N(o)?)$")
+            [string]$ret = $Matches[0]
+            if ($ret.ToLower().Startswith('y'))
+            {
+                Write-BuildMsg -AsWarning -Message "restarting machine ..."
+                Restart-Computer -Force
+                exit
+            }
+            else
+            {
+                Write-BuildMsg -AsError -ErrorAction Stop -Message "User choose not to restart the machine to apply the changes."
+            }
+        }
+        else
+        {
+            Write-BuildMsg -AsError -ErrorAction Stop -Message "$packageName installation failed with error code $errorCode"
+        }
     }
     else
     {
-        Write-BuildMsg -AsInfo -Message "$packageName present. Skipping installation." -Silent:$silent
-    }
-
-    # Require restarting PowerShell session
-    if ($null -eq $VSPackageInstalled)
-    {
-        Write-Host "To apply changes, please close this PowerShell window, open a new one and call Start-SSHBuild or Start-DscBootstrap again." -ForegroundColor Black -BackgroundColor Yellow
-        Write-Host -NoNewLine 'Press any key to close this PowerShell window...' -ForegroundColor Black -BackgroundColor Yellow
-        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-        exit
+        Write-BuildMsg -AsVerbose -Message 'VC++ 2015 Build Tools already present.'
     }
 
     # Ensure the VS C toolset is installed
@@ -241,11 +278,11 @@ function Start-OpenSSHBootstrap
     Write-BuildMsg -AsVerbose -Message "vcPath: $script:vcPath" -Silent:$silent
     if ((Test-Path -Path "$script:vcPath\vcvarsall.bat") -eq $false)
     {
-        Write-BuildMsg -AsError -ErrorAction Stop -Message "Could not find Visual Studio vcvarsall.bat at$script:vcPath, which means some required develop kits are missing on the machine." 
+        Write-BuildMsg -AsError -ErrorAction Stop -Message "Could not find Visual Studio vcvarsall.bat at $script:vcPath, which means some required develop kits are missing on the machine." 
     }
 }
 
-function Clone-Win32OpenSSH
+function Get-Win32OpenSSHRepo
 {
     [bool] $silent = -not $script:Verbose
 
@@ -264,7 +301,7 @@ function Clone-Win32OpenSSH
     Pop-Location
 }
 
-function Delete-Win32OpenSSH
+function Remove-Win32OpenSSHRepo
 {
     Remove-Item -Path $script:win32OpenSSHPath -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -282,7 +319,7 @@ function Copy-LibreSSLSDK
     }
 }
 
-function Package-OpenSSH
+function Start-OpenSSHPackage
 {
     [CmdletBinding(SupportsShouldProcess=$false)]    
     param
@@ -290,7 +327,7 @@ function Package-OpenSSH
         [ValidateSet('x86', 'x64')]
         [string]$NativeHostArch = "x64",
 
-        [ValidateSet('Debug', 'Release', '')]
+        [ValidateSet('Debug', 'Release')]
         [string]$Configuration = "Release",
 
         # Copy payload to DestinationPath instead of packaging
@@ -315,7 +352,7 @@ function Package-OpenSSH
     if ($NativeHostArch -ieq 'x86') {
         $packageName = "OpenSSH-Win32"
     }
-    while((($service = Get-Service ssh-agent -ErrorAction Ignore) -ne $null) -and ($service.Status -ine 'Stopped'))
+    while((($service = Get-Service ssh-agent -ErrorAction SilentlyContinue) -ne $null) -and ($service.Status -ine 'Stopped'))
     {        
         Stop-Service ssh-agent -Force
         #sleep to wait the servicelog file write        
@@ -361,11 +398,17 @@ function Package-OpenSSH
     }
     else {
         Remove-Item ($packageDir + '.zip') -Force -ErrorAction SilentlyContinue
-        Compress-Archive -Path $packageDir -DestinationPath ($packageDir + '.zip')
-        Write-BuildMsg -AsInfo -Message "Packaged Payload - '$packageDir'.zip"
+        if(get-command Compress-Archive -ErrorAction SilentlyContinue)
+        {
+            Compress-Archive -Path $packageDir -DestinationPath ($packageDir + '.zip')
+            Write-BuildMsg -AsInfo -Message "Packaged Payload - '$packageDir.zip'"
+        }
+        else
+        {
+               Write-BuildMsg -AsInfo -Message "Packaged Payload not compressed."
+        }
     }
     Remove-Item $packageDir -Recurse -Force -ErrorAction SilentlyContinue
-
     
     if ($DestinationPath -ne "") {
         Copy-Item -Path $symbolsDir\* -Destination $DestinationPath -Force -Recurse
@@ -373,13 +416,20 @@ function Package-OpenSSH
     }
     else {
         Remove-Item ($symbolsDir + '.zip') -Force -ErrorAction SilentlyContinue
-        Compress-Archive -Path $symbolsDir -DestinationPath ($symbolsDir + '.zip')
-        Write-BuildMsg -AsInfo -Message "Packaged Symbols - '$symbolsDir'.zip"
+        if(get-command Compress-Archive -ErrorAction SilentlyContinue)
+        {
+            Compress-Archive -Path $symbolsDir -DestinationPath ($symbolsDir + '.zip')
+            Write-BuildMsg -AsInfo -Message "Packaged Symbols - '$symbolsDir.zip'"
+        }
+        else
+        {
+               Write-BuildMsg -AsInfo -Message "Packaged Symbols not compressed."
+        }
     }
     Remove-Item $symbolsDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-function Build-OpenSSH
+function Start-OpenSSHBuild
 {
     [CmdletBinding(SupportsShouldProcess=$false)]    
     param
@@ -387,12 +437,11 @@ function Build-OpenSSH
         [ValidateSet('x86', 'x64')]
         [string]$NativeHostArch = "x64",
 
-        [ValidateSet('Debug', 'Release', '')]
+        [ValidateSet('Debug', 'Release')]
         [string]$Configuration = "Release",
 
         [switch]$NoOpenSSL
-    )
-    Set-StrictMode -Version Latest
+    )    
     $script:BuildLogFile = $null
 
     [System.IO.DirectoryInfo] $repositoryRoot = Get-RepositoryRoot
@@ -420,9 +469,9 @@ function Build-OpenSSH
     $script:win32OpenSSHPath = join-path $script:gitRoot "Win32-OpenSSH"
     if (-not (Test-Path (Join-Path $PSScriptRoot LibreSSLSDK)))
     {
-        Clone-Win32OpenSSH
+        Get-Win32OpenSSHRepo
         Copy-LibreSSLSDK
-        Delete-Win32OpenSSH
+        Remove-Win32OpenSSHRepo
     }
 
     if ($NoOpenSSL) 
@@ -465,7 +514,7 @@ function Get-BuildLogFile
         [ValidateSet('x86', 'x64')]
         [string]$NativeHostArch = "x64",
                 
-        [ValidateSet('Debug', 'Release', '')]
+        [ValidateSet('Debug', 'Release')]
         [string]$Configuration = "Release"
         
     )    
@@ -483,122 +532,6 @@ function Get-SolutionFile
     return Join-Path -Path $root -ChildPath "contrib\win32\openssh\Win32-OpenSSH.sln"    
 }
 
-<#
-    .Synopsis
-    Deploy all required files to a location and install the binaries
-#>
-function Install-OpenSSH
-{
-    [CmdletBinding()]
-    param
-    ( 
-        [ValidateSet('Debug', 'Release', '')]
-        [string]$Configuration = "",
 
-        [ValidateSet('x86', 'x64', '')]
-        [string]$NativeHostArch = "",
 
-        [string]$OpenSSHDir = "$env:SystemDrive\OpenSSH"
-    )
-
-    if ($Configuration -eq "")
-    {
-        $Configuration = 'Release'
-    }
-
-    if ($NativeHostArch -eq "") 
-    {
-        $NativeHostArch = 'x64'
-        if ($env:PROCESSOR_ARCHITECTURE  -eq 'x86') {
-            $NativeHostArch = 'x86'
-        }
-    }
-
-    Package-OpenSSH -NativeHostArch $NativeHostArch -Configuration $Configuration -DestinationPath $OpenSSHDir
-
-    Push-Location $OpenSSHDir 
-    & "$OpenSSHDir\install-sshd.ps1"
-    & "$OpenSSHDir\ssh-keygen.exe" -A
-
-    $keyFiles = Get-ChildItem "$OpenSSHDir\ssh_host_*_key*" | % {        
-        Adjust-HostKeyFileACL -FilePath $_.FullName
-    }
-
-    #machine will be reboot after Install-openssh anyway
-    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')
-    $newMachineEnvironmentPath = $machinePath
-    if (-not ($machinePath.ToLower().Contains($OpenSSHDir.ToLower())))
-    {
-        $newMachineEnvironmentPath = "$OpenSSHDir;$newMachineEnvironmentPath"
-        $env:Path = "$OpenSSHDir;$env:Path"
-    }
-    # Update machine environment path
-    if ($newMachineEnvironmentPath -ne $machinePath)
-    {
-        [Environment]::SetEnvironmentVariable('Path', $newMachineEnvironmentPath, 'MACHINE')
-    }
-    
-    Set-Service sshd -StartupType Automatic 
-    Set-Service ssh-agent -StartupType Automatic
-
-    Pop-Location
-    Write-Log -Message "OpenSSH installed!"
-}
-
-<#
-    .Synopsis
-    uninstalled sshd and sshla
-#>
-function UnInstall-OpenSSH
-{
-    [CmdletBinding()]
-    param
-    ( 
-        [string]$OpenSSHDir = "$env:SystemDrive\OpenSSH"
-    )
-
-    if (-not (Test-Path $OpenSSHDir))
-    {
-        return
-    }
-
-    Push-Location $OpenSSHDir
-    if((Get-Service ssh-agent -ErrorAction Ignore) -ne $null) {
-        Stop-Service ssh-agent -Force
-    }
-    &( "$OpenSSHDir\uninstall-sshd.ps1")
-        
-    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')
-    $newMachineEnvironmentPath = $machinePath
-    if ($machinePath.ToLower().Contains($OpenSSHDir.ToLower()))
-    {        
-        $newMachineEnvironmentPath = $newMachineEnvironmentPath.Replace("$OpenSSHDir;", '')
-        $env:Path = $env:Path.Replace("$OpenSSHDir;", '')
-    }
-
-    if(Test-Path -Path $OpenSSHDir)
-    {
-        Push-Location $OpenSSHDir
-        &( "$OpenSSHDir\uninstall-sshd.ps1")
-
-        $machinePath = [Environment]::GetEnvironmentVariable('Path', 'MACHINE')
-        $newMachineEnvironmentPath = $machinePath
-        if ($machinePath.ToLower().Contains($OpenSSHDir.ToLower()))
-        {
-            $newMachineEnvironmentPath.Replace("$OpenSSHDir;", '')
-            $env:Path = $env:Path.Replace("$OpenSSHDir;", '')
-        }
-
-        # Update machine environment path
-        # machine will be reboot after Uninstall-OpenSSH
-        if ($newMachineEnvironmentPath -ne $machinePath)
-        {
-            [Environment]::SetEnvironmentVariable('Path', $newMachineEnvironmentPath, 'MACHINE')
-        }
-        Pop-Location
-
-        Remove-Item -Path $OpenSSHDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
-
-Export-ModuleMember -Function Build-OpenSSH, Get-BuildLogFile, Install-OpenSSH, UnInstall-OpenSSH, Package-OpenSSH
+Export-ModuleMember -Function Start-OpenSSHBuild, Get-BuildLogFile, Start-OpenSSHPackage

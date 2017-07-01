@@ -78,7 +78,9 @@ struct Authctxt {
 #endif
 	Buffer		*loginmsg;
 	void		*methoddata;
-
+#ifdef WINDOWS
+	void		*auth_token;
+#endif
 	struct sshkey	**prev_userkeys;
 	u_int		 nprev_userkeys;
 };

@@ -1,4 +1,6 @@
-﻿$tC = 1
+﻿If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path}
+Import-Module $PSScriptRoot\CommonUtils.psm1 -Force
+$tC = 1
 $tI = 0
 $suite = "log_fileperm"
 
@@ -15,38 +17,52 @@ Describe "Tests for log file permission" -Tags "CI" {
             $null = New-Item $testDir -ItemType directory -Force -ErrorAction SilentlyContinue
         }
         $port = 47003
-        $logName = "log.txt"
+        $logName = "log.txt"        
+        
+        $systemSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::LocalSystemSid)
+        $adminsSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid)                        
+        $currentUserSid = Get-UserSID -User "$($env:USERDOMAIN)\$($env:USERNAME)"        
 
-        $systemAccount = New-Object System.Security.Principal.NTAccount("NT AUTHORITY", "SYSTEM")
-        $adminsAccount = New-Object System.Security.Principal.NTAccount("BUILTIN","Administrators")
-        $currentUser = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
-
-        Remove-Item (Join-Path $testDir "*$logName") -Force -ErrorAction Ignore
+        Remove-Item (Join-Path $testDir "*$logName") -Force -ErrorAction SilentlyContinue
+        
+        $platform = Get-Platform
+        if(($platform -eq [PlatformType]::Windows) -and ($psversiontable.BuildVersion.Major -le 6))
+        {
+            #suppress the firewall blocking dialogue on win7
+            netsh advfirewall firewall add rule name="sshd" program="$($OpenSSHTestInfo['OpenSSHBinPath'])\sshd.exe" protocol=any action=allow dir=in
+        }
 
         #only validate owner and ACEs of the file
-        function ValiLogFilePerm {
+        function ValidateLogFilePerm {
             param([string]$FilePath)
-
+            
             $myACL = Get-ACL $FilePath
-            $myACL.Owner.Equals($currentUser.Value) | Should Be $true
-            $myACL.Access | Should Not Be $null
+            $currentOwnerSid = Get-UserSid -User $myACL.Owner
+            $currentOwnerSid.Equals($currentUserSid) | Should Be $true
+            $myACL.Access | Should Not Be $null            
+            
+            $ReadWriteAccessPerm = ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Read.value__) -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Write.value__)  -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Synchronize.value__)
+            $FullControlPerm = [System.UInt32] [System.Security.AccessControl.FileSystemRights]::FullControl.value__
+            
             $myACL.Access.Count | Should Be 3
-            $identities = @($systemAccount.Value, $adminsAccount.Value, $currentUser.Value)            
+            $identities = @($systemSid, $adminsSid, $currentUserSid)            
 
             foreach ($a in $myACL.Access) {
-                $a.IdentityReference.Value -in $identities | Should Be $true           
+                $id = Get-UserSid -User $a.IdentityReference
+                $identities -contains $id | Should Be $true           
 
-                switch ($a.IdentityReference.Value)
+                switch ($id)
                 {
-                    {$_ -in @($systemAccount.Value, $adminsAccount.Value)}
+                    {@($systemSid, $adminsSid) -contains $_}
                     {
-                        $a.FileSystemRights | Should Be "FullControl"
+                        ([System.UInt32]$a.FileSystemRights.value__) | Should Be $FullControlPerm
                         break;
                     }
-
-                    $currentUser.Value
+                    $currentUserSid
                     {
-                        $a.FileSystemRights | Should Be "Write, Read, Synchronize"
+                        ([System.UInt32]$a.FileSystemRights.value__) | Should Be $ReadWriteAccessPerm
                         break;
                     }
                 }
@@ -63,11 +79,17 @@ Describe "Tests for log file permission" -Tags "CI" {
         $logPath = Join-Path $testDir "$tC.$tI.$logName"
     }
 
-    AfterEach {$tI++;} 
+    AfterEach {$tI++;}
+    AfterAll {
+        if(($platform -eq [PlatformType]::Windows) -and ($psversiontable.BuildVersion.Major -le 6))
+        {            
+            netsh advfirewall firewall delete rule name="sshd" program="$($OpenSSHTestInfo['OpenSSHBinPath'])\sshd.exe" protocol=any dir=in
+        }    
+    }
 
     Context "$tC-SSHD -E Log file permission" {
         BeforeAll {            
-            Get-Process -Name sshd | Where-Object {$_.SI -ne 0} | Stop-process
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
             $tI=1
         }
         
@@ -79,8 +101,8 @@ Describe "Tests for log file permission" -Tags "CI" {
             #Run
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-E $logPath") -NoNewWindow
             Start-sleep 1; 
-            ValiLogFilePerm -FilePath $logPath
-            Get-Process -Name sshd | % { if($_.SI -ne 0) { Stop-Process $_; Start-sleep 1 } }
+            ValidateLogFilePerm -FilePath $logPath
+            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
     }
 }

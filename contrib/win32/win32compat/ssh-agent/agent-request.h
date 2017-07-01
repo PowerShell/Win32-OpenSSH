@@ -16,6 +16,6 @@ int process_request_identities(struct sshbuf*, struct sshbuf*, struct agent_conn
 int process_sign_request(struct sshbuf*, struct sshbuf*, struct agent_connection*);
 int process_remove_key(struct sshbuf*, struct sshbuf*, struct agent_connection*);
 int process_remove_all(struct sshbuf*, struct sshbuf*, struct agent_connection*);
-int process_authagent_request(struct sshbuf*, struct sshbuf*, struct agent_connection*);
+int process_privagent_request(struct sshbuf*, struct sshbuf*, struct agent_connection*);
 
 /* auth */

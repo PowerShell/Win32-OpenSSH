@@ -126,3 +126,4 @@ PubkeyAcceptedKeyTypes ssh-ed25519*
 #AllowUsers allowuser1 allowu*r2 allow?se?3 allowuser4 localuser1 localu*r2 loc?lu?er3 localadmin
 #DenyGroups denygroup1 denygr*p2 deny?rou?3
 #AllowGroups allowgroup1 allowg*2 allowg?ou?3 Adm*
+hostkeyagent \\.\pipe\openssh-ssh-agent

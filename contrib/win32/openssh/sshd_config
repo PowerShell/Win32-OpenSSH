@@ -120,3 +120,4 @@ Subsystem	sftp	sftp-server.exe
 #	AllowTcpForwarding no
 #	ForceCommand cvs server
 # PubkeyAcceptedKeyTypes ssh-ed25519*
+hostkeyagent \\.\pipe\openssh-ssh-agent
