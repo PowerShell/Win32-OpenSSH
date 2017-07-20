@@ -332,7 +332,7 @@ process_remove_all(struct sshbuf* request, struct sshbuf* response, struct agent
 	int r = 0;
 
 	if (get_user_root(con, &user_root) != 0 ||
-	    RegOpenKeyExW(user_root, SSH_ROOT, 0, 
+	    RegOpenKeyExW(user_root, SSH_AGENT_ROOT, 0,
 		   DELETE | KEY_ENUMERATE_SUB_KEYS | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &root) != 0) {
 		goto done;
 	}

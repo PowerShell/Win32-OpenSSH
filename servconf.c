@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.308 2017/05/17 01:24:17 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.309 2017/06/24 06:34:38 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -164,6 +164,7 @@ initialize_server_options(ServerOptions *options)
 	options->version_addendum = NULL;
 	options->fingerprint_hash = -1;
 	options->disable_forwarding = -1;
+	options->expose_userauth_info = -1;
 }
 
 /* Returns 1 if a string option is unset or set to "none" or 0 otherwise. */
@@ -333,6 +334,8 @@ fill_default_server_options(ServerOptions *options)
 		options->fingerprint_hash = SSH_FP_HASH_DEFAULT;
 	if (options->disable_forwarding == -1)
 		options->disable_forwarding = 0;
+	if (options->expose_userauth_info == -1)
+		options->expose_userauth_info = 0;
 
 	assemble_algorithms(options);
 
@@ -418,6 +421,7 @@ typedef enum {
 	sAuthenticationMethods, sHostKeyAgent, sPermitUserRC,
 	sStreamLocalBindMask, sStreamLocalBindUnlink,
 	sAllowStreamLocalForwarding, sFingerprintHash, sDisableForwarding,
+	sExposeAuthInfo,
 	sDeprecated, sIgnore, sUnsupported
 } ServerOpCodes;
 
@@ -561,6 +565,7 @@ static struct {
 	{ "allowstreamlocalforwarding", sAllowStreamLocalForwarding, SSHCFG_ALL },
 	{ "fingerprinthash", sFingerprintHash, SSHCFG_GLOBAL },
 	{ "disableforwarding", sDisableForwarding, SSHCFG_ALL },
+	{ "exposeauthinfo", sExposeAuthInfo, SSHCFG_ALL },
 	{ NULL, sBadOption, 0 }
 };
 
@@ -1841,6 +1846,10 @@ process_server_config_line(ServerOptions *options, char *line,
 			options->fingerprint_hash = value;
 		break;
 
+	case sExposeAuthInfo:
+		intptr = &options->expose_userauth_info;
+		goto parse_flag;
+
 	case sDeprecated:
 	case sIgnore:
 	case sUnsupported:
@@ -1979,6 +1988,7 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(allow_streamlocal_forwarding);
 	M_CP_INTOPT(allow_agent_forwarding);
 	M_CP_INTOPT(disable_forwarding);
+	M_CP_INTOPT(expose_userauth_info);
 	M_CP_INTOPT(permit_tun);
 	M_CP_INTOPT(fwd_opts.gateway_ports);
 	M_CP_INTOPT(fwd_opts.streamlocal_bind_unlink);
@@ -2278,6 +2288,7 @@ dump_config(ServerOptions *o)
 	dump_cfg_fmtint(sAllowStreamLocalForwarding, o->allow_streamlocal_forwarding);
 	dump_cfg_fmtint(sStreamLocalBindUnlink, o->fwd_opts.streamlocal_bind_unlink);
 	dump_cfg_fmtint(sFingerprintHash, o->fingerprint_hash);
+	dump_cfg_fmtint(sExposeAuthInfo, o->expose_userauth_info);
 
 	/* string arguments */
 	dump_cfg_string(sPidFile, o->pid_file);

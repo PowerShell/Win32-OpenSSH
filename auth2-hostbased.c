@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-hostbased.c,v 1.30 2017/05/30 14:29:59 markus Exp $ */
+/* $OpenBSD: auth2-hostbased.c,v 1.31 2017/06/24 06:34:38 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -137,7 +137,7 @@ userauth_hostbased(struct ssh *ssh)
 	sshbuf_dump(b, stderr);
 #endif
 
-	pubkey_auth_info(authctxt, key,
+	auth2_record_info(authctxt,
 	    "client user \"%.100s\", client host \"%.100s\"", cuser, chost);
 
 	/* test for allowed key and correct signature */
@@ -147,11 +147,11 @@ userauth_hostbased(struct ssh *ssh)
 	    sshbuf_ptr(b), sshbuf_len(b), ssh->compat)) == 0)
 		authenticated = 1;
 
+	auth2_record_key(authctxt, authenticated, key);
 	sshbuf_free(b);
 done:
 	debug2("%s: authenticated %d", __func__, authenticated);
-	if (key != NULL)
-		sshkey_free(key);
+	sshkey_free(key);
 	free(pkalg);
 	free(pkblob);
 	free(cuser);

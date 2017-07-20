@@ -146,7 +146,7 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
             ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            $matches = Get-Content $filePath | Select-String -pattern "^Permission denied"
+            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup
@@ -165,7 +165,7 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
             ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            $matches = Get-Content $filePath | Select-String -pattern "^Permission denied"
+            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup
@@ -181,7 +181,7 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
             ssh -p $port -E $FilePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            $matches = Get-Content $filePath | Select-String -pattern "^Permission denied"
+            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup
@@ -197,7 +197,7 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
 
-            $matches = Get-Content $filePath | Select-String -pattern "^Permission denied"
+            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
             $matches.Count | Should BeGreaterThan 2
             
             #Cleanup

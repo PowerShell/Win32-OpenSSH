@@ -342,7 +342,14 @@ function Repair-FilePermissionInternal {
 
     foreach($a in $acl.Access)
     {
-        $IdentityReferenceSid = Get-UserSid -User $a.IdentityReference
+        if ($a.IdentityReference -is [System.Security.Principal.SecurityIdentifier]) 
+        {
+            $IdentityReferenceSid = $a.IdentityReference
+        }
+        Else 
+        {
+            $IdentityReferenceSid = Get-UserSid -User $a.IdentityReference
+        }
         if($IdentityReferenceSid -eq $null)
         {
             $idRefShortValue = ($a.IdentityReference.Value).split('\')[-1]

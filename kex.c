@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.133 2017/05/30 14:23:52 markus Exp $ */
+/* $OpenBSD: kex.c,v 1.134 2017/06/13 12:13:59 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -378,7 +378,9 @@ kex_input_ext_info(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct kex *kex = ssh->kex;
 	u_int32_t i, ninfo;
-	char *name, *val, *found;
+	char *name, *found;
+	u_char *val;
+	size_t vlen;
 	int r;
 
 	debug("SSH2_MSG_EXT_INFO received");
@@ -388,12 +390,17 @@ kex_input_ext_info(int type, u_int32_t seq, struct ssh *ssh)
 	for (i = 0; i < ninfo; i++) {
 		if ((r = sshpkt_get_cstring(ssh, &name, NULL)) != 0)
 			return r;
-		if ((r = sshpkt_get_cstring(ssh, &val, NULL)) != 0) {
+		if ((r = sshpkt_get_string(ssh, &val, &vlen)) != 0) {
 			free(name);
 			return r;
 		}
-		debug("%s: %s=<%s>", __func__, name, val);
 		if (strcmp(name, "server-sig-algs") == 0) {
+			/* Ensure no \0 lurking in value */
+			if (memchr(val, '\0', vlen) != NULL) {
+				error("%s: nul byte in %s", __func__, name);
+				return SSH_ERR_INVALID_FORMAT;
+			}
+			debug("%s: %s=<%s>", __func__, name, val);
 			found = match_list("rsa-sha2-256", val, NULL);
 			if (found) {
 				kex->rsa_sha2 = 256;
@@ -404,7 +411,8 @@ kex_input_ext_info(int type, u_int32_t seq, struct ssh *ssh)
 				kex->rsa_sha2 = 512;
 				free(found);
 			}
-		}
+		} else
+			debug("%s: %s (unrecognised)", __func__, name);
 		free(name);
 		free(val);
 	}

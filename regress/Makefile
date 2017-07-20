@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.94 2016/12/16 03:51:19 dtucker Exp $
+#	$OpenBSD: Makefile,v 1.95 2017/06/24 06:35:24 djm Exp $
 
 REGRESS_TARGETS=	unit t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t-exec
 tests:		prep $(REGRESS_TARGETS)
@@ -79,7 +79,8 @@ LTESTS= 	connect \
 		principals-command \
 		cert-file \
 		cfginclude \
-		allow-deny-users
+		allow-deny-users \
+		authinfo
 
 
 #		dhgex \

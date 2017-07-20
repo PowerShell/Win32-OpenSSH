@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.67 2017/05/31 10:54:00 markus Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.68 2017/06/24 06:34:38 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -138,7 +138,7 @@ userauth_pubkey(struct ssh *ssh)
 		goto done;
 	}
 	fp = sshkey_fingerprint(key, options.fingerprint_hash, SSH_FP_DEFAULT);
-	if (auth2_userkey_already_used(authctxt, key)) {
+	if (auth2_key_already_used(authctxt, key)) {
 		logit("refusing previously-used %s key", sshkey_type(key));
 		goto done;
 	}
@@ -195,7 +195,6 @@ userauth_pubkey(struct ssh *ssh)
 #ifdef DEBUG_PK
 		sshbuf_dump(b, stderr);
 #endif
-		pubkey_auth_info(authctxt, key, NULL);
 
 		/* test for correct signature */
 		authenticated = 0;
@@ -209,13 +208,10 @@ userauth_pubkey(struct ssh *ssh)
 		    sshbuf_len(b), ssh->compat)) == 0) {
 #endif
 			authenticated = 1;
-			/* Record the successful key to prevent reuse */
-			auth2_record_userkey(authctxt, key);
-			key = NULL; /* Don't free below */
 		}
 		sshbuf_free(b);
 		free(sig);
-
+		auth2_record_key(authctxt, authenticated, key);
 	} else {
 		debug("%s: test whether pkalg/pkblob are acceptable for %s %s",
 		    __func__, sshkey_type(key), fp);
@@ -245,51 +241,12 @@ userauth_pubkey(struct ssh *ssh)
 		auth_clear_options();
 done:
 	debug2("%s: authenticated %d pkalg %s", __func__, authenticated, pkalg);
-	if (key != NULL)
-		sshkey_free(key);
+	sshkey_free(key);
 	free(userstyle);
 	free(pkalg);
 	free(pkblob);
 	free(fp);
 	return authenticated;
-}
-
-void
-pubkey_auth_info(Authctxt *authctxt, const struct sshkey *key,
-    const char *fmt, ...)
-{
-	char *fp, *extra;
-	va_list ap;
-	int i;
-
-	extra = NULL;
-	if (fmt != NULL) {
-		va_start(ap, fmt);
-		i = vasprintf(&extra, fmt, ap);
-		va_end(ap);
-		if (i < 0 || extra == NULL)
-			fatal("%s: vasprintf failed", __func__);
-	}
-
-	if (sshkey_is_cert(key)) {
-		fp = sshkey_fingerprint(key->cert->signature_key,
-		    options.fingerprint_hash, SSH_FP_DEFAULT);
-		auth_info(authctxt, "%s ID %s (serial %llu) CA %s %s%s%s", 
-		    sshkey_type(key), key->cert->key_id,
-		    (unsigned long long)key->cert->serial,
-		    sshkey_type(key->cert->signature_key),
-		    fp == NULL ? "(null)" : fp,
-		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
-		free(fp);
-	} else {
-		fp = sshkey_fingerprint(key, options.fingerprint_hash,
-		    SSH_FP_DEFAULT);
-		auth_info(authctxt, "%s %s%s%s", sshkey_type(key),
-		    fp == NULL ? "(null)" : fp,
-		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
-		free(fp);
-	}
-	free(extra);
 }
 
 /*
@@ -1159,36 +1116,6 @@ user_key_allowed(struct passwd *pw, struct sshkey *key, int auth_attempt)
 	}
 
 	return success;
-}
-
-/* Records a public key in the list of previously-successful keys */
-void
-auth2_record_userkey(Authctxt *authctxt, struct sshkey *key)
-{
-	struct sshkey **tmp;
-
-	if (authctxt->nprev_userkeys >= INT_MAX ||
-	    (tmp = recallocarray(authctxt->prev_userkeys,
-	    authctxt->nprev_userkeys, authctxt->nprev_userkeys + 1,
-	    sizeof(*tmp))) == NULL)
-		fatal("%s: recallocarray failed", __func__);
-	authctxt->prev_userkeys = tmp;
-	authctxt->prev_userkeys[authctxt->nprev_userkeys] = key;
-	authctxt->nprev_userkeys++;
-}
-
-/* Checks whether a key has already been used successfully for authentication */
-int
-auth2_userkey_already_used(Authctxt *authctxt, struct sshkey *key)
-{
-	u_int i;
-
-	for (i = 0; i < authctxt->nprev_userkeys; i++) {
-		if (sshkey_equal_public(key, authctxt->prev_userkeys[i])) {
-			return 1;
-		}
-	}
-	return 0;
 }
 
 Authmethod method_pubkey = {

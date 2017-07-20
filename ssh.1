@@ -33,8 +33,8 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: ssh.1,v 1.382 2017/05/30 18:58:37 bluhm Exp $
-.Dd $Mdocdate: May 30 2017 $
+.\" $OpenBSD: ssh.1,v 1.383 2017/06/09 06:43:01 djm Exp $
+.Dd $Mdocdate: June 9 2017 $
 .Dt SSH 1
 .Os
 .Sh NAME
@@ -845,6 +845,17 @@ authentication.
 The client proves that it has access to the private key
 and the server checks that the corresponding public key
 is authorized to accept the account.
+.Pp
+The server may inform the client of errors that prevented public key
+authentication from succeeding after authentication completes using a
+different method.
+These may be viewed by increasing the
+.Cm LogLevel
+to
+.Cm DEBUG
+or higher (e.g. by using the
+.Fl v
+flag).
 .Pp
 The user creates his/her key pair by running
 .Xr ssh-keygen 1 .

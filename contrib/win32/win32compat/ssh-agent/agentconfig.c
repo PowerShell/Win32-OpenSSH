@@ -57,6 +57,19 @@ static char *config_file_name = _PATH_SERVER_CONFIG_FILE;
 int auth_sock = -1;
 
 int
+auth2_key_already_used(Authctxt *authctxt, const struct sshkey *key) 
+{
+	return 0;
+}
+
+void
+auth2_record_key(Authctxt *authctxt, int authenticated,
+	const struct sshkey *key)
+{
+	return;
+}
+
+int
 auth2_methods_valid(const char * c, int i) {
 	return 1;
 }

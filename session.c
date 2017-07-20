@@ -1,4 +1,4 @@
-/* $OpenBSD: session.c,v 1.288 2017/05/31 09:15:42 deraadt Exp $ */
+/* $OpenBSD: session.c,v 1.290 2017/06/24 06:34:38 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -94,6 +94,7 @@
 #include "kex.h"
 #include "monitor_wrap.h"
 #include "sftp.h"
+#include "atomicio.h"
 
 #if defined(KRB5) && defined(USE_AFS)
 #include <kafs.h>
@@ -134,7 +135,6 @@ static int session_pty_req(Session *);
 /* import */
 extern ServerOptions options;
 extern char *__progname;
-extern int log_stderr;
 extern int debug_flag;
 extern u_int utmp_len;
 extern int startup_pipe;
@@ -160,6 +160,9 @@ login_cap_t *lc;
 
 static int is_child = 0;
 static int in_chroot = 0;
+
+/* File containing userauth info, if ExposeAuthInfo set */
+static char *auth_info_file = NULL;
 
 /* Name and directory of socket for authentication agent forwarding. */
 static char *auth_sock_name = NULL;
@@ -255,6 +258,40 @@ display_loginmsg(void)
 	}
 }
 
+static void
+prepare_auth_info_file(struct passwd *pw, struct sshbuf *info)
+{
+	int fd = -1, success = 0;
+
+	if (!options.expose_userauth_info || info == NULL)
+		return;
+
+	temporarily_use_uid(pw);
+	auth_info_file = xstrdup("/tmp/sshauth.XXXXXXXXXXXXXXX");
+	if ((fd = mkstemp(auth_info_file)) == -1) {
+		error("%s: mkstemp: %s", __func__, strerror(errno));
+		goto out;
+	}
+	if (atomicio(vwrite, fd, sshbuf_mutable_ptr(info),
+	    sshbuf_len(info)) != sshbuf_len(info)) {
+		error("%s: write: %s", __func__, strerror(errno));
+		goto out;
+	}
+	if (close(fd) != 0) {
+		error("%s: close: %s", __func__, strerror(errno));
+		goto out;
+	}
+	success = 1;
+ out:
+	if (!success) {
+		if (fd != -1)
+			close(fd);
+		free(auth_info_file);
+		auth_info_file = NULL;
+	}
+	restore_uid();
+}
+
 void
 do_authenticated(Authctxt *authctxt)
 {
@@ -270,7 +307,10 @@ do_authenticated(Authctxt *authctxt)
 
 	auth_debug_send();
 
+	prepare_auth_info_file(authctxt->pw, authctxt->session_info);
+
 	do_authenticated2(authctxt);
+
 	do_cleanup(authctxt);
 }
 
@@ -641,10 +681,6 @@ do_exec_no_pty(Session *s, const char *command)
 	case 0:
 		is_child = 1;
 
-		/* Child.  Reinitialize the log since the pid has changed. */
-		log_init(__progname, options.log_level,
-		    options.log_facility, log_stderr);
-
 		/*
 		 * Create a new session and process group since the 4.4BSD
 		 * setlogin() affects the entire process group.
@@ -799,9 +835,6 @@ do_exec_pty(Session *s, const char *command)
 		close(fdout);
 		close(ptymaster);
 
-		/* Child.  Reinitialize the log because the pid has changed. */
-		log_init(__progname, options.log_level,
-		    options.log_facility, log_stderr);
 		/* Close the master side of the pseudo tty. */
 		close(ptyfd);
 
@@ -1363,6 +1396,8 @@ do_setup_env(Session *s, const char *shell)
 	free(laddr);
 	child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
 
+	if (auth_info_file != NULL)
+		child_set_env(&env, &envsize, "SSH_USER_AUTH", auth_info_file);
 	if (s->ttyfd != -1)
 		child_set_env(&env, &envsize, "SSH_TTY", s->tty);
 	if (s->term)
@@ -2839,6 +2874,15 @@ do_cleanup(Authctxt *authctxt)
 
 	/* remove agent socket */
 	auth_sock_cleanup_proc(authctxt->pw);
+
+	/* remove userauth info */
+	if (auth_info_file != NULL) {
+		temporarily_use_uid(authctxt->pw);
+		unlink(auth_info_file);
+		restore_uid();
+		free(auth_info_file);
+		auth_info_file = NULL;
+	}
 
 	/*
 	 * Cleanup ptys/utmp only if privsep is disabled,

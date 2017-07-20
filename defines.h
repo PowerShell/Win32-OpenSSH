@@ -519,6 +519,13 @@ struct winsize {
 }
 #endif
 
+#ifndef timespeccmp
+#define timespeccmp(tsp, usp, cmp)					\
+	(((tsp)->tv_sec == (usp)->tv_sec) ?				\
+	    ((tsp)->tv_nsec cmp (usp)->tv_nsec) :			\
+	    ((tsp)->tv_sec cmp (usp)->tv_sec))
+#endif
+
 #ifndef __P
 # define __P(x) x
 #endif

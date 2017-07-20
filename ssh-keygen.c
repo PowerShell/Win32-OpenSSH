@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.304 2017/05/30 14:16:41 markus Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.305 2017/06/28 01:09:22 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -59,6 +59,7 @@
 #include "krl.h"
 #include "digest.h"
 #include "utf8.h"
+#include "authfd.h"
 #include "sshfileperm.h"
 
 #ifdef WITH_OPENSSL
@@ -121,6 +122,9 @@ char *identity_comment = NULL;
 
 /* Path to CA key when certifying keys. */
 char *ca_key_path = NULL;
+
+/* Prefer to use agent keys for CA signing */
+int prefer_agent = 0;
 
 /* Certificate serial number */
 unsigned long long cert_serial = 0;
@@ -1615,24 +1619,66 @@ load_pkcs11_key(char *path)
 #endif /* ENABLE_PKCS11 */
 }
 
+/* Signer for sshkey_certify_custom that uses the agent */
+static int
+agent_signer(const struct sshkey *key, u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen,
+    const char *alg, u_int compat, void *ctx)
+{
+	int *agent_fdp = (int *)ctx;
+
+	return ssh_agent_sign(*agent_fdp, key, sigp, lenp,
+	    data, datalen, alg, compat);
+}
+
 static void
 do_ca_sign(struct passwd *pw, int argc, char **argv)
 {
-	int r, i, fd;
+	int r, i, fd, found, agent_fd = -1;
 	u_int n;
 	struct sshkey *ca, *public;
 	char valid[64], *otmp, *tmp, *cp, *out, *comment, **plist = NULL;
 	FILE *f;
+	struct ssh_identitylist *agent_ids;
+	size_t j;
 
 #ifdef ENABLE_PKCS11
 	pkcs11_init(1);
 #endif
 	tmp = tilde_expand_filename(ca_key_path, pw->pw_uid);
 	if (pkcs11provider != NULL) {
+		/* If a PKCS#11 token was specified then try to use it */
 		if ((ca = load_pkcs11_key(tmp)) == NULL)
 			fatal("No PKCS#11 key matching %s found", ca_key_path);
-	} else
+	} else if (prefer_agent) {
+		/*
+		 * Agent signature requested. Try to use agent after making
+		 * sure the public key specified is actually present in the
+		 * agent.
+		 */
+		if ((r = sshkey_load_public(tmp, &ca, NULL)) != 0)
+			fatal("Cannot load CA public key %s: %s",
+			    tmp, ssh_err(r));
+		if ((r = ssh_get_authentication_socket(&agent_fd)) != 0)
+			fatal("Cannot use public key for CA signature: %s",
+			    ssh_err(r));
+		if ((r = ssh_fetch_identitylist(agent_fd, &agent_ids)) != 0)
+			fatal("Retrieve agent key list: %s", ssh_err(r));
+		found = 0;
+		for (j = 0; j < agent_ids->nkeys; j++) {
+			if (sshkey_equal(ca, agent_ids->keys[j])) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+			fatal("CA key %s not found in agent", tmp);
+		ssh_free_identitylist(agent_ids);
+		ca->flags |= SSHKEY_FLAG_EXT;
+	} else {
+		/* CA key is assumed to be a private key on the filesystem */
 		ca = load_identity(tmp);
+	}
 	free(tmp);
 
 	if (key_type_name != NULL &&
@@ -1682,8 +1728,16 @@ do_ca_sign(struct passwd *pw, int argc, char **argv)
 		    &public->cert->signature_key)) != 0)
 			fatal("sshkey_from_private (ca key): %s", ssh_err(r));
 
-		if ((r = sshkey_certify(public, ca, key_type_name)) != 0)
-			fatal("Couldn't certify key %s: %s", tmp, ssh_err(r));
+		if (agent_fd != -1 && (ca->flags & SSHKEY_FLAG_EXT) != 0) {
+			if ((r = sshkey_certify_custom(public, ca,
+			    key_type_name, agent_signer, &agent_fd)) != 0)
+				fatal("Couldn't certify key %s via agent: %s",
+				    tmp, ssh_err(r));
+		} else {
+			if ((sshkey_certify(public, ca, key_type_name)) != 0)
+				fatal("Couldn't certify key %s: %s",
+				    tmp, ssh_err(r));
+		}
 
 		if ((cp = strrchr(tmp, '.')) != NULL && strcmp(cp, ".pub") == 0)
 			*cp = '\0';
@@ -2279,8 +2333,9 @@ usage(void)
 	    "       ssh-keygen -T output_file -f input_file [-v] [-a rounds] [-J num_lines]\n"
 	    "                  [-j start_line] [-K checkpt] [-W generator]\n"
 #endif
-	    "       ssh-keygen -s ca_key -I certificate_identity [-h] [-n principals]\n"
-	    "                  [-O option] [-V validity_interval] [-z serial_number] file ...\n"
+	    "       ssh-keygen -s ca_key -I certificate_identity [-h] [-U]\n"
+	    "                  [-D pkcs11_provider] [-n principals] [-O option]\n"
+	    "                  [-V validity_interval] [-z serial_number] file ...\n"
 	    "       ssh-keygen -L [-f input_keyfile]\n"
 	    "       ssh-keygen -A\n"
 	    "       ssh-keygen -k -f krl_file [-u] [-s ca_public] [-z version_number]\n"
@@ -2338,8 +2393,8 @@ main(int argc, char **argv)
 	if (gethostname(hostname, sizeof(hostname)) < 0)
 		fatal("gethostname: %s", strerror(errno));
 
-	/* Remaining characters: UYdw */
-	while ((opt = getopt(argc, argv, "ABHLQXceghiklopquvxy"
+	/* Remaining characters: Ydw */
+	while ((opt = getopt(argc, argv, "ABHLQUXceghiklopquvxy"
 	    "C:D:E:F:G:I:J:K:M:N:O:P:R:S:T:V:W:Z:"
 	    "a:b:f:g:j:m:n:r:s:t:z:")) != -1) {
 		switch (opt) {
@@ -2465,6 +2520,9 @@ main(int argc, char **argv)
 			break;
 		case 'D':
 			pkcs11provider = optarg;
+			break;
+		case 'U':
+			prefer_agent = 1;
 			break;
 		case 'u':
 			update_krl = 1;

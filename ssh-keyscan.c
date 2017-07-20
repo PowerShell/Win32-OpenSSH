@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.114 2017/05/31 07:00:13 markus Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.115 2017/06/30 04:17:23 dtucker Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -395,7 +395,6 @@ confree(int s)
 {
 	if (s >= maxfd || fdcon[s].c_status == CS_UNUSED)
 		fatal("confree: attempt to free bad fdno %d", s);
-	
 	free(fdcon[s].c_namebase);
 	free(fdcon[s].c_output_name);
 	if (fdcon[s].c_status == CS_KEYS)

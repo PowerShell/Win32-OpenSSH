@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.263 2017/05/31 07:00:13 markus Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.264 2017/06/14 00:31:38 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -474,7 +474,8 @@ userauth(Authctxt *authctxt, char *authlist)
 	for (;;) {
 		Authmethod *method = authmethod_get(authlist);
 		if (method == NULL)
-			fatal("Permission denied (%s).", authlist);
+			fatal("%s@%s: Permission denied (%s).",
+			    authctxt->server_user, authctxt->host, authlist);
 		authctxt->method = method;
 
 		/* reset the per method handler */

@@ -37,38 +37,35 @@ Describe "Tests for scp command" -Tags "CI" {
                 Title = 'Simple copy local file to local file'
                 Source = $SourceFilePath                   
                 Destination = $DestinationFilePath
-                Options = "-P $port "
             },
             @{
                 Title = 'Simple copy local file to remote file'
                 Source = $SourceFilePath
                 Destination = "test_target:$DestinationFilePath"
-                Options = "-P $port -S $sshcmd"
+                Options = "-S '$sshcmd'"
             },
             @{
                 Title = 'Simple copy remote file to local file'
                 Source = "test_target:$SourceFilePath"
                 Destination = $DestinationFilePath
-                Options = "-P $port -p -c aes128-ctr -C"
+                Options = "-p -c aes128-ctr -C"
             },            
             @{
                 Title = 'Simple copy local file to local dir'
                 Source = $SourceFilePath
                 Destination = $DestinationDir
-                Options = "-P $port "
             },
             @{
                 Title = 'simple copy local file to remote dir'         
                 Source = $SourceFilePath
                 Destination = "test_target:$DestinationDir"
-                Options = "-P $port -C -q"
-            }<#,
+                Options = "-C -q"
+            },
             @{
                 Title = 'simple copy remote file to local dir'
                 Source = "test_target:$SourceFilePath"
                 Destination = $DestinationDir
-                Options = "-P $port "
-            }#>
+            }
         )
 
         $testData1 = @(
@@ -76,7 +73,7 @@ Describe "Tests for scp command" -Tags "CI" {
                 Title = 'copy from local dir to remote dir'
                 Source = $sourceDir
                 Destination = "test_target:$DestinationDir"
-                Options = "-P $port -r -p -c aes128-ctr"
+                Options = "-r -p -c aes128-ctr"
             },
             @{
                 Title = 'copy from local dir to local dir'
@@ -88,7 +85,7 @@ Describe "Tests for scp command" -Tags "CI" {
                 Title = 'copy from remote dir to local dir'            
                 Source = "test_target:$sourceDir"
                 Destination = $DestinationDir
-                Options = "-P $port -C -r -q"
+                Options = "-C -r -q"
             }
         )
 
@@ -150,7 +147,7 @@ Describe "Tests for scp command" -Tags "CI" {
     
 
     It 'File copy: <Title> ' -TestCases:$testData {
-        param([string]$Title, $Source, $Destination, $Options)
+        param([string]$Title, $Source, $Destination, [string]$Options)
             
         iex  "scp $Options $Source $Destination"
         $LASTEXITCODE | Should Be 0
@@ -168,7 +165,7 @@ Describe "Tests for scp command" -Tags "CI" {
     }
                 
     It 'Directory recursive copy: <Title> ' -TestCases:$testData1 {
-        param([string]$Title, $Source, $Destination, $Options)                        
+        param([string]$Title, $Source, $Destination, [string]$Options)                        
             
         iex  "scp $Options $Source $Destination"
         $LASTEXITCODE | Should Be 0

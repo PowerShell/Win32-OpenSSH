@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.260 2017/06/06 09:12:17 dtucker Exp $ */
+/* $OpenBSD: packet.c,v 1.262 2017/06/24 06:38:11 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -901,6 +901,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	/*
 	 * The 2^(blocksize*2) limit is too expensive for 3DES,
 	 * so enforce a 1GB limit for small blocksizes.
+	 * See RFC4344 section 3.2.
 	 */
 	if (enc->block_size >= 16)
 		*max_blocks = (u_int64_t)1 << (enc->block_size*2);
@@ -944,7 +945,10 @@ ssh_packet_need_rekeying(struct ssh *ssh, u_int outbound_packet_len)
 	    (int64_t)state->rekey_time + state->rekey_interval <= monotime())
 		return 1;
 
-	/* Always rekey when MAX_PACKETS sent in either direction */
+	/*
+	 * Always rekey when MAX_PACKETS sent in either direction 
+	 * As per RFC4344 section 3.1 we do this after 2^31 packets.
+	 */
 	if (state->p_send.packets > MAX_PACKETS ||
 	    state->p_read.packets > MAX_PACKETS)
 		return 1;
@@ -2218,9 +2222,7 @@ newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 		return r;
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	/* The cipher struct is constant and shared, you export pointer */
 	if ((r = sshbuf_put_cstring(b, enc->name)) != 0 ||
-	    (r = sshbuf_put(b, &enc->cipher, sizeof(enc->cipher))) != 0 ||
 	    (r = sshbuf_put_u32(b, enc->enabled)) != 0 ||
 	    (r = sshbuf_put_u32(b, enc->block_size)) != 0 ||
 	    (r = sshbuf_put_string(b, enc->key, enc->key_len)) != 0 ||
@@ -2294,12 +2296,15 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	comp = &newkey->comp;
 
 	if ((r = sshbuf_get_cstring(b, &enc->name, NULL)) != 0 ||
-	    (r = sshbuf_get(b, &enc->cipher, sizeof(enc->cipher))) != 0 ||
 	    (r = sshbuf_get_u32(b, (u_int *)&enc->enabled)) != 0 ||
 	    (r = sshbuf_get_u32(b, &enc->block_size)) != 0 ||
 	    (r = sshbuf_get_string(b, &enc->key, &keylen)) != 0 ||
 	    (r = sshbuf_get_string(b, &enc->iv, &ivlen)) != 0)
 		goto out;
+	if ((enc->cipher = cipher_by_name(enc->name)) == NULL) {
+		r = SSH_ERR_INVALID_FORMAT;
+		goto out;
+	}
 	if (cipher_authlen(enc->cipher) == 0) {
 		if ((r = sshbuf_get_cstring(b, &mac->name, NULL)) != 0)
 			goto out;
@@ -2317,11 +2322,6 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	if ((r = sshbuf_get_u32(b, &comp->type)) != 0 ||
 	    (r = sshbuf_get_cstring(b, &comp->name, NULL)) != 0)
 		goto out;
-	if (enc->name == NULL ||
-	    cipher_by_name(enc->name) != enc->cipher) {
-		r = SSH_ERR_INVALID_FORMAT;
-		goto out;
-	}
 	if (sshbuf_len(b) != 0) {
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;

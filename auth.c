@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.121 2017/05/30 08:52:19 markus Exp $ */
+/* $OpenBSD: auth.c,v 1.122 2017/06/24 06:34:38 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -268,21 +268,41 @@ allowed_user(struct passwd * pw)
 	return 1;
 }
 
-void
-auth_info(Authctxt *authctxt, const char *fmt, ...)
+/*
+ * Formats any key left in authctxt->auth_method_key for inclusion in
+ * auth_log()'s message. Also includes authxtct->auth_method_info if present.
+ */
+static char *
+format_method_key(Authctxt *authctxt)
 {
-	va_list ap;
-        int i;
+	const struct sshkey *key = authctxt->auth_method_key;
+	const char *methinfo = authctxt->auth_method_info;
+	char *fp, *ret = NULL;
 
-	free(authctxt->info);
-	authctxt->info = NULL;
+	if (key == NULL)
+		return NULL;
 
-	va_start(ap, fmt);
-	i = vasprintf(&authctxt->info, fmt, ap);
-	va_end(ap);
-
-	if (i < 0 || authctxt->info == NULL)
-		fatal("vasprintf failed");
+	if (key_is_cert(key)) {
+		fp = sshkey_fingerprint(key->cert->signature_key,
+		    options.fingerprint_hash, SSH_FP_DEFAULT);
+		xasprintf(&ret, "%s ID %s (serial %llu) CA %s %s%s%s",
+		    sshkey_type(key), key->cert->key_id,
+		    (unsigned long long)key->cert->serial,
+		    sshkey_type(key->cert->signature_key),
+		    fp == NULL ? "(null)" : fp,
+		    methinfo == NULL ? "" : ", ",
+		    methinfo == NULL ? "" : methinfo);
+		free(fp);
+	} else {
+		fp = sshkey_fingerprint(key, options.fingerprint_hash,
+		    SSH_FP_DEFAULT);
+		xasprintf(&ret, "%s %s%s%s", sshkey_type(key),
+		    fp == NULL ? "(null)" : fp,
+		    methinfo == NULL ? "" : ", ",
+		    methinfo == NULL ? "" : methinfo);
+		free(fp);
+	}
+	return ret;
 }
 
 void
@@ -291,7 +311,8 @@ auth_log(Authctxt *authctxt, int authenticated, int partial,
 {
 	struct ssh *ssh = active_state; /* XXX */
 	void (*authlog) (const char *fmt,...) = verbose;
-	char *authmsg;
+	const char *authmsg;
+	char *extra = NULL;
 
 	if (use_privsep && !mm_is_monitor() && !authctxt->postponed)
 		return;
@@ -310,6 +331,11 @@ auth_log(Authctxt *authctxt, int authenticated, int partial,
 	else
 		authmsg = authenticated ? "Accepted" : "Failed";
 
+	if ((extra = format_method_key(authctxt)) == NULL) {
+		if (authctxt->auth_method_info != NULL)
+			extra = xstrdup(authctxt->auth_method_info);
+	}
+
 	authlog("%s %s%s%s for %s%.100s from %.200s port %d ssh2%s%s",
 	    authmsg,
 	    method,
@@ -318,10 +344,10 @@ auth_log(Authctxt *authctxt, int authenticated, int partial,
 	    authctxt->user,
 	    ssh_remote_ipaddr(ssh),
 	    ssh_remote_port(ssh),
-	    authctxt->info != NULL ? ": " : "",
-	    authctxt->info != NULL ? authctxt->info : "");
-	free(authctxt->info);
-	authctxt->info = NULL;
+	    extra != NULL ? ": " : "",
+	    extra != NULL ? extra : "");
+
+	free(extra);
 
 #ifdef CUSTOM_FAILED_LOGIN
 	if (authenticated == 0 && !authctxt->postponed &&

@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.171 2017/05/31 10:04:29 markus Exp $ */
+/* $OpenBSD: monitor.c,v 1.172 2017/06/24 06:34:38 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -308,6 +308,8 @@ monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 		partial = 0;
 		auth_method = "unknown";
 		auth_submethod = NULL;
+		auth2_authctxt_reset_info(authctxt);
+
 		authenticated = (monitor_read(pmonitor, mon_dispatch, &ent) == 1);
 
 		/* Special handling for multiple required authentications */
@@ -347,6 +349,10 @@ monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 			    auth_method, auth_submethod);
 			if (!partial && !authenticated)
 				authctxt->failures++;
+			if (authenticated || partial) {
+				auth2_update_session_info(authctxt,
+				    auth_method, auth_submethod);
+			}
 		}
 	}
 
@@ -1147,12 +1153,11 @@ mm_answer_keyallowed(int sock, Buffer *m)
 		switch (type) {
 		case MM_USERKEY:
 			allowed = options.pubkey_authentication &&
-			    !auth2_userkey_already_used(authctxt, key) &&
+			    !auth2_key_already_used(authctxt, key) &&
 			    match_pattern_list(sshkey_ssh_name(key),
 			    options.pubkey_key_types, 0) == 1 &&
 			    user_key_allowed(authctxt->pw, key,
 			    pubkey_auth_attempt);
-			pubkey_auth_info(authctxt, key, NULL);
 			auth_method = "publickey";
 			if (options.pubkey_authentication &&
 			    (!pubkey_auth_attempt || allowed != 1))
@@ -1160,11 +1165,12 @@ mm_answer_keyallowed(int sock, Buffer *m)
 			break;
 		case MM_HOSTKEY:
 			allowed = options.hostbased_authentication &&
+			    !auth2_key_already_used(authctxt, key) &&
 			    match_pattern_list(sshkey_ssh_name(key),
 			    options.hostbased_key_types, 0) == 1 &&
 			    hostbased_key_allowed(authctxt->pw,
 			    cuser, chost, key);
-			pubkey_auth_info(authctxt, key,
+			auth2_record_info(authctxt,
 			    "client user \"%.100s\", client host \"%.100s\"",
 			    cuser, chost);
 			auth_method = "hostbased";
@@ -1175,11 +1181,10 @@ mm_answer_keyallowed(int sock, Buffer *m)
 		}
 	}
 
-	debug3("%s: key %p is %s",
-	    __func__, key, allowed ? "allowed" : "not allowed");
+	debug3("%s: key is %s", __func__, allowed ? "allowed" : "not allowed");
 
-	if (key != NULL)
-		key_free(key);
+	auth2_record_key(authctxt, 0, key);
+	sshkey_free(key);
 
 	/* clear temporarily storage (used by verify) */
 	monitor_reset_key_state();
@@ -1353,10 +1358,12 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 	switch (key_blobtype) {
 	case MM_USERKEY:
 		valid_data = monitor_valid_userblob(data, datalen);
+		auth_method = "publickey";
 		break;
 	case MM_HOSTKEY:
 		valid_data = monitor_valid_hostbasedblob(data, datalen,
 		    hostbased_cuser, hostbased_chost);
+		auth_method = "hostbased";
 		break;
 	default:
 		valid_data = 0;
@@ -1367,23 +1374,17 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 
 	ret = sshkey_verify(key, signature, signaturelen, data, datalen,
 	    active_state->compat);
-	debug3("%s: key %p signature %s",
-	    __func__, key, (ret == 0) ? "verified" : "unverified");
-
-	/* If auth was successful then record key to ensure it isn't reused */
-	if (ret == 0 && key_blobtype == MM_USERKEY)
-		auth2_record_userkey(authctxt, key);
-	else
-		sshkey_free(key);
+	debug3("%s: %s %p signature %s", __func__, auth_method, key,
+	    (ret == 0) ? "verified" : "unverified");
+	auth2_record_key(authctxt, ret == 0, key);
 
 	free(blob);
 	free(signature);
 	free(data);
 
-	auth_method = key_blobtype == MM_USERKEY ? "publickey" : "hostbased";
-
 	monitor_reset_key_state();
 
+	sshkey_free(key);
 	sshbuf_reset(m);
 
 	/* encode ret != 0 as positive integer, since we're sending u32 */
@@ -1799,6 +1800,7 @@ int
 mm_answer_gss_userok(int sock, Buffer *m)
 {
 	int authenticated;
+	const char *displayname;
 
 	if (!options.gss_authentication)
 		fatal("%s: GSSAPI authentication not enabled", __func__);
@@ -1812,6 +1814,9 @@ mm_answer_gss_userok(int sock, Buffer *m)
 	mm_request_send(sock, MONITOR_ANS_GSSUSEROK, m);
 
 	auth_method = "gssapi-with-mic";
+
+	if ((displayname = ssh_gssapi_displayname()) != NULL)
+		auth2_record_info(authctxt, "%s", displayname);
 
 	/* Monitor loop will terminate if authenticated */
 	return (authenticated);

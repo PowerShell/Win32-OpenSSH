@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-gss.c,v 1.25 2017/05/30 14:29:59 markus Exp $ */
+/* $OpenBSD: auth2-gss.c,v 1.26 2017/06/24 06:34:38 djm Exp $ */
 
 /*
  * Copyright (c) 2001-2003 Simon Wilkinson. All rights reserved.
@@ -228,6 +228,7 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	int authenticated;
+	const char *displayname;
 
 	if (authctxt == NULL || (authctxt->methoddata == NULL && !use_privsep))
 		fatal("No authentication or GSSAPI context");
@@ -240,6 +241,10 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 	packet_check_eom();
 
 	authenticated = PRIVSEP(ssh_gssapi_userok(authctxt->user));
+
+	if ((!use_privsep || mm_is_monitor()) &&
+	    (displayname = ssh_gssapi_displayname()) != NULL)
+		auth2_record_info(authctxt, "%s", displayname);
 
 	authctxt->postponed = 0;
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
@@ -259,6 +264,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	Buffer b;
 	gss_buffer_desc mic, gssbuf;
 	u_int len;
+	const char *displayname;
 
 	if (authctxt == NULL || (authctxt->methoddata == NULL && !use_privsep))
 		fatal("No authentication or GSSAPI context");
@@ -281,6 +287,10 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 
 	buffer_free(&b);
 	free(mic.value);
+
+	if ((!use_privsep || mm_is_monitor()) &&
+	    (displayname = ssh_gssapi_displayname()) != NULL)
+		auth2_record_info(authctxt, "%s", displayname);
 
 	authctxt->postponed = 0;
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
