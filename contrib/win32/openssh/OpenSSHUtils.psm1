@@ -168,7 +168,9 @@ function Repair-AuthorizedKeyPermission
                 $userProfilePath =  $properties.ProfileImagePath
             }
             $userProfilePath = $userProfilePath.Replace("\", "\\")
-            $fullPath -match "^$userProfilePath[\\|\W|\w]+authorized_keys$"
+            if ( $properties.PSChildName -notmatch '\.bak$') {
+                $fullPath -match "^$userProfilePath\\[\\|\W|\w]+authorized_keys$"
+            }
         }
         if($profileItem)
         {
