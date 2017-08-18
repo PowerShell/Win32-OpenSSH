@@ -50,6 +50,7 @@
 #define TERM_IO_BUF_SIZE 2048
 
 extern int in_raw_mode;
+BOOL isFirstTime = TRUE;
 
 struct io_status {
 	DWORD to_transfer;
@@ -84,16 +85,51 @@ ReadThread(_In_ LPVOID lpParameter)
 	debug5("TermRead thread, io:%p", pio);
 	memset(&read_status, 0, sizeof(read_status));
 	if (FILETYPE(pio) == FILE_TYPE_CHAR) {
-		while (nBytesReturned == 0) {
-			nBytesReturned = ReadConsoleForTermEmul(WINHANDLE(pio),
-				pio->read_details.buf, pio->read_details.buf_size);
+		if (in_raw_mode) {
+			while (nBytesReturned == 0) {
+				nBytesReturned = ReadConsoleForTermEmul(WINHANDLE(pio),
+					pio->read_details.buf, pio->read_details.buf_size);
+			}
+			read_status.transferred = nBytesReturned;
+		}  else {
+			if (isFirstTime) {
+				isFirstTime = false;
+
+				DWORD dwAttributes;
+				if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwAttributes))
+					error("GetConsoleMode on STD_INPUT_HANDLE failed with %d\n", GetLastError());
+				
+				dwAttributes |= (ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
+
+				if (!SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwAttributes))
+					error("SetConsoleMode on STD_INPUT_HANDLE failed with %d\n", GetLastError());
+			}
+
+			if (!ReadFile(WINHANDLE(pio), pio->read_details.buf,
+				pio->read_details.buf_size, &read_status.transferred, NULL)) {
+				read_status.error = GetLastError();
+				debug("ReadThread - ReadFile failed %d, io:%p", GetLastError(), pio);
+				return -1;
+			}
+
+			char *p = NULL;
+			if (p = strstr(pio->read_details.buf, "\r\n"))
+				*p++ = '\n';
+			else if (p = strstr(pio->read_details.buf, "\r"))
+				*p++ = '\n';
+
+			if (p) {
+				*p = '\0';
+				pio->read_details.buf_size = (DWORD)strlen(pio->read_details.buf);
+				read_status.transferred = pio->read_details.buf_size;
+			}
 		}
-		read_status.transferred = nBytesReturned;
 	} else {
 		if (!ReadFile(WINHANDLE(pio), pio->read_details.buf,
 		    pio->read_details.buf_size, &read_status.transferred, NULL)) {
 			read_status.error = GetLastError();
 			debug("ReadThread - ReadFile failed %d, io:%p", GetLastError(), pio);
+			return -1;
 		}
 	}
 	if (0 == QueueUserAPC(ReadAPCProc, main_thread, (ULONG_PTR)pio)) {
@@ -221,7 +257,7 @@ syncio_close(struct w32_io* pio)
 	/* If io is pending, let worker threads exit. */
 	if (pio->read_details.pending) {
 		/* For console - the read thread is blocked so terminate it. */
-		if (FILETYPE(pio) == FILE_TYPE_CHAR)
+		if (FILETYPE(pio) == FILE_TYPE_CHAR && in_raw_mode)
 			TerminateThread(pio->read_overlapped.hEvent, 0);
 		else
 			WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);

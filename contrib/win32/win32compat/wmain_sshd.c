@@ -100,6 +100,7 @@ static VOID WINAPI service_handler(DWORD dwControl)
 int sshd_main(int argc, wchar_t **wargv) {
 	char** argv = NULL;
 	int i, r;
+	_set_invalid_parameter_handler(invalid_parameter_handler);
 
 	if (argc) {
 		if ((argv = malloc(argc * sizeof(char*))) == NULL)

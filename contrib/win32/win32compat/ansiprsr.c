@@ -473,12 +473,12 @@ ParseANSI(unsigned char * pszBuffer, unsigned char * pszBufferEnd, unsigned char
 		case '^': /* Private message */
 			/* while not stop */
 			while (pszCurrent && pszCurrent < pszBufferEnd &&
-				_strnicmp((const char *)pszCurrent, (const char *)VT_ST, strlen((const char *)VT_ST))) {
+				_strnicmp((const char *)pszCurrent, (const char *)VT_ST, strnlen((const char *)VT_ST, sizeof(VT_ST)))) {
 				if (pszCurrent && pszCurrent < pszBufferEnd &&
-				    _strnicmp((const char *)pszCurrent, (const char *)VT_ST, strlen((const char *)VT_ST)))
+				    _strnicmp((const char *)pszCurrent, (const char *)VT_ST, strnlen((const char *)VT_ST, sizeof(VT_ST))))
 					pszCurrent++;
 			}
-			pszCurrent += strlen((const char *)VT_ST) - 1;
+			pszCurrent += strnlen((const char *)VT_ST, sizeof(VT_ST)) - 1;
 			fcompletion = 1;
 			break;
 

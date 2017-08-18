@@ -189,11 +189,9 @@
 
 /* Define to 1 if you have the `arc4random' function. */
 /* #undef HAVE_ARC4RANDOM */
-#define HAVE_ARC4RANDOM 1
 
 /* Define to 1 if you have the `arc4random_buf' function. */
 /* #undef HAVE_ARC4RANDOM_BUF */
-#define HAVE_ARC4RANDOM_BUF 1
 
 /* Define to 1 if you have the `arc4random_uniform' function. */
 /* #undef HAVE_ARC4RANDOM_UNIFORM */

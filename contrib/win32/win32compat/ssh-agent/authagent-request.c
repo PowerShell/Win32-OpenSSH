@@ -160,7 +160,8 @@ generate_user_token(wchar_t* user_cpn) {
 		s4u_logon->ClientUpn.Length = (USHORT)wcslen(user_cpn) * 2;
 		s4u_logon->ClientUpn.MaximumLength = s4u_logon->ClientUpn.Length;
 		s4u_logon->ClientUpn.Buffer = (WCHAR*)(s4u_logon + 1);
-		memcpy(s4u_logon->ClientUpn.Buffer, user_cpn, s4u_logon->ClientUpn.Length + 2);
+		if (memcpy_s(s4u_logon->ClientUpn.Buffer, s4u_logon->ClientUpn.Length + 2, user_cpn, s4u_logon->ClientUpn.Length + 2))
+			goto done;
 		s4u_logon->ClientRealm.Length = 0;
 		s4u_logon->ClientRealm.MaximumLength = 0;
 		s4u_logon->ClientRealm.Buffer = 0;
@@ -178,14 +179,17 @@ generate_user_token(wchar_t* user_cpn) {
 		s4u_logon->UserPrincipalName.Length = (USHORT)wcslen(user_cpn) * 2;
 		s4u_logon->UserPrincipalName.MaximumLength = s4u_logon->UserPrincipalName.Length;
 		s4u_logon->UserPrincipalName.Buffer = (WCHAR*)(s4u_logon + 1);
-		memcpy(s4u_logon->UserPrincipalName.Buffer, user_cpn, s4u_logon->UserPrincipalName.Length + 2);
+		if(memcpy_s(s4u_logon->UserPrincipalName.Buffer, s4u_logon->UserPrincipalName.Length + 2, user_cpn, s4u_logon->UserPrincipalName.Length + 2))
+			goto done;
 		s4u_logon->DomainName.Length = 2;
 		s4u_logon->DomainName.MaximumLength = 2;
 		s4u_logon->DomainName.Buffer = ((WCHAR*)s4u_logon->UserPrincipalName.Buffer) + wcslen(user_cpn) + 1;
-		memcpy(s4u_logon->DomainName.Buffer, L".", 4);
+		if(memcpy_s(s4u_logon->DomainName.Buffer, 4, L".", 4))
+			goto done;
 	}
 
-	memcpy(sourceContext.SourceName,"sshagent", sizeof(sourceContext.SourceName));
+	if(memcpy_s(sourceContext.SourceName, TOKEN_SOURCE_LENGTH, "sshagent", sizeof(sourceContext.SourceName)))
+		goto done;
 
 	if (AllocateLocallyUniqueId(&sourceContext.SourceIdentifier) != TRUE)
 		goto done;
@@ -273,7 +277,13 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 
 	if ((token = generate_user_token(user_utf16)) == 0) {
 		error("unable to generate token for user %ls", user_utf16);
-		goto done;
+		/* work around for https://github.com/PowerShell/Win32-OpenSSH/issues/727 by doing a fake login */
+		LogonUserW(L"FakeUser", L"FakeDomain", L"FakePasswd",
+			LOGON32_LOGON_NETWORK_CLEARTEXT, LOGON32_PROVIDER_DEFAULT, &token);
+		if ((token = generate_user_token(user_utf16)) == 0) {
+			error("unable to generate token on 2nd attempt for user %ls", user_utf16);
+			goto done;
+		}
 	}
 
 	

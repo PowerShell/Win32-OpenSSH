@@ -50,7 +50,14 @@ Describe "Tests for user Key file permission" -Tags "CI" {
             $keyFileName = "sshtest_userPermTestkey_ed25519"
             $keyFilePath = Join-Path $testDir $keyFileName
             Remove-Item -path "$keyFilePath*" -Force -ErrorAction SilentlyContinue
-            ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase 
+            if($OpenSSHTestInfo["WindowsInBox"])
+            {
+                    ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase -Z aes128-ctr
+            }
+            else
+            {
+                ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase 
+            }
 
             $pubKeyUserProfilePath = Join-Path $pubKeyUserProfile .ssh
             if(-not (Test-Path $pubKeyUserProfilePath -PathType Container)) {

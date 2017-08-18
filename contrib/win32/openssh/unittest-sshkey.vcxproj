@@ -123,7 +123,7 @@
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y $(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\* $(OutDir)</Command>
+      <Command>xcopy /Y "$(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\*" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -149,7 +149,7 @@
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y $(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\* $(OutDir)</Command>
+      <Command>xcopy /Y "$(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\*" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -177,7 +177,7 @@
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y $(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\* $(OutDir)</Command>
+      <Command>xcopy /Y "$(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\*" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -206,7 +206,7 @@
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
     </Manifest>
     <PostBuildEvent>
-      <Command>xcopy /Y $(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\* $(OutDir)</Command>
+      <Command>xcopy /Y "$(ProjectDir)..\..\..\regress\unittests\sshkey\testdata\*" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -83,11 +83,15 @@
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING  0x4
 #endif
 
+#ifndef DISABLE_NEWLINE_AUTO_RETURN
+#define DISABLE_NEWLINE_AUTO_RETURN 0x8
+#endif
+
 typedef void *  SCREEN_HANDLE;
 
-int ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit);
-int ConUnInitWithRestore();
-int ConExitRawMode();
+void ConEnterRawMode();
+void ConUnInitWithRestore();
+void ConExitRawMode();
 BOOL ConIsRedirected(HANDLE hInput);
 HANDLE GetConsoleOutputHandle();
 HANDLE GetConsoleInputHandle();
@@ -141,6 +145,6 @@ void ConSaveWindowsState();
 void ConMoveVisibleWindow(int offset);
 int is_cursor_at_lastline_of_visible_window();
 void ConGetCursorPosition(int *x, int *y);
-void ConMoveCursorTop(CONSOLE_SCREEN_BUFFER_INFO csbi);
+void ConMoveCursorTopOfVisibleWindow();
 HANDLE get_console_handle(FILE *, DWORD *);
 #endif

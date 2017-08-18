@@ -18,7 +18,15 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         }
 
         $keypassphrase = "testpassword"
-        $keytypes = @("rsa","dsa","ecdsa","ed25519")
+        $WindowsInBox = $OpenSSHTestInfo["WindowsInBox"]
+        if($WindowsInBox)
+        {
+            $keytypes = @("ed25519")                
+        }
+        else
+        {
+            $keytypes = @("rsa","dsa","ecdsa","ed25519")            
+        }
         
         $ssouser = $OpenSSHTestInfo["SSOUser"]
         
@@ -117,8 +125,15 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             foreach($type in $keytypes)
             {
                 $keyPath = Join-Path $testDir "id_$type"
-                remove-item $keyPath -ErrorAction SilentlyContinue             
-                ssh-keygen -t $type -P $keypassphrase -f $keyPath
+                remove-item $keyPath -ErrorAction SilentlyContinue
+                if($OpenSSHTestInfo["WindowsInBox"])
+                {
+                    ssh-keygen -t $type -P $keypassphrase -f $keyPath -Z aes128-ctr
+                }
+                else
+                {
+                    ssh-keygen -t $type -P $keypassphrase -f $keyPath
+                }                
                 ValidateKeyFile -FilePath $keyPath
                 ValidateKeyFile -FilePath "$keyPath.pub"
             }
@@ -224,7 +239,15 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             $keyFileName = "sshadd_userPermTestkey_ed25519"
             $keyFilePath = Join-Path $testDir $keyFileName
             Remove-Item -path "$keyFilePath*" -Force -ErrorAction SilentlyContinue
-            ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase
+            if($OpenSSHTestInfo["WindowsInBox"])
+            {
+                ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase -Z aes128-ctr
+            }
+            else
+            {
+                ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase
+            }
+            
             #set up SSH_ASKPASS
             Add-PasswordSetting -Pass $keypassphrase
             $tI=1
@@ -331,7 +354,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
     }
 		
     Context "$tC - ssh-keyscan test cases" {
-        BeforeAll {
+        BeforeAll {            
             $tI=1
             $port = $OpenSSHTestInfo["Port"]
             Remove-item (join-path $testDir "$tC.$tI.out.txt") -force -ErrorAction SilentlyContinue
@@ -341,23 +364,23 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         }
         AfterAll{$tC++}
 
-		It "$tC.$tI - ssh-keyscan with default arguments" {
+		It "$tC.$tI - ssh-keyscan with default arguments" -Skip:$WindowsInBox {
 			cmd /c "ssh-keyscan -p $port 127.0.0.1 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'
 		}
 
-        It "$tC.$tI - ssh-keyscan with -p" {
+        It "$tC.$tI - ssh-keyscan with -p" -Skip:$WindowsInBox {
 			cmd /c "ssh-keyscan -p $port 127.0.0.1 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'
 		}
 
-		It "$tC.$tI - ssh-keyscan with -f" {
+		It "$tC.$tI - ssh-keyscan with -f" -Skip:$WindowsInBox {
 			Set-Content -Path tmp.txt -Value "127.0.0.1"
 			cmd /c "ssh-keyscan -p $port -f tmp.txt 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'
 		}
 
-		It "$tC.$tI - ssh-keyscan with -f -t" {
+		It "$tC.$tI - ssh-keyscan with -f -t" -Skip:$WindowsInBox {
 			Set-Content -Path tmp.txt -Value "127.0.0.1"
 			cmd /c "ssh-keyscan -p $port -f tmp.txt -t rsa,dsa 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'

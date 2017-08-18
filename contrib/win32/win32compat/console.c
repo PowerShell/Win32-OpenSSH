@@ -42,7 +42,8 @@
 #include "ansiprsr.h"
 
 HANDLE	hOutputConsole = NULL;
-DWORD	dwSavedAttributes = 0;
+DWORD	stdin_dwSavedAttributes = 0;
+DWORD	stdout_dwSavedAttributes = 0;
 WORD	wStartingAttributes = 0;
 
 int ScreenX;
@@ -72,8 +73,8 @@ int in_raw_mode = 0;
 char *consoleTitle = "OpenSSH SSH client";
 
 /* Used to enter the raw mode */
-int 
-ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
+void 
+ConEnterRawMode()
 {
 	DWORD dwAttributes = 0;
 	DWORD dwRet = 0;
@@ -81,22 +82,22 @@ ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 	CONSOLE_SCREEN_BUFFER_INFO csbi;
 	static bool bFirstConInit = true;
 
-	hOutputConsole = GetStdHandle(OutputHandle);
+	hOutputConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	if (hOutputConsole == INVALID_HANDLE_VALUE) {
 		dwRet = GetLastError();
 		error("GetStdHandle on OutputHandle failed with %d\n", dwRet);
-		return dwRet;
+		return;
 	}
 
-	if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &dwSavedAttributes)) {
+	if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &stdin_dwSavedAttributes)) {
 		dwRet = GetLastError();
 		error("GetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
-		return dwRet;
+		return;
 	}
 
 	SetConsoleTitle(consoleTitle);
 
-	dwAttributes = dwSavedAttributes;
+	dwAttributes = stdin_dwSavedAttributes;
 	dwAttributes &= ~(ENABLE_LINE_INPUT |
 		ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_MOUSE_INPUT);
 	dwAttributes |= ENABLE_WINDOW_INPUT;
@@ -104,17 +105,17 @@ ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 	if (!SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), dwAttributes)) { /* Windows NT */
 		dwRet = GetLastError();
 		error("SetConsoleMode on STD_INPUT_HANDLE failed with %d\n", dwRet);
-		return dwRet;
+		return;
 	}
 
-	if (!GetConsoleMode(hOutputConsole, &dwAttributes)) {
+	if (!GetConsoleMode(hOutputConsole, &stdout_dwSavedAttributes)) {
 		dwRet = GetLastError();
 		error("GetConsoleMode on hOutputConsole failed with %d\n", dwRet);
-		return dwRet;
-
+		return;
 	}
 
-	dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+	dwAttributes = stdout_dwSavedAttributes;
+	dwAttributes |= (DWORD)ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
 
 	char *envValue = NULL;
 	_dupenv_s(&envValue, NULL, "SSH_TERM_CONHOST_PARSER");
@@ -140,7 +141,7 @@ ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 		SavedViewRect = csbi.srWindow;
 		debug("console doesn't support the ansi parsing");
 	} else {
-		ConMoveCursorTop(csbi);
+		ConSaveViewRect();
 		debug("console supports the ansi parsing");
 	}		
 
@@ -150,26 +151,18 @@ ConEnterRawMode(DWORD OutputHandle, BOOL fSmartInit)
 	ScrollBottom = ConVisibleWindowHeight();		
 	
 	in_raw_mode = 1;
-
-	return 0;
 }
 
 /* Used to Uninitialize the Console */
-int 
+void 
 ConExitRawMode()
 {
-	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
-	in_raw_mode = 0;
-	if (hOutputConsole == NULL || !GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
-		return 0;
-	
-	SetConsoleMode(hOutputConsole, dwSavedAttributes);
-
-	return 0;
+	SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), stdin_dwSavedAttributes);
+	SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), stdout_dwSavedAttributes);
 }
 
 /* Used to exit the raw mode */
-int 
+void 
 ConUnInitWithRestore()
 {
 	DWORD dwWritten;
@@ -177,19 +170,19 @@ ConUnInitWithRestore()
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 
 	if (hOutputConsole == NULL)
-		return 0;
+		return;
 
 	if (!GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
-		return 0;
+		return;
 
-	SetConsoleMode(hOutputConsole, dwSavedAttributes);
+	SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), stdin_dwSavedAttributes);
+	SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), stdout_dwSavedAttributes);
 	Coord = consoleInfo.dwCursorPosition;
 	Coord.X = 0;
 	DWORD dwNumChar = (consoleInfo.dwSize.Y - consoleInfo.dwCursorPosition.Y) * consoleInfo.dwSize.X;
 	FillConsoleOutputCharacter(hOutputConsole, ' ', dwNumChar, Coord, &dwWritten);
 	FillConsoleOutputAttribute(hOutputConsole, wStartingAttributes, dwNumChar, Coord, &dwWritten);
 	SetConsoleTextAttribute(hOutputConsole, wStartingAttributes);
-	return 0;
 }
 
 BOOL 
@@ -524,12 +517,12 @@ ConWriteString(char* pszString, int cbString)
 	if ((needed = MultiByteToWideChar(CP_UTF8, 0, pszString, cbString, NULL, 0)) == 0 ||
 	    (utf16 = malloc(needed * sizeof(wchar_t))) == NULL ||
 	    (cnt = MultiByteToWideChar(CP_UTF8, 0, pszString, cbString, utf16, needed)) == 0) {
-		Result = (DWORD)printf(pszString);
+		Result = (DWORD)printf_s(pszString);
 	} else {
 		if (hOutputConsole)
 			WriteConsoleW(hOutputConsole, utf16, cnt, &Result, 0);
 		else
-			Result = (DWORD)wprintf(utf16);
+			Result = (DWORD)wprintf_s(utf16);
 	}
 
 	if (utf16)
@@ -546,7 +539,7 @@ ConTranslateAndWriteString(char* pszString, int cbString)
 	if (hOutputConsole)
 		WriteConsole(hOutputConsole, pszString, cbString, &Result, 0);
 	else
-		Result = (DWORD)printf(pszString);
+		Result = (DWORD)printf_s(pszString);
 
 	return Result;
 }
@@ -836,7 +829,11 @@ Con_printf(const char *Format, ...)
 
 	memset(temp, '\0', sizeof(temp));
 	va_start(va_data, Format);
-	len = vsnprintf(temp, sizeof(temp), Format, va_data);
+	len = vsnprintf_s(temp, sizeof(temp), _TRUNCATE, Format, va_data);
+	if (len == -1) {
+		error("Error from vsnprintf_s!");
+		return -1;
+	}
 	ConWriteConsole(temp, len);
 	va_end(va_data);
 
@@ -1080,6 +1077,7 @@ ConMoveVisibleWindow(int offset)
 {
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 	SMALL_RECT visibleWindowRect;
+	errno_t r = 0;
 
 	memset(&visibleWindowRect, 0, sizeof(SMALL_RECT));
 	if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo)) {
@@ -1090,14 +1088,19 @@ ConMoveVisibleWindow(int offset)
 			for (int i = 0; i < offset; i++)
 				ConScrollDown(0, consoleInfo.dwSize.Y - 1);
 
-			if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo))
-				memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
-			else {
+			if (GetConsoleScreenBufferInfo(hOutputConsole, &consoleInfo) == FALSE) {
 				error("GetConsoleScreenBufferInfo failed with %d", GetLastError());
 				return;
 			}
+			if ((r = memcpy_s(&visibleWindowRect, sizeof(visibleWindowRect), &consoleInfo.srWindow, sizeof(visibleWindowRect))) != 0) {
+				error("memcpy_s failed with error: %d.", r);
+				return;
+			}
 		} else {
-			memcpy(&visibleWindowRect, &consoleInfo.srWindow, sizeof(visibleWindowRect));
+			if ((r = memcpy_s(&visibleWindowRect, sizeof(visibleWindowRect), &consoleInfo.srWindow, sizeof(visibleWindowRect))) != 0) {
+				error("memcpy_s failed with error: %d.", r);
+				return;
+			}
 			visibleWindowRect.Top += offset;
 			visibleWindowRect.Bottom += offset;
 		}
@@ -1571,16 +1574,17 @@ ConSaveWindowsState()
 }
 
 void
-ConMoveCursorTop(CONSOLE_SCREEN_BUFFER_INFO csbi)
+ConMoveCursorTopOfVisibleWindow()
 {
-	/* Windows server at first sends the "cls" after the connection is established.
-	 * Since we don't want to loose any data on the console, we would like to scroll down
-	 * the visible window.
-	 */
-	int offset = csbi.dwCursorPosition.Y - csbi.srWindow.Top;
-	ConMoveVisibleWindow(offset);
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	int offset;
 
-	ConSaveViewRect();
+	if (GetConsoleScreenBufferInfo(hOutputConsole, &csbi)) {
+		offset = csbi.dwCursorPosition.Y - csbi.srWindow.Top;
+		ConMoveVisibleWindow(offset);
+
+		ConSaveViewRect();
+	}
 }
 
 HANDLE

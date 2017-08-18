@@ -2518,7 +2518,8 @@ main(int argc, char **argv)
 			usage();
 
 		userhost = xstrdup(argv[optind]);
-		file2 = argv[optind+1];
+		if(argc > optind + 1)
+			file2 = argv[optind+1];
 
 		if ((host = strrchr(userhost, '@')) == NULL)
 			host = userhost;

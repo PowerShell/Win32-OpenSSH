@@ -84,7 +84,9 @@ openrootdir(const char *name)
 	}
 	memset(pdir, 0, sizeof(DIR));
 	pdir->hFile = 0;
-	memcpy(&pdir->c_file, &c_file, sizeof(c_file));
+	if (memcpy_s(&pdir->c_file, sizeof(c_file), &c_file, sizeof(c_file))) {
+		return NULL;
+	}
 	pdir->first = 1;
 
 	return pdir;
@@ -138,7 +140,10 @@ opendir(const char *name)
 
 		memset(pdir, 0, sizeof(DIR));
 		pdir->hFile = hFile;
-		memcpy(&pdir->c_file, &c_file, sizeof(c_file));
+		if (memcpy_s(&pdir->c_file, sizeof(c_file), &c_file, sizeof(c_file))) {
+			_findclose(hFile);
+			return NULL;
+		}
 		pdir->first = 1;
 
 		return pdir;
@@ -236,7 +241,9 @@ readdir(void *avp)
 
 	for (;;) {
 		if (dirp->first) {
-			memcpy(&c_file, &dirp->c_file, sizeof(c_file));
+			if (memcpy_s(&c_file, sizeof(c_file), &dirp->c_file, sizeof(c_file))) {
+				return NULL;
+			}
 			dirp->first = 0;
 		} else if (_wfindnext(dirp->hFile, &c_file) != 0)
 			return NULL;
@@ -249,7 +256,9 @@ readdir(void *avp)
 			return NULL;
 		}
 
-		strncpy_s(pdirentry.d_name, PATH_MAX, tmp, strlen(tmp) + 1);		
+		if (strncpy_s(pdirentry.d_name, PATH_MAX, tmp, strlen(tmp) + 1)) {
+			return NULL;
+		}
 		free(tmp);
 
 		pdirentry.d_ino = 1; /* a fictious one like UNIX to say it is nonzero */

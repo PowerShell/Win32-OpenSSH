@@ -40,8 +40,8 @@ main(int, char **);
 int
 wmain(int argc, wchar_t **wargv) {
 	char** argv = NULL;
-	int i,r;
-
+	int i, r;
+	_set_invalid_parameter_handler(invalid_parameter_handler);
 	if (argc) {
 		if ((argv = malloc(argc * sizeof(char*))) == NULL)
 			fatal("out of memory");
@@ -53,9 +53,12 @@ wmain(int argc, wchar_t **wargv) {
 	if (getenv("SSH_AUTH_SOCK") == NULL)
 		_putenv("SSH_AUTH_SOCK=\\\\.\\pipe\\openssh-ssh-agent");
 
+	if (getenv("TERM") == NULL)
+		_putenv("TERM=xterm-256color");
+
 	w32posix_initialize();
 	
 	r = main(argc, argv);
-	w32posix_done();
+	w32posix_done();	
 	return r;
 }

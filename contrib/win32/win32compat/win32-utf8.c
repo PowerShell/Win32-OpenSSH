@@ -55,8 +55,7 @@ snmprintf(char *buf, size_t len, int *written, const char *fmt, ...)
 	int ret;
 	va_list valist;
 	va_start(valist, fmt);
-	if ((ret = vsnprintf(buf, len, fmt, valist)) >= len)
-		ret = len;
+	ret = vsnprintf_s(buf, len, _TRUNCATE, fmt, valist);		
 	va_end(valist);
 	if (written != NULL && ret != -1)
 		*written = ret;

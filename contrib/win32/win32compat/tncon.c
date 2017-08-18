@@ -155,7 +155,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 				switch (InputRecord.Event.KeyEvent.uChar.UnicodeChar) {
 				case 0xd:
 					if (pParams->nReceiveCRLF == ENUM_LF)
-						NetWriteString2(pParams->Socket, "\r", 1, 0);
+						NetWriteString2(pParams->Socket, "\n", 1, 0);
 					else
 						NetWriteString2(pParams->Socket, "\r\n", 2, 0);
 					break;
@@ -190,6 +190,12 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 					case VK_DELETE:
 						NetWriteString2(pParams->Socket, (char *)REMOVE_KEY, 4, 0);
 						break;
+					case VK_PRIOR: /* page up */
+						NetWriteString2(pParams->Socket, (char *)PREV_KEY, 4, 0);
+						break;
+					case VK_NEXT: /* page down */
+						NetWriteString2(pParams->Socket, (char *)NEXT_KEY, 4, 0);
+						break;
 					case VK_BACK:
 						NetWriteString2(pParams->Socket, (char *)BACKSPACE_KEY, 1, 0);
 						break;
@@ -201,6 +207,9 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 						break;
 					case VK_ESCAPE:
 						NetWriteString2(pParams->Socket, (char *)ESCAPE_KEY, 1, 0);
+						break;
+					case VK_OEM_2:
+						NetWriteString2(pParams->Socket, (char *)SHIFT_ALT_Q, 2, 0);
 						break;
 					case VK_SHIFT:
 					case VK_CONTROL:

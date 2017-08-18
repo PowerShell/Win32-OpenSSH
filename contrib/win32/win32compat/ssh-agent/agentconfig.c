@@ -57,7 +57,7 @@ static char *config_file_name = _PATH_SERVER_CONFIG_FILE;
 int auth_sock = -1;
 
 int
-auth2_key_already_used(Authctxt *authctxt, const struct sshkey *key) 
+auth2_key_already_used(Authctxt *authctxt, const struct sshkey *key)
 {
 	return 0;
 }
@@ -79,7 +79,7 @@ mm_is_monitor(void) {
 	return 0;
 }
 
-int 
+int
 mm_user_key_allowed(struct passwd *pw, Key *k, int i)
 {
 	return 0;
@@ -96,7 +96,7 @@ kexgex_server(struct ssh * sh) {
 	return -1;
 }
 
-static int 
+static int
 GetCurrentModulePath(wchar_t *path, int pathSize)
 {
 	if (GetModuleFileNameW(NULL, path, pathSize)) {
@@ -105,7 +105,7 @@ GetCurrentModulePath(wchar_t *path, int pathSize)
 
 		for (i = 0; path[i]; i++) {
 			if (path[i] == L'/' || path[i] == L'\\')
-				lastSlashPos = i;						
+				lastSlashPos = i;
 		}
 
 		path[lastSlashPos] = 0;
@@ -114,20 +114,27 @@ GetCurrentModulePath(wchar_t *path, int pathSize)
 	return -1;
 }
 
-int 
+int
 load_config() {
 	wchar_t basePath[PATH_MAX] = { 0 };
 	wchar_t path[PATH_MAX] = { 0 };
 	wchar_t* config_file = L"/sshd_config";
+	errno_t r = 0;
 
 	if (GetCurrentModulePath(basePath, PATH_MAX) == -1)
 		return -1;
 
-	if (wcslen(basePath) + wcslen(config_file) + 1 > PATH_MAX)
+	if (wcsnlen_s(basePath, PATH_MAX) + wcslen(config_file) + 1 > PATH_MAX)
 		fatal("unexpected config file path length");
-	
-	wcsncpy_s(path, PATH_MAX, basePath, PATH_MAX);
-	wcsncat_s(path, PATH_MAX, L"/sshd_config", PATH_MAX - wcslen(basePath));
+
+	if(( r = wcsncpy_s(path, PATH_MAX, basePath, wcsnlen_s(basePath, PATH_MAX))) != 0) {
+		debug3("memcpy_s failed with error: %d.", r);
+		return -1;
+	}
+	if (( r = wcsncat_s(path, PATH_MAX, L"/sshd_config", PATH_MAX - wcsnlen_s(basePath, PATH_MAX))) != 0) {
+		debug3("wcscat_s failed with error: %d.", r);
+		return -1;
+	}
 	
 	if ((config_file_name = utf16_to_utf8(path)) == NULL)
 		return -1;

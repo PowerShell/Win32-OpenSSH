@@ -112,18 +112,18 @@
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x86-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
+      <Command>powershell.exe -Executionpolicy Bypass -File "$(SolutionDir)config.ps1" -Config_h_vs "$(SolutionDir)config.h.vs" -Config_h "$(OpenSSH-Src-Path)config.h" -VCIncludePath "$(VC_IncludePath)" -OutCRTHeader "$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
-copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
-copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
-If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
+      <Command>copy /Y "$(SolutionDir)install-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
+copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
+If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -145,18 +145,18 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x64-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
+      <Command>powershell.exe -Executionpolicy Bypass -File "$(SolutionDir)config.ps1" -Config_h_vs "$(SolutionDir)config.h.vs" -Config_h "$(OpenSSH-Src-Path)config.h" -VCIncludePath "$(VC_IncludePath)" -OutCRTHeader "$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
-copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
-copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
-If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
+      <Command>copy /Y "$(SolutionDir)install-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
+copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
+If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -182,18 +182,18 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x86-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
+      <Command>powershell.exe -Executionpolicy Bypass -File "$(SolutionDir)config.ps1" -Config_h_vs "$(SolutionDir)config.h.vs" -Config_h "$(OpenSSH-Src-Path)config.h" -VCIncludePath "$(VC_IncludePath)" -OutCRTHeader "$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
-copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
-copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
-If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
+      <Command>copy /Y "$(SolutionDir)install-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
+copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
+If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -219,18 +219,18 @@ If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</C
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x64-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PreBuildEvent>
-      <Command>powershell.exe -Executionpolicy Bypass "$(SolutionDir)config.ps1" -Config_h_vs '$(SolutionDir)config.h.vs' -Config_h '$(OpenSSH-Src-Path)config.h' -VCIncludePath '$(VC_IncludePath)' -OutCRTHeader '$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h'</Command>
+      <Command>powershell.exe -Executionpolicy Bypass -File "$(SolutionDir)config.ps1" -Config_h_vs "$(SolutionDir)config.h.vs" -Config_h "$(OpenSSH-Src-Path)config.h" -VCIncludePath "$(VC_IncludePath)" -OutCRTHeader "$(OpenSSH-Src-Path)contrib\win32\win32compat\inc\crtheaders.h"</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Generate crtheaders.h and config.h</Message>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>copy /Y $(SolutionDir)install-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)uninstall-ssh*ps1 $(OutDir)
-copy /Y $(SolutionDir)OpenSSHUtils.ps*1 $(OutDir)
-copy /Y $(SolutionDir)Fix*FilePermissions.ps1 $(OutDir)
-copy /Y $(SolutionDir)ssh-add-hostkey.ps1 $(OutDir)
-If NOT exist $(OutDir)\sshd_config (copy $(SolutionDir)sshd_config $(OutDir))</Command>
+      <Command>copy /Y "$(SolutionDir)install-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
+copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
+copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
+If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>

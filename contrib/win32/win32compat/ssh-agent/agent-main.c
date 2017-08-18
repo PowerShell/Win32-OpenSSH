@@ -98,6 +98,7 @@ ctrl_c_handler(_In_ DWORD dwCtrlType)
 int 
 wmain(int argc, wchar_t **argv) 
 {
+	_set_invalid_parameter_handler(invalid_parameter_handler);
 	w32posix_initialize();
 	/* this exits() on failure*/
 	load_config();

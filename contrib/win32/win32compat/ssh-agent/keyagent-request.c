@@ -72,6 +72,7 @@ static int
 convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **eblob, DWORD *eblen, int encrypt) {
 	int success = 0;
 	DATA_BLOB in, out;
+	errno_t r = 0;
 
 	if (con->client_type <= ADMIN_USER)
 		if (ImpersonateLoggedOnUser(con->client_impersonation_token) == FALSE)
@@ -98,7 +99,10 @@ convert_blob(struct agent_connection* con, const char *blob, DWORD blen, char **
 	if (*eblob == NULL) 
 		goto done;
 
-	memcpy(*eblob, out.pbData, out.cbData);
+	if((r = memcpy_s(*eblob, out.cbData, out.pbData, out.cbData)) != 0) {
+		debug("memcpy_s failed with error: %d.", r);
+		goto done;
+	}
 	*eblen = out.cbData;
 	success = 1;
 done:

@@ -255,13 +255,13 @@ if (-not (Test-Path $sshdpath)) {
 if (Get-Service sshd -ErrorAction SilentlyContinue) 
 {
    Stop-Service sshd
-   sc.exe delete sshd 1> null
+   sc.exe delete sshd 1>$null
 }
 
 if (Get-Service ssh-agent -ErrorAction SilentlyContinue) 
 {
    Stop-Service ssh-agent
-   sc.exe delete ssh-agent 1> null
+   sc.exe delete ssh-agent 1>$null
 }
 
 New-Service -Name ssh-agent -BinaryPathName $sshagentpath -Description "SSH Agent" -StartupType Manual | Out-Null
@@ -272,6 +272,7 @@ sc.exe config sshd obj= $sshdAccount
 sc.exe privs sshd SeAssignPrimaryTokenPrivilege
 
 Add-Privilege -Account $sshdSid -Privilege SeAssignPrimaryTokenPrivilege
+Add-Privilege -Account $sshdSid -Privilege SeServiceLogonRight
 
 if(-not (test-path $logsdir -PathType Container))
 {
