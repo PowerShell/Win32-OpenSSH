@@ -164,7 +164,6 @@ struct key_translation keys[] = {
     { L"\x1bOQ",     VK_F2,       0 , 0 , 0},
     { L"\x1bOR",     VK_F3,       0 , 0 , 0},
     { L"\x1bOS",     VK_F4,       0 , 0 , 0},
-    { L"\x1b?",      VK_OEM_2, L'?' , 0 , SHIFT_PRESSED | LEFT_ALT_PRESSED},
     { L"\x1",        VK_A,   L'\x1' , 0 , LEFT_CTRL_PRESSED},
     { L"\x2",        VK_B,   L'\x2' , 0 , LEFT_CTRL_PRESSED},
     //{ L"\x3",        VK_C,   L'\x3' , 0 , LEFT_CTRL_PRESSED}, /* Control + C is handled differently */
@@ -311,7 +310,7 @@ SendKeyStrokeEx(HANDLE hInput, int vKey, wchar_t character, DWORD ctrlState, BOO
 
 	ir.EventType = KEY_EVENT;
 	ir.Event.KeyEvent.bKeyDown = keyDown;
-	ir.Event.KeyEvent.wRepeatCount = 0;
+	ir.Event.KeyEvent.wRepeatCount = 1;
 	ir.Event.KeyEvent.wVirtualKeyCode = vKey;
 	ir.Event.KeyEvent.wVirtualScanCode = MapVirtualKeyA(vKey, MAPVK_VK_TO_VSC);
 	ir.Event.KeyEvent.dwControlKeyState = ctrlState;

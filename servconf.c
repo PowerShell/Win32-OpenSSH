@@ -2084,6 +2084,32 @@ parse_server_config(ServerOptions *options, const char *filename, Buffer *conf,
 		fatal("%s: terminating, %d bad configuration options",
 		    filename, bad_options);
 	process_queued_listen_addrs(options);
+
+#ifdef WINDOWS	
+	/* TODO - Refactor this into a platform specific post-read config processing routine.
+	 * TODO - support all forms of username, groupname.
+	 *   a) domain\groupname
+	 *   b) domain\groupname@hostip
+	 *   c) full_domain_name\groupname
+	 *   d) full_domain_name\groupname@hostip
+	 *   e) user@domain
+	 *   f) domain\user
+	 *   g) fulldomain\user
+	 *   h) user@domain@hostip
+	 */
+	/* convert the users, user groups to lower case */
+	for(int i = 0; i < options->num_allow_users; i++)
+		lowercase(options->allow_users[i]);
+
+	for (int i = 0; i < options->num_deny_users; i++)
+		lowercase(options->deny_users[i]);
+
+	for (int i = 0; i < options->num_allow_groups; i++)
+		lowercase(options->allow_groups[i]);
+
+	for (int i = 0; i < options->num_deny_groups; i++)
+		lowercase(options->deny_groups[i]);
+#endif // WINDOWS
 }
 
 static const char *

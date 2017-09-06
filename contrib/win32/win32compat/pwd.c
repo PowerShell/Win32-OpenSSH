@@ -203,6 +203,8 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 			goto done;
 		}
 	}
+
+	to_lower_case(uname_upn);
 	pw.pw_name = uname_upn;
 	uname_upn = NULL;
 	pw.pw_dir = pw_home_utf8;

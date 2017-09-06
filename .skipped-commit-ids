@@ -19,3 +19,5 @@ fe5b31f69a60d47171836911f144acff77810217	Makefile.inc bits
 ea80f445e819719ccdcb237022cacfac990fdc5c	Makefile.inc warning flags
 b92c93266d8234d493857bb822260dacf4366157	moduli-gen.sh tweak
 b25bf747544265b39af74fe0716dc8d9f5b63b95	Updated moduli
+1bd41cba06a7752de4df304305a8153ebfb6b0ac	rsa.[ch] already removed
+e39b3902fe1d6c4a7ba6a3c58e072219f3c1e604	Makefile changes

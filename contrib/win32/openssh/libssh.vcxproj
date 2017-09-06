@@ -248,9 +248,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)progressmeter.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)readpass.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)rijndael.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)rsa.c">
-      <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)sc25519.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)smult_curve25519_ref.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-dss.c">
@@ -275,6 +272,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)uuencode.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)verify.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)platform-misc.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)platform-pledge.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)platform-tracing.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)platform.c" />

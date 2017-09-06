@@ -38,7 +38,10 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
 
         #only validate owner and ACEs of the file
         function ValidateKeyFile {
-            param([string]$FilePath)
+            param(
+                [string]$FilePath,
+                [bool]$IsHostKey = $true
+            )
 
             $myACL = Get-ACL $FilePath
             $currentOwnerSid = Get-UserSid -User $myACL.Owner
@@ -53,8 +56,14 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             $FullControlPerm = [System.UInt32] [System.Security.AccessControl.FileSystemRights]::FullControl.value__
     
             if($FilePath.EndsWith(".pub")) {
-                $myACL.Access.Count | Should Be 4
-                $identities = @($systemSid, $adminsSid, $currentUserSid, $everyoneSid)
+                if ($IsHostKey) {
+                    $myACL.Access.Count | Should Be 3
+                    $identities = @($systemSid, $adminsSid, $currentUserSid)
+                }
+                else {
+                    $myACL.Access.Count | Should Be 4
+                    $identities = @($systemSid, $adminsSid, $currentUserSid, $everyoneSid)
+                }
             }
             else {
                 $myACL.Access.Count | Should Be 3
@@ -135,7 +144,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
                     ssh-keygen -t $type -P $keypassphrase -f $keyPath
                 }                
                 ValidateKeyFile -FilePath $keyPath
-                ValidateKeyFile -FilePath "$keyPath.pub"
+                ValidateKeyFile -FilePath "$keyPath.pub" -IsHostKey $false
             }
         }
     }

@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.193 2017/05/31 07:00:13 markus Exp $ */
+/* $OpenBSD: serverloop.c,v 1.195 2017/08/11 04:16:35 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -204,6 +204,7 @@ wait_until_can_do_something(int connection_in, int connection_out,
 	int ret;
 	time_t minwait_secs = 0;
 	int client_alive_scheduled = 0;
+	static time_t last_client_time;
 
 	/* Allocate and update select() masks for channel descriptors. */
 	channel_prepare_select(readsetp, writesetp, maxfdp, nallocp,
@@ -268,8 +269,19 @@ wait_until_can_do_something(int connection_in, int connection_out,
 		memset(*writesetp, 0, *nallocp);
 		if (errno != EINTR)
 			error("select: %.100s", strerror(errno));
-	} else if (ret == 0 && client_alive_scheduled)
-		client_alive_check();
+	} else if (client_alive_scheduled) {
+		time_t now = monotime();
+
+		if (ret == 0) { /* timeout */
+			client_alive_check();
+		} else if (FD_ISSET(connection_in, *readsetp)) {
+			last_client_time = now;
+		} else if (last_client_time != 0 && last_client_time +
+		    options.client_alive_interval <= now) {
+			client_alive_check();
+			last_client_time = now;
+		}
+	}
 
 	notify_done(*readsetp);
 }

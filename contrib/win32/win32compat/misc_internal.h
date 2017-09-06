@@ -32,3 +32,6 @@ void unix_time_to_file_time(ULONG, LPFILETIME);
 void file_time_to_unix_time(const LPFILETIME, time_t *);
 int file_attr_to_st_mode(wchar_t * path, DWORD attributes);
 void invalid_parameter_handler(const wchar_t *, const wchar_t *, const wchar_t *, unsigned int, uintptr_t);
+static char *machine_domain_name;
+void to_lower_case(char *s);
+int get_machine_domain_name(wchar_t *domain, int size);

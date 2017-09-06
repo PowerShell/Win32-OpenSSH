@@ -91,4 +91,8 @@ int w32_sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 #define SIG_IGN	W32_SIG_IGN
 #define SIG_ERR W32_SIG_ERR
 
+/* TOTO - implement http://www.manpagez.com/man/3/sys_siglist/*/
+#undef NSIG
+#define NSIG 0
+
 #endif

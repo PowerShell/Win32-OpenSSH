@@ -33,16 +33,13 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: ssh_config.5,v 1.251 2017/06/24 05:35:05 djm Exp $
-.Dd $Mdocdate: June 24 2017 $
+.\" $OpenBSD: ssh_config.5,v 1.253 2017/07/23 23:37:02 djm Exp $
+.Dd $Mdocdate: July 23 2017 $
 .Dt SSH_CONFIG 5
 .Os
 .Sh NAME
 .Nm ssh_config
 .Nd OpenSSH SSH client configuration files
-.Sh SYNOPSIS
-.Nm ~/.ssh/config
-.Nm /etc/ssh/ssh_config
 .Sh DESCRIPTION
 .Xr ssh 1
 obtains configuration data from the following sources in
@@ -972,7 +969,9 @@ Accepted values are
 .Cm lowdelay ,
 .Cm throughput ,
 .Cm reliability ,
-or a numeric value.
+a numeric value, or
+.Cm none
+to use the operating system default.
 This option may take one or two arguments, separated by whitespace.
 If one argument is specified, it is used as the packet class unconditionally.
 If two values are specified, the first is automatically selected for

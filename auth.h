@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.h,v 1.92 2017/06/24 06:34:38 djm Exp $ */
+/* $OpenBSD: auth.h,v 1.93 2017/08/18 05:36:45 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -148,10 +148,6 @@ void	 auth2_record_info(Authctxt *authctxt, const char *, ...)
 	    __attribute__((__format__ (printf, 2, 3)))
 	    __attribute__((__nonnull__ (2)));
 void	 auth2_update_session_info(Authctxt *, const char *, const char *);
-
-struct stat;
-int	 auth_secure_path(const char *, struct stat *, const char *, uid_t,
-    char *, size_t);
 
 #ifdef KRB5
 int	auth_krb5(Authctxt *authctxt, krb5_data *auth, char **client, krb5_data *);

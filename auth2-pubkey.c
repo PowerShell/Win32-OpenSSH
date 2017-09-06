@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.68 2017/06/24 06:34:38 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.70 2017/08/18 05:48:04 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -27,7 +27,6 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -249,293 +248,6 @@ done:
 	return authenticated;
 }
 
-/*
- * Splits 's' into an argument vector. Handles quoted string and basic
- * escape characters (\\, \", \'). Caller must free the argument vector
- * and its members.
- */
-static int
-split_argv(const char *s, int *argcp, char ***argvp)
-{
-	int r = SSH_ERR_INTERNAL_ERROR;
-	int argc = 0, quote, i, j;
-	char *arg, **argv = xcalloc(1, sizeof(*argv));
-
-	*argvp = NULL;
-	*argcp = 0;
-
-	for (i = 0; s[i] != '\0'; i++) {
-		/* Skip leading whitespace */
-		if (s[i] == ' ' || s[i] == '\t')
-			continue;
-
-		/* Start of a token */
-		quote = 0;
-		if (s[i] == '\\' &&
-		    (s[i + 1] == '\'' || s[i + 1] == '\"' || s[i + 1] == '\\'))
-			i++;
-		else if (s[i] == '\'' || s[i] == '"')
-			quote = s[i++];
-
-		argv = xreallocarray(argv, (argc + 2), sizeof(*argv));
-		arg = argv[argc++] = xcalloc(1, strlen(s + i) + 1);
-		argv[argc] = NULL;
-
-		/* Copy the token in, removing escapes */
-		for (j = 0; s[i] != '\0'; i++) {
-			if (s[i] == '\\') {
-				if (s[i + 1] == '\'' ||
-				    s[i + 1] == '\"' ||
-				    s[i + 1] == '\\') {
-					i++; /* Skip '\' */
-					arg[j++] = s[i];
-				} else {
-					/* Unrecognised escape */
-					arg[j++] = s[i];
-				}
-			} else if (quote == 0 && (s[i] == ' ' || s[i] == '\t'))
-				break; /* done */
-			else if (quote != 0 && s[i] == quote)
-				break; /* done */
-			else
-				arg[j++] = s[i];
-		}
-		if (s[i] == '\0') {
-			if (quote != 0) {
-				/* Ran out of string looking for close quote */
-				r = SSH_ERR_INVALID_FORMAT;
-				goto out;
-			}
-			break;
-		}
-	}
-	/* Success */
-	*argcp = argc;
-	*argvp = argv;
-	argc = 0;
-	argv = NULL;
-	r = 0;
- out:
-	if (argc != 0 && argv != NULL) {
-		for (i = 0; i < argc; i++)
-			free(argv[i]);
-		free(argv);
-	}
-	return r;
-}
-
-/*
- * Reassemble an argument vector into a string, quoting and escaping as
- * necessary. Caller must free returned string.
- */
-static char *
-assemble_argv(int argc, char **argv)
-{
-	int i, j, ws, r;
-	char c, *ret;
-	struct sshbuf *buf, *arg;
-
-	if ((buf = sshbuf_new()) == NULL || (arg = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-
-	for (i = 0; i < argc; i++) {
-		ws = 0;
-		sshbuf_reset(arg);
-		for (j = 0; argv[i][j] != '\0'; j++) {
-			r = 0;
-			c = argv[i][j];
-			switch (c) {
-			case ' ':
-			case '\t':
-				ws = 1;
-				r = sshbuf_put_u8(arg, c);
-				break;
-			case '\\':
-			case '\'':
-			case '"':
-				if ((r = sshbuf_put_u8(arg, '\\')) != 0)
-					break;
-				/* FALLTHROUGH */
-			default:
-				r = sshbuf_put_u8(arg, c);
-				break;
-			}
-			if (r != 0)
-				fatal("%s: sshbuf_put_u8: %s",
-				    __func__, ssh_err(r));
-		}
-		if ((i != 0 && (r = sshbuf_put_u8(buf, ' ')) != 0) ||
-		    (ws != 0 && (r = sshbuf_put_u8(buf, '"')) != 0) ||
-		    (r = sshbuf_putb(buf, arg)) != 0 ||
-		    (ws != 0 && (r = sshbuf_put_u8(buf, '"')) != 0))
-			fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	}
-	if ((ret = malloc(sshbuf_len(buf) + 1)) == NULL)
-		fatal("%s: malloc failed", __func__);
-	memcpy(ret, sshbuf_ptr(buf), sshbuf_len(buf));
-	ret[sshbuf_len(buf)] = '\0';
-	sshbuf_free(buf);
-	sshbuf_free(arg);
-	return ret;
-}
-
-/*
- * Runs command in a subprocess. Returns pid on success and a FILE* to the
- * subprocess' stdout or 0 on failure.
- * NB. "command" is only used for logging.
- */
-static pid_t
-subprocess(const char *tag, struct passwd *pw, const char *command,
-    int ac, char **av, FILE **child)
-{
-#ifdef WINDOWS
-        logit("AuthorizedPrincipalsCommand and AuthorizedKeysCommand are not supported in Windows yet");
-        return 0;
-#else  /* !WINDOWS */
-	FILE *f;
-	struct stat st;
-	int devnull, p[2], i;
-	pid_t pid;
-	char *cp, errmsg[512];
-	u_int envsize;
-	char **child_env;
-
-	*child = NULL;
-
-	debug3("%s: %s command \"%s\" running as %s", __func__,
-	    tag, command, pw->pw_name);
-
-	/* Verify the path exists and is safe-ish to execute */
-	if (*av[0] != '/') {
-		error("%s path is not absolute", tag);
-		return 0;
-	}
-	temporarily_use_uid(pw);
-	if (stat(av[0], &st) < 0) {
-		error("Could not stat %s \"%s\": %s", tag,
-		    av[0], strerror(errno));
-		restore_uid();
-		return 0;
-	}
-	if (auth_secure_path(av[0], &st, NULL, 0,
-	    errmsg, sizeof(errmsg)) != 0) {
-		error("Unsafe %s \"%s\": %s", tag, av[0], errmsg);
-		restore_uid();
-		return 0;
-	}
-
-	/*
-	 * Run the command; stderr is left in place, stdout is the
-	 * authorized_keys output.
-	 */
-	if (pipe(p) != 0) {
-		error("%s: pipe: %s", tag, strerror(errno));
-		restore_uid();
-		return 0;
-	}
-
-	/*
-	 * Don't want to call this in the child, where it can fatal() and
-	 * run cleanup_exit() code.
-	 */
-	restore_uid();
-
-	switch ((pid = fork())) {
-	case -1: /* error */
-		error("%s: fork: %s", tag, strerror(errno));
-		close(p[0]);
-		close(p[1]);
-		return 0;
-	case 0: /* child */
-		/* Prepare a minimal environment for the child. */
-		envsize = 5;
-		child_env = xcalloc(sizeof(*child_env), envsize);
-		child_set_env(&child_env, &envsize, "PATH", _PATH_STDPATH);
-		child_set_env(&child_env, &envsize, "USER", pw->pw_name);
-		child_set_env(&child_env, &envsize, "LOGNAME", pw->pw_name);
-		child_set_env(&child_env, &envsize, "HOME", pw->pw_dir);
-		if ((cp = getenv("LANG")) != NULL)
-			child_set_env(&child_env, &envsize, "LANG", cp);
-
-		for (i = 0; i < NSIG; i++)
-			signal(i, SIG_DFL);
-
-		if ((devnull = open(_PATH_DEVNULL, O_RDWR)) == -1) {
-			error("%s: open %s: %s", tag, _PATH_DEVNULL,
-			    strerror(errno));
-			_exit(1);
-		}
-		/* Keep stderr around a while longer to catch errors */
-		if (dup2(devnull, STDIN_FILENO) == -1 ||
-		    dup2(p[1], STDOUT_FILENO) == -1) {
-			error("%s: dup2: %s", tag, strerror(errno));
-			_exit(1);
-		}
-		closefrom(STDERR_FILENO + 1);
-
-		/* Don't use permanently_set_uid() here to avoid fatal() */
-		if (setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) != 0) {
-			error("%s: setresgid %u: %s", tag, (u_int)pw->pw_gid,
-			    strerror(errno));
-			_exit(1);
-		}
-		if (setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) != 0) {
-			error("%s: setresuid %u: %s", tag, (u_int)pw->pw_uid,
-			    strerror(errno));
-			_exit(1);
-		}
-		/* stdin is pointed to /dev/null at this point */
-		if (dup2(STDIN_FILENO, STDERR_FILENO) == -1) {
-			error("%s: dup2: %s", tag, strerror(errno));
-			_exit(1);
-		}
-
-		execve(av[0], av, child_env);
-		error("%s exec \"%s\": %s", tag, command, strerror(errno));
-		_exit(127);
-	default: /* parent */
-		break;
-	}
-
-	close(p[1]);
-	if ((f = fdopen(p[0], "r")) == NULL) {
-		error("%s: fdopen: %s", tag, strerror(errno));
-		close(p[0]);
-		/* Don't leave zombie child */
-		kill(pid, SIGTERM);
-		while (waitpid(pid, NULL, 0) == -1 && errno == EINTR)
-			;
-		return 0;
-	}
-	/* Success */
-	debug3("%s: %s pid %ld", __func__, tag, (long)pid);
-	*child = f;
-	return pid;
-#endif  /* !WINDOWS */
-}
-
-/* Returns 0 if pid exited cleanly, non-zero otherwise */
-static int
-exited_cleanly(pid_t pid, const char *tag, const char *cmd)
-{
-	int status;
-
-	while (waitpid(pid, &status, 0) == -1) {
-		if (errno != EINTR) {
-			error("%s: waitpid: %s", tag, strerror(errno));
-			return -1;
-		}
-	}
-	if (WIFSIGNALED(status)) {
-		error("%s %s exited on signal %d", tag, cmd, WTERMSIG(status));
-		return -1;
-	} else if (WEXITSTATUS(status) != 0) {
-		error("%s %s failed, status %d", tag, cmd, WEXITSTATUS(status));
-		return -1;
-	}
-	return 0;
-}
-
 static int
 match_principals_option(const char *principal_list, struct sshkey_cert *cert)
 {
@@ -668,7 +380,7 @@ match_principals_command(struct passwd *user_pw, const struct sshkey *key)
 	}
 
 	/* Turn the command into an argument vector */
-	if (split_argv(options.authorized_principals_command, &ac, &av) != 0) {
+	if (argv_split(options.authorized_principals_command, &ac, &av) != 0) {
 		error("AuthorizedPrincipalsCommand \"%s\" contains "
 		    "invalid quotes", command);
 		goto out;
@@ -717,10 +429,11 @@ match_principals_command(struct passwd *user_pw, const struct sshkey *key)
 		av[i] = tmp;
 	}
 	/* Prepare a printable command for logs, etc. */
-	command = assemble_argv(ac, av);
+	command = argv_assemble(ac, av);
 
 	if ((pid = subprocess("AuthorizedPrincipalsCommand", pw, command,
-	    ac, av, &f)) == 0)
+	    ac, av, &f,
+	    SSH_SUBPROCESS_STDOUT_CAPTURE|SSH_SUBPROCESS_STDERR_DISCARD)) == 0)
 		goto out;
 
 	uid_swapped = 1;
@@ -731,7 +444,7 @@ match_principals_command(struct passwd *user_pw, const struct sshkey *key)
 	fclose(f);
 	f = NULL;
 
-	if (exited_cleanly(pid, "AuthorizedPrincipalsCommand", command) != 0)
+	if (exited_cleanly(pid, "AuthorizedPrincipalsCommand", command, 0) != 0)
 		goto out;
 
 	/* Read completed successfully */
@@ -1008,7 +721,7 @@ user_key_command_allowed2(struct passwd *user_pw, struct sshkey *key)
 	}
 
 	/* Turn the command into an argument vector */
-	if (split_argv(options.authorized_keys_command, &ac, &av) != 0) {
+	if (argv_split(options.authorized_keys_command, &ac, &av) != 0) {
 		error("AuthorizedKeysCommand \"%s\" contains invalid quotes",
 		    command);
 		goto out;
@@ -1032,7 +745,7 @@ user_key_command_allowed2(struct passwd *user_pw, struct sshkey *key)
 		av[i] = tmp;
 	}
 	/* Prepare a printable command for logs, etc. */
-	command = assemble_argv(ac, av);
+	command = argv_assemble(ac, av);
 
 	/*
 	 * If AuthorizedKeysCommand was run without arguments
@@ -1049,7 +762,8 @@ user_key_command_allowed2(struct passwd *user_pw, struct sshkey *key)
 	}
 
 	if ((pid = subprocess("AuthorizedKeysCommand", pw, command,
-	    ac, av, &f)) == 0)
+	    ac, av, &f,
+	    SSH_SUBPROCESS_STDOUT_CAPTURE|SSH_SUBPROCESS_STDERR_DISCARD)) == 0)
 		goto out;
 
 	uid_swapped = 1;
@@ -1060,7 +774,7 @@ user_key_command_allowed2(struct passwd *user_pw, struct sshkey *key)
 	fclose(f);
 	f = NULL;
 
-	if (exited_cleanly(pid, "AuthorizedKeysCommand", command) != 0)
+	if (exited_cleanly(pid, "AuthorizedKeysCommand", command, 0) != 0)
 		goto out;
 
 	/* Read completed successfully */

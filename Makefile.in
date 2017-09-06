@@ -81,7 +81,7 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	cipher-ctr.o cleanup.o \
 	compat.o crc32.o fatal.o hostfile.o \
 	log.o match.o moduli.o nchan.o packet.o opacket.o \
-	readpass.o rsa.o ttymodes.o xmalloc.o addrmatch.o \
+	readpass.o ttymodes.o xmalloc.o addrmatch.o \
 	atomicio.o key.o dispatch.o mac.o uidswap.o uuencode.o misc.o utf8.o \
 	monitor_fdpass.o rijndael.o ssh-dss.o ssh-ecdsa.o ssh-rsa.o dh.o \
 	msg.o progressmeter.o dns.o entropy.o gss-genr.o umac.o umac128.o \
@@ -92,7 +92,7 @@ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
 	kex.o kexdh.o kexgex.o kexecdh.o kexc25519.o \
 	kexdhc.o kexgexc.o kexecdhc.o kexc25519c.o \
 	kexdhs.o kexgexs.o kexecdhs.o kexc25519s.o \
-	platform-pledge.o platform-tracing.o
+	platform-pledge.o platform-tracing.o platform-misc.o
 
 SSHOBJS= ssh.o readconf.o clientloop.o sshtty.o \
 	sshconnect.o sshconnect2.o mux.o

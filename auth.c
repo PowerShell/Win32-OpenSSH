@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.122 2017/06/24 06:34:38 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.123 2017/08/18 05:36:45 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -42,9 +42,6 @@
 #endif
 #ifdef USE_SHADOW
 #include <shadow.h>
-#endif
-#ifdef HAVE_LIBGEN_H
-#include <libgen.h>
 #endif
 #include <stdarg.h>
 #include <stdio.h>
@@ -508,98 +505,6 @@ check_key_in_hostfiles(struct passwd *pw, struct sshkey *key, const char *host,
 	return host_status;
 }
 
-/*
- * Check a given path for security. This is defined as all components
- * of the path to the file must be owned by either the owner of
- * of the file or root and no directories must be group or world writable.
- *
- * XXX Should any specific check be done for sym links ?
- *
- * Takes a file name, its stat information (preferably from fstat() to
- * avoid races), the uid of the expected owner, their home directory and an
- * error buffer plus max size as arguments.
- *
- * Returns 0 on success and -1 on failure
- */
-int
-auth_secure_path(const char *name, struct stat *stp, const char *pw_dir,
-    uid_t uid, char *err, size_t errlen)
-{
-	char buf[PATH_MAX], homedir[PATH_MAX];
-	char *cp;
-	int comparehome = 0;
-	struct stat st;
-
-	if (realpath(name, buf) == NULL) {
-		snprintf(err, errlen, "realpath %s failed: %s", name,
-		    strerror(errno));
-		return -1;
-	}
-	if (pw_dir != NULL && realpath(pw_dir, homedir) != NULL)
-		comparehome = 1;
-
-	if (!S_ISREG(stp->st_mode)) {
-		snprintf(err, errlen, "%s is not a regular file", buf);
-		return -1;
-	}
-	if ((!platform_sys_dir_uid(stp->st_uid) && stp->st_uid != uid) ||
-	    (stp->st_mode & 022) != 0) {
-		snprintf(err, errlen, "bad ownership or modes for file %s",
-		    buf);
-		return -1;
-	}
-
-	/* for each component of the canonical path, walking upwards */
-	for (;;) {
-		if ((cp = dirname(buf)) == NULL) {
-			snprintf(err, errlen, "dirname() failed");
-			return -1;
-		}
-		strlcpy(buf, cp, sizeof(buf));
-
-		if (stat(buf, &st) < 0 ||
-		    (!platform_sys_dir_uid(st.st_uid) && st.st_uid != uid) ||
-		    (st.st_mode & 022) != 0) {
-			snprintf(err, errlen,
-			    "bad ownership or modes for directory %s", buf);
-			return -1;
-		}
-
-		/* If are past the homedir then we can stop */
-		if (comparehome && strcmp(homedir, buf) == 0)
-			break;
-
-		/*
-		 * dirname should always complete with a "/" path,
-		 * but we can be paranoid and check for "." too
-		 */
-		if ((strcmp("/", buf) == 0) || (strcmp(".", buf) == 0))
-			break;
-	}
-	return 0;
-}
-
-/*
- * Version of secure_path() that accepts an open file descriptor to
- * avoid races.
- *
- * Returns 0 on success and -1 on failure
- */
-static int
-secure_filename(FILE *f, const char *file, struct passwd *pw,
-    char *err, size_t errlen)
-{
-	struct stat st;
-
-	/* check the open file to avoid races */
-	if (fstat(fileno(f), &st) < 0) {
-		snprintf(err, errlen, "cannot stat file %s: %s",
-		    file, strerror(errno));
-		return -1;
-	}
-	return auth_secure_path(file, &st, pw->pw_dir, pw->pw_uid, err, errlen);
-}
-
 static FILE *
 auth_openfile(const char *file, struct passwd *pw, int strict_modes,
     int log_missing, char *file_type)
@@ -646,7 +551,7 @@ auth_openfile(const char *file, struct passwd *pw, int strict_modes,
 		return NULL;
 	}
 	if (strict_modes &&
-	    secure_filename(f, file, pw, line, sizeof(line)) != 0) {
+	    safe_path_fd(fileno(f), file, pw, line, sizeof(line)) != 0) {
 		fclose(f);
 		logit("Authentication refused: %s", line);
 		auth_debug_add("Ignored %s: %s", file_type, line);

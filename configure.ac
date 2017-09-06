@@ -980,6 +980,7 @@ mips-sony-bsd|mips-sony-newsos4)
 	AC_DEFINE([BROKEN_SETREUID])
 	AC_DEFINE([BROKEN_SETREGID])
 	AC_DEFINE([PASSWD_NEEDS_USERNAME])
+	AC_DEFINE([BROKEN_TCGETATTR_ICANON])
 	TEST_SHELL=$SHELL	# let configure find us a capable shell
 	case "$host" in
 	*-*-sysv5SCO_SV*)	# SCO OpenServer 6.x

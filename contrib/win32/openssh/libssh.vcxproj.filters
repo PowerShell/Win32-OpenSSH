@@ -14,17 +14,14 @@
     <ClCompile Include="$(OpenSSH-Src-Path)canohost.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)chacha.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)channels.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)cipher-3des1.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-aes.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-aesctr.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)cipher-bf1.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-chachapoly.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher-ctr.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cipher.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)cleanup.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)compat.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)crc32.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)deattack.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)dh.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)digest-libc.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)dispatch.c" />
@@ -60,7 +57,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)opacket.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)packet.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)poly1305.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)rsa.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)sc25519.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)smult_curve25519_ref.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)ssh-dss.c" />
@@ -83,7 +79,15 @@
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\ttymodes_windows.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\w32-sshfileperm.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)digest-openssl.c" />
-    <ClCompile Include="..\..\..\kexgexs.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)match.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)misc.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)moduli.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)progressmeter.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)readpass.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)rijndael.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)uuencode.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)verify.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(OpenSSH-Src-Path)addrmatch.c">
@@ -245,15 +249,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)mac.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)match.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)misc.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)moduli.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)monitor_fdpass.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -270,15 +265,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)poly1305.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)progressmeter.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)readpass.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)rijndael.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)rsa.c">
@@ -329,15 +315,6 @@
     <ClCompile Include="$(OpenSSH-Src-Path)umac.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)uuencode.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)verify.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)xmalloc.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)platform-pledge.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -361,11 +338,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)sshfileperm.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <ClInclude Include="$(OpenSSH-Src-Path)crypto-wrap.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)sshfileperm.h" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-rsa.c,v 1.61 2017/05/07 23:15:59 djm Exp $ */
+/* $OpenBSD: ssh-rsa.c,v 1.62 2017/07/01 13:50:45 djm Exp $ */
 /*
  * Copyright (c) 2000, 2003 Markus Friedl <markus@openbsd.org>
  *
@@ -76,6 +76,41 @@ rsa_hash_alg_nid(int type)
 	default:
 		return -1;
 	}
+}
+
+/* calculate p-1 and q-1 */
+int
+ssh_rsa_generate_additional_parameters(struct sshkey *key)
+{
+	RSA *rsa;
+	BIGNUM *aux = NULL;
+	BN_CTX *ctx = NULL;
+	int r;
+
+	if (key == NULL || key->rsa == NULL ||
+	    sshkey_type_plain(key->type) != KEY_RSA)
+		return SSH_ERR_INVALID_ARGUMENT;
+
+	if ((ctx = BN_CTX_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((aux = BN_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	rsa = key->rsa;
+
+	if ((BN_sub(aux, rsa->q, BN_value_one()) == 0) ||
+	    (BN_mod(rsa->dmq1, rsa->d, aux, ctx) == 0) ||
+	    (BN_sub(aux, rsa->p, BN_value_one()) == 0) ||
+	    (BN_mod(rsa->dmp1, rsa->d, aux, ctx) == 0)) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+	r = 0;
+ out:
+	BN_clear_free(aux);
+	BN_CTX_free(ctx);
+	return r;
 }
 
 /* RSASSA-PKCS1-v1_5 (PKCS #1 v2.0 signature) with SHA1 */

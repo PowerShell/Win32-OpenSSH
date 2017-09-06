@@ -54,84 +54,13 @@ int
 ga_init(const char *user, gid_t base)
 {
 #ifdef WINDOWS
-#pragma warning(push, 3)
-	LPLOCALGROUP_USERS_INFO_0 local_groups_info = NULL, tmp_groups_info;
-	wchar_t *user_utf16 = NULL, *full_name_utf16 = NULL, *udom_utf16 = NULL, *tmp;
-	char *group_utf8 = NULL;
-	DWORD i = 0, j = 0;
-	DWORD entries_read = 0, total_entries = 0, full_name_len = 0, index = 0;
-	NET_API_STATUS nStatus;
-	
-	if (ngroups > 0)
-		ga_free();
+	ngroups = 0;
+	groups_byname = NULL;
 
-	if ((user_utf16 = utf8_to_utf16(user)) == NULL) {
-		errno = ENOMEM;
-		goto done;
-	}
-
-	full_name_len = (DWORD)wcslen(user_utf16) + 1;
-	if ((full_name_utf16 = malloc(full_name_len * sizeof(wchar_t))) == NULL) {
-		errno = ENOMEM;
-		goto done;
-	}
-	
-	if ((tmp = wcschr(user_utf16, L'@')) != NULL) {
-		udom_utf16 = tmp + 1;
-		*tmp = L'\0';
-		index = (DWORD)wcslen(udom_utf16) + 1;
-		wmemcpy(full_name_utf16, udom_utf16, index);
-		full_name_utf16[wcslen(udom_utf16)] = L'\\';
-	}
-	wmemcpy(full_name_utf16 + index, user_utf16, wcslen(user_utf16) + 1);
-
-	nStatus = NetUserGetLocalGroups(NULL,
-		full_name_utf16,
-		0,
-		LG_INCLUDE_INDIRECT,
-		(LPBYTE *)&local_groups_info,
-		MAX_PREFERRED_LENGTH,
-		&entries_read,
-		&total_entries);
-
-	if (NERR_Success != nStatus) {
-		error("NetUserGetLocalGroups() failed with error: %u",
-			nStatus);
-		errno = ENOENT;
-		goto done;
-	}
-
-	if (entries_read != total_entries) {
-		error("NetUserGetLocalGroups(): entries_read (%u) is not equal to "
-		    "total_entries (%u) for user %.100s", entries_read, total_entries, user);
-		errno = ENOENT;
-		goto done;
-	}
-
-	if ((tmp_groups_info = local_groups_info) != NULL) {
-		groups_byname = xcalloc(entries_read, sizeof(*groups_byname));
-		for (i = 0, j = 0; i < total_entries; i++)
-		{
-			if ((group_utf8 = utf16_to_utf8(tmp_groups_info->lgrui0_name)) == NULL) {
-				errno = ENOMEM;
-				goto done;
-			}
-			groups_byname[j++] = group_utf8;
-			tmp_groups_info++;
-		}
-	}
-
-done:
-	if(user_utf16 != NULL)
-		free(user_utf16);
-	if(full_name_utf16 != NULL)
-		free(full_name_utf16);
-	if (local_groups_info != NULL)
-		NetApiBufferFree(local_groups_info);
-
-#pragma warning(pop)
-
+	groups_byname = getusergroups(user, &ngroups);
+	return ngroups;
 #else /* !WINDOWS */
+	
 	gid_t *groups_bygid;
 	int i, j;
 	struct group *gr;
@@ -153,8 +82,8 @@ done:
 		if ((gr = getgrgid(groups_bygid[i])) != NULL)
 			groups_byname[j++] = xstrdup(gr->gr_name);
 	free(groups_bygid);
-#endif /* !WINDOWS */
 	return (ngroups = j);
+#endif /* !WINDOWS */	
 }
 
 /*

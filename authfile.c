@@ -1,4 +1,4 @@
-/* $OpenBSD: authfile.c,v 1.126 2017/05/31 09:15:42 deraadt Exp $ */
+/* $OpenBSD: authfile.c,v 1.127 2017/07/01 13:50:45 djm Exp $ */
 /*
  * Copyright (c) 2000, 2013 Markus Friedl.  All rights reserved.
  *
@@ -42,7 +42,6 @@
 #include "ssh.h"
 #include "log.h"
 #include "authfile.h"
-#include "rsa.h"
 #include "misc.h"
 #include "atomicio.h"
 #include "sshkey.h"

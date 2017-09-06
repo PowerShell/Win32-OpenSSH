@@ -1,4 +1,4 @@
-/* $OpenBSD: authfd.c,v 1.104 2017/06/28 01:09:22 djm Exp $ */
+/* $OpenBSD: authfd.c,v 1.105 2017/07/01 13:50:45 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -51,7 +51,6 @@
 
 #include "xmalloc.h"
 #include "ssh.h"
-#include "rsa.h"
 #include "sshbuf.h"
 #include "sshkey.h"
 #include "authfd.h"
