@@ -84,8 +84,11 @@ processBuffer(HANDLE handle, char *buf, size_t len, unsigned char **respbuf, siz
 		/* Console has the capability to parse so pass the raw buffer to console directly */
 		ConRestoreViewRect(); /* Restore the visible window, otherwise WriteConsoleW() gets messy */
 		wchar_t* t = utf8_to_utf16(buf);
-		WriteConsoleW(handle, t, (DWORD)wcslen(t), 0, 0);
-		free(t);		
+		if (t) {
+			WriteConsoleW(handle, t, (DWORD)wcslen(t), 0, 0);
+			free(t);
+		}
+		
 		ConSaveViewRect();
 		return;
 	}

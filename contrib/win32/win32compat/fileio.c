@@ -666,7 +666,7 @@ fileio_write(struct w32_io* pio, const void *buf, size_t max_bytes)
 		debug3("write - ERROR:%d on prior unblocking write, io:%p", errno, pio);
 		pio->write_details.error = 0;
 		if ((FILETYPE(pio) == FILE_TYPE_PIPE) && (errno == ERROR_BROKEN_PIPE)) {
-			debug3("write - ERROR:read end of the pipe closed, io:%p", pio);
+			debug4("write - ERROR:read end of the pipe closed, io:%p", pio);
 			errno = EPIPE;
 		}
 		return -1;

@@ -53,7 +53,6 @@
 Buffer cfg;
 ServerOptions options;
 struct passwd *privsep_pw = NULL;
-static char *config_file_name = _PATH_SERVER_CONFIG_FILE;
 int auth_sock = -1;
 
 int
@@ -96,48 +95,10 @@ kexgex_server(struct ssh * sh) {
 	return -1;
 }
 
-static int
-GetCurrentModulePath(wchar_t *path, int pathSize)
-{
-	if (GetModuleFileNameW(NULL, path, pathSize)) {
-		int i;
-		int lastSlashPos = 0;
-
-		for (i = 0; path[i]; i++) {
-			if (path[i] == L'/' || path[i] == L'\\')
-				lastSlashPos = i;
-		}
-
-		path[lastSlashPos] = 0;
-		return 0;
-	}
-	return -1;
-}
-
 int
 load_config() {
-	wchar_t basePath[PATH_MAX] = { 0 };
-	wchar_t path[PATH_MAX] = { 0 };
-	wchar_t* config_file = L"/sshd_config";
+	char *config_file_name = "sshd_config";
 	errno_t r = 0;
-
-	if (GetCurrentModulePath(basePath, PATH_MAX) == -1)
-		return -1;
-
-	if (wcsnlen_s(basePath, PATH_MAX) + wcslen(config_file) + 1 > PATH_MAX)
-		fatal("unexpected config file path length");
-
-	if(( r = wcsncpy_s(path, PATH_MAX, basePath, wcsnlen_s(basePath, PATH_MAX))) != 0) {
-		debug3("memcpy_s failed with error: %d.", r);
-		return -1;
-	}
-	if (( r = wcsncat_s(path, PATH_MAX, L"/sshd_config", PATH_MAX - wcsnlen_s(basePath, PATH_MAX))) != 0) {
-		debug3("wcscat_s failed with error: %d.", r);
-		return -1;
-	}
-	
-	if ((config_file_name = utf16_to_utf8(path)) == NULL)
-		return -1;
 	
 	buffer_init(&cfg);
 	initialize_server_options(&options);
@@ -154,10 +115,10 @@ config_log_level() {
 }
 
 int
-pubkey_allowed(struct sshkey* pubkey, HANDLE user_token) {
+pubkey_allowed(struct sshkey* pubkey, char*  user_utf8) {
 	struct passwd *pw;
 
-	if ((pw = w32_getpwtoken(user_token)) == NULL)
+	if ((pw = w32_getpwnam(user_utf8)) == NULL)
 		return 0;
 
 	return user_key_allowed(pw, pubkey, 1);

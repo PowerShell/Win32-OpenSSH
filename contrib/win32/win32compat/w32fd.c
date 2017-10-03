@@ -254,7 +254,7 @@ w32_socket(int domain, int type, int protocol)
 	}	
 
 	fd_table_set(pio, min_index);
-	debug3("socket:%d, socktype:%d, io:%p, fd:%d ", pio->sock, type, pio, min_index);
+	debug4("socket:%d, socktype:%d, io:%p, fd:%d ", pio->sock, type, pio, min_index);
 	return min_index;
 }
 
@@ -275,7 +275,7 @@ w32_accept(int fd, struct sockaddr* addr, int* addrlen)
 
 	pio->type = SOCK_FD;
 	fd_table_set(pio, min_index);
-	debug3("socket:%d, io:%p, fd:%d ", pio->sock, pio, min_index);
+	debug4("socket:%d, io:%p, fd:%d ", pio->sock, pio, min_index);
 	return min_index;
 }
 
@@ -404,7 +404,7 @@ w32_pipe(int *pfds)
 	fd_table_set(pio[1], write_index);
 	pfds[0] = read_index;
 	pfds[1] = write_index;
-	debug3("pipe - r-h:%d,io:%p,fd:%d  w-h:%d,io:%p,fd:%d",
+	debug4("pipe - r-h:%d,io:%p,fd:%d  w-h:%d,io:%p,fd:%d",
 		pio[0]->handle, pio[0], read_index, pio[1]->handle, pio[1], write_index);
 	
 	return 0;
@@ -434,7 +434,7 @@ w32_open(const char *pathname, int flags, ... /* arg */)
 
 	pio->type = NONSOCK_FD;
 	fd_table_set(pio, min_index);
-	debug3("open - handle:%p, io:%p, fd:%d", pio->handle, pio, min_index);
+	debug4("open - handle:%p, io:%p, fd:%d", pio->handle, pio, min_index);
 	debug5("open - path:%s", pathname);
 	return min_index;
 }
@@ -532,7 +532,7 @@ w32_close(int fd)
 
 	pio = fd_table.w32_ios[fd];
 
-	debug3("close - io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd,
+	debug4("close - io:%p, type:%d, fd:%d, table_index:%d", pio, pio->type, fd,
 		pio->table_index);
 	
 	if (pio->type == SOCK_FD)
@@ -556,17 +556,17 @@ w32_io_process_fd_flags(struct w32_io* pio, int flags)
 
 	shi_flags = (flags & FD_CLOEXEC) ? 0 : HANDLE_FLAG_INHERIT;
 
-	if (SetHandleInformation(WINHANDLE(pio), HANDLE_FLAG_INHERIT, shi_flags) == FALSE) {
-		/* 
-		 * Ignore if handle is not valid yet. It will not be valid for 
-		 * UF_UNIX sockets that are not connected yet 
-		 */
-		if (GetLastError() != ERROR_INVALID_HANDLE) {
-			debug3("fcntl - SetHandleInformation failed  %d, io:%p",
-				GetLastError(), pio);
-			errno = EOTHER;
-			return -1;
-		}
+	HANDLE h = WINHANDLE(pio);
+	
+	/*
+	* Ignore if handle is not valid yet. It will not be valid for
+	* UF_UNIX sockets that are not connected yet
+	*/
+	if (IS_VALID_HANDLE(h) && (SetHandleInformation(h, HANDLE_FLAG_INHERIT, shi_flags) == FALSE)) {
+		debug3("fcntl - SetHandleInformation failed with error:%d, io:%p",
+			GetLastError(), pio);
+		errno = EOTHER;
+		return -1;
 	}
 
 	pio->fd_flags = flags;
@@ -731,7 +731,7 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 
 			if (timeout != NULL) {
 				if (timeout_ms < ticks_spent) {
-					debug3("select - timing out");
+					debug4("select - timing out");
 					break;
 				}
 				time_rem = timeout_ms - (ticks_spent & 0xffffffff);
@@ -797,7 +797,6 @@ w32_select(int fds, w32_fd_set* readfds, w32_fd_set* writefds, w32_fd_set* excep
 
 	debug5("select - returning %d", out_ready_fds);
 	return out_ready_fds;
-
 }
 
 int

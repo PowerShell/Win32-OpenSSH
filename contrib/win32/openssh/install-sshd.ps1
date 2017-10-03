@@ -220,19 +220,19 @@ namespace MyLsaWrapper
     }
 }
 '@
-$references = @()
-if(($psversiontable.Containskey("psedition")) -and ($psversiontable.PSEdition -ieq "core"))
-{
-    $references = "System.Security.Principal.Windows", "Microsoft.Win32.Primitives"
-}
 
+$references = @("System.Security.Principal.Windows", "Microsoft.Win32.Primitives")
 try {
     $null = [MyLsaWrapper.LsaWrapperCaller]
 }
 catch {
-    $types = Add-Type $definition -ref $references -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+    try {
+        $types = Add-Type $definition -ref $references -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+    }
+    catch {	
+	    $types = Add-Type $definition -WarningAction SilentlyContinue -ErrorAction SilentlyContinue
+    }
 }
-
 
 function Add-Privilege
 {

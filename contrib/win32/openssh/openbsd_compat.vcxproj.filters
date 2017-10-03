@@ -195,10 +195,16 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\xcrypt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\openbsd-compat\glob.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\bsd-getpagesize.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\openbsd-compat\strcasestr.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\recallocarray.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\glob.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\strcasestr.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

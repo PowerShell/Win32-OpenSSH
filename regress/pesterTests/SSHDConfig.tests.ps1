@@ -25,7 +25,7 @@ Describe "Tests of sshd_config" -Tags "CI" {
         Add-Type -AssemblyName System.DirectoryServices.AccountManagement
         $ContextName = $env:COMPUTERNAME
         $ContextType = [System.DirectoryServices.AccountManagement.ContextType]::Machine
-        $PrincipalContext = [System.DirectoryServices.AccountManagement.PrincipalContext]::new($ContextType, $ContextName)
+        $PrincipalContext = new-object -TypeName System.DirectoryServices.AccountManagement.PrincipalContext -ArgumentList @($ContextType, $ContextName)
         $IdentityType = [System.DirectoryServices.AccountManagement.IdentityType]::SamAccountName
 
         function Add-LocalUser
@@ -35,7 +35,7 @@ Describe "Tests of sshd_config" -Tags "CI" {
             if($user -eq $null)
             {
                 try {
-                    $user = [System.DirectoryServices.AccountManagement.UserPrincipal]::new($PrincipalContext,$UserName,$Password, $true)
+                    $user = new-object -TypeName System.DirectoryServices.AccountManagement.UserPrincipal -ArgumentList @($PrincipalContext,$UserName,$Password, $true)
                     $user.Save()
                 }
                 finally {
@@ -51,7 +51,7 @@ Describe "Tests of sshd_config" -Tags "CI" {
             if($group -eq $null)
             {
                 try {
-                    $group = [System.DirectoryServices.AccountManagement.GroupPrincipal]::new($PrincipalContext,$groupName)
+                    $group = new-object -TypeName System.DirectoryServices.AccountManagement.GroupPrincipal -ArgumentList @($PrincipalContext,$groupName)
                     $group.Save()
                 }
                 finally {

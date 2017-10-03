@@ -32,6 +32,8 @@
 
 #include "agent.h"
 #include "..\misc_internal.h"
+#include "..\Debug.h"
+#include <wchar.h>
 
 #pragma warning(push, 3)
 
@@ -90,9 +92,25 @@ BOOL WINAPI
 ctrl_c_handler(_In_ DWORD dwCtrlType) 
 {
 	/* for any Ctrl type, shutdown agent*/
-	debug3("Ctrl+C received");
+	debug4("Ctrl+C received");
 	agent_shutdown();
 	return TRUE;
+}
+
+/*set current working directory to module path*/
+static void
+fix_cwd()
+{
+	wchar_t path[PATH_MAX] = { 0 };
+	int i, lastSlashPos = 0;
+	GetModuleFileNameW(NULL, path, PATH_MAX);
+	for (i = 0; path[i]; i++) {
+		if (path[i] == L'/' || path[i] == L'\\')
+			lastSlashPos = i;
+	}
+
+	path[lastSlashPos] = 0;
+	_wchdir(path);
 }
 
 int 
@@ -100,6 +118,7 @@ wmain(int argc, wchar_t **argv)
 {
 	_set_invalid_parameter_handler(invalid_parameter_handler);
 	w32posix_initialize();
+	fix_cwd();
 	/* this exits() on failure*/
 	load_config();
 	if (!StartServiceCtrlDispatcherW(dispatch_table)) {

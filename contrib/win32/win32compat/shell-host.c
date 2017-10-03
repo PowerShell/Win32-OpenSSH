@@ -46,6 +46,8 @@
 #define MAX_CMD_LEN 8191 // msdn
 #define WM_APPEXIT WM_USER+1
 #define MAX_EXPECTED_BUFFER_SIZE 1024
+/* 4KB is the largest size for which writes are guaranteed to be atomic */
+#define BUFF_SIZE 4096
 
 #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING  0x4
@@ -81,6 +83,19 @@
 #define VK_X 0x58
 #define VK_Y 0x59
 #define VK_Z 0x5A
+#define VK_0 0x30
+#define VK_1 0x31
+#define VK_2 0x32
+#define VK_3 0x33
+#define VK_4 0x34
+#define VK_5 0x35
+#define VK_6 0x36
+#define VK_7 0x37
+#define VK_8 0x38
+#define VK_9 0x39
+
+const int MAX_CTRL_SEQ_LEN = 7;
+const int MIN_CTRL_SEQ_LEN = 6;
 
 typedef BOOL(WINAPI *__t_SetCurrentConsoleFontEx)(
 	_In_ HANDLE               hConsoleOutput,
@@ -115,7 +130,7 @@ typedef struct consoleEvent {
 } consoleEvent;
 
 struct key_translation {
-	wchar_t in[6];
+	wchar_t in[8];
 	int vk;
 	wchar_t out;
 	int in_key_len;
@@ -124,10 +139,10 @@ struct key_translation {
 
 /* All the substrings should be in the end, otherwise ProcessIncomingKeys() will not work as expected */
 struct key_translation keys[] = {
-    { L"\r",         VK_RETURN,  L'\r' , 0 , 0},
-    { L"\n",         VK_RETURN,  L'\r' , 0 , 0 },
-    { L"\b",         VK_BACK,    L'\b' , 0 , 0 },
-    { L"\x7f",       VK_BACK,    L'\b' , 0 , 0 },
+    { L"\r",         VK_RETURN,  L'\r', 0, 0},
+    { L"\n",         VK_RETURN,  L'\r', 0, 0 },
+    { L"\b",         VK_BACK,    L'\b', 0, 0 },
+    { L"\x7f",       VK_BACK,    L'\b', 0 , 0 },
     { L"\t",         VK_TAB,     L'\t' , 0 , 0},
     { L"\x1b[A",     VK_UP,       0 , 0 , 0},
     { L"\x1b[B",     VK_DOWN,     0 , 0 , 0},
@@ -189,7 +204,53 @@ struct key_translation keys[] = {
     { L"\x17",       VK_W,   L'\x17' , 0 , LEFT_CTRL_PRESSED},
     { L"\x18",       VK_X,   L'\x18' , 0 , LEFT_CTRL_PRESSED},
     { L"\x19",       VK_Y,   L'\x19' , 0 , LEFT_CTRL_PRESSED},
-    { L"\x1A",       VK_Z,   L'\x1A' , 0 , LEFT_CTRL_PRESSED}
+    { L"\x1A",       VK_Z,   L'\x1A' , 0 , LEFT_CTRL_PRESSED},
+    { L"\033a",      VK_A,   L'a', 0, LEFT_ALT_PRESSED},
+    { L"\033b",      VK_B,   L'b', 0, LEFT_ALT_PRESSED},
+    { L"\033c",      VK_C,   L'c', 0, LEFT_ALT_PRESSED},
+    { L"\033d",      VK_D,   L'd', 0, LEFT_ALT_PRESSED},
+    { L"\033e",      VK_E,   L'e', 0, LEFT_ALT_PRESSED},
+    { L"\033f",      VK_F,   L'f', 0, LEFT_ALT_PRESSED},
+    { L"\033g",      VK_G,   L'g', 0, LEFT_ALT_PRESSED},
+    { L"\033h",      VK_H,   L'h', 0, LEFT_ALT_PRESSED},
+    { L"\033i",      VK_I,   L'i', 0, LEFT_ALT_PRESSED},
+    { L"\033j",      VK_J,   L'j', 0, LEFT_ALT_PRESSED},
+    { L"\033k",      VK_K,   L'k', 0, LEFT_ALT_PRESSED},
+    { L"\033l",      VK_L,   L'l', 0, LEFT_ALT_PRESSED},
+    { L"\033m",      VK_M,   L'm', 0, LEFT_ALT_PRESSED},
+    { L"\033n",      VK_N,   L'n', 0, LEFT_ALT_PRESSED},
+    { L"\033o",      VK_O,   L'o', 0, LEFT_ALT_PRESSED},
+    { L"\033p",      VK_P,   L'p', 0, LEFT_ALT_PRESSED},
+    { L"\033q",      VK_Q,   L'q', 0, LEFT_ALT_PRESSED},
+    { L"\033r",      VK_R,   L'r', 0, LEFT_ALT_PRESSED},
+    { L"\033s",      VK_S,   L's', 0, LEFT_ALT_PRESSED},
+    { L"\033t",      VK_T,   L't', 0, LEFT_ALT_PRESSED},
+    { L"\033u",      VK_U,   L'u', 0, LEFT_ALT_PRESSED},
+    { L"\033v",      VK_V,   L'v', 0, LEFT_ALT_PRESSED},
+    { L"\033w",      VK_W,   L'w', 0, LEFT_ALT_PRESSED},
+    { L"\033x",      VK_X,   L'x', 0, LEFT_ALT_PRESSED},
+    { L"\033y",      VK_Y,   L'y', 0, LEFT_ALT_PRESSED},
+    { L"\033z",      VK_Z,   L'z', 0, LEFT_ALT_PRESSED},
+    { L"\0330",      VK_0,   L'0', 0, LEFT_ALT_PRESSED},
+    { L"\0331",      VK_1,   L'1', 0, LEFT_ALT_PRESSED},
+    { L"\0332",      VK_2,   L'2', 0, LEFT_ALT_PRESSED},
+    { L"\0333",      VK_3,   L'3', 0, LEFT_ALT_PRESSED},
+    { L"\0334",      VK_4,   L'4', 0, LEFT_ALT_PRESSED},
+    { L"\0335",      VK_5,   L'5', 0, LEFT_ALT_PRESSED},
+    { L"\0336",      VK_6,   L'6', 0, LEFT_ALT_PRESSED},
+    { L"\0337",      VK_7,   L'7', 0, LEFT_ALT_PRESSED},
+    { L"\0338",      VK_8,   L'8', 0, LEFT_ALT_PRESSED},
+    { L"\0339",      VK_9,   L'9', 0, LEFT_ALT_PRESSED},
+    { L"\033!",      VK_1,   L'!', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033@",      VK_2,   L'@', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033#",      VK_3,   L'#', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033$",      VK_4,   L'$', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033%",      VK_5,   L'%', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033^",      VK_6,   L'^', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033&",      VK_7,   L'&', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033*",      VK_8,   L'*', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033(",      VK_9,   L'(', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED },
+    { L"\033)",      VK_0,   L')', 0, LEFT_ALT_PRESSED | SHIFT_PRESSED }
 };
 
 static SHORT lastX = 0;
@@ -215,6 +276,7 @@ HANDLE pipe_in = INVALID_HANDLE_VALUE;
 HANDLE pipe_out = INVALID_HANDLE_VALUE;
 HANDLE pipe_err = INVALID_HANDLE_VALUE;
 HANDLE child = INVALID_HANDLE_VALUE;
+HANDLE job = NULL;
 HANDLE hConsoleBuffer = INVALID_HANDLE_VALUE;
 HANDLE monitor_thread = INVALID_HANDLE_VALUE;
 HANDLE io_thread = INVALID_HANDLE_VALUE;
@@ -334,11 +396,19 @@ initialize_keylen()
 }
 
 int
-ProcessCtrlSequence(wchar_t *buf, int buf_len)
+ProcessModifierKeySequence(wchar_t *buf, int buf_len)
 {
-	int vkey = 0;
-	/* Decode special keys when pressed CTRL key */
-	if (buf[0] == L'\033' && buf[1] == L'[' && buf[buf_len - 3] == L';' && buf[buf_len - 2] == L'5') {
+	if(buf_len < MIN_CTRL_SEQ_LEN)
+		return 0;
+
+	int vkey = 0;	
+	int modifier_key = _wtoi((wchar_t *)&buf[buf_len - 2]);
+
+	if ((modifier_key < 2) && (modifier_key > 7))
+		return 0;
+
+	/* Decode special keys when pressed ALT/CTRL/SHIFT key */
+	if (buf[0] == L'\033' && buf[1] == L'[' && buf[buf_len - 3] == L';') {
 		if (buf[buf_len - 1] == L'~') {
 			/* VK_DELETE, VK_PGDN, VK_PGUP */
 			if (!vkey && buf_len == 6)
@@ -356,18 +426,51 @@ ProcessCtrlSequence(wchar_t *buf, int buf_len)
 			if (!vkey && buf_len == 6 && buf[2] == L'1' && isalpha(buf[5]))
 				vkey = GetVirtualKeyByMask(L'O', &buf[5], 1, 0);
 		}
-		if (vkey)
-			SendKeyStroke(child_in, vkey, 0, LEFT_CTRL_PRESSED);
+		if (vkey) {
+			switch (modifier_key)
+			{
+				case 2:
+					SendKeyStroke(child_in, vkey, 0, SHIFT_PRESSED);
+					break;
+				case 3:
+					SendKeyStroke(child_in, vkey, 0, LEFT_ALT_PRESSED);
+					break;
+				case 4:
+					SendKeyStroke(child_in, vkey, 0, SHIFT_PRESSED | LEFT_ALT_PRESSED);
+					break;
+				case 5:
+					SendKeyStroke(child_in, vkey, 0, LEFT_CTRL_PRESSED);
+					break;
+				case 6:
+					SendKeyStroke(child_in, vkey, 0, SHIFT_PRESSED | LEFT_CTRL_PRESSED);
+					break;
+				case 7:
+					SendKeyStroke(child_in, vkey, 0, LEFT_CTRL_PRESSED | LEFT_ALT_PRESSED);
+					break;				
+			}
+		}
+			
 	}
 
 	return vkey;
+}
+int
+CheckKeyTranslations(wchar_t *buf, int buf_len, int *index)
+{
+	for (int j = 0; j < ARRAYSIZE(keys); j++) {
+		if ((buf_len >= keys[j].in_key_len) && (wcsncmp(buf, keys[j].in, keys[j].in_key_len) == 0)) {
+			*index = j;
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 void 
 ProcessIncomingKeys(char * ansikey)
 {
 	int buf_len = 0;
-	const int MAX_CTRL_SEQ_LEN = 7;
 	const wchar_t *ESC_SEQ = L"\x1b";
 	wchar_t *buf = utf8_to_utf16(ansikey);
 
@@ -378,26 +481,33 @@ ProcessIncomingKeys(char * ansikey)
 
 	loop:
 	while (buf && ((buf_len=(int)wcslen(buf)) > 0)) {
-		for (int j = 0; j < ARRAYSIZE(keys); j++) {
-			if ( (buf_len >= keys[j].in_key_len) && (wcsncmp(buf, keys[j].in, keys[j].in_key_len) == 0) ) {
-				SendKeyStroke(child_in, keys[j].vk, keys[j].out, keys[j].ctrlState);				
-				buf += keys[j].in_key_len;
-				goto loop;
-			}
+		int j = 0;
+		if (CheckKeyTranslations(buf, buf_len, &j)) {
+			SendKeyStroke(child_in, keys[j].vk, keys[j].out, keys[j].ctrlState);				
+			buf += keys[j].in_key_len;
+			goto loop;
 		}
 
 		/* Decode special keys when pressed CTRL key. CTRL sequences can be of size 6 or 7. */
-		if ((buf_len >= MAX_CTRL_SEQ_LEN) && ProcessCtrlSequence(buf, MAX_CTRL_SEQ_LEN)) {
+		if ((buf_len >= MAX_CTRL_SEQ_LEN) && ProcessModifierKeySequence(buf, MAX_CTRL_SEQ_LEN)) {
 			buf += MAX_CTRL_SEQ_LEN;
 			goto loop;
 		}
 
-		if ((buf_len >= (MAX_CTRL_SEQ_LEN - 1)) && ProcessCtrlSequence(buf, MAX_CTRL_SEQ_LEN - 1)) {
+		if ((buf_len >= (MAX_CTRL_SEQ_LEN - 1)) && ProcessModifierKeySequence(buf, MAX_CTRL_SEQ_LEN - 1)) {
 			buf += (MAX_CTRL_SEQ_LEN - 1);
 			goto loop;
 		}
 
 		if(wcsncmp(buf, ESC_SEQ, wcslen(ESC_SEQ)) == 0) {
+			wchar_t* p = buf + wcslen(ESC_SEQ);
+			/* Alt sequence */
+			if (CheckKeyTranslations(p, buf_len - (int)wcslen(ESC_SEQ), &j) && !(keys[j].ctrlState & LEFT_ALT_PRESSED)) {
+				SendKeyStroke(child_in, keys[j].vk, keys[j].out, keys[j].ctrlState| LEFT_ALT_PRESSED);
+				buf += wcslen(ESC_SEQ) +keys[j].in_key_len;
+				goto loop;
+			}
+
 			SendKeyStroke(child_in, VK_ESCAPE, L'\x1b', 0);
 			buf += wcslen(ESC_SEQ);
 			goto loop;
@@ -1110,7 +1220,7 @@ start_with_pty(wchar_t *command)
 	HMODULE hm_kernel32 = NULL, hm_user32 = NULL;
 	wchar_t kernel32_dll_path[PATH_MAX]={0,}, user32_dll_path[PATH_MAX]={0,};
 
-	if(cmd == NULL) {
+	if (cmd == NULL) {
 		printf_s("ssh-shellhost is out of memory");
 		exit(255);
 	}
@@ -1170,11 +1280,9 @@ start_with_pty(wchar_t *command)
 	GOTO_CLEANUP_ON_FALSE(SetHandleInformation(pipe_in, HANDLE_FLAG_INHERIT, 0));
 	
 	cmd[0] = L'\0';
-	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, w32_cmd_path()));
-	
+	GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, w32_cmd_path()));	
 	if (command) {
-		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" /c"));
-		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" "));
+		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" /c "));		
 		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, command));
 	}
 
@@ -1265,18 +1373,17 @@ start_withno_pty(wchar_t *command)
 {
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
-	wchar_t *cmd = (wchar_t *) malloc(sizeof(wchar_t) * MAX_CMD_LEN);
+	wchar_t *cmd = (wchar_t *)malloc(sizeof(wchar_t) * MAX_CMD_LEN);
 	SECURITY_ATTRIBUTES sa;
 	BOOL ret, process_input = FALSE, run_under_cmd = FALSE;
 	size_t command_len;
-	char buf[128];
+	char *buf = (char *)malloc(BUFF_SIZE + 1);
 	DWORD rd = 0, wr = 0, i = 0;
 
 	if (cmd == NULL) {
 		printf_s("ssh-shellhost is out of memory");
 		exit(255);
 	}
-
 	pipe_in = GetStdHandle(STD_INPUT_HANDLE);
 	pipe_out = GetStdHandle(STD_OUTPUT_HANDLE);
 	pipe_err = GetStdHandle(STD_ERROR_HANDLE);
@@ -1287,8 +1394,11 @@ start_withno_pty(wchar_t *command)
 
 	memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
 	sa.bInheritHandle = TRUE;
-	if (!CreatePipe(&child_pipe_read, &child_pipe_write, &sa, 128))
+	/* use the default buffer size, 64K*/
+	if (!CreatePipe(&child_pipe_read, &child_pipe_write, &sa, 0)) {
+		printf_s("ssh-shellhost-can't open no pty session, error: %d", GetLastError());
 		return -1;
+	}
 
 	memset(&si, 0, sizeof(STARTUPINFO));
 	memset(&pi, 0, sizeof(PROCESS_INFORMATION));
@@ -1320,10 +1430,10 @@ start_withno_pty(wchar_t *command)
 		process_input = TRUE;
 	else {
 		command_len = wcsnlen_s(command, MAX_CMD_LEN);
-		if ((command_len >= 3 && wcsncmp(command, L"cmd", 4) == 0) ||
-		    (command_len >= 7 && wcsncmp(command, L"cmd.exe", 8) == 0) ||
-		    (command_len >= 4 && wcsncmp(command, L"cmd ", 4) == 0) ||
-		    (command_len >= 8 && wcsncmp(command, L"cmd.exe ", 8) == 0))
+		if ((command_len >= 3 && _wcsnicmp(command, L"cmd", 4) == 0) ||
+		    (command_len >= 7 && _wcsnicmp(command, L"cmd.exe", 8) == 0) ||
+		    (command_len >= 4 && _wcsnicmp(command, L"cmd ", 4) == 0) ||
+		    (command_len >= 8 && _wcsnicmp(command, L"cmd.exe ", 8) == 0))
 			process_input = TRUE;
 	}
 
@@ -1342,12 +1452,11 @@ start_withno_pty(wchar_t *command)
 		run_under_cmd = TRUE;
 
 	/* if above failed with FILE_NOT_FOUND, try running the provided command under cmd*/
-	if (run_under_cmd) {		
+	if (run_under_cmd) {
 		cmd[0] = L'\0';
 		GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, w32_cmd_path()));
 		if (command) {
-			GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" /c"));
-			GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" "));
+			GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, L" /c "));
 			GOTO_CLEANUP_ON_ERR(wcscat_s(cmd, MAX_CMD_LEN, command));
 		}
 	
@@ -1368,10 +1477,15 @@ start_withno_pty(wchar_t *command)
 	/* disable Ctrl+C hander in this process*/
 	SetConsoleCtrlHandler(NULL, TRUE);
 
+	if (buf == NULL) {
+		printf_s("ssh-shellhost is out of memory");
+		exit(255);
+	}
 	/* process data from pipe_in and route appropriately */
 	while (1) {
 		rd = wr = i = 0;
-		GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, sizeof(buf)-1, &rd, NULL));
+		buf[0] = L'\0';
+		GOTO_CLEANUP_ON_FALSE(ReadFile(pipe_in, buf, BUFF_SIZE, &rd, NULL));
 
 		if (process_input == FALSE) {
 			/* write stream directly to child stdin */
@@ -1413,12 +1527,10 @@ start_withno_pty(wchar_t *command)
 
 			/* For CR and LF */
 			if ((buf[i] == '\r') || (buf[i] == '\n')) {
-				/* TODO - do a much accurate mapping */
-				GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
-				if ((buf[i] == '\r') && ((i == rd - 1) || (buf[i + 1] != '\n'))) {
+				/* TODO - do a much accurate mapping */				
+				if ((buf[i] == '\r') && ((i == rd - 1) || (buf[i + 1] != '\n')))
 					buf[i] = '\n';
-					GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
-				}
+				GOTO_CLEANUP_ON_FALSE(WriteFile(pipe_out, buf + i, 1, &wr, NULL));
 				in_cmd[in_cmd_len] = buf[i];
 				in_cmd_len++;
 				GOTO_CLEANUP_ON_FALSE(WriteFile(child_pipe_write, in_cmd, in_cmd_len, &wr, NULL));
@@ -1449,6 +1561,12 @@ cleanup:
 	}		
 	if (!IS_INVALID_HANDLE(child))
 		TerminateProcess(child, 0);
+
+	if (buf != NULL)
+		free(buf);
+
+	if (cmd != NULL)
+		free(cmd);
 	
 	return child_exit_code;
 }
@@ -1554,6 +1672,7 @@ wmain(int ac, wchar_t **av)
 {
 	int pty_requested = 0;
 	wchar_t *cmd = NULL, *cmd_b64 = NULL;
+	JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_info;
 
 	_set_invalid_parameter_handler(my_invalid_parameter_handler);
 	if ((ac == 1) || (ac == 2 && wcscmp(av[1], L"-nopty"))) {
@@ -1593,6 +1712,21 @@ wmain(int ac, wchar_t **av)
 	if (!GetSystemDirectory(system32_path, _countof(system32_path))) {
 		printf_s("GetSystemDirectory failed");
 		exit(255);
+	}
+
+	/* assign to job object */
+	if ((job = CreateJobObjectW(NULL, NULL)) == NULL) {
+		printf_s("cannot create job object, error: %d", GetLastError());
+		return -1;
+	}
+
+	memset(&job_info, 0, sizeof(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+	job_info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+	if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &job_info, sizeof(job_info)) ||
+		!AssignProcessToJobObject(job, GetCurrentProcess())) {
+		printf_s("cannot associate job object: %d", GetLastError());
+		return -1;
 	}
 
 	if (pty_requested)

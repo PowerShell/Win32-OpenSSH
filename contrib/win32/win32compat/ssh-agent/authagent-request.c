@@ -43,7 +43,7 @@
 
 #pragma warning(push, 3)
 
-int pubkey_allowed(struct sshkey* pubkey, HANDLE user_token);
+int pubkey_allowed(struct sshkey* pubkey, char*  user_utf8);
 
 static void
 InitLsaString(LSA_STRING *lsa_string, const char *str)
@@ -287,7 +287,7 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 	}
 
 	
-	if (pubkey_allowed(key, token) != 1) {
+	if (pubkey_allowed(key, user) != 1) {
 		debug("unable to verify public key for user %ls (profile:%ls)", user_utf16, wuser_home);
 		goto done;
 	}

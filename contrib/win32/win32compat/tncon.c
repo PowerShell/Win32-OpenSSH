@@ -50,6 +50,7 @@ extern int ScreenY;
 extern int ScreenX;
 extern int ScrollTop;
 extern int ScrollBottom;
+unsigned char tmp_buf[30];
 
 /* terminal global switches*/
 TelParams Parameters = {
@@ -103,6 +104,27 @@ DataAvailable(HANDLE h)
 }
 
 int
+GetModifierKey(DWORD dwControlKeyState)
+{
+	int modKey = 0;
+	if ((dwControlKeyState & LEFT_ALT_PRESSED) || (dwControlKeyState & RIGHT_ALT_PRESSED))
+		modKey += 2;
+
+	if (dwControlKeyState & SHIFT_PRESSED)
+		modKey += 1;
+
+	if ((dwControlKeyState & LEFT_CTRL_PRESSED) || (dwControlKeyState & RIGHT_CTRL_PRESSED))
+		modKey += 4;
+
+	if (modKey){
+		memset(tmp_buf, 0, sizeof(tmp_buf));
+		modKey++;
+	}		
+
+	return modKey;
+}
+
+int
 ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 {
 	HANDLE hHandle[] = { hInput, NULL };
@@ -110,11 +132,12 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 	DWORD dwInput = 0;
 	DWORD dwControlKeyState = 0;
 	DWORD rc = 0;
-	unsigned char octets[20];
+	unsigned char octets[20];	
 	char aChar = 0;
 	INPUT_RECORD InputRecord;
 	BOOL bCapsOn = FALSE;
 	BOOL bShift = FALSE;
+	int modKey = 0;
 
 	glob_out = destin;
 	glob_space = destinlen;
@@ -138,6 +161,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 			bShift = (InputRecord.Event.KeyEvent.dwControlKeyState & SHIFT_PRESSED);
 			dwControlKeyState = InputRecord.Event.KeyEvent.dwControlKeyState &
 				~(CAPSLOCK_ON | ENHANCED_KEY | NUMLOCK_ON | SCROLLLOCK_ON);
+			modKey = GetModifierKey(dwControlKeyState);
 			if (InputRecord.Event.KeyEvent.bKeyDown) {
 				int n = WideCharToMultiByte(
 					CP_UTF8,
@@ -167,34 +191,144 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 				default:
 					switch (InputRecord.Event.KeyEvent.wVirtualKeyCode) {
 					case VK_UP:
-						NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_UP_ARROW : UP_ARROW), 3, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_UP_ARROW : UP_ARROW), 3, 0);
+						else {
+							/* ^[[1;mA */
+							char *p = "\033[1;";			
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = 'A';
+							
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_DOWN:
-						NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_DOWN_ARROW : DOWN_ARROW), 3, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_DOWN_ARROW : DOWN_ARROW), 3, 0);
+						else {
+							/* ^[[1;mB */
+							char *p = "\033[1;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = 'B';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_RIGHT:
-						NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_RIGHT_ARROW : RIGHT_ARROW), 3, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_RIGHT_ARROW : RIGHT_ARROW), 3, 0);
+						else {
+							/* ^[[1;mC */
+							char *p = "\033[1;";			
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = 'C';
+							
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_LEFT:
-						NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_LEFT_ARROW : LEFT_ARROW), 3, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)(gbVTAppMode ? APP_LEFT_ARROW : LEFT_ARROW), 3, 0);
+						else {
+							/* ^[[1;mD */
+							char *p = "\033[1;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = 'D';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_END:
-						NetWriteString2(pParams->Socket, (char *)SELECT_KEY, 4, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)SELECT_KEY, 4, 0);
+						else {
+							/* ^[[1;mF */
+							char *p = "\033[1;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = 'F';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_HOME:
-						NetWriteString2(pParams->Socket, (char *)FIND_KEY, 4, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)FIND_KEY, 4, 0);
+						else {
+							/* ^[[1;mH */
+							char *p = "\033[1;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = 'H';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_INSERT:
-						NetWriteString2(pParams->Socket, (char *)INSERT_KEY, 4, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)INSERT_KEY, 4, 0);
+						else {
+							/* ^[[2;m~ */
+							char *p = "\033[2;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = '~';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_DELETE:
-						NetWriteString2(pParams->Socket, (char *)REMOVE_KEY, 4, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)REMOVE_KEY, 4, 0);
+						else {
+							/* ^[[3;m~ */
+							char *p = "\033[3;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = '~';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_PRIOR: /* page up */
-						NetWriteString2(pParams->Socket, (char *)PREV_KEY, 4, 0);
+						if (!modKey)
+							NetWriteString2(pParams->Socket, (char *)PREV_KEY, 4, 0);
+						else {
+							/* ^[[5;m~ */
+							char *p = "\033[5;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = '~';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_NEXT: /* page down */
-						NetWriteString2(pParams->Socket, (char *)NEXT_KEY, 4, 0);
+						if(!modKey)
+							NetWriteString2(pParams->Socket, (char *)NEXT_KEY, 4, 0);
+						else {
+							/* ^[[6;m~  */
+							char *p = "\033[6;";
+							strcpy_s(tmp_buf, sizeof(tmp_buf), p);
+							size_t index = strlen(p);
+							tmp_buf[index++] = modKey + '0';
+							tmp_buf[index] = '~';
+
+							NetWriteString2(pParams->Socket, tmp_buf, index+1, 0);
+						}
 						break;
 					case VK_BACK:
 						NetWriteString2(pParams->Socket, (char *)BACKSPACE_KEY, 1, 0);
@@ -574,7 +708,16 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 							NetWriteString2(pParams->Socket, (char *)SHIFT_CTRL_PF12_KEY, strlen(SHIFT_CTRL_PF12_KEY), 0);
 						break;
 					default:
-						NetWriteString2(pParams->Socket, (char *)octets, n, 0);
+						if (strcmp((char *) octets, "")) {
+							if ((dwControlKeyState & LEFT_ALT_PRESSED) || (dwControlKeyState & RIGHT_ALT_PRESSED)) {								
+								memset(tmp_buf, 0, sizeof(tmp_buf));
+								tmp_buf[0] = '\x1b';
+								memcpy(tmp_buf + 1, (char *)octets, n);
+								NetWriteString2(pParams->Socket, tmp_buf, n + 1, 0);								
+							}
+							else
+								NetWriteString2(pParams->Socket, (char *)octets, n, 0);
+						}							
 						break;
 					}
 				}

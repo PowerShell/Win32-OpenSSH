@@ -1788,8 +1788,15 @@ do_ca_sign(struct passwd *pw, int argc, char **argv)
 		if ((fd = open(out, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1)
 			fatal("Could not open \"%s\" for writing: %s", out,
 			    strerror(errno));		
+#ifdef WINDOWS
+		/* Windows POSIX adpater does not support fdopen() on open(file)*/
+		close(fd);
+		if ((f = fopen(out, "w")) == NULL)
+			fatal("fopen %s failed: %s", identity_file, strerror(errno));
+#else  /* !WINDOWS */
 		if ((f = fdopen(fd, "w")) == NULL)
 			fatal("%s: fdopen: %s", __func__, strerror(errno));
+#endif  /* !WINDOWS */
 		if ((r = sshkey_write(public, f)) != 0)
 			fatal("Could not write certified key to %s: %s",
 			    out, ssh_err(r));
