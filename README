@@ -58,9 +58,9 @@ References -
 [1] http://www.lothar.com/tech/crypto/
 [2] http://www.aet.tu-cottbus.de/personen/jaenicke/postfix_tls/prngd.html
 [3] http://www.gzip.org/zlib/
-[4] http://www.openssl.org/
-[5] http://www.openpam.org
-    http://www.kernel.org/pub/linux/libs/pam/
+[4] https://www.openssl.org/
+[5] https://www.openpam.org
+    https://www.kernel.org/pub/linux/libs/pam/
     (PAM also is standard on Solaris and HP-UX 11)
 [6] http://thrysoee.dk/editline/ (portable version)
-[7] http://man.openbsd.org/style.9
+[7] https://man.openbsd.org/style.9
