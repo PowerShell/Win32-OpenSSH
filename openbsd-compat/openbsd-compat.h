@@ -307,6 +307,10 @@ int	bcrypt_pbkdf(const char *, size_t, const u_int8_t *, size_t,
 void explicit_bzero(void *p, size_t n);
 #endif
 
+#ifndef HAVE_FREEZERO
+void freezero(void *, size_t);
+#endif
+
 char *xcrypt(const char *password, const char *salt);
 char *shadow_pw(struct passwd *pw);
 

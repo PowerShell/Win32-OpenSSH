@@ -26,6 +26,8 @@ ssh-keyscan
 ssh-keysign
 ssh-pkcs11-helper
 sshd
+!regress/misc/fuzz-harness/Makefile
+
 # Ignores in Windows fork
 /bin/x64/Debug
 /contrib/win32/openssh/.vs/Win32-OpenSSH/v14

@@ -207,7 +207,7 @@ sys_tun_open(int tun, int mode)
 #define OPENBSD_AF_INET6	24
 
 int
-sys_tun_infilter(struct Channel *c, char *buf, int _len)
+sys_tun_infilter(struct ssh *ssh, struct Channel *c, char *buf, int _len)
 {
 	int r;
 	size_t len;
@@ -245,24 +245,22 @@ sys_tun_infilter(struct Channel *c, char *buf, int _len)
 	POKE_U32(buf, af == AF_INET6 ? OPENBSD_AF_INET6 : OPENBSD_AF_INET);
 #endif
 
-	if ((r = sshbuf_put_string(&c->input, ptr, len)) != 0)
+	if ((r = sshbuf_put_string(c->input, ptr, len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	return (0);
 }
 
 u_char *
-sys_tun_outfilter(struct Channel *c, u_char **data, u_int *dlen)
+sys_tun_outfilter(struct ssh *ssh, struct Channel *c,
+    u_char **data, size_t *dlen)
 {
 	u_char *buf;
 	u_int32_t af;
 	int r;
-	size_t xxx_dlen;
 
 	/* XXX new API is incompatible with this signature. */
-	if ((r = sshbuf_get_string(&c->output, data, &xxx_dlen)) != 0)
+	if ((r = sshbuf_get_string(c->output, data, dlen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (dlen != NULL)
-		*dlen = xxx_dlen;
 	if (*dlen < sizeof(af))
 		return (NULL);
 	buf = *data;

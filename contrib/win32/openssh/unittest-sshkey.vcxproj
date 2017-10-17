@@ -23,7 +23,7 @@
     <ProjectGuid>{FC568FF0-60F2-4B2E-AF62-FD392EDBA1B9}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Win32OpenSSH</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>$(WindowsSDKVersion)</WindowsTargetPlatformVersion>
     <ProjectName>unittest-sshkey</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -210,14 +210,30 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\common.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\tests.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\test_file.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\test_fuzz.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\test_sshkey.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\fuzz.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\test_helper.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_common.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\common.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\tests.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\test_file.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\test_fuzz.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshkey\test_sshkey.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\fuzz.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\test_helper.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_common.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1227,7 +1227,12 @@ sink(int argc, char **argv)
 		}
 		omode = mode;
 		mode |= S_IWUSR;
-		if ((ofd = open(np, O_WRONLY|O_CREAT, mode)) < 0) {
+#ifdef WINDOWS
+		// In windows, we would like to inherit the parent folder permissions by setting mode to USHRT_MAX.
+		if ((ofd = open(np, O_WRONLY | O_CREAT, USHRT_MAX)) < 0) {
+#else
+		if ((ofd = open(np, O_WRONLY | O_CREAT, mode)) < 0) {
+#endif // WINDOWS
 bad:			run_err("%s: %s", np, strerror(errno));
 			continue;
 		}

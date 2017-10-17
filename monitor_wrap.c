@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor_wrap.c,v 1.92 2017/05/30 14:10:53 markus Exp $ */
+/* $OpenBSD: monitor_wrap.c,v 1.94 2017/10/02 19:33:20 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -242,6 +242,7 @@ mm_key_sign(struct sshkey *key, u_char **sigp, u_int *lenp,
 struct passwd *
 mm_getpwnamallow(const char *username)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	Buffer m;
 	struct passwd *pw;
 	u_int len, i;
@@ -289,13 +290,20 @@ out:
 		for (i = 0; i < newopts->nx; i++) \
 			newopts->x[i] = buffer_get_string(&m, NULL); \
 	} while (0)
+#define M_CP_STRARRAYOPT_ALLOC(x, nx) do { \
+		newopts->x = newopts->nx == 0 ? \
+		    NULL : xcalloc(newopts->nx, sizeof(*newopts->x)); \
+		M_CP_STRARRAYOPT(x, nx); \
+	} while (0)
 	/* See comment in servconf.h */
 	COPY_MATCH_STRING_OPTS();
 #undef M_CP_STROPT
 #undef M_CP_STRARRAYOPT
+#undef M_CP_STRARRAYOPT_ALLOC
 
 	copy_set_server_options(&options, newopts, 1);
 	log_change_level(options.log_level);
+	process_permitopen(ssh, &options);
 	free(newopts);
 
 	buffer_free(&m);

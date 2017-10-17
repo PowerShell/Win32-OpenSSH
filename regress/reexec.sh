@@ -1,4 +1,4 @@
-#	$OpenBSD: reexec.sh,v 1.11 2017/04/30 23:34:55 djm Exp $
+#	$OpenBSD: reexec.sh,v 1.12 2017/08/07 03:52:55 dtucker Exp $
 #	Placed in the Public Domain.
 
 tid="reexec tests"
@@ -51,17 +51,4 @@ rm -f $SSHD_COPY
 copy_tests
 
 stop_sshd
-
-verbose "test reexec fallback without privsep"
-
-cp $OBJ/sshd_config.orig $OBJ/sshd_config
-echo "UsePrivilegeSeparation=no" >> $OBJ/sshd_config
-
-start_sshd_copy
-rm -f $SSHD_COPY
-
-copy_tests
-
-stop_sshd
-
 fi

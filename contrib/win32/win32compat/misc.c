@@ -34,6 +34,8 @@
 #include <Shlwapi.h>
 #include <conio.h>
 #include <LM.h>
+#include <Sddl.h>
+#include <Aclapi.h>
 
 #include "inc\unistd.h"
 #include "inc\sys\stat.h"
@@ -591,7 +593,8 @@ has_executable_extension(wchar_t * path)
 int
 file_attr_to_st_mode(wchar_t * path, DWORD attributes)
 {
-	int mode = S_IREAD;	
+	int mode = S_IREAD;
+	BOOL isReadOnlyFile = FALSE;
 	if ((attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 || is_root_or_empty(path))
 		mode |= S_IFDIR | _S_IEXEC;
 	else {
@@ -603,10 +606,13 @@ file_attr_to_st_mode(wchar_t * path, DWORD attributes)
 	}
 	if (!(attributes & FILE_ATTRIBUTE_READONLY))
 		mode |= S_IWRITE;
+	else
+		isReadOnlyFile = TRUE;
 
-	// propagate owner read/write/execute bits to group/other fields.
-	mode |= (mode & 0700) >> 3;
-	mode |= (mode & 0700) >> 6;
+	// We don't populate the group permissions as its not applicable to windows OS.
+	// propagate owner read/write/execute bits to other fields.	
+	mode |= get_others_file_permissions(path, isReadOnlyFile);
+
 	return mode;
 }
 
@@ -1303,4 +1309,107 @@ to_lower_case(char *s)
 {
 	for (; *s; s++)
 		*s = tolower((u_char)*s);
+}
+
+static int
+get_final_mode(int allow_mode, int deny_mode)
+{	
+	// If deny permissions are not specified then return allow permissions.
+	if (!deny_mode) return allow_mode;
+
+	// If allow permissions are not specified then return allow permissions (0).
+	if (!allow_mode) return allow_mode;
+	
+	if(deny_mode & S_IROTH)
+		allow_mode = allow_mode & ~S_IROTH;
+
+	if (deny_mode & S_IWOTH)
+		allow_mode = allow_mode & ~S_IWOTH;
+
+	if (deny_mode & S_IXOTH)
+		allow_mode = allow_mode & ~S_IXOTH;
+
+	return allow_mode;
+}
+
+int
+get_others_file_permissions(wchar_t * file_name, int isReadOnlyFile)
+{
+	PSECURITY_DESCRIPTOR pSD = NULL;
+	PSID owner_sid = NULL, current_trustee_sid = NULL;
+	PACL dacl = NULL;
+	DWORD error_code = ERROR_SUCCESS;
+	BOOL is_valid_sid = FALSE, is_valid_acl = FALSE;
+	int ret = 0, allow_mode_world = 0, allow_mode_auth_users = 0, deny_mode_world = 0, deny_mode_auth_users = 0;
+	wchar_t *w_sid = NULL;
+
+	/*Get the owner sid of the file.*/
+	if ((error_code = GetNamedSecurityInfoW(file_name, SE_FILE_OBJECT,
+		OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+		&owner_sid, NULL, &dacl, NULL, &pSD)) != ERROR_SUCCESS) {
+		debug3("failed to retrieve the owner sid and dacl of file: %ls with error code: %d", file_name, error_code);
+		goto cleanup;
+	}
+
+	if (((is_valid_sid = IsValidSid(owner_sid)) == FALSE) || ((is_valid_acl = IsValidAcl(dacl)) == FALSE)) {
+		debug3("IsValidSid: %d; is_valid_acl: %d", is_valid_sid, is_valid_acl);
+		goto cleanup;
+	}
+
+	for (DWORD i = 0; i < dacl->AceCount; i++) {
+		PVOID current_ace = NULL;
+		PACE_HEADER current_aceHeader = NULL;
+		ACCESS_MASK current_access_mask = 0;
+		int mode_tmp = 0;
+		if (!GetAce(dacl, i, &current_ace)) {
+			debug3("GetAce() failed");
+			goto cleanup;
+		}
+
+		current_aceHeader = (PACE_HEADER)current_ace;
+		/* only interested in Allow ACE */
+		if (current_aceHeader->AceType == ACCESS_ALLOWED_ACE_TYPE) {
+			PACCESS_ALLOWED_ACE pAllowedAce = (PACCESS_ALLOWED_ACE)current_ace;
+			current_trustee_sid = &(pAllowedAce->SidStart);
+			current_access_mask = pAllowedAce->Mask;
+		} else if (current_aceHeader->AceType == ACCESS_DENIED_ACE_TYPE) {
+			PACCESS_DENIED_ACE pDeniedAce = (PACCESS_DENIED_ACE)current_ace;
+			current_trustee_sid = &(pDeniedAce->SidStart);
+			current_access_mask = pDeniedAce->Mask;
+		} else continue;
+		
+		if (!(IsWellKnownSid(current_trustee_sid, WinWorldSid) || 
+		    IsWellKnownSid(current_trustee_sid, WinAuthenticatedUserSid)))
+			continue;
+		
+		if ((current_access_mask & READ_PERMISSIONS) == READ_PERMISSIONS)
+			mode_tmp |= S_IROTH;
+
+		if (!isReadOnlyFile && ((current_access_mask & WRITE_PERMISSIONS) == WRITE_PERMISSIONS))
+			mode_tmp |= S_IWOTH;
+
+		if ((current_access_mask & EXECUTE_PERMISSIONS) == EXECUTE_PERMISSIONS)
+			mode_tmp |= S_IXOTH;
+
+		if (IsWellKnownSid(current_trustee_sid, WinWorldSid)) {
+			if(current_aceHeader->AceType == ACCESS_ALLOWED_ACE_TYPE)
+				allow_mode_world |= mode_tmp;
+			else
+				deny_mode_world |= mode_tmp;
+		} else if (IsWellKnownSid(current_trustee_sid, WinAuthenticatedUserSid)) {
+			if (current_aceHeader->AceType == ACCESS_ALLOWED_ACE_TYPE)
+				allow_mode_auth_users |= mode_tmp;
+			else
+				deny_mode_auth_users |= mode_tmp;
+		}
+	}
+	
+	allow_mode_world = get_final_mode(allow_mode_world, deny_mode_world);
+	allow_mode_auth_users = get_final_mode(allow_mode_auth_users, deny_mode_auth_users);
+
+	ret = allow_mode_world ? allow_mode_world : allow_mode_auth_users;
+cleanup:
+	if (pSD)
+		LocalFree(pSD);
+	return ret;
 }

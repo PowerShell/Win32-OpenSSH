@@ -175,7 +175,7 @@ WARNING: Following changes will be made to OpenSSH configuration
     Start-Service ssh-agent
 
     #copy sshtest keys
-    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force    
+    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force  
     Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*"| % {
         #workaround for the cariggage new line added by git before copy them
         $filePath = "$($_.FullName)"
@@ -191,6 +191,17 @@ WARNING: Following changes will be made to OpenSSH configuration
             }
         }        
     }
+
+    #copy ca pubkey to SSHD bin path
+    Copy-Item "$($Script:E2ETestDirectory)\sshtest_ca_userkeys.pub"  $script:OpenSSHBinPath -Force 
+
+    #copy ca private key to test dir
+    $ca_priv_key = (Join-Path $Global:OpenSSHTestInfo["TestDataPath"] sshtest_ca_userkeys)
+    Copy-Item (Join-Path $Script:E2ETestDirectory sshtest_ca_userkeys) $ca_priv_key -Force
+    $con = (Get-Content $ca_priv_key | Out-String).Replace("`r`n","`n")
+    Set-Content -Path $ca_priv_key -Value "$con"
+    Repair-UserSshConfigPermission -FilePath $ca_priv_key -confirm:$false    
+    $Global:OpenSSHTestInfo["CA_Private_Key"] = $ca_priv_key
 
     Restart-Service sshd -Force
    
@@ -241,7 +252,8 @@ WARNING: Following changes will be made to OpenSSH configuration
     Copy-Item $testPubKeyPath $authorizedKeyPath -Force -ErrorAction SilentlyContinue
     Repair-AuthorizedKeyPermission -FilePath $authorizedKeyPath -confirm:$false
     
-    $testPriKeypath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519
+    copy-item (Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519) $Global:OpenSSHTestInfo["TestDataPath"]
+    $testPriKeypath = Join-Path $Global:OpenSSHTestInfo["TestDataPath"] sshtest_userssokey_ed25519
     $con = (Get-Content $testPriKeypath | Out-String).Replace("`r`n","`n")
     Set-Content -Path $testPriKeypath -Value "$con"
     cmd /c "ssh-add -D 2>&1 >> $Script:TestSetupLogFile"
@@ -462,7 +474,9 @@ function Clear-OpenSSHTestEnvironment
         Remove-ItemProperty "HKLM:Software\Microsoft\Windows NT\CurrentVersion\AeDebug" -Name Auto -ErrorAction SilentlyContinue -Force | Out-Null
     }
     
-    Remove-Item $sshBinPath\sshtest*hostkey* -Force -ErrorAction SilentlyContinue    
+    Remove-Item "$sshBinPath\sshtest*hostkey*" -Force -ErrorAction SilentlyContinue   
+    Remove-Item "$sshBinPath\sshtest*ca_userkeys*" -Force -ErrorAction SilentlyContinue   
+     
     #Restore sshd_config
     $backupConfigPath = Join-Path $sshBinPath sshd_config.ori
     if (Test-Path $backupConfigPath -PathType Leaf) {        

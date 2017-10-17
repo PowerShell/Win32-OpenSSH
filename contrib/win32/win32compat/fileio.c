@@ -271,20 +271,11 @@ st_mode_to_file_att(int mode, wchar_t * attributes)
 	case S_IRWXO:
 		swprintf_s(attributes, MAX_ATTRIBUTE_LENGTH, L"FA");
 		break;
-	case S_IXOTH:
-		swprintf_s(attributes, MAX_ATTRIBUTE_LENGTH, L"FX");
-		break;
-	case S_IWOTH:
-		swprintf_s(attributes, MAX_ATTRIBUTE_LENGTH, L"FW");
-		break;
-	case S_IROTH:
-		swprintf_s(attributes, MAX_ATTRIBUTE_LENGTH, L"FR");
-		break;
 	default:
 		if((mode & S_IROTH) != 0)
-			att |= FILE_GENERIC_READ;
+			att |= (FILE_GENERIC_READ | FILE_EXECUTE);
 		if ((mode & S_IWOTH) != 0)
-			att |= FILE_GENERIC_WRITE;
+			att |= (FILE_GENERIC_WRITE | DELETE);
 		if ((mode & S_IXOTH) != 0)
 			att |= FILE_GENERIC_EXECUTE;
 		swprintf_s(attributes, MAX_ATTRIBUTE_LENGTH, L"%#lx", att);
@@ -295,13 +286,13 @@ st_mode_to_file_att(int mode, wchar_t * attributes)
 
 /* maps open() file modes and flags to ones needed by CreateFile */
 static int
-createFile_flags_setup(int flags, u_short mode, struct createFile_flags* cf_flags)
+createFile_flags_setup(int flags, mode_t mode, struct createFile_flags* cf_flags)
 {
 	/* check flags */
 	int rwflags = flags & 0x3, c_s_flags = flags & 0xfffffff0, ret = -1;
 	PSECURITY_DESCRIPTOR pSD = NULL;
 	wchar_t sddl[SDDL_LENGTH + 1] = { 0 }, owner_ace[MAX_ACE_LENGTH + 1] = {0}, everyone_ace[MAX_ACE_LENGTH + 1] = {0};
-	wchar_t owner_access[MAX_ATTRIBUTE_LENGTH + 1] = {0}, everyone_access[MAX_ATTRIBUTE_LENGTH + 1] = {0}, *sid_utf16;
+	wchar_t owner_access[MAX_ATTRIBUTE_LENGTH + 1] = {0}, everyone_access[MAX_ATTRIBUTE_LENGTH + 1] = {0}, *sid_utf16 = NULL;
 	PACL dacl = NULL;
 	struct passwd * pwd;
 	PSID owner_sid = NULL;
@@ -319,13 +310,6 @@ createFile_flags_setup(int flags, u_short mode, struct createFile_flags* cf_flag
 	/*only following create and status flags currently supported*/
 	if (c_s_flags & ~(O_NONBLOCK | O_APPEND | O_CREAT | O_TRUNC | O_EXCL | O_BINARY)) {
 		debug3("open - ERROR: Unsupported flags: %d", flags);
-		errno = ENOTSUP;
-		return -1;
-	}
-
-	/*validate mode*/
-	if (mode & ~(S_IRWXU | S_IRWXG | S_IRWXO)) {
-		debug3("open - ERROR: unsupported mode: %d", mode);
 		errno = ENOTSUP;
 		return -1;
 	}
@@ -360,47 +344,60 @@ createFile_flags_setup(int flags, u_short mode, struct createFile_flags* cf_flag
 
 	cf_flags->dwFlagsAndAttributes = FILE_FLAG_OVERLAPPED | FILE_FLAG_BACKUP_SEMANTICS;
 
-	/*map mode*/
-	if ((pwd = getpwuid(0)) == NULL)
-		fatal("getpwuid failed.");	
+	// If the mode is USHRT_MAX then we will inherit the permissions from the parent folder.
+	if (mode != USHRT_MAX) {
+		/*validate mode*/
+		/*
+		 * __S_IFDIR  __S_IFREG are added for compat
+		 * TODO- open(__S_IFDIR) on a file and vice versa should fail
+		*/
+		if (mode & ~(S_IRWXU | S_IRWXG | S_IRWXO | __S_IFDIR | __S_IFREG)) {
+			debug3("open - ERROR: unsupported mode: %d", mode);
+			errno = ENOTSUP;
+			return -1;
+		}
 
-	if ((sid_utf16 = utf8_to_utf16(pwd->pw_sid)) == NULL) {
-		debug3("Failed to get utf16 of the sid string");
-		errno = ENOMEM;
-		goto cleanup;
-	}
+		if ((pwd = getpwuid(0)) == NULL)
+			fatal("getpwuid failed.");
 
-	if (ConvertStringSidToSid(pwd->pw_sid, &owner_sid) == FALSE ||
-		(IsValidSid(owner_sid) == FALSE)) {
-		debug3("cannot retrieve SID of user %s", pwd->pw_name);
-		goto cleanup;
-	}
-
-	if (!IsWellKnownSid(owner_sid, WinLocalSystemSid) && ((mode & S_IRWXU) != 0)) {
-		if (st_mode_to_file_att((mode & S_IRWXU) >> 6, owner_access) != 0) {
-			debug3("st_mode_to_file_att()");
+		if ((sid_utf16 = utf8_to_utf16(pwd->pw_sid)) == NULL) {
+			debug3("Failed to get utf16 of the sid string");
+			errno = ENOMEM;
 			goto cleanup;
 		}
-		swprintf_s(owner_ace, MAX_ACE_LENGTH, L"(A;;%s;;;%s)", owner_access, sid_utf16);
-	}
 
-	if (mode & S_IRWXO) {
-		if (st_mode_to_file_att(mode & S_IRWXO, everyone_access) != 0) {			
-			debug3("st_mode_to_file_att()");
+		if (ConvertStringSidToSid(pwd->pw_sid, &owner_sid) == FALSE ||
+			(IsValidSid(owner_sid) == FALSE)) {
+			debug3("cannot retrieve SID of user %s", pwd->pw_name);
 			goto cleanup;
 		}
-		swprintf_s(everyone_ace, MAX_ACE_LENGTH, L"(A;;%s;;;WD)", everyone_access);
-	}
 
-	swprintf_s(sddl, SDDL_LENGTH, L"O:%sD:PAI(A;;FA;;;BA)(A;;FA;;;SY)%s%s", sid_utf16, owner_ace, everyone_ace);
-	if (ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION, &pSD, NULL) == FALSE) {
-		debug3("ConvertStringSecurityDescriptorToSecurityDescriptorW failed with error code %d", GetLastError());
-		goto cleanup;
-	}
+		if (!IsWellKnownSid(owner_sid, WinLocalSystemSid) && ((mode & S_IRWXU) != 0)) {
+			if (st_mode_to_file_att((mode & S_IRWXU) >> 6, owner_access) != 0) {
+				debug3("st_mode_to_file_att()");
+				goto cleanup;
+			}
+			swprintf_s(owner_ace, MAX_ACE_LENGTH, L"(A;;%s;;;%s)", owner_access, sid_utf16);
+		}
 
-	if (IsValidSecurityDescriptor(pSD) == FALSE) {
-		debug3("IsValidSecurityDescriptor return FALSE");
-		goto cleanup;
+		if (mode & S_IRWXO) {
+			if (st_mode_to_file_att(mode & S_IRWXO, everyone_access) != 0) {
+				debug3("st_mode_to_file_att()");
+				goto cleanup;
+			}
+			swprintf_s(everyone_ace, MAX_ACE_LENGTH, L"(A;;%s;;;WD)", everyone_access);
+		}
+
+		swprintf_s(sddl, SDDL_LENGTH, L"O:%sD:PAI(A;;FA;;;BA)(A;;FA;;;SY)%s%s", sid_utf16, owner_ace, everyone_ace);
+		if (ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION, &pSD, NULL) == FALSE) {
+			debug3("ConvertStringSecurityDescriptorToSecurityDescriptorW failed with error code %d", GetLastError());
+			goto cleanup;
+		}
+
+		if (IsValidSecurityDescriptor(pSD) == FALSE) {
+			debug3("IsValidSecurityDescriptor return FALSE");
+			goto cleanup;
+		}
 	}
 
 	cf_flags->securityAttributes.lpSecurityDescriptor = pSD;
@@ -418,7 +415,7 @@ cleanup:
 
 /* open() implementation. Uses CreateFile to open file, console, device, etc */
 struct w32_io*
-fileio_open(const char *path_utf8, int flags, u_short mode)
+fileio_open(const char *path_utf8, int flags, mode_t mode)
 {
 	struct w32_io* pio = NULL;
 	struct createFile_flags cf_flags;

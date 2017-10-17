@@ -67,7 +67,23 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
                 Options = '-i $identifyFile -l $($server.localAdminUserName)'
             }
         )#>
-        
+        $dfltShellRegPath = "HKLM:\Software\OpenSSH"
+        $dfltShellRegKeyName = "DefaultShell"
+        $dfltShellCmdOptionRegKeyName = "DefaultShellCommandOption"
+
+        function ConfigureDefaultShell {
+            param
+            (
+                  [string] $default_shell_path,
+                  [string] $default_shell_cmd_option_val
+            )
+            
+            if (!(Test-Path $dfltShellRegPath)) {
+                New-Item -Path $dfltShellRegPath -Force | Out-Null
+            }
+            New-ItemProperty -Path $dfltShellRegPath -Name $dfltShellRegKeyName -Value $default_shell_path -PropertyType String -Force
+            New-ItemProperty -Path $dfltShellRegPath -Name $dfltShellCmdOptionRegKeyName -Value $default_shell_cmd_option_val -PropertyType String -Force
+        }
     }
 
     BeforeEach {
@@ -98,7 +114,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
         }
 
     }
-
+    
     Context "$tC - exit code (exit-status.sh)" {
         BeforeAll {$tI=1}
         AfterAll{$tC++}
@@ -131,8 +147,37 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
             0 | ssh -p $port $ssouser@$server pause
             $true | Should Be $true
         }#>
-    }
+    }    
+    
+    Context "$tC - configure default shell Scenarios" {
+        BeforeAll {$tI=1}
+        AfterAll{$tC++}
+        AfterEach {
+            Remove-ItemProperty -Path $dfltShellRegPath -Name $dfltShellRegKeyName -ErrorAction SilentlyContinue
+            Remove-ItemProperty -Path $dfltShellRegPath -Name $dfltShellCmdOptionRegKeyName -ErrorAction SilentlyContinue
+        }
 
+        It "$tC.$tI - default shell as powershell" {
+            $shell_path = (Get-Command powershell.exe -ErrorAction SilentlyContinue).path
+            if($shell_path -ne $null) {
+                ConfigureDefaultShell -default_shell_path $shell_path -default_shell_cmd_option_val "/c"
+
+                $o = ssh test_target Write-Output 1234
+                $o | Should Be "1234"
+            }
+        }
+
+        It "$tC.$tI - default shell as cmd" {
+            $shell_path = (Get-Command cmd.exe -ErrorAction SilentlyContinue).path
+            if($shell_path -ne $null) {
+                ConfigureDefaultShell -default_shell_path $shell_path -default_shell_cmd_option_val "/c"
+
+                $o = ssh test_target where cmd
+                $o | Should Contain "cmd"
+            }
+        }
+    }
+    
     Context "$tC - cmdline parameters" {
         
         BeforeAll {$tI=1}
@@ -192,7 +237,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
             $logFile | Should Contain "[::1]"            
         }
     }
-
+    
 
     
     <#Context "Key is not secured in ssh-agent on server" {

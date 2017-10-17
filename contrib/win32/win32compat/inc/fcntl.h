@@ -59,3 +59,10 @@ int w32_allocate_fd_for_handle(HANDLE, BOOL);
 # define S_IRWXU			0000700	/* read, write, execute */
 # define S_IRWXG			0000070	/* read, write, execute */
 # define S_IRWXO			0000007	/* read, write, execute */
+
+/* 
+ * File types. Note that the values are different from similar variants 
+ * defined in stat.h. These are based on similar definition values on Linux
+ */
+#define __S_IFDIR       0040000 /* Directory.  */
+#define __S_IFREG       0100000 /* Regular file.  */

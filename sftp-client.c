@@ -1219,8 +1219,13 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 		return(-1);
 	}
 
+#ifdef WINDOWS
+	// In windows, we would like to inherit the parent folder permissions by setting mode to USHRT_MAX.
+	local_fd = open(local_path, O_WRONLY | O_CREAT | (resume_flag ? 0 : O_TRUNC), USHRT_MAX);
+#else
 	local_fd = open(local_path,
-	    O_WRONLY | O_CREAT | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
+		O_WRONLY | O_CREAT | (resume_flag ? 0 : O_TRUNC), mode | S_IWUSR);
+#endif // WINDOWS
 	if (local_fd == -1) {
 		error("Couldn't open local file \"%s\" for writing: %s",
 		    local_path, strerror(errno));

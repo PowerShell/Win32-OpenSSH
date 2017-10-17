@@ -33,8 +33,8 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: ssh.1,v 1.383 2017/06/09 06:43:01 djm Exp $
-.Dd $Mdocdate: June 9 2017 $
+.\" $OpenBSD: ssh.1,v 1.384 2017/09/21 19:16:53 markus Exp $
+.Dd $Mdocdate: September 21 2017 $
 .Dt SSH 1
 .Os
 .Sh NAME
@@ -592,21 +592,30 @@ Causes most warning and diagnostic messages to be suppressed.
 .Ar remote_socket : local_socket
 .Sm on
 .Xc
+.It Fl R Xo
+.Sm off
+.Oo Ar bind_address : Oc
+.Ar port
+.Sm on
+.Xc
 Specifies that connections to the given TCP port or Unix socket on the remote
-(server) host are to be forwarded to the given host and port, or Unix socket,
-on the local side.
+(server) host are to be forwarded to the local side.
+.Pp
 This works by allocating a socket to listen to either a TCP
 .Ar port
 or to a Unix socket on the remote side.
 Whenever a connection is made to this port or Unix socket, the
 connection is forwarded over the secure channel, and a connection
-is made to either
+is made from the local machine to either an explicit destination specified by
 .Ar host
 port
 .Ar hostport ,
 or
 .Ar local_socket ,
-from the local machine.
+or, if no explicit destination was specified,
+.Nm
+will act as a SOCKS 4/5 proxy and forward connections to the destinations
+requested by the remote SOCKS client.
 .Pp
 Port forwardings can also be specified in the configuration file.
 Privileged ports can be forwarded only when

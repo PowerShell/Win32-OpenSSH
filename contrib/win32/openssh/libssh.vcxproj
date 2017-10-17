@@ -23,7 +23,7 @@
     <ProjectGuid>{05E1115F-8529-46D0-AAAF-52A404CE79A7}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>libssh</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>$(WindowsSDKVersion)</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

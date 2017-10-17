@@ -23,7 +23,7 @@
     <ProjectGuid>{890C6129-286F-4CD8-8252-FB8D3B4E6E1B}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Win32OpenSSH</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>$(WindowsSDKVersion)</WindowsTargetPlatformVersion>
     <ProjectName>unittest-hostkeys</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

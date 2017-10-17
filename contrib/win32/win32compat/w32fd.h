@@ -34,6 +34,7 @@
 
 #include <Windows.h>
 #include <stdio.h>
+#include "inc\sys\types.h"
 
 enum w32_io_type {
 	UNKNOWN_FD = 0,
@@ -144,7 +145,7 @@ int fileio_close(struct w32_io* pio);
 int fileio_pipe(struct w32_io* pio[2]);
 struct w32_io* fileio_afunix_socket();
 int fileio_connect(struct w32_io*, char*);
-struct w32_io* fileio_open(const char *pathname, int flags, u_short mode);
+struct w32_io* fileio_open(const char *pathname, int flags, mode_t mode);
 int fileio_read(struct w32_io* pio, void *dst, size_t max);
 int fileio_write(struct w32_io* pio, const void *buf, size_t max);
 int fileio_fstat(struct w32_io* pio, struct _stat64 *buf);

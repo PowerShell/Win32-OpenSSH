@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.491 2017/07/01 13:50:45 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.492 2017/09/12 06:32:07 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1714,9 +1714,6 @@ main(int ac, char **av)
 			    "enabled authentication methods");
 	}
 
-	/* set default channel AF */
-	channel_set_af(options.address_family);
-
 	/* Check that there are no remaining arguments. */
 	if (optind < ac) {
 		fprintf(stderr, "Extra argument %s.\n", av[optind]);
@@ -2075,7 +2072,13 @@ main(int ac, char **av)
 	packet_set_connection(sock_in, sock_out);
 	packet_set_server();
 	ssh = active_state; /* XXX */
+
 	check_ip_options(ssh);
+
+	/* Prepare the channels layer */
+	channel_init_channels(ssh);
+	channel_set_af(ssh, options.address_family);
+	process_permitopen(ssh, &options);
 
 	/* Set SO_KEEPALIVE if requested. */
 	if (options.tcp_keep_alive && packet_connection_is_on_socket() &&
@@ -2200,10 +2203,10 @@ main(int ac, char **av)
 	    options.client_alive_count_max);
 
 	/* Try to send all our hostkeys to the client */
-	notify_hostkeys(active_state);
+	notify_hostkeys(ssh);
 
 	/* Start session. */
-	do_authenticated(authctxt);
+	do_authenticated(ssh, authctxt);
 
 	/* The connection has been terminated. */
 	packet_get_bytes(&ibytes, &obytes);
@@ -2331,8 +2334,10 @@ do_ssh2_kex(void)
 void
 cleanup_exit(int i)
 {
+	struct ssh *ssh = active_state; /* XXX */
+
 	if (the_authctxt) {
-		do_cleanup(the_authctxt);
+		do_cleanup(ssh, the_authctxt);
 		if (use_privsep && privsep_is_preauth &&
 		    pmonitor != NULL && pmonitor->m_pid > 1) {
 			debug("Killing privsep child %d", pmonitor->m_pid);

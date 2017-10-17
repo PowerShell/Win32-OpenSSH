@@ -23,7 +23,7 @@
     <ProjectGuid>{F6644EC5-D6B6-42A1-828C-75E2977470E0}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Win32OpenSSH</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>$(WindowsSDKVersion)</WindowsTargetPlatformVersion>
     <ProjectName>ssh-agent</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -117,7 +117,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x86-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;Ws2_32.lib;Netapi32.lib;Secur32.lib;Userenv.lib;Crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;$(AdditionalDependentLibs);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
@@ -140,7 +140,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x64-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;Ws2_32.lib;Netapi32.lib;Secur32.lib;Userenv.lib;Crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;$(AdditionalDependentLibs);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>targetos.manifest</AdditionalManifestFiles>
@@ -165,7 +165,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x86-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;Ws2_32.lib;Netapi32.lib;Secur32.lib;Userenv.lib;Crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;$(AdditionalDependentLibs);%(AdditionalDependencies)</AdditionalDependencies>
       <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
     </Link>
     <Manifest>
@@ -192,7 +192,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(OpenSSH-Lib-Path)$(Platform)\$(Configuration);$(LibreSSL-x64-Path);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;Ws2_32.lib;Netapi32.lib;Secur32.lib;Userenv.lib;Crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>posix_compat.lib;libssh.lib;openbsd_compat.lib;libcrypto-41.lib;$(AdditionalDependentLibs);%(AdditionalDependencies)</AdditionalDependencies>
       <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
     </Link>
     <Manifest>

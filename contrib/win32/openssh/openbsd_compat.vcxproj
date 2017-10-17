@@ -123,7 +123,7 @@
     <ProjectGuid>{DD483F7D-C553-4740-BC1A-903805AD0174}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>openbsd_compat</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>$(WindowsSDKVersion)</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

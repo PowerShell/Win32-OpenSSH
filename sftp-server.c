@@ -696,7 +696,12 @@ process_open(u_int32_t id)
 		verbose("Refusing open request in read-only mode");
 		status = SSH2_FX_PERMISSION_DENIED;
 	} else {
+#ifdef WINDOWS
+		// In windows, we would like to inherit the parent folder permissions by setting mode to USHRT_MAX.
+		fd = open(name, flags, USHRT_MAX);
+#else
 		fd = open(name, flags, mode);
+#endif // WINDOWS
 		if (fd < 0) {
 			status = errno_to_portable(errno);
 		} else {

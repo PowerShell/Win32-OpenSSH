@@ -142,7 +142,9 @@ function Write-BuildMsg
     Verifies all tools and dependencies required for building Open SSH are installed on the machine.
 #>
 function Start-OpenSSHBootstrap
-{    
+{
+    param([switch]$OneCore)
+
     [bool] $silent = -not $script:Verbose
     Write-BuildMsg -AsInfo -Message "Checking tools and dependencies" -Silent:$silent
 
@@ -264,6 +266,17 @@ function Start-OpenSSHBootstrap
     else
     {
         Write-BuildMsg -AsVerbose -Message 'VC++ 2015 Build Tools already present.'
+    }
+
+    if($OneCore)
+    {
+        $win10sdk = Get-Windows10SDKVersion
+        if($win10sdk -eq $null)
+        {
+            $packageName = "windows-sdk-10.1"
+            Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName ..."
+            choco install $packageName --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
+        }
     }
 
     # Ensure the VS C toolset is installed
@@ -440,7 +453,9 @@ function Start-OpenSSHBuild
         [ValidateSet('Debug', 'Release')]
         [string]$Configuration = "Release",
 
-        [switch]$NoOpenSSL
+        [switch]$NoOpenSSL,
+
+        [switch]$OneCore
     )    
     $script:BuildLogFile = $null
 
@@ -464,7 +479,7 @@ function Start-OpenSSHBuild
     
     Write-BuildMsg -AsInfo -Message "Starting Open SSH build; Build Log: $($script:BuildLogFile)"
 
-    Start-OpenSSHBootstrap
+    Start-OpenSSHBootstrap -OneCore:$OneCore
 
     $script:win32OpenSSHPath = join-path $script:gitRoot "Win32-OpenSSH"
     if (-not (Test-Path (Join-Path $PSScriptRoot LibreSSLSDK)))
@@ -474,21 +489,33 @@ function Start-OpenSSHBuild
         Remove-Win32OpenSSHRepo
     }
 
-    if ($NoOpenSSL) 
-    {
-        $f = Join-Path $PSScriptRoot paths.targets
-        (Get-Content $f).Replace('<!-- <UseOpenSSL>false</UseOpenSSL> -->', '<UseOpenSSL>false</UseOpenSSL>') | Set-Content $f
+    $PathTargets = Join-Path $PSScriptRoot paths.targets
+    if ($NoOpenSSL -or $OneCore) 
+    {        
+        [XML]$xml = Get-Content $PathTargets
+        $xml.Project.PropertyGroup.UseOpenSSL = 'false'
+        $xml.Save($PathTargets)
         $f = Join-Path $PSScriptRoot config.h.vs
         (Get-Content $f).Replace('#define WITH_OPENSSL 1','') | Set-Content $f
         (Get-Content $f).Replace('#define OPENSSL_HAS_ECC 1','') | Set-Content $f
         (Get-Content $f).Replace('#define OPENSSL_HAS_NISTP521 1','') | Set-Content $f
     }
 
+    if($OneCore)
+    {
+        $win10SDKVer = Get-Windows10SDKVersion
+        [XML]$xml = Get-Content $PathTargets
+        $xml.Project.PropertyGroup.UseOpenSSL = 'false'
+        $xml.Project.PropertyGroup.WindowsSDKVersion = $win10SDKVer.ToString()
+        $xml.Project.PropertyGroup.AdditionalDependentLibs = 'onecore.lib'
+        $xml.Save($PathTargets)
+    }
+
     $msbuildCmd = "msbuild.exe"
     $solutionFile = Get-SolutionFile -root $repositoryRoot.FullName
     $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/m", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
 
-    if ($NoOpenSSL) {
+    if ($OneCore -or $NoOpenSSL) {
         $cmdMsg += @("/t:core\scp", "/t:core\sftp", "/t:core\sftp-server", "/t:core\ssh", "/t:core\ssh-add", "/t:core\ssh-agent", "/t:core\sshd", "/t:core\ssh-keygen", "/t:core\ssh-shellhost")
     }
 
@@ -501,6 +528,21 @@ function Start-OpenSSHBuild
     }    
 
     Write-BuildMsg -AsInfo -Message "SSH build successful."
+}
+
+function Get-Windows10SDKVersion
+{   
+   ## Search for latest windows sdk available on the machine
+   $windowsSDKPath = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\Lib"
+   $minSDKVersion = [version]"10.0.14393.0"
+   $versionsAvailable = @()
+   $versionsAvailable += Get-ChildItem $windowsSDKPath | ? {$_.Name.StartsWith("10.")} | % {$version = [version]$_.Name; if($version.CompareTo($minSDKVersion) -ge 0) {$version}}
+   if(0 -eq $versionsAvailable.count)
+   {
+        return $null
+   }
+   $versionsAvailable = $versionsAvailable | Sort-Object -Descending
+   return $versionsAvailable[0]
 }
 
 function Get-BuildLogFile

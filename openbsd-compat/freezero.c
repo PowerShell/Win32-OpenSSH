@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2008, 2010, 2011, 2016 Otto Moerbeek <otto@drijf.net>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,21 +14,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _PORT_TUN_H
-#define _PORT_TUN_H
+#include "includes.h"
 
-struct Channel;
-struct ssh;
+#ifndef HAVE_FREEZERO
 
-#if defined(SSH_TUN_LINUX) || defined(SSH_TUN_FREEBSD)
-# define CUSTOM_SYS_TUN_OPEN
-int	  sys_tun_open(int, int);
-#endif
+void
+freezero(void *ptr, size_t sz)
+{
+	explicit_bzero(ptr, sz);
+	free(ptr);
+}
 
-#if defined(SSH_TUN_COMPAT_AF) || defined(SSH_TUN_PREPEND_AF)
-# define SSH_TUN_FILTER
-int	 sys_tun_infilter(struct ssh *, struct Channel *, char *, int);
-u_char	*sys_tun_outfilter(struct ssh *, struct Channel *, u_char **, size_t *);
-#endif
+#endif /* HAVE_FREEZERO */
 
-#endif

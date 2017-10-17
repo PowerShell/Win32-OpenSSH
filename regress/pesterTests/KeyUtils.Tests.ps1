@@ -49,10 +49,14 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             $myACL.Access | Should Not Be $null
             
             $ReadAccessPerm = ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Read.value__) -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::ReadAndExecute.value__)  -bor `
                     ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Synchronize.value__)
             $ReadWriteAccessPerm = ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Read.value__) -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::ReadAndExecute.value__)  -bor `
                     ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Write.value__)  -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Modify.value__)  -bor `
                     ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Synchronize.value__)
+
             $FullControlPerm = [System.UInt32] [System.Security.AccessControl.FileSystemRights]::FullControl.value__
     
             if($FilePath.EndsWith(".pub")) {

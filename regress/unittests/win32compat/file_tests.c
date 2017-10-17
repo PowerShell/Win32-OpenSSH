@@ -123,7 +123,7 @@ void file_simple_fileio()
 		retValue = stat(tmp_filename, &st);
 		ASSERT_INT_EQ(retValue, 0);
 		ASSERT_INT_EQ(st.st_size, strlen(small_write_buf));
-		ASSERT_INT_EQ(st.st_mode & 0777, 0666);
+		ASSERT_INT_EQ(st.st_mode & 0777, 0600);
 		char mode[12];
 		strmode(st.st_mode, mode);
 		ASSERT_CHAR_EQ(mode[0], '-');
@@ -462,6 +462,29 @@ file_miscellaneous_tests()
 
 	retValue = w32_allocate_fd_for_handle(h, FALSE);
 	ASSERT_HANDLE(h);
+
+	f = open(tmp_filename, O_RDWR | O_CREAT | O_TRUNC, 0666);
+	ASSERT_INT_NE(f, -1);
+	wchar_t *t = utf8_to_utf16(tmp_filename);
+	ASSERT_PTR_NE(t, NULL);
+	int perm = get_others_file_permissions(t, 0);
+	ASSERT_INT_EQ(perm, 7);
+	free(t);
+	close(f);
+	retValue = unlink(tmp_filename);
+	ASSERT_INT_EQ(retValue, 0);
+	
+
+	f = open(tmp_filename, O_RDWR | O_CREAT | O_TRUNC, 0666);
+	ASSERT_INT_NE(f, -1);
+	t = utf8_to_utf16(tmp_filename);
+	ASSERT_PTR_NE(t, NULL);
+	perm = get_others_file_permissions(t, 1);
+	ASSERT_INT_EQ(perm, 5);
+	free(t);
+	close(f);
+	retValue = unlink(tmp_filename);
+	ASSERT_INT_EQ(retValue, 0);	
 
 	TEST_DONE();
 }

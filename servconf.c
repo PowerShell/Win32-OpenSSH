@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.309 2017/06/24 06:34:38 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.312 2017/10/02 19:33:20 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -149,7 +149,7 @@ initialize_server_options(ServerOptions *options)
 	options->num_authkeys_files = 0;
 	options->num_accept_env = 0;
 	options->permit_tun = -1;
-	options->num_permitted_opens = -1;
+	options->permitted_opens = NULL;
 	options->adm_forced_command = NULL;
 	options->chroot_directory = NULL;
 	options->authorized_keys_command = NULL;
@@ -703,6 +703,44 @@ process_queued_listen_addrs(ServerOptions *options)
 	options->num_queued_listens = 0;
 }
 
+/*
+ * Inform channels layer of permitopen options from configuration.
+ */
+void
+process_permitopen(struct ssh *ssh, ServerOptions *options)
+{
+	u_int i;
+	int port;
+	char *host, *arg, *oarg;
+
+	channel_clear_adm_permitted_opens(ssh);
+	if (options->num_permitted_opens == 0)
+		return; /* permit any */
+
+	/* handle keywords: "any" / "none" */
+	if (options->num_permitted_opens == 1 &&
+	    strcmp(options->permitted_opens[0], "any") == 0)
+		return;
+	if (options->num_permitted_opens == 1 &&
+	    strcmp(options->permitted_opens[0], "none") == 0) {
+		channel_disable_adm_local_opens(ssh);
+		return;
+	}
+	/* Otherwise treat it as a list of permitted host:port */
+	for (i = 0; i < options->num_permitted_opens; i++) {
+		oarg = arg = xstrdup(options->permitted_opens[i]);
+		host = hpdelim(&arg);
+		if (host == NULL)
+			fatal("%s: missing host in PermitOpen", __func__);
+		host = cleanhostname(host);
+		if (arg == NULL || ((port = permitopen_port(arg)) < 0))
+			fatal("%s: bad port number in PermitOpen", __func__);
+		/* Send it to channels layer */
+		channel_add_adm_permitted_opens(ssh, host, port);
+		free(oarg);
+	}
+}
+
 struct connection_info *
 get_connection_info(int populate, int use_dns)
 {
@@ -960,7 +998,7 @@ process_server_config_line(ServerOptions *options, char *line,
     const char *filename, int linenum, int *activep,
     struct connection_info *connectinfo)
 {
-	char *cp, **charptr, *arg, *p;
+	char *cp, **charptr, *arg, *arg2, *p;
 	int cmdline = 0, *intptr, value, value2, n, port;
 	SyslogFacility *log_facility_ptr;
 	LogLevel *log_level_ptr;
@@ -1631,24 +1669,18 @@ process_server_config_line(ServerOptions *options, char *line,
 		if (!arg || *arg == '\0')
 			fatal("%s line %d: missing PermitOpen specification",
 			    filename, linenum);
-		n = options->num_permitted_opens;	/* modified later */
-		if (strcmp(arg, "any") == 0) {
-			if (*activep && n == -1) {
-				channel_clear_adm_permitted_opens();
-				options->num_permitted_opens = 0;
-			}
-			break;
-		}
-		if (strcmp(arg, "none") == 0) {
-			if (*activep && n == -1) {
+		i = options->num_permitted_opens;	/* modified later */
+		if (strcmp(arg, "any") == 0 || strcmp(arg, "none") == 0) {
+			if (*activep && i == 0) {
 				options->num_permitted_opens = 1;
-				channel_disable_adm_local_opens();
+				options->permitted_opens = xcalloc(1,
+				    sizeof(*options->permitted_opens));
+				options->permitted_opens[0] = xstrdup(arg);
 			}
 			break;
 		}
-		if (*activep && n == -1)
-			channel_clear_adm_permitted_opens();
 		for (; arg != NULL && *arg != '\0'; arg = strdelim(&cp)) {
+			arg2 = xstrdup(arg);
 			p = hpdelim(&arg);
 			if (p == NULL)
 				fatal("%s line %d: missing host in PermitOpen",
@@ -1657,9 +1689,16 @@ process_server_config_line(ServerOptions *options, char *line,
 			if (arg == NULL || ((port = permitopen_port(arg)) < 0))
 				fatal("%s line %d: bad port number in "
 				    "PermitOpen", filename, linenum);
-			if (*activep && n == -1)
-				options->num_permitted_opens =
-				    channel_add_adm_permitted_opens(p, port);
+			if (*activep && i == 0) {
+				options->permitted_opens = xrecallocarray(
+				    options->permitted_opens,
+				    options->num_permitted_opens,
+				    options->num_permitted_opens + 1,
+				    sizeof(*options->permitted_opens));
+				i = options->num_permitted_opens++;
+				options->permitted_opens[i] = arg2;
+			} else
+				free(arg2);
 		}
 		break;
 
@@ -2030,6 +2069,13 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 			dst->n[dst->num_n] = xstrdup(src->n[dst->num_n]); \
 	} \
 } while(0)
+#define M_CP_STRARRAYOPT_ALLOC(n, num_n) do { \
+	if (src->num_n != 0) { \
+		dst->n = xcalloc(src->num_n, sizeof(*dst->n)); \
+		M_CP_STRARRAYOPT(n, num_n); \
+		dst->num_n = src->num_n; \
+	} \
+} while(0)
 
 	/* See comment in servconf.h */
 	COPY_MATCH_STRING_OPTS();
@@ -2060,6 +2106,7 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 #undef M_CP_INTOPT
 #undef M_CP_STROPT
 #undef M_CP_STRARRAYOPT
+#undef M_CP_STRARRAYOPT_ALLOC
 
 void
 parse_server_config(ServerOptions *options, const char *filename, Buffer *conf,
@@ -2384,5 +2431,12 @@ dump_config(ServerOptions *o)
 	printf("rekeylimit %llu %d\n", (unsigned long long)o->rekey_limit,
 	    o->rekey_interval);
 
-	channel_print_adm_permitted_opens();
+	printf("permitopen");
+	if (o->num_permitted_opens == 0)
+		printf(" any");
+	else {
+		for (i = 0; i < o->num_permitted_opens; i++)
+			printf(" %s", o->permitted_opens[i]);
+	}
+	printf("\n");
 }

@@ -23,7 +23,7 @@
     <ProjectGuid>{CD9740CE-C96E-49B3-823F-012E09D17806}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Win32OpenSSH</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>$(WindowsSDKVersion)</WindowsTargetPlatformVersion>
     <ProjectName>unittest-sshbuf</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -198,21 +198,39 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\tests.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_fixed.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_fuzz.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_getput_basic.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\tests.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_fixed.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_fuzz.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_getput_basic.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_getput_crypto.c">
       <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_getput_fuzz.c">
       <ExcludedFromBuild Condition="$(UseOpenSSL)==false">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_misc.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\fuzz.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\test_helper.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_common.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\sshbuf\test_sshbuf_misc.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\fuzz.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)regress\unittests\test_helper\test_helper.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\wmain_common.c">
+        <ExcludedFromBuild Condition="$(UseOpenSSL)=='false'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

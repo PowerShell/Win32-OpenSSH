@@ -127,3 +127,4 @@ PubkeyAcceptedKeyTypes ssh-ed25519*
 #DenyGroups denygroup1 denygr*p2 deny?rou?3
 #AllowGroups allowgroup1 allowg*2 allowg?ou?3 Adm*
 hostkeyagent \\.\pipe\openssh-ssh-agent
+TrustedUserCAKeys sshtest_ca_userkeys.pub

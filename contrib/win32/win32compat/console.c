@@ -514,6 +514,9 @@ ConWriteString(char* pszString, int cbString)
 	int cnt = 0;
 	wchar_t* utf16 = NULL;
 
+	if (pszString == NULL)
+		return 0;
+
 	if ((needed = MultiByteToWideChar(CP_UTF8, 0, pszString, cbString, NULL, 0)) == 0 ||
 	    (utf16 = malloc(needed * sizeof(wchar_t))) == NULL ||
 	    (cnt = MultiByteToWideChar(CP_UTF8, 0, pszString, cbString, utf16, needed)) == 0) {
@@ -535,6 +538,9 @@ int
 ConTranslateAndWriteString(char* pszString, int cbString)
 {
 	DWORD Result = 0;
+
+	if (pszString == NULL)
+		return 0;
 
 	if (hOutputConsole)
 		WriteConsole(hOutputConsole, pszString, cbString, &Result, 0);

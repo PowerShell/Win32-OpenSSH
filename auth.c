@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.123 2017/08/18 05:36:45 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.124 2017/09/12 06:32:07 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -592,6 +592,7 @@ getpwnamallow(const char *user)
 	ci->user = user;
 	parse_server_match_config(&options, ci);
 	log_change_level(options.log_level);
+	process_permitopen(ssh, &options);
 
 #if defined(_AIX) && defined(HAVE_SETAUTHDB)
 	aix_setauthdb(user);

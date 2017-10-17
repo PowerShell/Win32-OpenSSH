@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.462 2017/08/12 06:46:01 djm Exp $ */
+/* $OpenBSD: ssh.c,v 1.464 2017/09/21 19:16:53 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -208,7 +208,7 @@ usage(void)
 	exit(255);
 }
 
-static int ssh_session2(void);
+static int ssh_session2(struct ssh *);
 static void load_public_identity_files(void);
 static void main_sigchld_handler(int);
 
@@ -596,6 +596,14 @@ main(int ac, char **av)
 	 */
 	initialize_options(&options);
 
+	/*
+	 * Prepare main ssh transport/connection structures
+	 */
+	if ((ssh = ssh_alloc_session_state()) == NULL)
+		fatal("Couldn't allocate session state");
+	channel_init_channels(ssh);
+	active_state = ssh; /* XXX legacy API compat */
+
 	/* Parse command-line arguments. */
 	host = NULL;
 	use_syslog = 0;
@@ -860,7 +868,8 @@ main(int ac, char **av)
 			break;
 
 		case 'R':
-			if (parse_forward(&fwd, optarg, 0, 1)) {
+			if (parse_forward(&fwd, optarg, 0, 1) ||
+			    parse_forward(&fwd, optarg, 1, 1)) {
 				add_remote_forward(&options, &fwd);
 			} else {
 				fprintf(stderr,
@@ -1108,7 +1117,7 @@ main(int ac, char **av)
 
 	if (options.port == 0)
 		options.port = default_ssh_port();
-	channel_set_af(options.address_family);
+	channel_set_af(ssh, options.address_family);
 
 	/* Tidy and check options */
 	if (options.host_key_alias != NULL)
@@ -1253,8 +1262,7 @@ main(int ac, char **av)
 	if (options.control_path != NULL) {
 		int sock;
 		if ((sock = muxclient(options.control_path)) >= 0) {
-			packet_set_connection(sock, sock);
-			ssh = active_state; /* XXX */
+			ssh_packet_set_connection(ssh, sock, sock);
 			packet_set_mux();
 			goto skip_connect;
 		}
@@ -1274,7 +1282,7 @@ main(int ac, char **av)
 	timeout_ms = options.connection_timeout * 1000;
 
 	/* Open a connection to the remote host. */
-	if (ssh_connect(host, addrs, &hostaddr, options.port,
+	if (ssh_connect(ssh, host, addrs, &hostaddr, options.port,
 	    options.address_family, options.connection_attempts,
 	    &timeout_ms, options.tcp_keep_alive,
 	    options.use_privileged_port) != 0)
@@ -1457,7 +1465,7 @@ main(int ac, char **av)
 	}
 
  skip_connect:
-	exit_status = ssh_session2();
+	exit_status = ssh_session2(ssh);
 	packet_close();
 
 	if (options.control_path != NULL && muxserver_sock != -1)
@@ -1539,7 +1547,7 @@ fork_postauth(void)
 
 /* Callback for remote forward global requests */
 static void
-ssh_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
+ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
 	struct Forward *rfwd = (struct Forward *)ctxt;
 
@@ -1557,10 +1565,10 @@ ssh_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
 			logit("Allocated port %u for remote forward to %s:%d",
 			    rfwd->allocated_port,
 			    rfwd->connect_host, rfwd->connect_port);
-			channel_update_permitted_opens(rfwd->handle,
-			    rfwd->allocated_port);
+			channel_update_permitted_opens(ssh,
+			    rfwd->handle, rfwd->allocated_port);
 		} else {
-			channel_update_permitted_opens(rfwd->handle, -1);
+			channel_update_permitted_opens(ssh, rfwd->handle, -1);
 		}
 	}
 	
@@ -1589,21 +1597,21 @@ ssh_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-client_cleanup_stdio_fwd(int id, void *arg)
+client_cleanup_stdio_fwd(struct ssh *ssh, int id, void *arg)
 {
 	debug("stdio forwarding: done");
 	cleanup_exit(0);
 }
 
 static void
-ssh_stdio_confirm(int id, int success, void *arg)
+ssh_stdio_confirm(struct ssh *ssh, int id, int success, void *arg)
 {
 	if (!success)
 		fatal("stdio forwarding failed");
 }
 
 static void
-ssh_init_stdio_forwarding(void)
+ssh_init_stdio_forwarding(struct ssh *ssh)
 {
 	Channel *c;
 	int in, out;
@@ -1617,15 +1625,15 @@ ssh_init_stdio_forwarding(void)
 	if ((in = dup(STDIN_FILENO)) < 0 ||
 	    (out = dup(STDOUT_FILENO)) < 0)
 		fatal("channel_connect_stdio_fwd: dup() in/out failed");
-	if ((c = channel_connect_stdio_fwd(options.stdio_forward_host,
+	if ((c = channel_connect_stdio_fwd(ssh, options.stdio_forward_host,
 	    options.stdio_forward_port, in, out)) == NULL)
 		fatal("%s: channel_connect_stdio_fwd failed", __func__);
-	channel_register_cleanup(c->self, client_cleanup_stdio_fwd, 0);
-	channel_register_open_confirm(c->self, ssh_stdio_confirm, NULL);
+	channel_register_cleanup(ssh, c->self, client_cleanup_stdio_fwd, 0);
+	channel_register_open_confirm(ssh, c->self, ssh_stdio_confirm, NULL);
 }
 
 static void
-ssh_init_forwarding(void)
+ssh_init_forwarding(struct ssh *ssh)
 {
 	int success = 0;
 	int i;
@@ -1644,7 +1652,7 @@ ssh_init_forwarding(void)
 		    options.local_forwards[i].connect_path :
 		    options.local_forwards[i].connect_host,
 		    options.local_forwards[i].connect_port);
-		success += channel_setup_local_fwd_listener(
+		success += channel_setup_local_fwd_listener(ssh,
 		    &options.local_forwards[i], &options.fwd_opts);
 	}
 	if (i > 0 && success != i && options.exit_on_forward_failure)
@@ -1666,7 +1674,7 @@ ssh_init_forwarding(void)
 		    options.remote_forwards[i].connect_host,
 		    options.remote_forwards[i].connect_port);
 		options.remote_forwards[i].handle =
-		    channel_request_remote_forwarding(
+		    channel_request_remote_forwarding(ssh,
 		    &options.remote_forwards[i]);
 		if (options.remote_forwards[i].handle < 0) {
 			if (options.exit_on_forward_failure)
@@ -1675,14 +1683,15 @@ ssh_init_forwarding(void)
 				logit("Warning: Could not request remote "
 				    "forwarding.");
 		} else {
-			client_register_global_confirm(ssh_confirm_remote_forward,
+			client_register_global_confirm(
+			    ssh_confirm_remote_forward,
 			    &options.remote_forwards[i]);
 		}
 	}
 
 	/* Initiate tunnel forwarding. */
 	if (options.tun_open != SSH_TUNMODE_NO) {
-		if (client_request_tun_fwd(options.tun_open,
+		if (client_request_tun_fwd(ssh, options.tun_open,
 		    options.tun_local, options.tun_remote) == -1) {
 			if (options.exit_on_forward_failure)
 				fatal("Could not request tunnel forwarding.");
@@ -1709,7 +1718,7 @@ check_agent_present(void)
 }
 
 static void
-ssh_session2_setup(int id, int success, void *arg)
+ssh_session2_setup(struct ssh *ssh, int id, int success, void *arg)
 {
 	extern char **environ;
 	const char *display;
@@ -1722,15 +1731,15 @@ ssh_session2_setup(int id, int success, void *arg)
 	display = getenv("DISPLAY");
 	if (display == NULL && options.forward_x11)
 		debug("X11 forwarding requested but DISPLAY not set");
-	if (options.forward_x11 && client_x11_get_proto(display,
+	if (options.forward_x11 && client_x11_get_proto(ssh, display,
 	    options.xauth_location, options.forward_x11_trusted,
 	    options.forward_x11_timeout, &proto, &data) == 0) {
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication "
 		    "spoofing.");
-		x11_request_forwarding_with_spoofing(id, display, proto,
+		x11_request_forwarding_with_spoofing(ssh, id, display, proto,
 		    data, 1);
-		client_expect_confirm(id, "X11 forwarding", CONFIRM_WARN);
+		client_expect_confirm(ssh, id, "X11 forwarding", CONFIRM_WARN);
 		/* XXX exit_on_forward_failure */
 		interactive = 1;
 	}
@@ -1738,7 +1747,7 @@ ssh_session2_setup(int id, int success, void *arg)
 	check_agent_present();
 	if (options.forward_agent) {
 		debug("Requesting authentication agent forwarding.");
-		channel_request_start(id, "auth-agent-req@openssh.com", 0);
+		channel_request_start(ssh, id, "auth-agent-req@openssh.com", 0);
 		packet_send();
 	}
 
@@ -1746,13 +1755,13 @@ ssh_session2_setup(int id, int success, void *arg)
 	packet_set_interactive(interactive,
 	    options.ip_qos_interactive, options.ip_qos_bulk);
 
-	client_session2_setup(id, tty_flag, subsystem_flag, getenv("TERM"),
+	client_session2_setup(ssh, id, tty_flag, subsystem_flag, getenv("TERM"),
 	    NULL, fileno(stdin), &command, environ);
 }
 
 /* open new channel for a session */
 static int
-ssh_session2_open(void)
+ssh_session2_open(struct ssh *ssh)
 {
 	Channel *c;
 	int window, packetmax, in, out, err;
@@ -1782,34 +1791,34 @@ ssh_session2_open(void)
 		window >>= 1;
 		packetmax >>= 1;
 	}
-	c = channel_new(
+	c = channel_new(ssh,
 	    "session", SSH_CHANNEL_OPENING, in, out, err,
 	    window, packetmax, CHAN_EXTENDED_WRITE,
 	    "client-session", /*nonblock*/0);
 
-	debug3("ssh_session2_open: channel_new: %d", c->self);
+	debug3("%s: channel_new: %d", __func__, c->self);
 
-	channel_send_open(c->self);
+	channel_send_open(ssh, c->self);
 	if (!no_shell_flag)
-		channel_register_open_confirm(c->self,
+		channel_register_open_confirm(ssh, c->self,
 		    ssh_session2_setup, NULL);
 
 	return c->self;
 }
 
 static int
-ssh_session2(void)
+ssh_session2(struct ssh *ssh)
 {
 	int id = -1;
 
 	/* XXX should be pre-session */
 	if (!options.control_persist)
-		ssh_init_stdio_forwarding();
-	ssh_init_forwarding();
+		ssh_init_stdio_forwarding(ssh);
+	ssh_init_forwarding(ssh);
 
 	/* Start listening for multiplex clients */
 	if (!packet_get_mux())
-		muxserver_listen();
+		muxserver_listen(ssh);
 
  	/*
 	 * If we are in control persist mode and have a working mux listen
@@ -1837,10 +1846,10 @@ ssh_session2(void)
 	 * stdio forward setup that we skipped earlier.
 	 */
 	if (options.control_persist && muxserver_sock == -1)
-		ssh_init_stdio_forwarding();
+		ssh_init_stdio_forwarding(ssh);
 
 	if (!no_shell_flag || (datafellows & SSH_BUG_DUMMYCHAN))
-		id = ssh_session2_open();
+		id = ssh_session2_open(ssh);
 	else {
 		packet_set_interactive(
 		    options.control_master == SSHCTL_MASTER_NO,
@@ -1875,7 +1884,7 @@ ssh_session2(void)
 			fork_postauth();
 	}
 
-	return client_loop(tty_flag, tty_flag ?
+	return client_loop(ssh, tty_flag, tty_flag ?
 	    options.escape_char : SSH_ESCAPECHAR_NONE, id);
 }
 

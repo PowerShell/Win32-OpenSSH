@@ -1,4 +1,4 @@
-#	$OpenBSD: test-exec.sh,v 1.60 2017/04/30 23:34:55 djm Exp $
+#	$OpenBSD: test-exec.sh,v 1.61 2017/07/28 10:32:08 dtucker Exp $
 #	Placed in the Public Domain.
 
 #SUDO=sudo
@@ -304,8 +304,15 @@ stop_sshd ()
 					i=`expr $i + 1`
 					sleep $i
 				done
-				test -f $PIDFILE && \
-				    fatal "sshd didn't exit port $PORT pid $pid"
+				if test -f $PIDFILE; then
+					if $SUDO kill -0 $pid; then
+						echo "sshd didn't exit " \
+						    "port $PORT pid $pid"
+					else
+						echo "sshd died without cleanup"
+					fi
+					exit 1
+				fi
 			fi
 		fi
 	fi

@@ -23,7 +23,7 @@
     <ProjectGuid>{0D02F0F0-013B-4EE3-906D-86517F3822C0}</ProjectGuid>
     <RootNamespace>win32iocompat</RootNamespace>
     <Keyword>Win32Proj</Keyword>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>$(WindowsSDKVersion)</WindowsTargetPlatformVersion>
     <ProjectName>posix_compat</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

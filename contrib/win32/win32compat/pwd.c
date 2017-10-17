@@ -106,7 +106,7 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 	char *uname_utf8 = NULL, *uname_upn = NULL, *udom_utf8 = NULL, *pw_home_utf8 = NULL, *user_sid_utf8 = NULL;
 	LPBYTE user_info = NULL;
 	LPWSTR user_sid_local = NULL;
-	wchar_t reg_path[PATH_MAX], profile_home[PATH_MAX];
+	wchar_t reg_path[PATH_MAX], profile_home[PATH_MAX], profile_home_exp[PATH_MAX];
 	HKEY reg_key = 0;
 	int tmp_len = PATH_MAX;
 	PDOMAIN_CONTROLLER_INFOW pdc = NULL;
@@ -165,8 +165,10 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 	/* if one of below fails, set profile path to Windows directory */
 	if (swprintf_s(reg_path, PATH_MAX, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\%ls", user_sid) == -1 ||
 	    RegOpenKeyExW(HKEY_LOCAL_MACHINE, reg_path, 0, STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_WOW64_64KEY, &reg_key) != 0 ||
-	    RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, (LPBYTE)profile_home, &tmp_len) != 0) 
-		if (GetWindowsDirectoryW(profile_home, PATH_MAX) == 0) {
+	    RegQueryValueExW(reg_key, L"ProfileImagePath", 0, NULL, (LPBYTE)profile_home, &tmp_len) != 0 ||
+	    ExpandEnvironmentStringsW(profile_home, NULL, 0) > PATH_MAX || 
+	    ExpandEnvironmentStringsW(profile_home, profile_home_exp, PATH_MAX) == 0)
+		if (GetWindowsDirectoryW(profile_home_exp, PATH_MAX) == 0) {
 			debug3("GetWindowsDirectoryW failed with %d", GetLastError());
 			errno = EOTHER;
 			goto done;
@@ -174,7 +176,7 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 
 	if ((uname_utf8 = utf16_to_utf8(uname_utf16)) == NULL ||
 	    (udom_utf16 && (udom_utf8 = utf16_to_utf8(udom_utf16)) == NULL) ||
-	    (pw_home_utf8 = utf16_to_utf8(profile_home)) == NULL ||
+	    (pw_home_utf8 = utf16_to_utf8(profile_home_exp)) == NULL ||
 	    (user_sid_utf8 = utf16_to_utf8(user_sid)) == NULL) {
 		errno = ENOMEM;
 		goto done;

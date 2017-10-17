@@ -40,10 +40,13 @@ Describe "Tests for log file permission" -Tags "CI" {
             $currentOwnerSid = Get-UserSid -User $myACL.Owner
             $currentOwnerSid.Equals($currentUserSid) | Should Be $true
             $myACL.Access | Should Not Be $null            
-            
+
             $ReadWriteAccessPerm = ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Read.value__) -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::ReadAndExecute.value__)  -bor `
                     ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Write.value__)  -bor `
+                    ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Modify.value__)  -bor `
                     ([System.UInt32] [System.Security.AccessControl.FileSystemRights]::Synchronize.value__)
+
             $FullControlPerm = [System.UInt32] [System.Security.AccessControl.FileSystemRights]::FullControl.value__
             
             $myACL.Access.Count | Should Be 3

@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.263 2017/07/23 23:37:02 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.264 2017/09/12 06:32:07 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -2090,35 +2090,6 @@ ssh_packet_get_maxsize(struct ssh *ssh)
 	return ssh->state->max_packet_size;
 }
 
-/*
- * 9.2.  Ignored Data Message
- *
- *   byte      SSH_MSG_IGNORE
- *   string    data
- *
- * All implementations MUST understand (and ignore) this message at any
- * time (after receiving the protocol version). No implementation is
- * required to send them. This message can be used as an additional
- * protection measure against advanced traffic analysis techniques.
- */
-void
-ssh_packet_send_ignore(struct ssh *ssh, int nbytes)
-{
-	u_int32_t rnd = 0;
-	int r, i;
-
-	if ((r = sshpkt_start(ssh, SSH2_MSG_IGNORE)) != 0 ||
-	    (r = sshpkt_put_u32(ssh, nbytes)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	for (i = 0; i < nbytes; i++) {
-		if (i % 4 == 0)
-			rnd = arc4random();
-		if ((r = sshpkt_put_u8(ssh, (u_char)rnd & 0xff)) != 0)
-			fatal("%s: %s", __func__, ssh_err(r));
-		rnd >>= 8;
-	}
-}
-
 void
 ssh_packet_set_rekey_limits(struct ssh *ssh, u_int64_t bytes, u_int32_t seconds)
 {
@@ -2539,6 +2510,12 @@ sshpkt_get_string_direct(struct ssh *ssh, const u_char **valp, size_t *lenp)
 }
 
 int
+sshpkt_peek_string_direct(struct ssh *ssh, const u_char **valp, size_t *lenp)
+{
+	return sshbuf_peek_string_direct(ssh->state->incoming_packet, valp, lenp);
+}
+
+int
 sshpkt_get_cstring(struct ssh *ssh, char **valp, size_t *lenp)
 {
 	return sshbuf_get_cstring(ssh->state->incoming_packet, valp, lenp);
@@ -2618,6 +2595,37 @@ ssh_packet_send_mux(struct ssh *ssh)
 		/* sshbuf_dump(state->output, stderr); */
 	}
 	sshbuf_reset(state->outgoing_packet);
+	return 0;
+}
+
+/*
+ * 9.2.  Ignored Data Message
+ *
+ *   byte      SSH_MSG_IGNORE
+ *   string    data
+ *
+ * All implementations MUST understand (and ignore) this message at any
+ * time (after receiving the protocol version). No implementation is
+ * required to send them. This message can be used as an additional
+ * protection measure against advanced traffic analysis techniques.
+ */
+int
+sshpkt_msg_ignore(struct ssh *ssh, u_int nbytes)
+{
+	u_int32_t rnd = 0;
+	int r;
+	u_int i;
+
+	if ((r = sshpkt_start(ssh, SSH2_MSG_IGNORE)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, nbytes)) != 0)
+		return r;
+	for (i = 0; i < nbytes; i++) {
+		if (i % 4 == 0)
+			rnd = arc4random();
+		if ((r = sshpkt_put_u8(ssh, (u_char)rnd & 0xff)) != 0)
+			return r;
+		rnd >>= 8;
+	}
 	return 0;
 }
 
