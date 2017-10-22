@@ -261,7 +261,7 @@ get_con_client_info(struct agent_connection* con)
 	    (client_process_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL ||
 	    OpenProcessToken(client_process_handle, TOKEN_QUERY | TOKEN_DUPLICATE, &client_primary_token) == FALSE ||
 	    DuplicateToken(client_primary_token, SecurityImpersonation, &client_impersonation_token) == FALSE) {
-		error("cannot retrieve client impersonatin token");
+		error("cannot retrieve client impersonation token");
 		goto done;
 	}
 
