@@ -9,6 +9,7 @@ $scriptdir = Split-Path $scriptpath
 $sshdpath = Join-Path $scriptdir "sshd.exe"
 $sshagentpath = Join-Path $scriptdir "ssh-agent.exe"
 $logsdir = Join-Path $scriptdir "logs"
+$piddir = Join-Path $scriptdir "pid"
 
 $sshdAccount = "NT SERVICE\SSHD"
 $sshdSid = "S-1-5-80-3847866527-469524349-687026318-516638107-1125189541"
@@ -274,19 +275,27 @@ sc.exe privs sshd SeAssignPrimaryTokenPrivilege
 Add-Privilege -Account $sshdSid -Privilege SeAssignPrimaryTokenPrivilege
 Add-Privilege -Account $sshdSid -Privilege SeServiceLogonRight
 
-# create logs folder and set its permissions
+# create logs and pid folder and set its permissions
 if(-not (test-path $logsdir -PathType Container))
 {
     $null = New-Item $logsdir -ItemType Directory -Force -ErrorAction Stop
 }
+if(-not (test-path $piddir -PathType Container))
+{
+    $null = New-Item $piddir -ItemType Directory -Force -ErrorAction Stop
+}
+
 $acl = Get-Acl -Path $logsdir
+$aclpid = Get-Acl -Path $piddir
 # following SDDL implies 
 # - owner - built in Administrators
 # - disabled inheritance
 # - Full access to System
 # - Full access to built in Administrators
 $acl.SetSecurityDescriptorSddlForm("O:BAD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)")
+$aclpid.SetSecurityDescriptorSddlForm("O:BAD:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)")
 Set-Acl -Path $logsdir -AclObject $acl
+Set-Acl -Path $piddir -AclObject $aclpid
 
 $agentlog = Join-Path $logsdir "ssh-agent.log"
 if(-not (test-path $agentlog)){ $null | Set-Content $agentlog }
@@ -298,5 +307,12 @@ $rights = [System.Security.AccessControl.FileSystemRights]"Read, Write"
 $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($sshdAccount, $rights, "None", "None", "Allow")
 $acl.SetAccessRule($accessRule)
 Set-Acl -Path $sshdlog -AclObject $acl
+
+$sshdpid = Join-Path $piddir "sshd.pid"
+if(-not (test-path $sshdpid)){ $null | Set-Content $sshdpid }
+$rights = [System.Security.AccessControl.FileSystemRights]"Read, Write"
+$accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($sshdAccount, $rights, "None", "None", "Allow")
+$acl.SetAccessRule($accessRule)
+Set-Acl -Path $sshdpid -AclObject $acl
 
 Write-Host -ForegroundColor Green "sshd and ssh-agent services successfully installed"
