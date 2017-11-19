@@ -52,22 +52,15 @@
 extern int in_raw_mode;
 BOOL isFirstTime = TRUE;
 
-struct io_status {
-	DWORD to_transfer;
-	DWORD transferred;
-	DWORD error;
-};
-static struct io_status read_status, write_status;
-
 /* APC that gets queued on main thread when a sync Read completes on worker thread */
 static VOID CALLBACK
 ReadAPCProc(_In_ ULONG_PTR dwParam)
 {
 	struct w32_io* pio = (struct w32_io*)dwParam;
 	debug5("TermRead CB - io:%p, bytes: %d, pending: %d, error: %d", pio, read_status.transferred,
-		pio->read_details.pending, read_status.error);
-	pio->read_details.error = read_status.error;
-	pio->read_details.remaining = read_status.transferred;
+		pio->read_details.pending, pio->sync_read_status.error);
+	pio->read_details.error = pio->sync_read_status.error;
+	pio->read_details.remaining = pio->sync_read_status.transferred;
 	pio->read_details.completed = 0;
 	pio->read_details.pending = FALSE;
 	WaitForSingleObject(pio->read_overlapped.hEvent, INFINITE);
@@ -83,14 +76,14 @@ ReadThread(_In_ LPVOID lpParameter)
 	struct w32_io* pio = (struct w32_io*)lpParameter;
 
 	debug5("TermRead thread, io:%p", pio);
-	memset(&read_status, 0, sizeof(read_status));
+	memset(&pio->sync_read_status, 0, sizeof(pio->sync_read_status));
 	if (FILETYPE(pio) == FILE_TYPE_CHAR) {
 		if (in_raw_mode) {
 			while (nBytesReturned == 0) {
 				nBytesReturned = ReadConsoleForTermEmul(WINHANDLE(pio),
 					pio->read_details.buf, pio->read_details.buf_size);
 			}
-			read_status.transferred = nBytesReturned;
+			pio->sync_read_status.transferred = nBytesReturned;
 		}  else {
 			if (isFirstTime) {
 				isFirstTime = false;
@@ -106,10 +99,10 @@ ReadThread(_In_ LPVOID lpParameter)
 			}
 
 			if (!ReadFile(WINHANDLE(pio), pio->read_details.buf,
-				pio->read_details.buf_size, &read_status.transferred, NULL)) { 
+				pio->read_details.buf_size, &(pio->sync_read_status.transferred), NULL)) {
 				debug4("ReadThread - ReadFile failed, error:%d, io:%p", GetLastError(), pio); 
-				read_status.error = GetLastError();
-				return -1;
+				pio->sync_read_status.error = GetLastError();
+				goto done;
 			}
 
 			char *p = NULL;
@@ -121,17 +114,19 @@ ReadThread(_In_ LPVOID lpParameter)
 			if (p) {
 				*p = '\0';
 				pio->read_details.buf_size = (DWORD)strlen(pio->read_details.buf);
-				read_status.transferred = pio->read_details.buf_size;
+				pio->sync_read_status.transferred = pio->read_details.buf_size;
 			}
 		}
 	} else {
 		if (!ReadFile(WINHANDLE(pio), pio->read_details.buf,
-		    pio->read_details.buf_size, &read_status.transferred, NULL)) {
+		    pio->read_details.buf_size, &(pio->sync_read_status.transferred), NULL)) {
 			debug4("ReadThread - ReadFile failed, error:%d, io:%p", GetLastError(), pio); 
-			read_status.error = GetLastError();
-			return -1;
+			pio->sync_read_status.error = GetLastError();
+			goto done;
 		}
 	}
+
+done:
 	if (0 == QueueUserAPC(ReadAPCProc, main_thread, (ULONG_PTR)pio)) {		
 		pio->read_details.pending = FALSE;
 		pio->read_details.error = GetLastError();
@@ -175,9 +170,9 @@ WriteAPCProc(_In_ ULONG_PTR dwParam)
 {
 	struct w32_io* pio = (struct w32_io*)dwParam;
 	debug5("TermWrite CB - io:%p, bytes: %d, pending: %d, error: %d", pio, write_status.transferred,
-		pio->write_details.pending, write_status.error);
-	pio->write_details.error = write_status.error;
-	pio->write_details.remaining -= write_status.transferred;
+		pio->write_details.pending, pio->sync_write_status.error);
+	pio->write_details.error = pio->sync_write_status.error;
+	pio->write_details.remaining -= pio->sync_write_status.transferred;
 	/* TODO- assert that reamining is 0 by now */
 	pio->write_details.completed = 0;
 	pio->write_details.pending = FALSE;
@@ -197,27 +192,27 @@ WriteThread(_In_ LPVOID lpParameter)
 	debug5("WriteThread thread, io:%p", pio);
 
 	if (FILETYPE(pio) == FILE_TYPE_CHAR) {
-		pio->write_details.buf[write_status.to_transfer] = '\0';
+		pio->write_details.buf[pio->sync_write_status.to_transfer] = '\0';
 		if (0 == in_raw_mode) {
 			wchar_t* t = utf8_to_utf16(pio->write_details.buf);
 			WriteConsoleW(WINHANDLE(pio), t, (DWORD)wcslen(t), 0, 0);
 			free(t);		
 		} else {
-			processBuffer(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer, &respbuf, &resplen);
+			processBuffer(WINHANDLE(pio), pio->write_details.buf, pio->sync_write_status.to_transfer, &respbuf, &resplen);
 			/* TODO - respbuf is not null in some cases, this needs to be returned back via read stream */
 		}
-		write_status.transferred = write_status.to_transfer;
+		pio->sync_write_status.transferred = pio->sync_write_status.to_transfer;
 	} else {
-		if (!WriteFile(WINHANDLE(pio), pio->write_details.buf, write_status.to_transfer,
-		    &write_status.transferred, NULL)) {
-			write_status.error = GetLastError();
+		if (!WriteFile(WINHANDLE(pio), pio->write_details.buf, pio->sync_write_status.to_transfer,
+		    &(pio->sync_write_status.transferred), NULL)) {
+			pio->sync_write_status.error = GetLastError();
 			debug4("WriteThread - WriteFile %d, io:%p", GetLastError(), pio);
 		}
 	}
 
 	
 	if (0 == QueueUserAPC(WriteAPCProc, main_thread, (ULONG_PTR)pio)) {
-		debug3("WriteThread thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
+		error("WriteThread thread - ERROR QueueUserAPC failed %d, io:%p", GetLastError(), pio);
 		pio->write_details.pending = FALSE;
 		pio->write_details.error = GetLastError();
 		DebugBreak();
@@ -232,8 +227,8 @@ syncio_initiate_write(struct w32_io* pio, DWORD num_bytes)
 {
 	HANDLE write_thread;
 	debug5("syncio_initiate_write initiate io:%p", pio);
-	memset(&write_status, 0, sizeof(write_status));
-	write_status.to_transfer = num_bytes;
+	memset(&(pio->sync_write_status), 0, sizeof(pio->sync_write_status));
+	pio->sync_write_status.to_transfer = num_bytes;
 	write_thread = CreateThread(NULL, 0, WriteThread, pio, 0, NULL);
 	if (write_thread == NULL) {
 		errno = errno_from_Win32LastError();
@@ -246,7 +241,7 @@ syncio_initiate_write(struct w32_io* pio, DWORD num_bytes)
 	return 0;
 }
 
-/* tty close */
+/* close */
 int 
 syncio_close(struct w32_io* pio)
 {

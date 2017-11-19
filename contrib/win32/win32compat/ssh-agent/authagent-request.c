@@ -40,6 +40,7 @@
 #include "key.h"
 #include "inc\utf.h"
 #include "..\priv-agent.h"
+#include "logonuser.h"
 
 #pragma warning(push, 3)
 
@@ -278,8 +279,8 @@ int process_pubkeyauth_request(struct sshbuf* request, struct sshbuf* response, 
 	if ((token = generate_user_token(user_utf16)) == 0) {
 		error("unable to generate token for user %ls", user_utf16);
 		/* work around for https://github.com/PowerShell/Win32-OpenSSH/issues/727 by doing a fake login */
-		LogonUserW(L"FakeUser", L"FakeDomain", L"FakePasswd",
-			LOGON32_LOGON_NETWORK_CLEARTEXT, LOGON32_PROVIDER_DEFAULT, &token);
+		LogonUserExExWHelper(L"FakeUser", L"FakeDomain", L"FakePasswd",
+			LOGON32_LOGON_NETWORK_CLEARTEXT, LOGON32_PROVIDER_DEFAULT, NULL, &token, NULL, NULL, NULL, NULL);
 		if ((token = generate_user_token(user_utf16)) == 0) {
 			error("unable to generate token on 2nd attempt for user %ls", user_utf16);
 			goto done;

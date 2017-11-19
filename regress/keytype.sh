@@ -1,4 +1,4 @@
-#	$OpenBSD: keytype.sh,v 1.5 2017/03/20 22:08:06 djm Exp $
+#	$OpenBSD: keytype.sh,v 1.6 2017/10/30 22:01:52 djm Exp $
 #	Placed in the Public Domain.
 
 tid="login with different key types"
@@ -17,7 +17,7 @@ for i in `$SSH -Q key`; do
 	esac
 done
 
-for kt in $ktypes; do 
+for kt in $ktypes; do
 	rm -f $OBJ/key.$kt
 	bits=`echo ${kt} | awk -F- '{print $2}'`
 	type=`echo ${kt}  | awk -F- '{print $1}'`
@@ -27,10 +27,10 @@ for kt in $ktypes; do
 done
 
 tries="1 2 3"
-for ut in $ktypes; do 
+for ut in $ktypes; do
 	htypes=$ut
 	#htypes=$ktypes
-	for ht in $htypes; do 
+	for ht in $htypes; do
 		case $ht in
 		dsa-1024)	t=ssh-dss;;
 		ecdsa-256)	t=ecdsa-sha2-nistp256;;
@@ -42,13 +42,13 @@ for ut in $ktypes; do
 		trace "ssh connect, userkey $ut, hostkey $ht"
 		(
 			grep -v HostKey $OBJ/sshd_proxy_bak
-			echo HostKey $OBJ/key.$ht 
+			echo HostKey $OBJ/key.$ht
 			echo PubkeyAcceptedKeyTypes $t
 			echo HostKeyAlgorithms $t
 		) > $OBJ/sshd_proxy
 		(
 			grep -v IdentityFile $OBJ/ssh_proxy_bak
-			echo IdentityFile $OBJ/key.$ut 
+			echo IdentityFile $OBJ/key.$ut
 			echo PubkeyAcceptedKeyTypes $t
 			echo HostKeyAlgorithms $t
 		) > $OBJ/ssh_proxy

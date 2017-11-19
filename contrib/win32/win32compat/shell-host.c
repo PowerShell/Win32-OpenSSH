@@ -1650,28 +1650,24 @@ static void* xmalloc(size_t size) {
 	return ptr;
 }
 
-#define SET_USER_ENV(folder_id, evn_variable) do  {                \
-       if (SHGetKnownFolderPath(&folder_id,0,NULL,&path) == S_OK)              \
-        {                                                                       \
-                SetEnvironmentVariableW(evn_variable, path);                    \
-                CoTaskMemFree(path);                                            \
-       }                                                                        \
-} while (0)
-
 /* set user environment variables from user profile */
-static void setup_session_user_vars()	
+static void setup_session_user_vars()
 {
 	/* retrieve and set env variables. */
 	HKEY reg_key = 0;
-	wchar_t *path;
 	wchar_t name[256];
+	wchar_t userprofile_path[PATH_MAX + 1] = { 0, }, path[PATH_MAX + 1] = { 0, };
 	wchar_t *data = NULL, *data_expanded = NULL, *path_value = NULL, *to_apply;
 	DWORD type, name_chars = 256, data_chars = 0, data_expanded_chars = 0, required, i = 0;
 	LONG ret;
-
-	SET_USER_ENV(FOLDERID_LocalAppData, L"LOCALAPPDATA");
-	SET_USER_ENV(FOLDERID_Profile, L"USERPROFILE");
-	SET_USER_ENV(FOLDERID_RoamingAppData, L"APPDATA");
+	DWORD len = GetCurrentDirectory(_countof(userprofile_path), userprofile_path);
+	if (len > 0) {
+		SetEnvironmentVariableW(L"USERPROFILE", userprofile_path);
+		swprintf_s(path, _countof(path), L"%s\\AppData\\Local", userprofile_path);
+		SetEnvironmentVariableW(L"LOCALAPPDATA", path);
+		swprintf_s(path, _countof(path), L"%s\\AppData\\Roaming", userprofile_path);
+		SetEnvironmentVariableW(L"APPDATA", path);
+	}
 
 	ret = RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_QUERY_VALUE, &reg_key);
 	if (ret != ERROR_SUCCESS)

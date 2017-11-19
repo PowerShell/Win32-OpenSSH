@@ -499,7 +499,7 @@ CALLBACK WSASendCompletionRoutine(IN DWORD dwError,
 	pio->write_details.error = dwError;
 	/* TODO - assert that remaining == cbTransferred */
 	if ((dwError == 0) && (pio->write_details.remaining != cbTransferred)) {
-		debug3("WSASendCB - ERROR: broken assumption, io:%p, sent:%d, remaining:%d", pio,
+		error("WSASendCB - ERROR: broken assumption, io:%p, sent:%d, remaining:%d", pio,
 			cbTransferred, pio->write_details.remaining);
 		DebugBreak();
 	}
@@ -633,7 +633,7 @@ socketio_close(struct w32_io* pio)
 	SleepEx(0, TRUE);
 	if ((pio->internal.state == SOCK_READY) &&
 	    (pio->read_details.pending || pio->write_details.pending)) {
-		debug4("close - IO is still pending on closed socket. read:%d, write:%d, io:%p",
+		error("close - IO is still pending on closed socket. read:%d, write:%d, io:%p",
 			pio->read_details.pending, pio->write_details.pending, pio);
 		DebugBreak();
 	}

@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.305 2017/09/19 04:24:22 djm Exp $ */
+/* $OpenBSD: clientloop.c,v 1.306 2017/10/23 05:08:00 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1605,12 +1605,13 @@ client_request_agent(struct ssh *ssh, const char *request_type, int rchan)
 	return c;
 }
 
-int
+char *
 client_request_tun_fwd(struct ssh *ssh, int tun_mode,
     int local_tun, int remote_tun)
 {
 	Channel *c;
 	int fd;
+	char *ifname = NULL;
 
 	if (tun_mode == SSH_TUNMODE_NO)
 		return 0;
@@ -1618,10 +1619,11 @@ client_request_tun_fwd(struct ssh *ssh, int tun_mode,
 	debug("Requesting tun unit %d in mode %d", local_tun, tun_mode);
 
 	/* Open local tunnel device */
-	if ((fd = tun_open(local_tun, tun_mode)) == -1) {
+	if ((fd = tun_open(local_tun, tun_mode, &ifname)) == -1) {
 		error("Tunnel device open failed.");
-		return -1;
+		return NULL;
 	}
+	debug("Tunnel forwarding using interface %s", ifname);
 
 	c = channel_new(ssh, "tun", SSH_CHANNEL_OPENING, fd, fd, -1,
 	    CHAN_TCP_WINDOW_DEFAULT, CHAN_TCP_PACKET_DEFAULT, 0, "tun", 1);
@@ -1642,7 +1644,7 @@ client_request_tun_fwd(struct ssh *ssh, int tun_mode,
 	packet_put_int(remote_tun);
 	packet_send();
 
-	return 0;
+	return ifname;
 }
 
 /* XXXX move to generic input handler */

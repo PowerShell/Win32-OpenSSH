@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.h,v 1.82 2017/09/12 06:32:07 djm Exp $ */
+/* $OpenBSD: packet.h,v 1.83 2017/10/25 00:17:08 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -61,6 +61,7 @@ struct ssh {
 	int remote_port;
 	char *local_ipaddr;
 	int local_port;
+	char *rdomain_in;
 
 	/* Optional preamble for log messages (e.g. username) */
 	char *log_preamble;
@@ -162,6 +163,7 @@ const char *ssh_remote_ipaddr(struct ssh *);
 int	 ssh_remote_port(struct ssh *);
 const char *ssh_local_ipaddr(struct ssh *);
 int	 ssh_local_port(struct ssh *);
+const char *ssh_packet_rdomain_in(struct ssh *);
 
 void	 ssh_packet_set_rekey_limits(struct ssh *, u_int64_t, u_int32_t);
 time_t	 ssh_packet_get_rekey_timeout(struct ssh *);

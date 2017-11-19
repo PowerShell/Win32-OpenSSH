@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.174 2017/10/02 19:33:20 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.175 2017/10/05 15:52:03 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -760,12 +760,10 @@ mm_answer_pwnamallow(int sock, Buffer *m)
 		for (i = 0; i < options.nx; i++) \
 			buffer_put_cstring(m, options.x[i]); \
 	} while (0)
-#define M_CP_STRARRAYOPT_ALLOC(x, nx) M_CP_STRARRAYOPT(x, nx)
 	/* See comment in servconf.h */
 	COPY_MATCH_STRING_OPTS();
 #undef M_CP_STROPT
 #undef M_CP_STRARRAYOPT
-#undef M_CP_STRARRAYOPT_ALLOC
 
 	/* Create valid auth method lists */
 	if (auth2_setup_methods_lists(authctxt) != 0) {

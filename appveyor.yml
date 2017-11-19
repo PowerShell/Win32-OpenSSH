@@ -1,4 +1,4 @@
-version: 0.0.22.0.{build}
+version: 0.0.23.0.{build}
 image: Visual Studio 2015
 
 branches:

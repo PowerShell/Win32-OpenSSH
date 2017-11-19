@@ -91,6 +91,7 @@ errno_from_Win32Error(int win32_error)
 	case ERROR_FILE_EXISTS:
 		return EEXIST;
 	case ERROR_FILE_NOT_FOUND:
+	case ERROR_PATH_NOT_FOUND:
 		return ENOENT;
 	default:
 		return win32_error;
@@ -627,7 +628,7 @@ WriteCompletionRoutine(_In_ DWORD dwErrorCode,
 	pio->write_details.error = dwErrorCode;
 	/* TODO - assert that remaining == dwNumberOfBytesTransfered */
 	if ((dwErrorCode == 0) && (pio->write_details.remaining != dwNumberOfBytesTransfered)) {
-		debug3("WriteCB - ERROR: broken assumption, io:%p, wrote:%d, remaining:%d", pio,
+		error("WriteCB - ERROR: broken assumption, io:%p, wrote:%d, remaining:%d", pio,
 			dwNumberOfBytesTransfered, pio->write_details.remaining);
 		DebugBreak();
 	}
@@ -900,6 +901,22 @@ fileio_close(struct w32_io* pio)
 		free(pio);
 		return 0;
 	}
+
+	/*
+	* we report to POSIX app that an async write has completed as soon its
+	* copied to internal buffer. The app may subsequently try to close the
+	* fd thinking everything is written. IF the Windows handle is closed
+	* now, the pipe/file io write operation may terminate prematurely.
+	* To compensate for the discrepency
+	* wait here until async write has completed.
+	* If you see any process waiting here indefinitely - its because no one
+	* is draining from other end of the pipe/file. This is an unfortunate
+	* consequence that should otherwise have very little impact on practical
+	* scenarios.
+	*/
+	while (pio->write_details.pending)
+		if (0 != wait_for_any_event(NULL, 0, INFINITE))
+			return -1;
 
 	CancelIo(WINHANDLE(pio));
 	/* let queued APCs (if any) drain */

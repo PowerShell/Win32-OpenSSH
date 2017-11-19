@@ -25,6 +25,7 @@
 
 #include "includes.h"
 
+#ifdef WITH_OPENSSL
 
 #include <openssl/bn.h>
 #include <openssl/dh.h>
@@ -465,3 +466,5 @@ dh_estimate(int bits)
 		return 7680;
 	return 8192;
 }
+
+#endif /* WITH_OPENSSL */

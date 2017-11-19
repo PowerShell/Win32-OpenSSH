@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.198 2017/09/12 06:35:32 djm Exp $ */
+/* $OpenBSD: serverloop.c,v 1.199 2017/10/23 05:08:00 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -98,6 +98,9 @@ static volatile sig_atomic_t received_sigterm = 0;
 
 /* prototypes */
 static void server_init_dispatch(void);
+
+/* requested tunnel forwarding interface(s), shared with session.c */
+char *tun_fwd_ifnames = NULL;
 
 /*
  * we write to this pipe if a SIGCHLD is caught in order to avoid
@@ -519,6 +522,7 @@ server_request_tun(struct ssh *ssh)
 	Channel *c = NULL;
 	int mode, tun;
 	int sock;
+	char *tmp, *ifname = NULL;
 
 	mode = packet_get_int();
 	switch (mode) {
@@ -541,9 +545,10 @@ server_request_tun(struct ssh *ssh)
 			goto done;
 		tun = forced_tun_device;
 	}
-	sock = tun_open(tun, mode);
+	sock = tun_open(tun, mode, &ifname);
 	if (sock < 0)
 		goto done;
+	debug("Tunnel forwarding using interface %s", ifname);
 	c = channel_new(ssh, "tun", SSH_CHANNEL_OPEN, sock, sock, -1,
 	    CHAN_TCP_WINDOW_DEFAULT, CHAN_TCP_PACKET_DEFAULT, 0, "tun", 1);
 	c->datagram = 1;
@@ -552,6 +557,19 @@ server_request_tun(struct ssh *ssh)
 		channel_register_filter(ssh, c->self, sys_tun_infilter,
 		    sys_tun_outfilter, NULL, NULL);
 #endif
+
+	/*
+	 * Update the list of names exposed to the session
+	 * XXX remove these if the tunnels are closed (won't matter
+	 * much if they are already in the environment though)
+	 */
+	tmp = tun_fwd_ifnames;
+	xasprintf(&tun_fwd_ifnames, "%s%s%s",
+	    tun_fwd_ifnames == NULL ? "" : tun_fwd_ifnames,
+	    tun_fwd_ifnames == NULL ? "" : ",",
+	    ifname);
+	free(tmp);
+	free(ifname);
 
  done:
 	if (c == NULL)

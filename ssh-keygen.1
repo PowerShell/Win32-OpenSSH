@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ssh-keygen.1,v 1.144 2017/07/08 18:32:54 jmc Exp $
+.\"	$OpenBSD: ssh-keygen.1,v 1.145 2017/11/03 05:14:04 djm Exp $
 .\"
 .\" Author: Tatu Ylonen <ylo@cs.hut.fi>
 .\" Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -35,7 +35,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: July 8 2017 $
+.Dd $Mdocdate: November 3 2017 $
 .Dt SSH-KEYGEN 1
 .Os
 .Sh NAME
@@ -584,13 +584,20 @@ Specify a validity interval when signing a certificate.
 A validity interval may consist of a single time, indicating that the
 certificate is valid beginning now and expiring at that time, or may consist
 of two times separated by a colon to indicate an explicit time interval.
-The start time may be specified as a date in YYYYMMDD format, a time
-in YYYYMMDDHHMMSS format or a relative time (to the current time) consisting
-of a minus sign followed by a relative time in the format described in the
+.Pp
+The start time may be specified as the string
+.Dq always
+to indicate the certificate has no specified start time,
+a date in YYYYMMDD format, a time in YYYYMMDDHHMMSS format,
+a relative time (to the current time) consisting of a minus sign followed by
+an interval in the format described in the
 TIME FORMATS section of
 .Xr sshd_config 5 .
-The end time may be specified as a YYYYMMDD date, a YYYYMMDDHHMMSS time or
-a relative time starting with a plus character.
+.Pp
+The end time may be specified as a YYYYMMDD date, a YYYYMMDDHHMMSS time,
+a relative time starting with a plus character or the string
+.Dq forever
+to indicate that the certificate has no expirty date.
 .Pp
 For example:
 .Dq +52w1d
@@ -601,6 +608,8 @@ For example:
 (valid from 12:30 PM, January 1st, 2010 to 12:30 PM, January 1st, 2011),
 .Dq -1d:20110101
 (valid from yesterday to midnight, January 1st, 2011).
+.Dq -1m:forever
+(valid from one minute ago and never expiring).
 .It Fl v
 Verbose mode.
 Causes

@@ -325,7 +325,7 @@ char *shadow_pw(struct passwd *pw);
 #include "port-irix.h"
 #include "port-linux.h"
 #include "port-solaris.h"
-#include "port-tun.h"
+#include "port-net.h"
 #include "port-uw.h"
 
 /* _FORTIFY_SOURCE breaks FD_ISSET(n)/FD_SET(n) for n > FD_SETSIZE. Avoid. */

@@ -145,7 +145,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 	while (DataAvailable(hInput)) {
 		if (glob_outlen >= destinlen)
 			return glob_outlen;
-		ReadConsoleInput(hInput, &InputRecord, 1, &dwInput);
+		ReadConsoleInputW(hInput, &InputRecord, 1, &dwInput);
 		switch (InputRecord.EventType) {
 		case WINDOW_BUFFER_SIZE_EVENT:
 			queue_terminal_window_change_event();

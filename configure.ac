@@ -427,6 +427,16 @@ AC_CHECK_HEADERS([sys/capsicum.h], [], [], [
 #endif
 ])
 
+# net/route.h requires sys/socket.h and sys/types.h.
+# sys/sysctl.h also requires sys/param.h
+AC_CHECK_HEADERS([net/route.h sys/sysctl.h], [], [], [
+#ifdef HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#include <sys/param.h>
+#include <sys/socket.h>
+])
+
 # lastlog.h requires sys/time.h to be included first on Solaris
 AC_CHECK_HEADERS([lastlog.h], [], [], [
 #ifdef HAVE_SYS_TIME_H
@@ -769,6 +779,9 @@ main() { if (NSVersionOfRunTimeLibrary("System") >= (60 << 16))
 		AC_DEFINE([SSH_TUN_PREPEND_AF], [1],
 		    [Prepend the address family to IP tunnel traffic])
 	fi
+	AC_CHECK_HEADER([linux/if.h],
+	    AC_DEFINE([SYS_RDOMAIN_LINUX], [1],
+		[Support routing domains using Linux VRF]))
 	AC_CHECK_HEADERS([linux/seccomp.h linux/filter.h linux/audit.h], [],
 	    [], [#include <linux/types.h>])
 	AC_MSG_CHECKING([for seccomp architecture])

@@ -205,7 +205,7 @@ sw_process_pending_signals()
 		sigdelset(&pending_tmp, exp[i]);
 	if (pending_tmp) {
 		/* unexpected signals queued up */
-		debug3("process_signals() - ERROR unexpected signals in queue: %d", pending_tmp);
+		error("process_signals() - ERROR unexpected signals in queue: %d", pending_tmp);
 		errno = ENOTSUP;
 		DebugBreak();
 		return -1;

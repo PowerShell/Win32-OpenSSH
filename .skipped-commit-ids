@@ -1,3 +1,7 @@
+# Commit IDs against the new CVS->GIT translation go here (and delete this line)
+
+Old upstream tree:
+
 321065a95a7ccebdd5fd08482a1e19afbf524e35	Update DH groups
 d4f699a421504df35254cf1c6f1a7c304fb907ca	Remove 1k bit groups
 aafe246655b53b52bc32c8a24002bc262f4230f7	Remove intermediate moduli

@@ -129,7 +129,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-solaris.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-tun.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-net.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="$(OpenSSH-Src-Path)openbsd-compat\port-uw.c">
@@ -278,7 +278,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\port-solaris.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\port-tun.h">
+    <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\port-net.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="$(OpenSSH-Src-Path)openbsd-compat\port-uw.h">

@@ -1,4 +1,4 @@
-/* $OpenBSD: sshkey.c,v 1.56 2017/08/12 06:42:52 djm Exp $ */
+/* $OpenBSD: sshkey.c,v 1.57 2017/10/13 06:24:51 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -3304,7 +3304,7 @@ sshkey_private_pem_to_blob(struct sshkey *key, struct sshbuf *blob,
 	int blen, len = strlen(_passphrase);
 	u_char *passphrase = (len > 0) ? (u_char *)_passphrase : NULL;
 	const EVP_CIPHER *cipher = (len > 0) ? EVP_aes_128_cbc() : NULL;
-	const u_char *bptr;
+	char *bptr;
 	BIO *bio = NULL;
 
 	if (len > 0 && len <= 4)

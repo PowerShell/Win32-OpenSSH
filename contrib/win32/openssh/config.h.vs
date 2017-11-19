@@ -435,7 +435,7 @@
 /* #undef HAVE_GETOPT_OPTRESET */
 
 /* Define if your libraries define getpagesize() */
-#define HAVE_GETPAGESIZE 1
+/* #undef HAVE_GETPAGESIZE */
 
 /* Define to 1 if you have the `getpeereid' function. */
 /* #undef HAVE_GETPEEREID */

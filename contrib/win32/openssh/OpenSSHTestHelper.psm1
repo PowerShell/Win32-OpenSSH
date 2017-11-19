@@ -20,6 +20,7 @@ $Script:UnitTestResultsFile = Join-Path $TestDataPath $UnitTestResultsFileName
 $Script:TestSetupLogFile = Join-Path $TestDataPath $TestSetupLogFileName
 $Script:E2ETestDirectory = Join-Path $repositoryRoot.FullName -ChildPath "regress\pesterTests"
 $Script:WindowsInBox = $false
+$Script:NoLibreSSL = $false
 $Script:EnableAppVerifier = $true
 $Script:PostmortemDebugging = $false
 
@@ -37,7 +38,8 @@ function Set-OpenSSHTestEnvironment
         [string] $TestDataPath = "$env:SystemDrive\OpenSSHTests",        
         [Boolean] $DebugMode = $false,
         [Switch] $NoAppVerifier,
-        [Switch] $PostmortemDebugging
+        [Switch] $PostmortemDebugging,
+        [Switch] $NoLibreSSL
     )
     
     if($PSBoundParameters.ContainsKey("Verbose"))
@@ -56,6 +58,7 @@ function Set-OpenSSHTestEnvironment
     $Script:TestSetupLogFile = Join-Path $TestDataPath "TestSetupLog.txt"
     $Script:UnitTestDirectory = Get-UnitTestDirectory
     $Script:EnableAppVerifier = -not ($NoAppVerifier.IsPresent)
+    $Script:NoLibreSSL = $NoLibreSSL.IsPresent
     if($Script:EnableAppVerifier)
     {
         $Script:PostmortemDebugging = $PostmortemDebugging.IsPresent
@@ -77,6 +80,7 @@ function Set-OpenSSHTestEnvironment
         "DebugMode" = $DebugMode                               # run openssh E2E in debug mode
         "EnableAppVerifier" = $Script:EnableAppVerifier
         "PostmortemDebugging" = $Script:PostmortemDebugging
+        "NoLibreSSL" = $Script:NoLibreSSL
         }
         
     #if user does not set path, pick it up
@@ -301,7 +305,8 @@ function Get-LocalUserProfile
 <#
       .SYNOPSIS
       This function installs the tools required by our tests
-      1) Pester for running the tests  
+      1) Pester for running the tests
+      2) Windbg for postmortem debugging
 #>
 function Install-OpenSSHTestDependencies
 {
@@ -594,7 +599,7 @@ function Invoke-OpenSSHE2ETest
     # Discover all CI tests and run them.
     Import-Module pester -force -global
     Push-Location $Script:E2ETestDirectory
-    Write-Log -Message "Running OpenSSH E2E tests..."    
+    Write-Log -Message "Running OpenSSH E2E tests..."
     $testFolders = @(Get-ChildItem *.tests.ps1 -Recurse | ForEach-Object{ Split-Path $_.FullName} | Sort-Object -Unique)
     Invoke-Pester $testFolders -OutputFormat NUnitXml -OutputFile $Script:E2ETestResultsFile -Tag $pri -PassThru
     Pop-Location

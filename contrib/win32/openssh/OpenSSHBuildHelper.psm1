@@ -143,7 +143,11 @@ function Write-BuildMsg
 #>
 function Start-OpenSSHBootstrap
 {
-    param([switch]$OneCore)
+    param(
+        [ValidateSet('x86', 'x64', 'arm64', 'arm')]
+        [string]$NativeHostArch = "x64",
+
+        [switch]$OneCore)
 
     [bool] $silent = -not $script:Verbose
     Write-BuildMsg -AsInfo -Message "Checking tools and dependencies" -Silent:$silent
@@ -192,47 +196,19 @@ function Start-OpenSSHBootstrap
     {
         Write-BuildMsg -AsVerbose -Message "$gitCmdPath already present in Path environment variable" -Silent:$silent
     }
-        
-    $nativeMSBuildPath = "${env:ProgramFiles(x86)}\MSBuild\14.0\bin"    
-    if($env:PROCESSOR_ARCHITECTURE -ieq "AMD64")
-    {
-        $nativeMSBuildPath += "\amd64"
-    }
 
-    if (-not ($machinePath.ToLower().Contains($nativeMSBuildPath.ToLower())))
-    {
-        Write-BuildMsg -AsVerbose -Message "Adding $nativeMSBuildPath to Path environment variable" -Silent:$silent
-        $newMachineEnvironmentPath += ";$nativeMSBuildPath"
-        if(-not ($env:Path.ToLower().Contains($nativeMSBuildPath.ToLower())))
-        {
-            $env:Path += ";$nativeMSBuildPath"
-        }
-    }
-    else
-    {
-        Write-BuildMsg -AsVerbose -Message "$nativeMSBuildPath already present in Path environment variable" -Silent:$silent
-    } 
+    $nativeMSBuildPath = Get-VS2015BuildToolPath
 
     # Update machine environment path
     if ($newMachineEnvironmentPath -ne $machinePath)
     {
         [Environment]::SetEnvironmentVariable('Path', $newMachineEnvironmentPath, 'MACHINE')
-    }
-
-    $VCTargetsPath = "${env:ProgramFiles(x86)}\MSBuild\Microsoft.Cpp\v4.0\V140\"
-    if([Environment]::GetEnvironmentVariable('VCTargetsPath', 'MACHINE') -eq $null)
-    {
-        [Environment]::SetEnvironmentVariable('VCTargetsPath', $VCTargetsPath, 'MACHINE')
-    }
-    if ($env:VCTargetsPath -eq $null)
-    {
-        $env:VCTargetsPath = $VCTargetsPath
-    }
+    }    
 
     $vcVars = "${env:ProgramFiles(x86)}\Microsoft Visual Studio 14.0\Common7\Tools\vsvars32.bat"
     $sdkPath = "${env:ProgramFiles(x86)}\Windows Kits\8.1\bin\x86\register_app.vbs"
     $packageName = "vcbuildtools"
-    If ((-not (Test-Path $nativeMSBuildPath)) -or (-not (Test-Path $VcVars)) -or (-not (Test-Path $sdkPath))) {
+    If (($nativeMSBuildPath -eq $null) -or (-not (Test-Path $VcVars)) -or (-not (Test-Path $sdkPath))) {
         Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName ..."
         choco install $packageName -ia "/InstallSelectableItems VisualCppBuildTools_ATLMFC_SDK;VisualCppBuildTools_NETFX_SDK;Win81SDK_CppBuildSKUV1" -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
         $errorCode = $LASTEXITCODE
@@ -268,7 +244,17 @@ function Start-OpenSSHBootstrap
         Write-BuildMsg -AsVerbose -Message 'VC++ 2015 Build Tools already present.'
     }
 
-    if($OneCore)
+    if($NativeHostArch.ToLower().Startswith('arm'))
+    {		
+        $nativeMSBuildPath = Get-VS2017BuildToolPath
+        If ($nativeMSBuildPath -eq $null)
+        {
+            #todo, install vs 2017 build tools
+            Write-BuildMsg -AsError -ErrorAction Stop -Message "The required msbuild 15.0 is not installed on the machine."
+        }
+    }
+
+    if($OneCore -or ($NativeHostArch.ToLower().Startswith('arm')))
     {
         $win10sdk = Get-Windows10SDKVersion
         if($win10sdk -eq $null)
@@ -337,7 +323,7 @@ function Start-OpenSSHPackage
     [CmdletBinding(SupportsShouldProcess=$false)]    
     param
     (        
-        [ValidateSet('x86', 'x64')]
+        [ValidateSet('x86', 'x64', 'arm64', 'arm')]
         [string]$NativeHostArch = "x64",
 
         [ValidateSet('Debug', 'Release')]
@@ -365,6 +351,13 @@ function Start-OpenSSHPackage
     if ($NativeHostArch -ieq 'x86') {
         $packageName = "OpenSSH-Win32"
     }
+    elseif ($NativeHostArch -ieq 'arm64') {
+        $packageName = "OpenSSH-ARM64"
+    }
+    elseif ($NativeHostArch -ieq 'arm') {
+        $packageName = "OpenSSH-ARM"
+    }
+
     while((($service = Get-Service ssh-agent -ErrorAction SilentlyContinue) -ne $null) -and ($service.Status -ine 'Stopped'))
     {        
         Stop-Service ssh-agent -Force
@@ -395,9 +388,9 @@ function Start-OpenSSHPackage
         }
     }
 
-    #copy libcrypto-41 dll
+    #copy libcrypto dll
     $libreSSLSDKPath = Join-Path $PSScriptRoot $script:libreSSLSDKStr
-    Copy-Item -Path $(Join-Path $libreSSLSDKPath "$NativeHostArch\libcrypto-41.dll") -Destination $packageDir -Force -ErrorAction Stop    
+    Copy-Item -Path $(Join-Path $libreSSLSDKPath "$NativeHostArch\libcrypto.dll") -Destination $packageDir -Force -ErrorAction Stop    
 
     if ($DestinationPath -ne "") {
         if (Test-Path $DestinationPath) {            
@@ -447,7 +440,7 @@ function Start-OpenSSHBuild
     [CmdletBinding(SupportsShouldProcess=$false)]    
     param
     (        
-        [ValidateSet('x86', 'x64')]
+        [ValidateSet('x86', 'x64', 'arm64', 'arm')]
         [string]$NativeHostArch = "x64",
 
         [ValidateSet('Debug', 'Release')]
@@ -490,36 +483,62 @@ function Start-OpenSSHBuild
     }
 
     $PathTargets = Join-Path $PSScriptRoot paths.targets
-    if ($NoOpenSSL -or $OneCore) 
+    if ($NoOpenSSL) 
     {        
         [XML]$xml = Get-Content $PathTargets
         $xml.Project.PropertyGroup.UseOpenSSL = 'false'
+        $xml.Project.PropertyGroup.SSLLib = [string]::Empty
         $xml.Save($PathTargets)
         $f = Join-Path $PSScriptRoot config.h.vs
         (Get-Content $f).Replace('#define WITH_OPENSSL 1','') | Set-Content $f
         (Get-Content $f).Replace('#define OPENSSL_HAS_ECC 1','') | Set-Content $f
         (Get-Content $f).Replace('#define OPENSSL_HAS_NISTP521 1','') | Set-Content $f
     }
+    
+    if($NativeHostArch.ToLower().Startswith('arm'))
+    {
+        $win10SDKVer = Get-Windows10SDKVersion
+        [XML]$xml = Get-Content $PathTargets
+        $xml.Project.PropertyGroup.WindowsSDKVersion = $win10SDKVer.ToString()
+        $arch = $NativeHostArch.ToUpper()
+        $nodeName = "WindowsSDKDesktop$($arch)Support"
+        $node = $xml.Project.PropertyGroup.ChildNodes | where {$_.Name -eq $nodeName}
+        if($node -eq $null)
+        {
+            $newElement =$xml.CreateElement($nodeName, $xml.Project.xmlns)
+            $newNode = $xml.Project.PropertyGroup.AppendChild($newElement)
+            $null = $newNode.AppendChild($xml.CreateTextNode("true"))
+        } 
+        else
+        {
+            $node.InnerText = "true"
+        }
+        $xml.Save($PathTargets)
+    }
 
     if($OneCore)
     {
         $win10SDKVer = Get-Windows10SDKVersion
         [XML]$xml = Get-Content $PathTargets
-        $xml.Project.PropertyGroup.UseOpenSSL = 'false'
         $xml.Project.PropertyGroup.WindowsSDKVersion = $win10SDKVer.ToString()
         $xml.Project.PropertyGroup.AdditionalDependentLibs = 'onecore.lib'
+        $xml.Project.PropertyGroup.MinimalCoreWin = 'true'
         $xml.Save($PathTargets)
     }
-
-    $msbuildCmd = "msbuild.exe"
+    
     $solutionFile = Get-SolutionFile -root $repositoryRoot.FullName
-    $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/m", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")
+    $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/m", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")    
 
-    if ($OneCore -or $NoOpenSSL) {
-        $cmdMsg += @("/t:core\scp", "/t:core\sftp", "/t:core\sftp-server", "/t:core\ssh", "/t:core\ssh-add", "/t:core\ssh-agent", "/t:core\sshd", "/t:core\ssh-keygen", "/t:core\ssh-shellhost")
+    if($NativeHostArch.ToLower().Startswith('arm'))
+    {
+        $msbuildCmd = Get-VS2017BuildToolPath
+    }
+    else
+    {
+        $msbuildCmd = Get-VS2015BuildToolPath
     }
 
-    & $msbuildCmd $cmdMsg
+    & "$msbuildCmd" $cmdMsg
     $errorCode = $LASTEXITCODE
 
     if ($errorCode -ne 0)
@@ -528,6 +547,38 @@ function Start-OpenSSHBuild
     }    
 
     Write-BuildMsg -AsInfo -Message "SSH build successful."
+}
+
+function Get-VS2017BuildToolPath
+{
+    $searchPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2017\*\MSBuild\15.0\Bin"
+    if($env:PROCESSOR_ARCHITECTURE -ieq "AMD64")
+    {
+        $searchPath += "\amd64"
+    }
+    $toolAvailable = @()
+    $toolAvailable += Get-ChildItem -path $searchPath\* -Filter "MSBuild.exe" -ErrorAction SilentlyContinue
+    if($toolAvailable.count -eq 0)
+    {
+        return $null
+    }
+   return $toolAvailable[0].FullName
+}
+
+function Get-VS2015BuildToolPath
+{
+    $searchPath = "${env:ProgramFiles(x86)}\MSBuild\14.0\Bin"
+    if($env:PROCESSOR_ARCHITECTURE -ieq "AMD64")
+    {
+        $searchPath += "\amd64"
+    }
+    $toolAvailable = @()
+    $toolAvailable += Get-ChildItem -path $searchPath\* -Filter "MSBuild.exe" -ErrorAction SilentlyContinue
+    if($toolAvailable.count -eq 0)
+    {
+        return $null
+    }
+   return $toolAvailable[0].FullName
 }
 
 function Get-Windows10SDKVersion
@@ -553,7 +604,7 @@ function Get-BuildLogFile
         [ValidateNotNull()]
         [System.IO.DirectoryInfo] $root,
 
-        [ValidateSet('x86', 'x64')]
+        [ValidateSet('x86', 'x64', 'arm64', 'arm')]
         [string]$NativeHostArch = "x64",
                 
         [ValidateSet('Debug', 'Release')]

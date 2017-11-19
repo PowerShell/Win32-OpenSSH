@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.279 2017/09/21 19:16:53 markus Exp $ */
+/* $OpenBSD: readconf.c,v 1.280 2017/10/21 23:06:24 millert Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -687,34 +687,6 @@ match_cfg_line(Options *options, char **condition, struct passwd *pw,
 	*condition = cp;
 	free(host);
 	return result;
-}
-
-/* Check and prepare a domain name: removes trailing '.' and lowercases */
-static void
-valid_domain(char *name, const char *filename, int linenum)
-{
-	size_t i, l = strlen(name);
-	u_char c, last = '\0';
-
-	if (l == 0)
-		fatal("%s line %d: empty hostname suffix", filename, linenum);
-	if (!isalpha((u_char)name[0]) && !isdigit((u_char)name[0]))
-		fatal("%s line %d: hostname suffix \"%.100s\" "
-		    "starts with invalid character", filename, linenum, name);
-	for (i = 0; i < l; i++) {
-		c = tolower((u_char)name[i]);
-		name[i] = (char)c;
-		if (last == '.' && c == '.')
-			fatal("%s line %d: hostname suffix \"%.100s\" contains "
-			    "consecutive separators", filename, linenum, name);
-		if (c != '.' && c != '-' && !isalnum(c) &&
-		    c != '_') /* technically invalid, but common */
-			fatal("%s line %d: hostname suffix \"%.100s\" contains "
-			    "invalid characters", filename, linenum, name);
-		last = c;
-	}
-	if (name[l - 1] == '.')
-		name[l - 1] = '\0';
 }
 
 /*
@@ -1568,7 +1540,11 @@ parse_keytypes:
 	case oCanonicalDomains:
 		value = options->num_canonical_domains != 0;
 		while ((arg = strdelim(&s)) != NULL && *arg != '\0') {
-			valid_domain(arg, filename, linenum);
+			const char *errstr;
+			if (!valid_domain(arg, 1, &errstr)) {
+				fatal("%s line %d: %s", filename, linenum,
+				    errstr);
+			}
 			if (!*activep || value)
 				continue;
 			if (options->num_canonical_domains >= MAX_CANON_DOMAINS)
@@ -2311,11 +2287,13 @@ parse_jump(const char *s, Options *o, int active)
 
 		if (first) {
 			/* First argument and configuration is active */
-			if (parse_user_host_port(cp, &user, &host, &port) != 0)
+			if (parse_ssh_uri(cp, &user, &host, &port) == -1 ||
+			    parse_user_host_port(cp, &user, &host, &port) != 0)
 				goto out;
 		} else {
 			/* Subsequent argument or inactive configuration */
-			if (parse_user_host_port(cp, NULL, NULL, NULL) != 0)
+			if (parse_ssh_uri(cp, NULL, NULL, NULL) == -1 ||
+			    parse_user_host_port(cp, NULL, NULL, NULL) != 0)
 				goto out;
 		}
 		first = 0; /* only check syntax for subsequent hosts */
@@ -2338,6 +2316,18 @@ parse_jump(const char *s, Options *o, int active)
 	free(user);
 	free(host);
 	return ret;
+}
+
+int
+parse_ssh_uri(const char *uri, char **userp, char **hostp, int *portp)
+{
+	char *path;
+	int r;
+
+	r = parse_uri("ssh", uri, userp, hostp, portp, &path);
+	if (r == 0 && path != NULL)
+		r = -1;		/* path not allowed */
+	return r;
 }
 
 /* XXX the following is a near-vebatim copy from servconf.c; refactor */

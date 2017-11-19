@@ -18,8 +18,8 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         }
 
         $keypassphrase = "testpassword"
-        $WindowsInBox = $OpenSSHTestInfo["WindowsInBox"]
-        if($WindowsInBox)
+        $NoLibreSSL = $OpenSSHTestInfo["NoLibreSSL"]
+        if($NoLibreSSL)
         {
             $keytypes = @("ed25519")                
         }
@@ -139,7 +139,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             {
                 $keyPath = Join-Path $testDir "id_$type"
                 remove-item $keyPath -ErrorAction SilentlyContinue
-                if($OpenSSHTestInfo["WindowsInBox"])
+                if($OpenSSHTestInfo["NoLibreSSL"])
                 {
                     ssh-keygen -t $type -P $keypassphrase -f $keyPath -Z aes128-ctr
                 }
@@ -252,7 +252,7 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
             $keyFileName = "sshadd_userPermTestkey_ed25519"
             $keyFilePath = Join-Path $testDir $keyFileName
             Remove-Item -path "$keyFilePath*" -Force -ErrorAction SilentlyContinue
-            if($OpenSSHTestInfo["WindowsInBox"])
+            if($OpenSSHTestInfo["NoLibreSSL"])
             {
                 ssh-keygen.exe -t ed25519 -f $keyFilePath -P $keypassphrase -Z aes128-ctr
             }
@@ -377,23 +377,23 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         }
         AfterAll{$tC++}
 
-		It "$tC.$tI - ssh-keyscan with default arguments" -Skip:$WindowsInBox {
+		It "$tC.$tI - ssh-keyscan with default arguments" -Skip:$NoLibreSSL {
 			cmd /c "ssh-keyscan -p $port 127.0.0.1 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'
 		}
 
-        It "$tC.$tI - ssh-keyscan with -p" -Skip:$WindowsInBox {
+        It "$tC.$tI - ssh-keyscan with -p" -Skip:$NoLibreSSL {
 			cmd /c "ssh-keyscan -p $port 127.0.0.1 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'
 		}
 
-		It "$tC.$tI - ssh-keyscan with -f" -Skip:$WindowsInBox {
+		It "$tC.$tI - ssh-keyscan with -f" -Skip:$NoLibreSSL {
 			Set-Content -Path tmp.txt -Value "127.0.0.1"
 			cmd /c "ssh-keyscan -p $port -f tmp.txt 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'
 		}
 
-		It "$tC.$tI - ssh-keyscan with -f -t" -Skip:$WindowsInBox {
+		It "$tC.$tI - ssh-keyscan with -f -t" -Skip:$NoLibreSSL {
 			Set-Content -Path tmp.txt -Value "127.0.0.1"
 			cmd /c "ssh-keyscan -p $port -f tmp.txt -t rsa,dsa 2>&1 > $outputFile"
 			$outputFile | Should Contain '.*ssh-rsa.*'

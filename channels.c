@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.375 2017/09/24 13:45:34 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.376 2017/10/25 00:15:35 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1666,19 +1666,6 @@ port_open_helper(struct ssh *ssh, Channel *c, char *rtype)
 		fatal("%s: channel %i: send %s", __func__, c->self, ssh_err(r));
 	free(remote_ipaddr);
 	free(local_ipaddr);
-}
-
-static void
-channel_set_reuseaddr(int fd)
-{
-	int on = 1;
-
-	/*
-	 * Set socket options.
-	 * Allow local port reuse in TIME_WAIT.
-	 */
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) == -1)
-		error("setsockopt SO_REUSEADDR fd %d: %s", fd, strerror(errno));
 }
 
 void
@@ -3370,7 +3357,7 @@ channel_setup_fwd_listener_tcpip(struct ssh *ssh, int type,
 			continue;
 		}
 
-		channel_set_reuseaddr(sock);
+		set_reuseaddr(sock);
 		if (ai->ai_family == AF_INET6)
 			sock_set_v6only(sock);
 
@@ -4443,7 +4430,7 @@ x11_create_display_inet(struct ssh *ssh, int x11_display_offset,
 			if (ai->ai_family == AF_INET6)
 				sock_set_v6only(sock);
 			if (x11_use_localhost)
-				channel_set_reuseaddr(sock);
+				set_reuseaddr(sock);
 			if (bind(sock, ai->ai_addr, ai->ai_addrlen) < 0) {
 				debug2("%s: bind port %d: %.100s", __func__,
 				    port, strerror(errno));

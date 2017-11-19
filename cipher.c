@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher.c,v 1.107 2017/05/07 23:12:57 djm Exp $ */
+/* $OpenBSD: cipher.c,v 1.108 2017/11/03 02:22:41 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -449,8 +449,8 @@ cipher_get_keyiv_len(const struct sshcipher_ctx *cc)
 int
 cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 {
-	const struct sshcipher *c = cc->cipher;
 #ifdef WITH_OPENSSL
+	const struct sshcipher *c = cc->cipher;
  	int evplen;
 #endif
 
@@ -494,8 +494,8 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 int
 cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 {
-	const struct sshcipher *c = cc->cipher;
 #ifdef WITH_OPENSSL
+	const struct sshcipher *c = cc->cipher;
  	int evplen = 0;
 #endif
 

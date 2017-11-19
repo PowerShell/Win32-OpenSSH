@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.264 2017/09/12 06:32:07 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.266 2017/10/25 00:17:08 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -555,6 +555,18 @@ ssh_local_port(struct ssh *ssh)
 {
 	(void)ssh_remote_ipaddr(ssh); /* Will lookup and cache. */
 	return ssh->local_port;
+}
+
+/* Returns the routing domain of the input socket, or NULL if unavailable */
+const char *
+ssh_packet_rdomain_in(struct ssh *ssh)
+{
+	if (ssh->rdomain_in != NULL)
+		return ssh->rdomain_in;
+	if (!ssh_packet_connection_is_on_socket(ssh))
+		return NULL;
+	ssh->rdomain_in = get_rdomain(ssh->state->connection_in);
+	return ssh->rdomain_in;
 }
 
 /* Closes the connection and clears and frees internal data structures. */
@@ -1773,6 +1785,8 @@ ssh_packet_send_debug(struct ssh *ssh, const char *fmt,...)
 	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
+
+	debug3("sending debug message: %s", buf);
 
 	if ((r = sshpkt_start(ssh, SSH2_MSG_DEBUG)) != 0 ||
 	    (r = sshpkt_put_u8(ssh, 0)) != 0 || /* always display */

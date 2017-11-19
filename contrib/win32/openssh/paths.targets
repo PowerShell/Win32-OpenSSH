@@ -1,14 +1,18 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <OpenSSH-Src-Path>$(SolutionDir)..\..\..\</OpenSSH-Src-Path> 
+    <OpenSSH-Src-Path>$(SolutionDir)..\..\..\</OpenSSH-Src-Path>
     <OpenSSH-Bin-Path>$(SolutionDir)..\..\..\bin\</OpenSSH-Bin-Path>
     <OpenSSH-Lib-Path>$(SolutionDir)lib\</OpenSSH-Lib-Path>
     <LibreSSL-Path>$(SolutionDir)\LibreSSLSDK\</LibreSSL-Path>
     <LibreSSL-x86-Path>$(SolutionDir)\LibreSSLSDK\x86\</LibreSSL-x86-Path>
     <LibreSSL-x64-Path>$(SolutionDir)\LibreSSLSDK\x64\</LibreSSL-x64-Path>
+    <LibreSSL-arm64-Path>$(SolutionDir)\LibreSSLSDK\arm64\</LibreSSL-arm64-Path>
+    <LibreSSL-arm-Path>$(SolutionDir)\LibreSSLSDK\arm\</LibreSSL-arm-Path>
     <UseOpenSSL>true</UseOpenSSL>
+    <SSLLib>libcrypto.lib;</SSLLib>
     <WindowsSDKVersion>8.1</WindowsSDKVersion>
     <AdditionalDependentLibs>bcrypt.lib;Userenv.lib;Crypt32.lib;Ws2_32.lib;Secur32.lib;Shlwapi.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;Netapi32.lib</AdditionalDependentLibs>
+    <MinimalCoreWin>false</MinimalCoreWin>
   </PropertyGroup>
 </Project>

@@ -102,6 +102,19 @@ struct w32_io {
 		DWORD std_handle;  /* ex. STD_INPUT_HANDLE */
 	};
 
+	/*internal state used by synchronous io - terminal handles and external 
+	  handles passed through std io*/
+	struct {
+		DWORD to_transfer;
+		DWORD transferred;
+		DWORD error;
+	}sync_read_status;
+	struct {
+		DWORD to_transfer;
+		DWORD transferred;
+		DWORD error;
+	}sync_write_status;
+
 	/*handle specific internal state context, used by sockets and pipes*/
 	struct {
 		enum w32_io_sock_state state;

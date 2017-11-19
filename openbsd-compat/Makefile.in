@@ -20,7 +20,7 @@ OPENBSD=base64.o basename.o bcrypt_pbkdf.o bindresvport.o blowfish.o daemon.o di
 
 COMPAT=arc4random.o bsd-asprintf.o bsd-closefrom.o bsd-cray.o bsd-cygwin_util.o bsd-getpeereid.o getrrsetbyname-ldns.o bsd-err.o bsd-getpagesize.o bsd-misc.o bsd-nextstep.o bsd-openpty.o bsd-poll.o bsd-malloc.o bsd-setres_id.o bsd-snprintf.o bsd-statvfs.o bsd-waitpid.o fake-rfc2553.o openssl-compat.o xcrypt.o kludge-fd_set.o
 
-PORTS=port-aix.o port-irix.o port-linux.o port-solaris.o port-tun.o port-uw.o
+PORTS=port-aix.o port-irix.o port-linux.o port-solaris.o port-net.o port-uw.o
 
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
