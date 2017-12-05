@@ -124,13 +124,14 @@ int sshd_main(int argc, wchar_t **wargv) {
 }
 
 int wmain(int argc, wchar_t **wargv) {
-
 	if (!StartServiceCtrlDispatcherW(dispatch_table)) {
-		if (GetLastError() != ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
+		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
+			return sshd_main(argc, wargv); /* sshd running NOT as service*/
+		else
 			return -1;
 	}
 
-	return sshd_main(argc, wargv);
+	return 0;
 }
 
 int scm_start_service(DWORD num, LPWSTR* args) {

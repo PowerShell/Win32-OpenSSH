@@ -41,8 +41,9 @@ BOOL
 LogonUserExExWHelper(wchar_t *user_name, wchar_t *domain, wchar_t *password, DWORD logon_type,
 	DWORD logon_provider, PTOKEN_GROUPS token_groups, PHANDLE token, PSID *logon_sid, 
 	PVOID *profile_buffer, LPDWORD profile_length, PQUOTA_LIMITS quota_limits)
-{	
+{
 	wchar_t sspicli_dll_path[MAX_PATH + 1] = { 0, };
+	wchar_t advapi32_dll_path[MAX_PATH + 1] = { 0, };
 	wchar_t system32_path[MAX_PATH + 1] = { 0, };
 	
 	if (!GetSystemDirectoryW(system32_path, _countof(system32_path))) {
@@ -51,14 +52,23 @@ LogonUserExExWHelper(wchar_t *user_name, wchar_t *domain, wchar_t *password, DWO
 	}
 	wcsncpy_s(sspicli_dll_path, _countof(sspicli_dll_path), system32_path, wcsnlen(system32_path, _countof(system32_path)) + 1);
 	wcscat_s(sspicli_dll_path, _countof(sspicli_dll_path), L"\\sspicli.dll");
-
-	if (hMod == NULL)
-		hMod = LoadLibraryW(sspicli_dll_path);
+	wcsncpy_s(advapi32_dll_path, _countof(advapi32_dll_path), system32_path, wcsnlen(system32_path, _countof(system32_path)) + 1);
+	wcscat_s(advapi32_dll_path, _countof(advapi32_dll_path), L"\\advapi32.dll");	
 
 	if (hMod == NULL) {
-		debug3("Failed to retrieve the module handle of sspicli.dll with error %d", GetLastError());
-		return FALSE;
+		hMod = LoadLibraryW(sspicli_dll_path);
+		if (hMod == NULL)
+			debug3("Failed to retrieve the module handle of sspicli.dll with error %d", GetLastError());
 	}
+
+	if (hMod == NULL)
+		hMod = LoadLibraryW(advapi32_dll_path);
+
+	if (hMod == NULL) {
+		debug3("Failed to retrieve the module handle of advapi32.dll with error %d", GetLastError());
+		return FALSE;
+	}	
+
 	if (func == NULL)
 		func = (LogonUserExExWType)GetProcAddress(hMod, "LogonUserExExW");
 

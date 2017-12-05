@@ -337,7 +337,7 @@ function Install-OpenSSHTestDependencies
     if (-not ($isModuleAvailable))
     {      
         Write-Log -Message "Installing Pester..." 
-        choco install Pester -y --force --limitoutput 2>&1 >> $Script:TestSetupLogFile
+        choco install Pester --version 3.4.6 -y --force --limitoutput 2>&1 >> $Script:TestSetupLogFile
     }
 
     if($Script:PostmortemDebugging -or (($OpenSSHTestInfo -ne $null) -and ($OpenSSHTestInfo["PostmortemDebugging"])))

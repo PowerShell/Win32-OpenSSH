@@ -46,7 +46,7 @@ int w32_dup2(int oldfd, int newfd);
 unsigned int w32_alarm(unsigned int seconds);
 #define alarm w32_alarm
 
-long w32_lseek(int fd, long offset, int origin);
+long w32_lseek(int fd, unsigned __int64 offset, int origin);
 #define lseek w32_lseek
 
 #define getdtablesize() MAX_FDS
