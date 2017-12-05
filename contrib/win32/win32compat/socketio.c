@@ -701,6 +701,7 @@ socketio_accept(struct w32_io* pio, struct sockaddr* addr, int* addrlen)
 	if (pio->read_details.error) {
 		errno = errno_from_WSAError(pio->read_details.error);
 		debug3("accept - ERROR: async io completed with error: %d, io:%p", pio->read_details.error, pio);
+		pio->read_details.error = 0;
 		goto on_error;
 	}
 
