@@ -382,25 +382,15 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="$(OpenSSH-Src-Path)\servconf.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\ssh-pubkey\ssh-pubkeydefs.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\agent-request.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\agent.h" />
-    <ClInclude Include="$(OpenSSH-Src-Path)groupaccess.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="$(OpenSSH-Src-Path)\auth.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\servconf.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\agent-main.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\agent.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\authagent-request.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\agentconfig.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\connection.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\ssh-agent\keyagent-request.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)auth-options.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)auth2-pubkey.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)groupaccess.c" />
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\logonuser.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />

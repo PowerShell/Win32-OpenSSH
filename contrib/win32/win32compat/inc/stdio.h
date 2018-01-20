@@ -20,3 +20,5 @@ FILE* w32_fdopen(int fd, const char *mode);
 
 int w32_rename(const char *old_name, const char *new_name);
 #define rename w32_rename
+
+int is_absolute_path(char *);

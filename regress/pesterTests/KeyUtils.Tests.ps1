@@ -171,32 +171,17 @@ Describe "E2E scenarios for ssh key management" -Tags "CI" {
         # Executing ssh-agent will start agent service
         # This is to support typical Unix scenarios where 
         # running ssh-agent will setup the agent for current session
-        It "$tC.$tI - ssh-agent starts agent service and sshd depends on ssh-agent" {
+        It "$tC.$tI - ssh-agent starts agent service" {
             if ((Get-Service ssh-agent).Status -eq "Running") {
                 Stop-Service ssh-agent -Force
             }
 
             (Get-Service ssh-agent).Status | Should Be "Stopped"
-            (Get-Service sshd).Status | Should Be "Stopped"
 
             ssh-agent
             WaitForStatus -ServiceName ssh-agent -Status "Running"
 
             (Get-Service ssh-agent).Status | Should Be "Running"
-
-            Stop-Service ssh-agent -Force
-            
-            WaitForStatus -ServiceName ssh-agent -Status "Stopped"
-
-            (Get-Service ssh-agent).Status | Should Be "Stopped"
-            (Get-Service sshd).Status | Should Be "Stopped"
-
-            # this should automatically start both the services
-            Start-Service sshd
-            
-            WaitForStatus -ServiceName sshd -Status "Running"
-            (Get-Service ssh-agent).Status | Should Be "Running"
-            (Get-Service sshd).Status | Should Be "Running"
         }
 
         It "$tC.$tI - ssh-add - add and remove all key types" {

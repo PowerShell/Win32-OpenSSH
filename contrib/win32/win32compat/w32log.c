@@ -35,45 +35,47 @@
 
 #include "inc\syslog.h"
 #include "misc_internal.h"
+#include "inc\utf.h"
 
 #define MSGBUFSIZ 1024
 static int logfd = -1;
 
 /*
- * open a log file using the name of executable under logs folder
- * Ex. if called from c:\windows\system32\openssh\sshd.exe
- * logfile - c:\windows\system32\openssh\logs\sshd.log
+ * log file location will be - "%programData%\\openssh\\logs\\<module_name>.log"
  */
 void
 openlog(char *ident, unsigned int option, int facility)
-{
-	wchar_t *logs_dir = L"\\logs\\";
+{	
 	if (logfd != -1 || ident == NULL)
 		return;
 
-	wchar_t path[PATH_MAX] = { 0 }, log_file[PATH_MAX + 12] = { 0 };
-	errno_t r = 0;
-	if (GetModuleFileNameW(NULL, path, PATH_MAX) == 0)
+	wchar_t *logs_dir = L"\\logs\\";
+	wchar_t module_path[PATH_MAX] = { 0 }, log_file[PATH_MAX + 12] = { 0 };
+
+	if (GetModuleFileNameW(NULL, module_path, PATH_MAX) == 0)
 		return;
 
-	path[PATH_MAX - 1] = L'\0';
-
-	if (wcsnlen(path, MAX_PATH) > MAX_PATH - wcslen(logs_dir))
+	if (wcsnlen(module_path, MAX_PATH) > MAX_PATH - wcslen(logs_dir))
 		return;
 
 	/* split path root and module */
 	{
-		wchar_t* tail = path + wcsnlen(path, MAX_PATH);
-		while (tail > path && *tail != L'\\' && *tail != L'/')
+		wchar_t* tail = module_path + wcsnlen(module_path, MAX_PATH);
+		while (tail > module_path && *tail != L'\\' && *tail != L'/')
 			tail--;
+		
+		char ssh_cfg_path[PATH_MAX] = {0 ,};
+		strcat_s(ssh_cfg_path, _countof(ssh_cfg_path), get_program_data_path()); /* "%programData%" */
+		strcat_s(ssh_cfg_path, _countof(ssh_cfg_path), "\\ssh"); /* "%programData%\\ssh" */
 
-		if (((r = wcsncat_s(log_file, PATH_MAX + 12, path, tail - path)) != 0 ) ||
-			(r = wcsncat_s(log_file, PATH_MAX + 12, logs_dir, 6) != 0 )||
-			(r = wcsncat_s(log_file, PATH_MAX + 12, tail + 1, wcslen(tail + 1) - 3) != 0 ) ||
-			(r = wcsncat_s(log_file, PATH_MAX + 12, L"log", 3) != 0 ))
+		wchar_t* ssh_root_path_w = utf8_to_utf16(ssh_cfg_path); /* "%programData%\\ssh" */
+
+		if ((wcsncat_s(log_file, PATH_MAX + 12, ssh_root_path_w, wcslen(ssh_root_path_w)) != 0) ||
+		    (wcsncat_s(log_file, PATH_MAX + 12, logs_dir, 6) != 0) ||
+		    (wcsncat_s(log_file, PATH_MAX + 12, tail + 1, wcslen(tail + 1) - 3) != 0 ) ||
+		    (wcsncat_s(log_file, PATH_MAX + 12, L"log", 3) != 0))
 			return;
 	}
-	
 	
 	errno_t err = _wsopen_s(&logfd, log_file, O_WRONLY | O_CREAT | O_APPEND, SH_DENYNO, S_IREAD | S_IWRITE);
 		
@@ -98,8 +100,8 @@ syslog(int priority, const char *format, const char *formatBuffer)
 		return;
 
 	GetLocalTime(&st);
-	r = _snprintf_s(msgbufTimestamp, sizeof(msgbufTimestamp), _TRUNCATE, "%d %02d:%02d:%02d:%03d %s\n",
-		GetCurrentProcessId(), st.wHour, st.wMinute, st.wSecond,
+	r = _snprintf_s(msgbufTimestamp, sizeof(msgbufTimestamp), _TRUNCATE, "%d %04d-%02d-%02d %02d:%02d:%02d.%03d %s\n",
+		GetCurrentProcessId(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
 		st.wMilliseconds, formatBuffer);
 	if (r == -1) {
 		_write(logfd, "_snprintf_s failed.", 30);

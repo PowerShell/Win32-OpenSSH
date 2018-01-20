@@ -358,3 +358,9 @@ setegid(gid_t gid)
 {
 	return 0;
 }
+
+void 
+endpwent(void)
+{
+	return;
+}

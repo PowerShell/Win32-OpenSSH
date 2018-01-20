@@ -2309,6 +2309,10 @@ connect_to_server(char *path, char **args, int *in, int *out)
 	*out = pout[1];
 	c_in = pout[0];
 	c_out = pin[1];
+	fcntl(pout[0], F_SETFD, FD_CLOEXEC);
+	fcntl(pout[1], F_SETFD, FD_CLOEXEC);
+	fcntl(pin[0], F_SETFD, FD_CLOEXEC);
+	fcntl(pin[1], F_SETFD, FD_CLOEXEC);
 #else /* USE_PIPES */
 	int inout[2];
 
@@ -2316,19 +2320,27 @@ connect_to_server(char *path, char **args, int *in, int *out)
 		fatal("socketpair: %s", strerror(errno));
 	*in = *out = inout[0];
 	c_in = c_out = inout[1];
+	fcntl(inout[0], F_SETFD, FD_CLOEXEC);
+	fcntl(inout[1], F_SETFD, FD_CLOEXEC);
 #endif /* USE_PIPES */
 
-#ifdef WINDOWS
-	/* fork replacement on Windows */
-	/* disable inheritance on local pipe ends*/
-	fcntl(pout[1], F_SETFD, FD_CLOEXEC);
-	fcntl(pin[0], F_SETFD, FD_CLOEXEC);
 
-	sshpid = spawn_child(path, args + 1, c_in, c_out, STDERR_FILENO, 0);
-	if (sshpid == -1)
-#else /* !WINDOWS */
+#ifdef FORK_NOT_SUPPORTED
+	{
+		posix_spawn_file_actions_t actions;
+		sshpid = -1;
+
+		if (posix_spawn_file_actions_init(&actions) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, c_in, STDIN_FILENO) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, c_out, STDOUT_FILENO) != 0 ) 
+			fatal("posix_spawn initialization failed");
+		else if (posix_spawn(&sshpid, path, &actions, NULL, args, NULL) != 0) 
+			fatal("posix_spawn: %s", strerror(errno));
+		
+		posix_spawn_file_actions_destroy(&actions);
+	}
+#else 
 	if ((sshpid = fork()) == -1)
-#endif  /* !WINDOWS */
 		fatal("fork: %s", strerror(errno));
 	else if (sshpid == 0) {
 		if ((dup2(c_in, STDIN_FILENO) == -1) ||
@@ -2354,7 +2366,7 @@ connect_to_server(char *path, char **args, int *in, int *out)
 		fprintf(stderr, "exec: %s: %s\n", path, strerror(errno));
 		_exit(1);
 	}
-
+#endif
 	signal(SIGTERM, killchild);
 	signal(SIGINT, killchild);
 	signal(SIGHUP, killchild);

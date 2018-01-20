@@ -174,14 +174,17 @@ w32_raise(int sig)
 		return 0;
 	}
 
-	/* if set to ignore, nothing to do */
-	if (sig_handlers[sig] == W32_SIG_IGN)
+	/* if set to ignore, handle SIGCHLD since zombies need to be automatically reaped */
+	if (sig_handlers[sig] == W32_SIG_IGN) {
+		if (sig == W32_SIGCHLD)
+			sw_cleanup_child_zombies();
 		return 0;
+	}
 
 	/* execute any default handlers */
 	switch (sig) {
 	case W32_SIGCHLD:
-		sw_cleanup_child_zombies();
+		/* do nothing for SIGCHLD */;
 		break;
 	default: /* exit process */
 		exit(0);
@@ -222,7 +225,8 @@ sw_process_pending_signals()
 				/* sftp client is not expecting it */
 				if (exp[i] != W32_SIGALRM)
 					sig_int = TRUE;
-			}
+			} else if (exp[i] == W32_SIGCHLD) /*if SIGCHLD is SIG_IGN, reap zombies*/
+				sw_cleanup_child_zombies();
 
 			sigdelset(&pending_tmp, exp[i]);
 		}

@@ -32,6 +32,27 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             #suppress the firewall blocking dialogue on win7
             netsh advfirewall firewall add rule name="sshd" program="$($OpenSSHTestInfo['OpenSSHBinPath'])\sshd.exe" protocol=any action=allow dir=in
         }
+
+        $Taskfolder = "\OpenSSHTestTasks\"
+        $Taskname = "StartTestDaemon"
+        
+        function Start-SSHD-TestDaemon
+        {
+            param([string] $Arguments)
+            $opensshbinpath = $OpenSSHTestInfo['OpenSSHBinPath']
+
+            $ac = New-ScheduledTaskAction -Execute (join-path $opensshbinpath "sshd") -WorkingDirectory $opensshbinpath -Argument $Arguments
+            $task = Register-ScheduledTask -TaskName $Taskname -User system -Action $ac -TaskPath $Taskfolder -Force
+            Start-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname
+        }
+
+        function Stop-SSHD-TestDaemon
+        {
+            Stop-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname
+            #stop-scheduledTask does not wait for worker process to end. Kill it if still running. Logic below assume sshd service is running
+            $svcpid = ((tasklist /svc | select-string -Pattern ".+sshd").ToString() -split "\s+")[1]
+            (gps sshd).id | foreach { if ((-not($_ -eq $svcpid))) {Stop-Process $_ -Force} }
+        }
     }
 
     AfterEach { $tI++ }
@@ -91,12 +112,11 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Repair-FilePermission -Filepath $authorizedkeyPath -Owners $objUserSid -FullAccessNeeded  $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
+            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts" echo 1234
+            Stop-SSHD-TestDaemon
             $o | Should Be "1234"
             
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by local system)" {
@@ -104,12 +124,12 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $systemSid -FullAccessNeeded  $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
+            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
+            
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts"  echo 1234
+            Stop-SSHD-TestDaemon
             $o | Should Be "1234"
             
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd does not have explict ACE)" {
@@ -117,12 +137,11 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $adminsSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
+            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts"  echo 1234
+            Stop-SSHD-TestDaemon
             $o | Should Be "1234"
             
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd have explict ACE)" {
@@ -130,12 +149,11 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $adminsSid -FullAccessNeeded $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
+            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts"  echo 1234
+            Stop-SSHD-TestDaemon
             $o | Should Be "1234"
             
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
         }
 
         It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other admin user)" {
@@ -143,14 +161,11 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $currentUserSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
+            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
             ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
-            $matches.Count | Should BeGreaterThan 2
-            
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
+            Stop-SSHD-TestDaemon
+            $logPath | Should Contain "Authentication refused."
         }
 
         It "$tC.$tI-authorized_keys-negative(other account can access private key file)" {
@@ -162,14 +177,11 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Set-FilePermission -FilePath $authorizedkeyPath -User $objPwdUserSid -Perm "Read"
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
+            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
             ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
-            $matches.Count | Should BeGreaterThan 2
-            
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue  
+            Stop-SSHD-TestDaemon
+            $logPath | Should Contain "Authentication refused."
         }
 
         It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other non-admin user)" {
@@ -178,30 +190,11 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $objPwdUserSid -FullAccessNeeded $adminsSid,$systemSid,$objPwdUser -confirm:$false
 
             #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
+            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
             ssh -p $port -E $FilePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
-            $matches.Count | Should BeGreaterThan 2
-            
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue 
-        }
-        It "$tC.$tI-authorized_keys-negative(the running process does not have read access to the authorized_keys)" -skip:$skip {
-            #setup to have ssouser as owner and grant it full control            
-            Repair-FilePermission -Filepath $authorizedkeyPath -Owner $objUserSid -FullAccessNeeded $systemSid,$objUserSid -confirm:$false
-            Set-FilePermission -Filepath $authorizedkeyPath -UserSid $adminsSid -Action Delete
-
-            #Run
-            Start-Process -FilePath sshd.exe -WorkingDirectory $($OpenSSHTestInfo['OpenSSHBinPath']) -ArgumentList @("-d", "-p $port", "-o `"AuthorizedKeysFile .testssh/authorized_keys`"", "-E $logPath") -NoNewWindow
-            ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
-            $LASTEXITCODE | Should Not Be 0
-
-            $matches = Get-Content $filePath | Select-String -pattern "Permission denied"
-            $matches.Count | Should BeGreaterThan 2
-            
-            #Cleanup
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
+            Stop-SSHD-TestDaemon
+            $logPath | Should Contain "Authentication refused."            
         }
     }
 }

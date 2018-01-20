@@ -281,6 +281,10 @@ do_cmd(char *host, char *remuser, int port, char *cmd, int *fdin, int *fdout)
 		fatal("pipe: %s", strerror(errno));
 	if (pipe(pout) < 0)
 		fatal("pipe: %s", strerror(errno));
+	fcntl(pout[0], F_SETFD, FD_CLOEXEC);
+	fcntl(pout[1], F_SETFD, FD_CLOEXEC);
+	fcntl(pin[0], F_SETFD, FD_CLOEXEC);
+	fcntl(pin[1], F_SETFD, FD_CLOEXEC);
 
 	/* Free the reserved descriptors. */
 	close(reserved[0]);
@@ -291,9 +295,12 @@ do_cmd(char *host, char *remuser, int port, char *cmd, int *fdin, int *fdout)
 	signal(SIGTTOU, suspchild);
 
 	/* Fork a child to execute the command on the remote host using ssh. */
-#ifdef WINDOWS
-	/* generate command line and spawn_child */
+#ifdef FORK_NOT_SUPPORTED
 	replacearg(&args, 0, "%s", ssh_program);
+	if (port != -1) {
+		addargs(&args, "-p");
+		addargs(&args, "%d", port);
+	}
 	if (remuser != NULL) {
 		addargs(&args, "-l");
 		addargs(&args, "%s", remuser);
@@ -302,14 +309,22 @@ do_cmd(char *host, char *remuser, int port, char *cmd, int *fdin, int *fdout)
 	addargs(&args, "%s", host);
 	addargs(&args, "%s", cmd);
 
-	fcntl(pout[0], F_SETFD, FD_CLOEXEC);
-	fcntl(pin[1], F_SETFD, FD_CLOEXEC);
+	{
+		posix_spawn_file_actions_t actions;
+		do_cmd_pid = -1;
 
-	do_cmd_pid = spawn_child(args.list[0], args.list + 1, pin[0], pout[1], STDERR_FILENO, 0);
+		if (posix_spawn_file_actions_init(&actions) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, pin[0], STDIN_FILENO) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, pout[1], STDOUT_FILENO) != 0 )
+			fatal("posix_spawn initialization failed");
+		else if (posix_spawn(&do_cmd_pid, args.list[0], &actions, NULL, args.list, NULL) != 0) 
+			fatal("posix_spawn: %s", strerror(errno));
+			
+			posix_spawn_file_actions_destroy(&actions);
+	}
 
-#else /* !WINDOWS */
+#else 
 	do_cmd_pid = fork();
-#endif /* !WINDOWS */
 	if (do_cmd_pid == 0) {
 		/* Child. */
 		close(pin[1]);
@@ -338,6 +353,7 @@ do_cmd(char *host, char *remuser, int port, char *cmd, int *fdin, int *fdout)
 	} else if (do_cmd_pid == -1) {
 		fatal("fork: %s", strerror(errno));
 	}
+#endif 
 	/* Parent.  Close the other side, and return the local side. */
 	close(pin[0]);
 	*fdout = pin[1];
@@ -370,9 +386,13 @@ do_cmd2(char *host, char *remuser, int port, char *cmd, int fdin, int fdout)
 		port = sshport;
 
 	/* Fork a child to execute the command on the remote host using ssh. */
-#ifdef WINDOWS
+#ifdef FORK_NOT_SUPPORTED
 	/* generate command line and spawn_child */
 	replacearg(&args, 0, "%s", ssh_program);
+	if (port != -1) {
+		addargs(&args, "-p");
+		addargs(&args, "%d", port);
+	}
 	if (remuser != NULL) {
 		addargs(&args, "-l");
 		addargs(&args, "%s", remuser);
@@ -381,11 +401,21 @@ do_cmd2(char *host, char *remuser, int port, char *cmd, int fdin, int fdout)
 	addargs(&args, "%s", host);
 	addargs(&args, "%s", cmd);
 
-	pid = spawn_child(args.list[0], args.list + 1, fdin, fdout, STDERR_FILENO, 0);
-		
-#else /* !WINDOWS */
+	{
+		posix_spawn_file_actions_t actions;
+		pid = -1;
+
+		if (posix_spawn_file_actions_init(&actions) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, fdin, STDIN_FILENO) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, fdout, STDOUT_FILENO) != 0 ) 
+			fatal("posix_spawn initialization failed");
+		else if (posix_spawn(&pid, args.list[0], &actions, NULL, args.list, NULL) != 0) 
+			fatal("posix_spawn: %s", strerror(errno));
+
+		posix_spawn_file_actions_destroy(&actions);
+	}		
+#else 
 	pid = fork();
-#endif /* !WINDOWS */
 	if (pid == 0) {
 		dup2(fdin, 0);
 		dup2(fdout, 1);
@@ -409,6 +439,7 @@ do_cmd2(char *host, char *remuser, int port, char *cmd, int fdin, int fdout)
 	} else if (pid == -1) {
 		fatal("fork: %s", strerror(errno));
 	}
+#endif
 	while (waitpid(pid, &status, 0) == -1)
 		if (errno != EINTR)
 			fatal("do_cmd2: waitpid: %s", strerror(errno));

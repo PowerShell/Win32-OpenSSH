@@ -174,11 +174,12 @@ cleanup:
 static int pipe_counter = 0;
 
 /*
- * pipe() implementation. Creates an inbound named pipe, uses CreateFile to connect
+ * pipe() (unidirectional) and socketpair() (duplex)
+ * implementation. Creates an inbound named pipe, uses CreateFile to connect
  * to it. These handles are associated with read end and write end of the pipe
  */
 int
-fileio_pipe(struct w32_io* pio[2])
+fileio_pipe(struct w32_io* pio[2], int duplex)
 {
 	HANDLE read_handle = INVALID_HANDLE_VALUE, write_handle = INVALID_HANDLE_VALUE;
 	struct w32_io *pio_read = NULL, *pio_write = NULL;
@@ -205,7 +206,7 @@ fileio_pipe(struct w32_io* pio[2])
 
 	/* create named pipe */
 	write_handle = CreateNamedPipeA(pipe_name,
-		PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
+		(duplex ? PIPE_ACCESS_DUPLEX : PIPE_ACCESS_OUTBOUND ) | FILE_FLAG_OVERLAPPED,
 		PIPE_TYPE_BYTE | PIPE_WAIT,
 		1,
 		4096,
@@ -220,7 +221,7 @@ fileio_pipe(struct w32_io* pio[2])
 
 	/* connect to named pipe */
 	read_handle = CreateFileA(pipe_name,
-		GENERIC_READ,
+		duplex ? GENERIC_READ | GENERIC_WRITE :  GENERIC_READ,
 		0,
 		&sec_attributes,
 		OPEN_EXISTING,
@@ -923,14 +924,12 @@ fileio_close(struct w32_io* pio)
 	/* let queued APCs (if any) drain */
 	SleepEx(0, TRUE);
 	CloseHandle(WINHANDLE(pio));
-	/* free up non stdio */
-	if (!IS_STDIO(pio)) {
-		if (pio->read_details.buf)
-			free(pio->read_details.buf);
-		if (pio->write_details.buf)
-			free(pio->write_details.buf);
-		free(pio);
-	}
+	if (pio->read_details.buf)
+		free(pio->read_details.buf);
+	if (pio->write_details.buf)
+		free(pio->write_details.buf);
+	free(pio);
+
 	return 0;
 }
 

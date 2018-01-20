@@ -120,12 +120,7 @@ ssh_get_authentication_socket(int *fdp)
 }
 
 /* Communicate with agent: send request and read reply */
-#ifdef WINDOWS
-/* for Windows we need to access this function from other places to talk to agent*/
-int
-#else /* !WINDOWS */
 static int
-#endif /* !WINDOWS */
 ssh_request_reply(int sock, struct sshbuf *request, struct sshbuf *reply)
 {
 	int r;

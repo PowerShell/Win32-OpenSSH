@@ -30,7 +30,6 @@
  */
 #include "agent.h"
 #include "agent-request.h"
-#include "..\priv-agent.h"
 
 #pragma warning(push, 3)
 
@@ -117,26 +116,6 @@ agent_connection_disconnect(struct agent_connection* con)
 	DisconnectNamedPipe(con->pipe_handle);
 }
 
-static char*
-con_type_to_string(struct agent_connection* con) {
-	switch (con->client_type) {
-	case UNKNOWN:
-		return "unknown";
-	case NONADMIN_USER:
-		return "restricted user";
-	case ADMIN_USER:
-		return "administrator";
-	case SSHD_SERVICE:
-		return "sshd service";
-	case SYSTEM:
-		return "system";
-	case SERVICE:
-		return "service";
-	default:
-		return "unexpected";
-	}
-}
-
 static int
 process_request(struct agent_connection* con) 
 {
@@ -169,9 +148,6 @@ process_request(struct agent_connection* con)
 		break;
 	case SSH2_AGENTC_REMOVE_ALL_IDENTITIES:
 		r = process_remove_all(request, response, con);
-		break;
-	case SSH_PRIV_AGENT_MSG_ID:
-		r = process_privagent_request(request, response, con);
 		break;
 	default:
 		debug("unknown agent request %d", type);

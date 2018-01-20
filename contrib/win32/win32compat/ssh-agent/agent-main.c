@@ -113,14 +113,15 @@ fix_cwd()
 	_wchdir(path);
 }
 
+/* TODO - get rid of this dependency */
+void log_init(char*, int, int, int);
+
 int 
 wmain(int argc, wchar_t **argv) 
 {
 	_set_invalid_parameter_handler(invalid_parameter_handler);
 	w32posix_initialize();
 	fix_cwd();
-	/* this exits() on failure*/
-	load_config();
 	if (!StartServiceCtrlDispatcherW(dispatch_table)) {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
 			/* 
@@ -146,7 +147,7 @@ wmain(int argc, wchar_t **argv)
 				char* h = 0;
 				h += _wtoi(*(argv + 1));
 				if (h != 0) {
-					log_init("ssh-agent", config_log_level(), 1, 0);
+					log_init("ssh-agent", 3, 1, 0);
 					agent_process_connection(h);
 					return 0;
 				}
@@ -184,7 +185,7 @@ scm_start_service(DWORD num, LPWSTR* args)
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
-	log_init("ssh-agent", config_log_level(), 1, 0);
+	log_init("ssh-agent", 3, 1, 0);
 	agent_start(FALSE);
 	return 0;
 }

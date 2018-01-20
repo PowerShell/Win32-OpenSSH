@@ -168,10 +168,6 @@ agent_cleanup_connection(struct agent_connection* con)
 {
 	debug("connection %p clean up", con);
 	CloseHandle(con->pipe_handle);
-        if (con->profile_handle)
-                UnloadUserProfile(con->profile_token, con->profile_handle);
-        if (con->profile_token)
-                CloseHandle(con->profile_token);
         if (con->client_impersonation_token)
                 CloseHandle(con->client_impersonation_token);
 	if (con->client_process_handle)
@@ -222,7 +218,7 @@ agent_start(BOOL dbg_mode)
 }
 
 static char*
-con_type_to_string(struct agent_connection* con) 
+con_type_to_string(struct agent_connection* con)
 {
 	switch (con->client_type) {
 	case UNKNOWN:
@@ -258,16 +254,16 @@ get_con_client_info(struct agent_connection* con)
 	BOOL isMember = FALSE;
 
 	if (GetNamedPipeClientProcessId(con->pipe_handle, &client_pid) == FALSE ||
-	    (client_process_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL ||
-	    OpenProcessToken(client_process_handle, TOKEN_QUERY | TOKEN_DUPLICATE, &client_primary_token) == FALSE ||
-	    DuplicateToken(client_primary_token, SecurityImpersonation, &client_impersonation_token) == FALSE) {
+		(client_process_handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, client_pid)) == NULL ||
+		OpenProcessToken(client_process_handle, TOKEN_QUERY | TOKEN_DUPLICATE, &client_primary_token) == FALSE ||
+		DuplicateToken(client_primary_token, SecurityImpersonation, &client_impersonation_token) == FALSE) {
 		error("cannot retrieve client impersonation token");
 		goto done;
 	}
 
 	if (GetTokenInformation(client_primary_token, TokenUser, NULL, 0, &info_len) == TRUE ||
-	    (info = (TOKEN_USER*)malloc(info_len)) == NULL ||
-	    GetTokenInformation(client_primary_token, TokenUser, info, info_len, &info_len) == FALSE)
+		(info = (TOKEN_USER*)malloc(info_len)) == NULL ||
+		GetTokenInformation(client_primary_token, TokenUser, info, info_len, &info_len) == FALSE)
 		goto done;
 
 	/* check if its localsystem */
@@ -322,7 +318,7 @@ get_con_client_info(struct agent_connection* con)
 		sid_size = SECURITY_MAX_SID_SIZE;
 		if (CreateWellKnownSid(WinBuiltinAdministratorsSid, NULL, sid, &sid_size) == FALSE)
 			goto done;
-		if (CheckTokenMembership(client_impersonation_token, sid, &isMember) == FALSE) 
+		if (CheckTokenMembership(client_impersonation_token, sid, &isMember) == FALSE)
 			goto done;
 		if (isMember) {
 			con->client_type = ADMIN_USER;
@@ -355,7 +351,7 @@ done:
 			CloseHandle(client_process_handle);
 		if (client_impersonation_token)
 			CloseHandle(client_impersonation_token);
-	}	
+	}
 
 	return r;
 }

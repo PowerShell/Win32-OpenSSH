@@ -1586,6 +1586,43 @@ mm_answer_audit_command(int socket, Buffer *m)
 #endif /* SSH_AUDIT_EVENTS */
 
 void
+monitor_send_keystate(struct monitor *pmonitor) {
+	struct sshbuf *m;
+	int r;
+
+	if ((m = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_stringb(m, child_state)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+
+	if (ssh_msg_send(pmonitor->m_sendfd, 0, m) == -1)
+		fatal("%s: ssh_msg_send failed", __func__);
+
+	sshbuf_free(m);
+}
+
+void 
+monitor_recv_keystate(struct monitor*pmonitor) {
+	Buffer m;
+	char *cp;
+	u_int len;
+
+	buffer_init(&m);
+
+	if (ssh_msg_recv(pmonitor->m_recvfd, &m) == -1)
+		fatal("%s: ssh_msg_recv failed", __func__);
+	if (buffer_get_char(&m) != 0)
+		fatal("%s: recv_keystate version mismatch", __func__);
+
+	cp = buffer_get_string(&m, &len);
+	child_state = sshbuf_new();
+	buffer_append(child_state, cp, len);
+	free(cp);
+	buffer_free(&m);
+}
+
+
+void
 monitor_clear_keystate(struct monitor *pmonitor)
 {
 	struct ssh *ssh = active_state;	/* XXX */

@@ -150,10 +150,13 @@
     <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\win32_sshpty.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\win32_monitor_wrap.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\logonuser.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\logonuser.c">
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\win32_usertoken_utils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OpenSSH-Src-Path)contrib\win32\win32compat\spawn-ext.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

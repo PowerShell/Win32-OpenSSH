@@ -93,7 +93,7 @@ innetgr(const char *netgroup, const char *host, const char *user, const char *do
 int
 chroot(const char *path)
 {
-	return -1;
+	return 0;
 }
 
 int

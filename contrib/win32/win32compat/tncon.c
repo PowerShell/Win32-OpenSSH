@@ -131,6 +131,7 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 	DWORD nHandle = 1;
 	DWORD dwInput = 0;
 	DWORD dwControlKeyState = 0;
+	DWORD dwAltGrFlags = LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED;
 	DWORD rc = 0;
 	unsigned char octets[20];	
 	char aChar = 0;
@@ -161,6 +162,11 @@ ReadConsoleForTermEmul(HANDLE hInput, char *destin, int destinlen)
 			bShift = (InputRecord.Event.KeyEvent.dwControlKeyState & SHIFT_PRESSED);
 			dwControlKeyState = InputRecord.Event.KeyEvent.dwControlKeyState &
 				~(CAPSLOCK_ON | ENHANCED_KEY | NUMLOCK_ON | SCROLLLOCK_ON);
+
+			/* ignore the AltGr flags*/
+			if ((dwControlKeyState & dwAltGrFlags) == dwAltGrFlags)
+				dwControlKeyState = dwControlKeyState & ~dwAltGrFlags;
+
 			modKey = GetModifierKey(dwControlKeyState);
 			if (InputRecord.Event.KeyEvent.bKeyDown) {
 				int n = WideCharToMultiByte(

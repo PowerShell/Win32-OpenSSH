@@ -13,6 +13,7 @@ $PubKeyUser = "sshtest_pubkeyuser"
 $PasswdUser = "sshtest_passwduser"
 $OpenSSHTestAccountsPassword = "P@ssw0rd_1"
 $OpenSSHTestAccounts = $Script:SSOUser, $Script:PubKeyUser, $Script:PasswdUser
+$OpenSSHConfigPath = Join-Path $env:ProgramData "ssh"
 
 $Script:TestDataPath = "$env:SystemDrive\OpenSSHTests"
 $Script:E2ETestResultsFile = Join-Path $TestDataPath $E2ETestResultsFileName
@@ -106,7 +107,7 @@ function Set-OpenSSHTestEnvironment
         }        
     }
     else
-    {        
+    {
         if (-not (Test-Path (Join-Path $OpenSSHBinPath ssh.exe) -PathType Leaf))
         {
             Throw "Cannot find OpenSSH binaries under $OpenSSHBinPath. Please specify -OpenSSHBinPath to the OpenSSH installed location"
@@ -162,25 +163,19 @@ WARNING: Following changes will be made to OpenSSH configuration
     }
 
     #Backup existing OpenSSH configuration
-    $backupConfigPath = Join-Path $script:OpenSSHBinPath sshd_config.ori
+    $backupConfigPath = Join-Path $OpenSSHConfigPath sshd_config.ori
     if (-not (Test-Path $backupConfigPath -PathType Leaf)) {
-        Copy-Item (Join-Path $script:OpenSSHBinPath sshd_config) $backupConfigPath -Force
+        Copy-Item (Join-Path $OpenSSHConfigPath sshd_config) $backupConfigPath -Force
     }
-    $targetsshdConfig = Join-Path $script:OpenSSHBinPath sshd_config
+    $targetsshdConfig = Join-Path $OpenSSHConfigPath sshd_config
     # copy new sshd_config
-    if($Script:WindowsInBox -and (Test-Path $targetsshdConfig))
-    {
-        $currentUser = New-Object System.Security.Principal.NTAccount($($env:USERDOMAIN), $($env:USERNAME))
-        Add-PermissionToFileACL -FilePath $targetsshdConfig -User $currentUser -Perm "Read,Write"
-    }
-    
     Copy-Item (Join-Path $Script:E2ETestDirectory sshd_config) $targetsshdConfig -Force
     
     Start-Service ssh-agent
 
     #copy sshtest keys
-    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $script:OpenSSHBinPath -Force  
-    Get-ChildItem "$($script:OpenSSHBinPath)\sshtest*hostkey*"| % {
+    Copy-Item "$($Script:E2ETestDirectory)\sshtest*hostkey*" $OpenSSHConfigPath -Force  
+    Get-ChildItem "$($OpenSSHConfigPath)\sshtest*hostkey*"| % {
         #workaround for the cariggage new line added by git before copy them
         $filePath = "$($_.FullName)"
         $con = (Get-Content $filePath | Out-String).Replace("`r`n","`n")
@@ -188,16 +183,11 @@ WARNING: Following changes will be made to OpenSSH configuration
         if (-not ($_.Name.EndsWith(".pub")))
         {
             Repair-SshdHostKeyPermission -FilePath $_.FullName -confirm:$false
-            if($psversiontable.BuildVersion.Major -gt 6)
-            {                
-                #register private key with agent
-                ssh-add-hostkey.ps1 $_.FullName
-            }
         }        
     }
 
-    #copy ca pubkey to SSHD bin path
-    Copy-Item "$($Script:E2ETestDirectory)\sshtest_ca_userkeys.pub"  $script:OpenSSHBinPath -Force 
+    #copy ca pubkey to ssh config path
+    Copy-Item "$($Script:E2ETestDirectory)\sshtest_ca_userkeys.pub"  $OpenSSHConfigPath -Force 
 
     #copy ca private key to test dir
     $ca_priv_key = (Join-Path $Global:OpenSSHTestInfo["TestDataPath"] sshtest_ca_userkeys)
@@ -462,11 +452,6 @@ function Clear-OpenSSHTestEnvironment
         Throw "Cannot find OpenSSH binaries under $script:OpenSSHBinPath. "
     }
     
-    #unregister test host keys from agent
-    Get-ChildItem "$sshBinPath\sshtest*hostkey*.pub"| % {
-        ssh-add-hostkey.ps1 -Delete_key $_.FullName
-    }
-
     if($Global:OpenSSHTestInfo["EnableAppVerifier"] -and (Test-path $env:windir\System32\appverif.exe))
     {
         # clear all applications in application verifier
@@ -479,14 +464,14 @@ function Clear-OpenSSHTestEnvironment
         Remove-ItemProperty "HKLM:Software\Microsoft\Windows NT\CurrentVersion\AeDebug" -Name Auto -ErrorAction SilentlyContinue -Force | Out-Null
     }
     
-    Remove-Item "$sshBinPath\sshtest*hostkey*" -Force -ErrorAction SilentlyContinue   
-    Remove-Item "$sshBinPath\sshtest*ca_userkeys*" -Force -ErrorAction SilentlyContinue   
+    Remove-Item "$OpenSSHConfigPath\sshtest*hostkey*" -Force -ErrorAction SilentlyContinue
+    Remove-Item "$OpenSSHConfigPath\sshtest*ca_userkeys*" -Force -ErrorAction SilentlyContinue
      
     #Restore sshd_config
-    $backupConfigPath = Join-Path $sshBinPath sshd_config.ori
+    $backupConfigPath = Join-Path $OpenSSHConfigPath sshd_config.ori
     if (Test-Path $backupConfigPath -PathType Leaf) {        
-        Copy-Item $backupConfigPath (Join-Path $sshBinPath sshd_config) -Force -ErrorAction SilentlyContinue
-        Remove-Item (Join-Path $sshBinPath sshd_config.ori) -Force -ErrorAction SilentlyContinue
+        Copy-Item $backupConfigPath (Join-Path $OpenSSHConfigPath sshd_config) -Force -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $OpenSSHConfigPath sshd_config.ori) -Force -ErrorAction SilentlyContinue
         Restart-Service sshd
     }
     

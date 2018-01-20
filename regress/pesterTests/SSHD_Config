@@ -21,10 +21,10 @@ Port 47002
 # HostKey for protocol version 1
 #HostKey /etc/ssh/ssh_host_key
 # HostKeys for protocol version 2
-HostKey sshtest_hostkey_rsa
-HostKey sshtest_hostkey_dsa
-HostKey sshtest_hostkey_ecdsa
-HostKey sshtest_hostkey_ed25519
+HostKey __PROGRAMDATA__\ssh\sshtest_hostkey_rsa
+HostKey __PROGRAMDATA__\ssh\sshtest_hostkey_dsa
+HostKey __PROGRAMDATA__\ssh\sshtest_hostkey_ecdsa
+HostKey __PROGRAMDATA__\ssh\sshtest_hostkey_ed25519
 
 # Lifetime and size of ephemeral version 1 server key
 #KeyRegenerationInterval 1h
@@ -126,5 +126,4 @@ PubkeyAcceptedKeyTypes ssh-ed25519*
 #AllowUsers allowuser1 allowu*r2 allow?se?3 allowuser4 localuser1 localu*r2 loc?lu?er3 localadmin
 #DenyGroups denygroup1 denygr*p2 deny?rou?3
 #AllowGroups allowgroup1 allowg*2 allowg?ou?3 Adm*
-hostkeyagent \\.\pipe\openssh-ssh-agent
-TrustedUserCAKeys sshtest_ca_userkeys.pub
+TrustedUserCAKeys __PROGRAMDATA__\ssh\sshtest_ca_userkeys.pub

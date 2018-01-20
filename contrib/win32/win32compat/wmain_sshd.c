@@ -34,12 +34,12 @@
 #define __STDC__ 1
 #include <Windows.h>
 #include <wchar.h>
+#include <Lm.h>
 #include "inc\utf.h"
 #include "misc_internal.h"
 
 int main(int, char **);
 extern HANDLE main_thread;
-extern int is_child;
 
 int scm_start_service(DWORD, LPWSTR*);
 
@@ -97,6 +97,60 @@ static VOID WINAPI service_handler(DWORD dwControl)
 	ReportSvcStatus(service_status.dwCurrentState, NO_ERROR, 0);
 }
 
+#define SSH_HOSTKEY_GEN_CMDLINE L"ssh-keygen -A"
+static void 
+prereq_setup()
+{
+	TOKEN_USER* info = NULL;
+	DWORD info_len = 0, dwError = 0;
+	HANDLE proc_token = NULL;
+	UUID uuid;
+	RPC_CWSTR rpc_str;
+	USER_INFO_1 ui;
+	NET_API_STATUS nStatus;
+	STARTUPINFOW si;
+	PROCESS_INFORMATION pi;
+	wchar_t cmdline[MAX_PATH];
+
+	if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &proc_token) == FALSE ||
+	    GetTokenInformation(proc_token, TokenUser, NULL, 0, &info_len) == TRUE ||
+	    (info = (TOKEN_USER*)malloc(info_len)) == NULL ||
+	    GetTokenInformation(proc_token, TokenUser, info, info_len, &info_len) == FALSE)
+		goto cleanup;
+
+	if (IsWellKnownSid(info->User.Sid, WinLocalSystemSid)) {
+		/* create sshd account if it does not exist */
+		UuidCreate(&uuid);
+		UuidToStringW(&uuid, (RPC_WSTR*)&rpc_str);
+		ui.usri1_name = L"sshd";
+		ui.usri1_password = (LPWSTR)rpc_str;
+		ui.usri1_priv = USER_PRIV_USER;
+		ui.usri1_home_dir = NULL;
+		ui.usri1_comment = NULL;
+		ui.usri1_flags = UF_SCRIPT;
+		ui.usri1_script_path = NULL;
+
+		NetUserAdd(NULL, 1, (LPBYTE)&ui, &dwError);
+		RpcStringFreeW((RPC_WSTR*)&rpc_str);
+
+		/* create host keys if they dont already exist */
+		ZeroMemory(&si, sizeof(si));
+		si.cb = sizeof(STARTUPINFOW);
+		ZeroMemory(&pi, sizeof(pi));
+		memcpy(cmdline, SSH_HOSTKEY_GEN_CMDLINE, wcslen(SSH_HOSTKEY_GEN_CMDLINE) * 2 + 2);
+		if (CreateProcessW(NULL, cmdline, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi)) {
+			WaitForSingleObject(pi.hProcess, INFINITE);
+			CloseHandle(pi.hThread);
+			CloseHandle(pi.hProcess);
+		}
+	}
+cleanup:
+	if (proc_token)
+		CloseHandle(proc_token);
+	if (info)
+		free(info);
+}
+
 int sshd_main(int argc, wchar_t **wargv) {
 	char** argv = NULL;
 	int i, r;
@@ -110,20 +164,26 @@ int sshd_main(int argc, wchar_t **wargv) {
 	}
 
 	w32posix_initialize();
-	if (getenv("SSHD_REMSOC"))
-		is_child = 1;
-	
-	/* change current directory to sshd.exe root */
-	wchar_t* path_utf16 = utf8_to_utf16(w32_programdir());
-	_wchdir(path_utf16);
-	free(path_utf16);
 
 	r =  main(argc, argv);
 	w32posix_done();
 	return r;
 }
 
+int argc_original = 0;
+wchar_t **wargv_original = NULL;
+
 int wmain(int argc, wchar_t **wargv) {
+	wchar_t* path_utf16;
+	argc_original = argc;
+	wargv_original = wargv;
+
+	/* change current directory to sshd.exe root */
+	if ( (path_utf16 = utf8_to_utf16(w32_programdir())) == NULL) 
+		return -1;
+	_wchdir(path_utf16);
+	free(path_utf16);
+	
 	if (!StartServiceCtrlDispatcherW(dispatch_table)) {
 		if (GetLastError() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT)
 			return sshd_main(argc, wargv); /* sshd running NOT as service*/
@@ -139,8 +199,9 @@ int scm_start_service(DWORD num, LPWSTR* args) {
 	ZeroMemory(&service_status, sizeof(service_status));
 	service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
 	ReportSvcStatus(SERVICE_START_PENDING, NO_ERROR, 300);
+	prereq_setup();
 	ReportSvcStatus(SERVICE_RUNNING, NO_ERROR, 0);
-	return sshd_main(num, args);
+	return sshd_main(argc_original, wargv_original);
 }
 
 

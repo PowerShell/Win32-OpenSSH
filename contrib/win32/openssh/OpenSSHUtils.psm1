@@ -41,8 +41,6 @@ $adminsSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnown
 # get the everyone
 $everyoneSid = Get-UserSID -WellKnownSidType ([System.Security.Principal.WellKnownSidType]::WorldSid)
 
-$sshdSid = New-Object System.Security.Principal.SecurityIdentifier("S-1-5-80-3847866527-469524349-687026318-516638107-1125189541")
-
 $currentUserSid = Get-UserSID -User "$($env:USERDOMAIN)\$($env:USERNAME)"
 
 #Taken from P/Invoke.NET with minor adjustments.
@@ -112,7 +110,7 @@ function Repair-SshdConfigPermission
         [ValidateNotNullOrEmpty()]        
         [string]$FilePath)
 
-        Repair-FilePermission -Owners $systemSid,$adminsSid -FullAccessNeeded $systemSid -ReadAccessNeeded $sshdSid @psBoundParameters
+        Repair-FilePermission -Owners $systemSid,$adminsSid -FullAccessNeeded $systemSid @psBoundParameters
 }
 
 <#
@@ -134,10 +132,10 @@ function Repair-SshdHostKeyPermission
             $PSBoundParameters["FilePath"] = $PSBoundParameters["FilePath"].Replace(".pub", "")
         }
 
-        Repair-FilePermission -Owners $systemSid,$adminsSid -ReadAccessNeeded $sshdSid @psBoundParameters
+        Repair-FilePermission -Owners $systemSid,$adminsSid @psBoundParameters
         
         $PSBoundParameters["FilePath"] += ".pub"
-        Repair-FilePermission -Owners $systemSid,$adminsSid -ReadAccessOK $everyoneSid -ReadAccessNeeded $sshdSid @psBoundParameters
+        Repair-FilePermission -Owners $systemSid,$adminsSid -ReadAccessOK $everyoneSid @psBoundParameters
 }
 
 <#
@@ -175,7 +173,7 @@ function Repair-AuthorizedKeyPermission
         if($profileItem)
         {
             $userSid = $profileItem.PSChildName            
-            Repair-FilePermission -Owners $userSid,$adminsSid,$systemSid -AnyAccessOK $userSid -FullAccessNeeded $systemSid -ReadAccessNeeded $sshdSid @psBoundParameters
+            Repair-FilePermission -Owners $userSid,$adminsSid,$systemSid -AnyAccessOK $userSid -FullAccessNeeded $systemSid @psBoundParameters
             
         }
         else

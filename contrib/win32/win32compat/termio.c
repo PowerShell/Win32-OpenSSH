@@ -105,16 +105,18 @@ ReadThread(_In_ LPVOID lpParameter)
 				goto done;
 			}
 
-			char *p = NULL;
-			if (p = strstr(pio->read_details.buf, "\r\n"))
-				*p++ = '\n';
-			else if (p = strstr(pio->read_details.buf, "\r"))
-				*p++ = '\n';
+			if (pio->sync_read_status.transferred) {
+				char *p = NULL;
+				if (p = strstr(pio->read_details.buf, "\r\n"))
+					*p++ = '\n';
+				else if (p = strstr(pio->read_details.buf, "\r"))
+					*p++ = '\n';
 
-			if (p) {
-				*p = '\0';
-				pio->read_details.buf_size = (DWORD)strlen(pio->read_details.buf);
-				pio->sync_read_status.transferred = pio->read_details.buf_size;
+				if (p) {
+					*p = '\0';
+					pio->read_details.buf_size = (DWORD)strlen(pio->read_details.buf);
+					pio->sync_read_status.transferred = pio->read_details.buf_size;
+				}
 			}
 		}
 	} else {
@@ -265,13 +267,10 @@ syncio_close(struct w32_io* pio)
 	/* drain queued APCs */
 	SleepEx(0, TRUE);
 	CloseHandle(WINHANDLE(pio));
-	/* free up if non stdio */
-	if (!IS_STDIO(pio)) {
-		if (pio->read_details.buf)
-			free(pio->read_details.buf);
-		if (pio->write_details.buf)
-			free(pio->write_details.buf);
-		free(pio);
-	}
+	if (pio->read_details.buf)
+		free(pio->read_details.buf);
+	if (pio->write_details.buf)
+		free(pio->write_details.buf);
+	free(pio);
 	return 0;
 }

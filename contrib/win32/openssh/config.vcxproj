@@ -196,8 +196,7 @@
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -229,8 +228,7 @@ If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -262,8 +260,7 @@ If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -295,8 +292,7 @@ If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -332,8 +328,7 @@ If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -369,8 +364,7 @@ If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -406,8 +400,7 @@ If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -443,8 +436,7 @@ If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir
 copy /Y "$(SolutionDir)uninstall-ssh*ps1" "$(OutDir)"
 copy /Y "$(SolutionDir)OpenSSHUtils.ps*1" "$(OutDir)"
 copy /Y "$(SolutionDir)Fix*FilePermissions.ps1" "$(OutDir)"
-copy /Y "$(SolutionDir)ssh-add-hostkey.ps1" "$(OutDir)"
-If NOT exist "$(OutDir)\sshd_config" (copy "$(SolutionDir)sshd_config" "$(OutDir)")</Command>
+copy /Y "$(SolutionDir)sshd_config" "$(OutDir)sshd_config_default"</Command>
       <Message>Copy install-sshd.ps1, uninstall-sshd.ps1, OpenSSHUtils.psm1, OpenSSHUtils.psd1, FixHostFilePermissions.ps1, FixUserFilePermissions.ps1,  ssh-add-hostkey.ps1, and sshd_config (if not already present) to build directory</Message>
     </PostBuildEvent>
   </ItemDefinitionGroup>

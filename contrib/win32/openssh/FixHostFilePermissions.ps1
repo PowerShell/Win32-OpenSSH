@@ -5,14 +5,14 @@ If ($PSVersiontable.PSVersion.Major -le 2) {$PSScriptRoot = Split-Path -Parent $
 Import-Module $PSScriptRoot\OpenSSHUtils -Force
 
 #check sshd config file
-$sshdConfigPath = join-path $PSScriptRoot "sshd_config"
+$sshdConfigPath = join-path $env:ProgramData\ssh "sshd_config"
 if(Test-Path $sshdConfigPath -PathType Leaf)
 {
     Repair-SshdConfigPermission -FilePath $sshdConfigPath @psBoundParameters
 }
 else
 {
-    Write-host "$FilePath does not exist"  -ForegroundColor Yellow
+    Write-host "$sshdConfigPath does not exist"  -ForegroundColor Yellow
 }
  
 #check host keys
@@ -36,7 +36,7 @@ If you choose not to register the keys with ssh-agent, please grant sshd read ac
     Write-Host " "
 }#>
 
-Get-ChildItem $PSScriptRoot\ssh_host_*_key -ErrorAction SilentlyContinue | % {    
+Get-ChildItem $env:ProgramData\ssh\ssh_host_*_key -ErrorAction SilentlyContinue | % {
     Repair-SshdHostKeyPermission -FilePath $_.FullName @psBoundParameters
 }
 

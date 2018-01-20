@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include "sys\types.h"
 #include "fcntl.h"
+#include "spawn.h"
 
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
@@ -79,7 +80,8 @@ int daemon(int nochdir, int noclose);
 char *crypt(const char *key, const char *salt);
 int link(const char *oldpath, const char *newpath);
 int readlink(const char *path, char *link, int linklen);
-int spawn_child(char*, char**, int, int, int, unsigned long);
+
+int chroot(const char *path);
 
 /* 
  * readpassphrase.h definitions 

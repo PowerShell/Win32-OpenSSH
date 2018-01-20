@@ -1126,10 +1126,6 @@ tun_open(int tun, int mode, char **ifname)
 void
 sanitise_stdfd(void)
 {
-#ifdef WINDOWS
-	/* nothing to do for Windows*/
-	return;
-#else /* !WINDOWS */
 	int nullfd, dupfd;
 
 	if ((nullfd = dupfd = open(_PATH_DEVNULL, O_RDWR)) == -1) {
@@ -1148,7 +1144,6 @@ sanitise_stdfd(void)
 	}
 	if (nullfd > STDERR_FILENO)
 		close(nullfd);
-#endif /* !WINDOWS */
 }
 
 char *

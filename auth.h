@@ -93,9 +93,6 @@ struct Authctxt {
 
 	/* Information exposed to session */
 	struct sshbuf	*session_info;	/* Auth info for environment */
-#ifdef WINDOWS
-	void		*auth_token;
-#endif
 };
 
 /*

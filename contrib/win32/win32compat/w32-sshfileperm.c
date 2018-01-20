@@ -34,8 +34,8 @@
 #include "inc\pwd.h"
 #include "sshfileperm.h"
 #include "debug.h"
-
-#define SSHD_ACCOUNT L"NT Service\\sshd"
+#include "misc_internal.h"
+#include "config.h"
 
 /*
 * The function is to check if current user is secure to access to the file. 
@@ -46,10 +46,10 @@
 * Returns 0 on success and -1 on failure
 */
 int
-check_secure_file_permission(const char *name, struct passwd * pw)
+check_secure_file_permission(const char *input_path, struct passwd * pw)
 {	
 	PSECURITY_DESCRIPTOR pSD = NULL;
-	wchar_t * name_utf16 = NULL;
+	wchar_t * path_utf16 = NULL;
 	PSID owner_sid = NULL, user_sid = NULL;
 	PACL dacl = NULL;
 	DWORD error_code = ERROR_SUCCESS; 
@@ -57,6 +57,7 @@ check_secure_file_permission(const char *name, struct passwd * pw)
 	struct passwd * pwd = pw;
 	char *bad_user = NULL;
 	int ret = 0;
+	char *path = NULL;
 
 	if (pwd == NULL)
 		if ((pwd = getpwuid(0)) == NULL) 
@@ -68,17 +69,19 @@ check_secure_file_permission(const char *name, struct passwd * pw)
 		ret = -1;
 		goto cleanup;
 	}
-	if ((name_utf16 = utf8_to_utf16(name)) == NULL) {
+
+	path = resolved_path(input_path);
+	if ((path_utf16 = utf8_to_utf16(path)) == NULL) {
 		ret = -1;
 		errno = ENOMEM;
 		goto cleanup;
 	}
 
 	/*Get the owner sid of the file.*/
-	if ((error_code = GetNamedSecurityInfoW(name_utf16, SE_FILE_OBJECT,
+	if ((error_code = GetNamedSecurityInfoW(path_utf16, SE_FILE_OBJECT,
 		OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
 		&owner_sid, NULL, &dacl, NULL, &pSD)) != ERROR_SUCCESS) {
-		debug3("failed to retrieve the owner sid and dacl of file %s with error code: %d", name, error_code);
+		debug3("failed to retrieve the owner sid and dacl of file %s with error code: %d", path, error_code);
 		errno = EOTHER;
 		ret = -1;
 		goto cleanup;
@@ -91,7 +94,7 @@ check_secure_file_permission(const char *name, struct passwd * pw)
 	if (!IsWellKnownSid(owner_sid, WinBuiltinAdministratorsSid) &&
 		!IsWellKnownSid(owner_sid, WinLocalSystemSid) &&
 		!EqualSid(owner_sid, user_sid)) {
-		debug3("Bad owner on %s", name);
+		debug3("Bad owner on %s", path);
 		ret = -1;
 		goto cleanup;
 	}
@@ -127,21 +130,13 @@ check_secure_file_permission(const char *name, struct passwd * pw)
 			IsWellKnownSid(current_trustee_sid, WinLocalSystemSid) ||
 			EqualSid(current_trustee_sid, user_sid)) {
 			continue;
-		}
-		else if(is_sshd_account(current_trustee_sid)){
-			if ((current_access_mask & ~FILE_GENERIC_READ) != 0){
-				debug3("Bad permission. %s can only read access to %s", SSHD_ACCOUNT, name);	
-				ret = -1;			
-				break;			
-			}			
-		}
-		else {
+		} else {
 			ret = -1;
 			if (ConvertSidToStringSid(current_trustee_sid, &bad_user) == FALSE) {
 				debug3("ConvertSidToSidString failed with %d. ", GetLastError());
 				break;
 			}
-			debug3("Bad permissions. Try removing permissions for user: %s on file %s.", bad_user, name);
+			debug3("Bad permissions. Try removing permissions for user: %s on file %s.", bad_user, path);
 			break;
 		}
 	}	
@@ -152,31 +147,8 @@ cleanup:
 		LocalFree(pSD);
 	if (user_sid)
 		LocalFree(user_sid);
-	if(name_utf16)
-		free(name_utf16);
+	if(path_utf16)
+		free(path_utf16);
 	return ret;
 }
 
-/*TODO: optimize to get sshd sid first and then call EqualSid*/
-static BOOL
-is_sshd_account(PSID user_sid) {	
-	wchar_t user_name[UNCLEN] = { 0 }, full_name[UNCLEN + DNLEN + 2] = { 0 };
-	DWORD name_length = UNCLEN, domain_name_length = 0, full_name_len = UNCLEN + DNLEN + 2;
-	SID_NAME_USE sid_type = SidTypeInvalid;
-	BOOL ret = FALSE;
-	errno_t r = 0;
-	
-	if (LookupAccountSidLocalW(user_sid, user_name, &name_length, full_name, &full_name_len, &sid_type) == FALSE)
-	{
-		debug3("LookupAccountSidLocalW() failed with error: %d. ", GetLastError());
-		errno = ENOENT;
-		return FALSE;
-	}	
-	domain_name_length = wcsnlen(full_name, _countof(full_name));
-	full_name[domain_name_length] = L'\\';
-	if ((r = wmemcpy_s(full_name + domain_name_length + 1, _countof(full_name) - domain_name_length -1, user_name, wcsnlen_s(user_name, UNCLEN) + 1)) != 0) {
-		debug3("wmemcpy_s failed with error: %d.", r);
-		return FALSE;
-	}
-	return (wcsicmp(full_name, SSHD_ACCOUNT) == 0);
-}

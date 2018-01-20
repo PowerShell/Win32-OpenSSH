@@ -98,9 +98,4 @@ int mm_bsdauth_respond(void *, u_int, char **);
 int mm_skey_query(void *, char **, char **, u_int *, char ***, u_int **);
 int mm_skey_respond(void *, u_int, char **);
 
-/* Windows specific */
-void* mm_auth_pubkey(const char*, const struct sshkey *, const u_char *, size_t,
-    struct sshbuf*);
-int mm_load_profile(const char*, u_int );
-
 #endif /* _MM_WRAP_H_ */

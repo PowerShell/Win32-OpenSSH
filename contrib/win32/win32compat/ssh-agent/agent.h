@@ -1,7 +1,7 @@
 #include <Windows.h>
 #include <stdio.h>
-#define __attribute__(A)
-#include "log.h"
+#include "Debug.h"
+
 #define MAX_MESSAGE_SIZE 256 * 1024
 
 #define SSH_ROOT L"SOFTWARE\\OpenSSH"
@@ -37,9 +37,6 @@ struct agent_connection {
 		SYSTEM, /* client is running as System */
 		SERVICE, /* client is running as LS or NS */
 	} client_type;
-	/* user profile related members */
-	HANDLE profile_token;
-	HANDLE profile_handle;
 };
 
 void agent_connection_on_io(struct agent_connection*, DWORD, OVERLAPPED*);
@@ -50,6 +47,3 @@ void agent_start(BOOL);
 void agent_process_connection(HANDLE);
 void agent_shutdown();
 void agent_cleanup_connection(struct agent_connection*);
-
-int load_config();
-int config_log_level();

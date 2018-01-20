@@ -292,6 +292,7 @@
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tncon.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.c" />
     <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\utf.c" />
+    <ClCompile Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\spawn.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\w32fd.h" />
@@ -337,6 +338,7 @@
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\debug.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\console.h" />
     <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\tnnet.h" />
+    <ClInclude Include="$(OpenSSH-Src-Path)\contrib\win32\win32compat\inc\spawn.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

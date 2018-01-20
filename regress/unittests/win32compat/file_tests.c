@@ -460,9 +460,6 @@ file_miscellaneous_tests()
 	h = w32_fd_to_handle(STDERR_FILENO);
 	ASSERT_HANDLE(h);
 
-	retValue = w32_allocate_fd_for_handle(h, FALSE);
-	ASSERT_HANDLE(h);
-
 	f = open(tmp_filename, O_RDWR | O_CREAT | O_TRUNC, 0666);
 	ASSERT_INT_NE(f, -1);
 	wchar_t *t = utf8_to_utf16(tmp_filename);

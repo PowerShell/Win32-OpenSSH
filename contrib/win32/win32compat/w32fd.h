@@ -99,7 +99,6 @@ struct w32_io {
 	union {
 		SOCKET sock;
 		HANDLE handle;
-		DWORD std_handle;  /* ex. STD_INPUT_HANDLE */
 	};
 
 	/*internal state used by synchronous io - terminal handles and external 
@@ -122,8 +121,7 @@ struct w32_io {
 	}internal;
 };
 
-#define IS_STDIO(pio) ((pio)->table_index <= 2)
-#define WINHANDLE(pio) (IS_STDIO(pio)? GetStdHandle((pio)->std_handle):(pio)->handle)
+#define WINHANDLE(pio) ((pio)->handle)
 #define FILETYPE(pio) (GetFileType(WINHANDLE(pio)))
 extern HANDLE main_thread;
 
@@ -155,7 +153,7 @@ int socketio_close(struct w32_io* pio);
 BOOL fileio_is_io_available(struct w32_io* pio, BOOL rd);
 void fileio_on_select(struct w32_io* pio, BOOL rd);
 int fileio_close(struct w32_io* pio);
-int fileio_pipe(struct w32_io* pio[2]);
+int fileio_pipe(struct w32_io* pio[2], int);
 struct w32_io* fileio_afunix_socket();
 int fileio_connect(struct w32_io*, char*);
 struct w32_io* fileio_open(const char *pathname, int flags, mode_t mode);

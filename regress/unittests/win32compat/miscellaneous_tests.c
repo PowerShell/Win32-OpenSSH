@@ -67,9 +67,9 @@ test_sanitizedpath()
 	char *win32prgdir = w32_programdir();
 	ASSERT_PTR_NE(win32prgdir, NULL);
 
-	ASSERT_PTR_EQ(sanitized_path(NULL), NULL);
+	ASSERT_PTR_EQ(resolved_path(NULL), NULL);
 
-	char *ret = sanitized_path(win32prgdir);
+	char *ret = resolved_path(win32prgdir);
 	retValue = strcmp(win32prgdir, ret);
 	ASSERT_INT_EQ(retValue, 0);
 
@@ -79,14 +79,14 @@ test_sanitizedpath()
 	strncpy(tmp_path+1, win32prgdir, win32prgdir_len);
 	tmp_path[win32prgdir_len+1] = '\0';
 
-	ret = sanitized_path(tmp_path);
+	ret = resolved_path(tmp_path);
 	retValue = strcmp(win32prgdir, ret);
 	ASSERT_INT_EQ(retValue, 0);
 
 	char *s1 = malloc(4), *s2 = malloc(4);
 	s1[0] = '/', s1[1] = win32prgdir[0],  s1[2] = ':', s1[3] = '\0';
 	s2[0] = win32prgdir[0], s2[1] = ':', s2[2] = '\\', s2[3] = '\0';
-	ret = sanitized_path(s1);
+	ret = resolved_path(s1);
 	retValue = strcmp(ret, s2);
 	ASSERT_INT_EQ(retValue, 0);
 

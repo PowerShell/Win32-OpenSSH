@@ -66,14 +66,33 @@ ssh_askpass(char *askpass, const char *msg)
 		return NULL;
 	}
 	osigchld = signal(SIGCHLD, SIG_DFL);
-#ifdef WINDOWS 
-	/* spawd child for Windows */
 	fcntl(p[0], F_SETFD, FD_CLOEXEC);
-	pid = spawn_child(askpass, NULL, p[1], p[1], STDERR_FILENO, 0);
-	if (pid < 0) {
-#else  /* !WINDOWS */
-	if ((pid = fork()) < 0) {
-#endif  /* !WINDOWS */
+	fcntl(p[1], F_SETFD, FD_CLOEXEC);
+#ifdef FORK_NOT_SUPPORTED
+	{
+		posix_spawn_file_actions_t actions;
+		pid = -1;
+		if (posix_spawn_file_actions_init(&actions) != 0 ||
+		    posix_spawn_file_actions_adddup2(&actions, p[1], STDOUT_FILENO) != 0 ) {
+			error("posix_spawn initialization failed");
+			signal(SIGCHLD, osigchld);
+			return NULL;
+		} else {
+			char* spawn_argv[2];
+			spawn_argv[0] = askpass;
+			spawn_argv[1] = NULL;
+			if (posix_spawn(&pid, spawn_argv[0], &actions, NULL, spawn_argv, NULL) != 0) {
+				posix_spawn_file_actions_destroy(&actions);
+				error("ssh_askpass: posix_spawn: %s", strerror(errno));
+				signal(SIGCHLD, osigchld);
+				return NULL;
+			}
+			posix_spawn_file_actions_destroy(&actions);
+		}
+
+	}
+#else 
+	if ((pid = fork()) < 0) { 
 		error("ssh_askpass: fork: %s", strerror(errno));
 		signal(SIGCHLD, osigchld);
 		return NULL;
@@ -86,6 +105,7 @@ ssh_askpass(char *askpass, const char *msg)
 		execlp(askpass, askpass, msg, (char *)NULL);
 		fatal("ssh_askpass: exec(%s): %s", askpass, strerror(errno));
 	}
+#endif
 	close(p[1]);
 
 	len = 0;

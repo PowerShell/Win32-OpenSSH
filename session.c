@@ -518,9 +518,6 @@ int do_exec_windows(struct ssh *ssh, Session *s, const char *command, int pty) {
 		*cmd = '\0';
 	}
 
-	/* load user profile */
-	mm_load_profile(s->pw->pw_name, ((INT_PTR)s->authctxt->auth_token) & 0xffffffff);
-
 	/* start the process */
 	{
 		memset(&si, 0, sizeof(STARTUPINFO));
@@ -536,28 +533,13 @@ int do_exec_windows(struct ssh *ssh, Session *s, const char *command, int pty) {
 		si.hStdError = (HANDLE)w32_fd_to_handle(pipeerr[1]);
 		si.lpDesktop = NULL;
 
-		hToken = s->authctxt->auth_token;
-
 		debug("Executing command: %s", exec_command);
 		UTF8_TO_UTF16_FATAL(exec_command_w, exec_command);
 		
-		_putenv_s("SSH_ASYNC_STDIN", "1");
-		_putenv_s("SSH_ASYNC_STDOUT", "1");
-		_putenv_s("SSH_ASYNC_STDERR", "1");
-
 		/* in debug mode launch using sshd.exe user context */
-		if (debug_flag)
-			create_process_ret_val = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
-				DETACHED_PROCESS, NULL, pw_dir_w,
-				&si, &pi);
-		else /* launch as client user context */
-			create_process_ret_val = CreateProcessAsUserW(hToken, NULL, exec_command_w, NULL, NULL, TRUE,
-				DETACHED_PROCESS , NULL, pw_dir_w,
-				&si, &pi);
-
-		_putenv_s("SSH_ASYNC_STDIN", "");
-		_putenv_s("SSH_ASYNC_STDOUT", "");
-		_putenv_s("SSH_ASYNC_STDERR", "");
+		create_process_ret_val = CreateProcessW(NULL, exec_command_w, NULL, NULL, TRUE,
+			DETACHED_PROCESS, NULL, pw_dir_w,
+			&si, &pi);
 
 		if (!create_process_ret_val)
 			fatal("ERROR. Cannot create process (%u).\n", GetLastError());
@@ -2162,7 +2144,11 @@ session_pty_req(struct ssh *ssh, Session *s)
 
 	/* Allocate a pty and open it. */
 	debug("Allocating pty.");
+#ifdef WINDOWS	
+	if (!(pty_allocate(&s->ptyfd, &s->ttyfd, s->tty,
+#else
 	if (!PRIVSEP(pty_allocate(&s->ptyfd, &s->ttyfd, s->tty,
+#endif
 	    sizeof(s->tty)))) {
 		free(s->term);
 		s->term = NULL;
