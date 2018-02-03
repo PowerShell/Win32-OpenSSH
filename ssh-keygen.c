@@ -1541,10 +1541,7 @@ do_change_comment(struct passwd *pw)
 	sshkey_free(private);
 
 	strlcat(identity_file, ".pub", sizeof(identity_file));
-	fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (fd == -1)
-		fatal("Could not save your public key in %s", identity_file);
-	f = fdopen(fd, "w");
+	f = fopen(identity_file, "w");
 	if (f == NULL)
 		fatal("fdopen %s failed: %s", identity_file, strerror(errno));
 	if ((r = sshkey_write(public, f)) != 0)
