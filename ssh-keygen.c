@@ -1543,7 +1543,7 @@ do_change_comment(struct passwd *pw)
 	strlcat(identity_file, ".pub", sizeof(identity_file));
 	f = fopen(identity_file, "w");
 	if (f == NULL)
-		fatal("fdopen %s failed: %s", identity_file, strerror(errno));
+		fatal("fopen %s failed: %s", identity_file, strerror(errno));
 	if ((r = sshkey_write(public, f)) != 0)
 		fatal("write key failed: %s", ssh_err(r));
 	sshkey_free(public);
