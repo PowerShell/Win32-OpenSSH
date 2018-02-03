@@ -1468,7 +1468,7 @@ do_change_comment(struct passwd *pw)
 	struct sshkey *public;
 	struct stat st;
 	FILE *f;
-	int r, fd;
+	int r;
 
 	if (!have_identity)
 		ask_filename(pw, "Enter file in which the key is");
