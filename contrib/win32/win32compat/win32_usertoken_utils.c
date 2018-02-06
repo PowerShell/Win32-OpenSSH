@@ -253,11 +253,6 @@ process_custom_lsa_auth(char* user, const char* pwd, char* lsa_pkg)
 		*tmp = L'\0';
 	}
 
-	if (domw == NULL) {
-		debug("no domain found");
-		goto done;
-	}
-
 	/* call into LSA provider , get and duplicate token */
 	InitLsaString(&logon_process_name, "sshd");
 	InitLsaString(&lsa_auth_package_name, lsa_pkg);
