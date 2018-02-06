@@ -1468,7 +1468,7 @@ do_change_comment(struct passwd *pw)
 	struct sshkey *public;
 	struct stat st;
 	FILE *f;
-	int r;
+	int r, fd;
 
 	if (!have_identity)
 		ask_filename(pw, "Enter file in which the key is");
@@ -1541,9 +1541,18 @@ do_change_comment(struct passwd *pw)
 	sshkey_free(private);
 
 	strlcat(identity_file, ".pub", sizeof(identity_file));
-	f = fopen(identity_file, "w");
-	if (f == NULL)
+	if ((fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644)) == -1)
+		fatal("Could not save your public key in %s: %s",
+			identity_file, strerror(errno));
+#ifdef WINDOWS
+	/* Windows POSIX adpater does not support fdopen() on open(file)*/
+	close(fd);
+	if ((f = fopen(identity_file, "w")) == NULL)
 		fatal("fopen %s failed: %s", identity_file, strerror(errno));
+#else  /* !WINDOWS */
+	if ((f = fdopen(fd, "w")) == NULL)
+		fatal("fdopen %s failed: %s", identity_file, strerror(errno));
+#endif  /* !WINDOWS */
 	if ((r = sshkey_write(public, f)) != 0)
 		fatal("write key failed: %s", ssh_err(r));
 	sshkey_free(public);
