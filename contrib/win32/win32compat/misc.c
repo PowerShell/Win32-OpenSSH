@@ -68,7 +68,9 @@ static char* s_programdir = NULL;
 
  /* Difference in us between UNIX Epoch and Win32 Epoch */
 #define EPOCH_DELTA_US  116444736000000000ULL
-#define RATE_DIFF 10000000ULL /* 1000 nsecs */
+#define RATE_DIFF 10000000ULL /* 100 nsecs */
+#define NSEC_IN_SEC 1000000000ULL // 10**9
+#define USEC_IN_SEC 1000000ULL // 10**6
 
 typedef struct _REPARSE_DATA_BUFFER {
 	ULONG  ReparseTag;
@@ -151,6 +153,14 @@ usleep(unsigned int useconds)
 	return 1;
 }
 
+static LONGLONG
+timespec_to_nsec(const struct timespec *req)
+{
+	LONGLONG sec = req->tv_sec;
+	return sec * NSEC_IN_SEC + req->tv_nsec;
+}
+
+
 int
 nanosleep(const struct timespec *req, struct timespec *rem)
 {
@@ -167,7 +177,8 @@ nanosleep(const struct timespec *req, struct timespec *rem)
 		return -1;
 	}
 
-	li.QuadPart = -req->tv_nsec;
+	/* convert timespec to 100ns intervals */
+	li.QuadPart = -(timespec_to_nsec(req) / 100);
 	if (!SetWaitableTimer(timer, &li, 0, NULL, NULL, FALSE)) {
 		CloseHandle(timer);
 		errno = EFAULT;
@@ -180,6 +191,7 @@ nanosleep(const struct timespec *req, struct timespec *rem)
 		CloseHandle(timer);
 		return 0;
 	default:
+		CloseHandle(timer);
 		errno = EFAULT;
 		return -1;
 	}
@@ -201,12 +213,12 @@ gettimeofday(struct timeval *tv, void *tz)
 	/* Fetch time since Jan 1, 1601 in 100ns increments */
 	GetSystemTimeAsFileTime(&timehelper.ft);	
 
-	/* Remove the epoch difference */
-	us = timehelper.ns - EPOCH_DELTA_US;
+	/* Remove the epoch difference & convert 100ns to us */
+	us = (timehelper.ns - EPOCH_DELTA_US) / 10;
 
 	/* Stuff result into the timeval */
-	tv->tv_sec = (long)(us / RATE_DIFF);
-	tv->tv_usec = (long)(us % RATE_DIFF);
+	tv->tv_sec = (long)(us / USEC_IN_SEC);
+	tv->tv_usec = (long)(us % USEC_IN_SEC);
 
 	return 0;
 }
