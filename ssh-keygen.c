@@ -1544,9 +1544,16 @@ do_change_comment(struct passwd *pw)
 	fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (fd == -1)
 		fatal("Could not save your public key in %s", identity_file);
+#ifdef WINDOWS
+	/* Windows POSIX adpater does not support fdopen() on open(file)*/
+	close(fd);
+	if ((f = fopen(identity_file, "w")) == NULL)
+		fatal("fopen %s failed: %s", identity_file, strerror(errno));
+#else  /* !WINDOWS */
 	f = fdopen(fd, "w");
 	if (f == NULL)
 		fatal("fdopen %s failed: %s", identity_file, strerror(errno));
+#endif  /* !WINDOWS */
 	if ((r = sshkey_write(public, f)) != 0)
 		fatal("write key failed: %s", ssh_err(r));
 	sshkey_free(public);

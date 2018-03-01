@@ -111,6 +111,8 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 	int tmp_len = PATH_MAX;
 	PDOMAIN_CONTROLLER_INFOW pdc = NULL;
 	DWORD dsStatus, uname_upn_len = 0, uname_len = 0, udom_len = 0;
+	wchar_t wmachine_name[MAX_COMPUTERNAME_LENGTH + 1];
+	DWORD wmachine_name_len = MAX_COMPUTERNAME_LENGTH + 1;
 	errno_t r = 0;
 
 	errno = 0;
@@ -133,6 +135,14 @@ get_passwd(const char *user_utf8, LPWSTR user_sid)
 	} else {
 		uname_utf16 = user_utf16;
 		udom_utf16 = NULL;
+	}
+
+	if (udom_utf16) {
+		/* this should never fail */
+		GetComputerNameW(wmachine_name, &wmachine_name_len);
+		/* If this is a local account (domain part and computer name are the same), strip out domain */
+		if (_wcsicmp(udom_utf16, wmachine_name) == 0)
+			udom_utf16 = NULL;
 	}
 
 	if (user_sid == NULL) {

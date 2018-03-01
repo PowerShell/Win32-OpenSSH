@@ -162,8 +162,14 @@ WARNING: Following changes will be made to OpenSSH configuration
        New-Item -ItemType Directory -Path $TestDataPath -Force -ErrorAction SilentlyContinue | out-null
     }
 
-    #Backup existing OpenSSH configuration
+    
+    if(-not (Test-Path $OpenSSHConfigPath -pathType Container))
+    {
+        #starting the service will create ssh config folder
+        start-service sshd
+    }    
     $backupConfigPath = Join-Path $OpenSSHConfigPath sshd_config.ori
+    #Backup existing OpenSSH configuration
     if (-not (Test-Path $backupConfigPath -PathType Leaf)) {
         Copy-Item (Join-Path $OpenSSHConfigPath sshd_config) $backupConfigPath -Force
     }
@@ -244,7 +250,7 @@ WARNING: Following changes will be made to OpenSSH configuration
     $authorizedKeyPath = Join-Path $ssouserProfile .ssh\authorized_keys
     $testPubKeyPath = Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519.pub
     Copy-Item $testPubKeyPath $authorizedKeyPath -Force -ErrorAction SilentlyContinue
-    Repair-AuthorizedKeyPermission -FilePath $authorizedKeyPath -confirm:$false
+    Repair-AuthorizedKeyPermission -FilePath $authorizedKeyPath -confirm:$false 
     
     copy-item (Join-Path $Script:E2ETestDirectory sshtest_userssokey_ed25519) $Global:OpenSSHTestInfo["TestDataPath"]
     $testPriKeypath = Join-Path $Global:OpenSSHTestInfo["TestDataPath"] sshtest_userssokey_ed25519

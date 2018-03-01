@@ -231,7 +231,7 @@ sys_auth_passwd(Authctxt *authctxt, const char *password)
 
 #elif defined(WINDOWS)
 HANDLE password_auth_token = NULL;
-HANDLE process_custom_lsa_auth(char*, const char*, char*);
+HANDLE process_custom_lsa_auth(const char*, const char*, const char*);
 
 void 
 sys_auth_passwd_lsa(Authctxt *authctxt, const char *password)
@@ -253,8 +253,7 @@ sys_auth_passwd_lsa(Authctxt *authctxt, const char *password)
 			lsa_auth_pkg = utf16_to_utf8(lsa_auth_pkg_w);
 			if (!lsa_auth_pkg)
 				fatal("utf16_to_utf8 failed to convert lsa_auth_pkg_w:%ls", lsa_auth_pkg_w);
-
-			debug("Authenticating using LSA Auth Package:%ls", lsa_auth_pkg_w);
+			
 			password_auth_token = process_custom_lsa_auth(authctxt->pw->pw_name, password, lsa_auth_pkg);
 		}
 	}

@@ -106,3 +106,51 @@ function Remove-PasswordSetting
     if ($env:DISPLAY -eq 1) { Remove-Item env:\DISPLAY }
     Remove-item "env:SSH_ASKPASS" -ErrorAction SilentlyContinue
 }
+
+$Taskfolder = "\OpenSSHTestTasks\"
+$Taskname = "StartTestDaemon"
+        
+function Start-SSHDTestDaemon
+{
+    param(
+    [string] $Arguments,
+    [string] $Workdir)    
+
+    $ac = New-ScheduledTaskAction -Execute (join-path $workdir "sshd") -WorkingDirectory $workdir -Argument $Arguments
+    $task = Register-ScheduledTask -TaskName $Taskname -User system -Action $ac -TaskPath $Taskfolder -Force    
+    Start-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname
+    $svcpid = ((tasklist /svc | select-string -Pattern ".+sshd").ToString() -split "\s+")[1]
+    #sleep for 1 seconds for process to ready to listener
+    $num = 0
+    while((Get-Process sshd | Where-Object {$_.Id -ne $svcpid}) -eq $null)
+    {
+        start-sleep 1
+        $num++
+        if($num -gt 30) { break }
+    }
+}
+
+function Stop-SSHDTestDaemon
+{
+    $task = Get-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname -ErrorAction SilentlyContinue
+    if($task)
+    {
+        if($task.State -eq "Running")
+        {
+            Stop-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname
+        }        
+        Unregister-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname -Confirm:$false
+    }
+    #if still running, wait a little while for task to complete
+    #stop-scheduledTask does not wait for worker process to end. Kill it if still running. Logic below assume sshd service is running
+    $svcpid = ((tasklist /svc | select-string -Pattern ".+sshd").ToString() -split "\s+")[1]
+    Get-Process sshd -ErrorAction SilentlyContinue | Where-Object {$_.Id -ne $svcpid} | Stop-Process -Force -ErrorAction SilentlyContinue
+    $num = 0
+    while((Get-Process sshd | Where-Object {$_.Id -ne $svcpid}))
+    {
+        # sshd process is still running; wait 1 more seconds"
+        start-sleep 1
+        $num++
+        if($num -gt 30) { break }
+    }
+}

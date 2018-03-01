@@ -106,7 +106,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
 
         It "$tC.$tI - test version" {
             iex "cmd /c `"ssh -V 2> $stderrFile`""
-            $stderrFile | Should Contain "OpenSSH_"
+            $stderrFile | Should Contain "OpenSSH_for_Windows"
         }
 
         It "$tC.$tI - test help" {
@@ -147,7 +147,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
             $o | Should Be "1234"
         }
 
-        It "$tC.$tI - stdin from PS object" {
+        It "$tC.$tI - stdin from PS object" -skip:$skip {
             # execute this script that dumps the length of input data, on the remote end
             $str = "begin {} process { Write-Output `$input.Length} end { }"
             $EncodedText =[Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($str))
@@ -157,7 +157,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
             $o | Should Be "8"
         }
 
-        It "$tC.$tI - stream file in and out" {
+        It "$tC.$tI - stream file in and out" -skip:$skip {
             # prep a file of size > 10KB (https://github.com/PowerShell/Win32-OpenSSH/issues/908 was caught with such file size)
             $str = ""
             (1..100) | foreach {$str += "1234567890"}
@@ -191,7 +191,7 @@ Describe "E2E scenarios for ssh client" -Tags "CI" {
             Remove-ItemProperty -Path $dfltShellRegPath -Name $dfltShellCmdOptionRegKeyName -ErrorAction SilentlyContinue
         }
 
-        It "$tC.$tI - default shell as powershell" {
+        It "$tC.$tI - default shell as powershell" -skip:$skip {
             $shell_path = (Get-Command powershell.exe -ErrorAction SilentlyContinue).path
             if($shell_path -ne $null) {
                 ConfigureDefaultShell -default_shell_path $shell_path -default_shell_cmd_option_val "/c"

@@ -2,7 +2,7 @@
 #include <VersionHelpers.h>
 
 #define PATH_MAX MAX_PATH
-
+#define SSH_REGISTRY_ROOT L"SOFTWARE\\OpenSSH"
 #define GOTO_CLEANUP_IF(_cond_,_err_) do {  \
     if ((_cond_)) {                         \
         hr = _err_;                         \
@@ -40,3 +40,5 @@ int get_machine_domain_name(wchar_t *domain, int size);
 char* get_program_data_path();
 HANDLE get_user_token(char* user);
 int load_user_profile(HANDLE user_token, char* user);
+int copy_file(char *source, char *destination);
+int create_directory_withsddl(char *path, char *sddl);

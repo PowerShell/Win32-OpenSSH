@@ -1460,9 +1460,86 @@ int
 is_absolute_path(char *path)
 {
 	int retVal = 0;
-	if (*path == '/' || *path == '\\' || (*path != '\0' && path[1] == ':') ||
+	if(*path == '\"') /* skip double quote if path is "c:\abc" */
+		path++;
+
+	if (*path == '/' || *path == '\\' || (*path != '\0' && isalpha(*path) && path[1] == ':') ||
 	    ((strlen(path) >= strlen(PROGRAM_DATA)) && (memcmp(path, PROGRAM_DATA, strlen(PROGRAM_DATA)) == 0)))
 		retVal = 1;
-	
+
 	return retVal;
 }
+
+/* return -1 - in case of failure, 0 - success */
+int
+create_directory_withsddl(char *path, char *sddl)
+{
+	struct stat st;
+	if (stat(path, &st) < 0) {
+		PSECURITY_DESCRIPTOR pSD = NULL;
+		SECURITY_ATTRIBUTES sa;
+		memset(&sa, 0, sizeof(SECURITY_ATTRIBUTES));
+		sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+		sa.bInheritHandle = FALSE;
+
+		wchar_t *path_w = utf8_to_utf16(path);
+		if (!path_w) {
+			error("%s utf8_to_utf16() has failed to convert string:%s", __func__, path);
+			return -1;
+		}
+
+		wchar_t *sddl_w = utf8_to_utf16(sddl);
+		if (!sddl_w) {
+			error("%s utf8_to_utf16() has failed to convert string:%s", __func__, sddl);
+			return -1;
+		}
+
+		if (ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl_w, SDDL_REVISION, &pSD, NULL) == FALSE) {
+			error("ConvertStringSecurityDescriptorToSecurityDescriptorW failed with error code %d", GetLastError());
+			return -1;
+		}
+
+		if (IsValidSecurityDescriptor(pSD) == FALSE) {
+			error("IsValidSecurityDescriptor return FALSE");
+			return -1;
+		}
+
+		sa.lpSecurityDescriptor = pSD;
+		if (!CreateDirectoryW(path_w, &sa)) {
+			error("Failed to create directory:%ls error:%d", path_w, GetLastError());
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+/* return -1 - in case of failure, 0 - success */
+int
+copy_file(char *source, char *destination)
+{
+	if (!source || !destination) return 0;
+
+	struct stat st;
+	if ((stat(source, &st) >= 0) && (stat(destination, &st) < 0)) {
+		wchar_t *source_w = utf8_to_utf16(source);
+		if (!source_w) {
+			error("%s utf8_to_utf16() has failed to convert string:%s", __func__, source_w);
+			return -1;
+		}
+
+		wchar_t *destination_w = utf8_to_utf16(destination);
+		if (!destination_w) {
+			error("%s utf8_to_utf16() has failed to convert string:%s", __func__, destination_w);
+			return -1;
+		}
+
+		if (!CopyFileW(source_w, destination_w, FALSE)) {
+			error("Failed to copy %ls to %ls, error:%d", source_w, destination_w, GetLastError());
+			return -1;
+		}
+	}
+
+	return 0;
+}
+

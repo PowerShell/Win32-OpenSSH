@@ -430,7 +430,7 @@ expand_authorized_keys(const char *filename, struct passwd *pw)
 
 #ifdef WINDOWS
 	/* Return if the path is absolute. If not, prepend the '%h\\' */
-	if ((strlen(file) > 1) && (file[1] == ':'))
+	if(is_absolute_path(file))
 		return (file);
 
 	i = snprintf(ret, sizeof(ret), "%s\\%s", pw->pw_dir, file);

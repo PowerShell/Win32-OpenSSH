@@ -197,7 +197,8 @@ function Start-OpenSSHBootstrap
         Write-BuildMsg -AsVerbose -Message "$gitCmdPath already present in Path environment variable" -Silent:$silent
     }
 
-    $nativeMSBuildPath = Get-VS2015BuildToolPath
+    $VS2015Path = Get-VS2015BuildToolPath
+    $VS2017Path = Get-VS2017BuildToolPath
 
     # Update machine environment path
     if ($newMachineEnvironmentPath -ne $machinePath)
@@ -206,9 +207,24 @@ function Start-OpenSSHBootstrap
     }    
 
     $vcVars = "${env:ProgramFiles(x86)}\Microsoft Visual Studio 14.0\Common7\Tools\vsvars32.bat"
-    $sdkPath = "${env:ProgramFiles(x86)}\Windows Kits\8.1\bin\x86\register_app.vbs"
-    $packageName = "vcbuildtools"
-    If (($nativeMSBuildPath -eq $null) -or (-not (Test-Path $VcVars)) -or (-not (Test-Path $sdkPath))) {
+    $sdkPath = "${env:ProgramFiles(x86)}\Windows Kits\8.1\bin\x86\register_app.vbs"    
+    #use vs2017 build tool if exists
+    if($VS2017Path -ne $null)
+    {
+        If (-not (Test-Path $sdkPath))
+        {
+            $packageName = "windows-sdk-8.1"
+            Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName ..."
+            choco install $packageName -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
+        }
+
+        if(-not (Test-Path $VcVars))
+        {
+            Write-BuildMsg -AsError -ErrorAction Stop -Message "VC++ 2015.3 v140 toolset are not installed."   
+        }
+    }
+    elseIf (($VS2015Path -eq $null) -or (-not (Test-Path $VcVars)) -or (-not (Test-Path $sdkPath))) {
+        $packageName = "vcbuildtools"
         Write-BuildMsg -AsInfo -Message "$packageName not present. Installing $packageName ..."
         choco install $packageName -ia "/InstallSelectableItems VisualCppBuildTools_ATLMFC_SDK;VisualCppBuildTools_NETFX_SDK;Win81SDK_CppBuildSKUV1" -y --force --limitoutput --execution-timeout 10000 2>&1 >> $script:BuildLogFile
         $errorCode = $LASTEXITCODE
@@ -234,9 +250,9 @@ function Start-OpenSSHBootstrap
                 Write-BuildMsg -AsError -ErrorAction Stop -Message "User choose not to restart the machine to apply the changes."
             }
         }
-        else
+        elseif($errorCode -ne 0)
         {
-            Write-BuildMsg -AsError -ErrorAction Stop -Message "$packageName installation failed with error code $errorCode"
+            Write-BuildMsg -AsError -ErrorAction Stop -Message "$packageName installation failed with error code $errorCode."
         }
     }
     else
@@ -244,14 +260,11 @@ function Start-OpenSSHBootstrap
         Write-BuildMsg -AsVerbose -Message 'VC++ 2015 Build Tools already present.'
     }
 
-    if($NativeHostArch.ToLower().Startswith('arm'))
-    {		
-        $nativeMSBuildPath = Get-VS2017BuildToolPath
-        If ($nativeMSBuildPath -eq $null)
-        {
-            #todo, install vs 2017 build tools
-            Write-BuildMsg -AsError -ErrorAction Stop -Message "The required msbuild 15.0 is not installed on the machine."
-        }
+    if($NativeHostArch.ToLower().Startswith('arm') -and ($VS2017Path -eq $null))
+    {
+        
+        #todo, install vs 2017 build tools
+        Write-BuildMsg -AsError -ErrorAction Stop -Message "The required msbuild 15.0 is not installed on the machine."
     }
 
     if($OneCore -or ($NativeHostArch.ToLower().Startswith('arm')))
@@ -268,7 +281,7 @@ function Start-OpenSSHBootstrap
     # Ensure the VS C toolset is installed
     if ($null -eq $env:VS140COMNTOOLS)
     {
-        Write-BuildMsg -AsError -ErrorAction Stop -Message "Cannot find Visual Studio 2015 Environment variable VS140COMNTOOlS"
+        Write-BuildMsg -AsError -ErrorAction Stop -Message "Cannot find Visual Studio 2015 Environment variable VS140COMNTOOlS."
     }
 
     $item = Get-Item(Join-Path -Path $env:VS140COMNTOOLS -ChildPath '../../vc')
@@ -314,7 +327,7 @@ function Copy-LibreSSLSDK
     Copy-Item -Container -Path $sourcePath -Destination $PSScriptRoot -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable e
     if($e -ne $null)
     {
-        Write-BuildMsg -AsError -ErrorAction Stop -Message "Copy LibreSSLSDK from $sourcePath to $PSScriptRoot failed"
+        Write-BuildMsg -AsError -ErrorAction Stop -Message "Copy LibreSSLSDK from $sourcePath to $PSScriptRoot failed."
     }
 }
 
@@ -330,7 +343,8 @@ function Start-OpenSSHPackage
         [string]$Configuration = "Release",
 
         # Copy payload to DestinationPath instead of packaging
-        [string]$DestinationPath = ""
+        [string]$DestinationPath = "",
+        [switch]$NoOpenSSL
     )
 
     [System.IO.DirectoryInfo] $repositoryRoot = Get-RepositoryRoot
@@ -390,7 +404,10 @@ function Start-OpenSSHPackage
 
     #copy libcrypto dll
     $libreSSLSDKPath = Join-Path $PSScriptRoot $script:libreSSLSDKStr
-    Copy-Item -Path $(Join-Path $libreSSLSDKPath "$NativeHostArch\libcrypto.dll") -Destination $packageDir -Force -ErrorAction Stop    
+    if (-not $NoOpenSSL.IsPresent) 
+    {        
+        Copy-Item -Path $(Join-Path $libreSSLSDKPath "$NativeHostArch\libcrypto.dll") -Destination $packageDir -Force -ErrorAction Stop
+    }    
 
     if ($DestinationPath -ne "") {
         if (Test-Path $DestinationPath) {            
@@ -400,7 +417,7 @@ function Start-OpenSSHPackage
             New-Item -ItemType Directory $DestinationPath -Force | Out-Null
         }
         Copy-Item -Path $packageDir\* -Destination $DestinationPath -Force -Recurse
-        Write-BuildMsg -AsInfo -Message "Copied payload to $DestinationPath"
+        Write-BuildMsg -AsInfo -Message "Copied payload to $DestinationPath."
     }
     else {
         Remove-Item ($packageDir + '.zip') -Force -ErrorAction SilentlyContinue
@@ -411,7 +428,7 @@ function Start-OpenSSHPackage
         }
         else
         {
-               Write-BuildMsg -AsInfo -Message "Packaged Payload not compressed."
+            Write-BuildMsg -AsInfo -Message "Packaged Payload not compressed."
         }
     }
     Remove-Item $packageDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -470,7 +487,7 @@ function Start-OpenSSHBuild
         Remove-Item -Path $script:BuildLogFile -force
     }
     
-    Write-BuildMsg -AsInfo -Message "Starting Open SSH build; Build Log: $($script:BuildLogFile)"
+    Write-BuildMsg -AsInfo -Message "Starting Open SSH build; Build Log: $($script:BuildLogFile)."
 
     Start-OpenSSHBootstrap -OneCore:$OneCore
 
@@ -523,17 +540,25 @@ function Start-OpenSSHBuild
         $xml.Project.PropertyGroup.WindowsSDKVersion = $win10SDKVer.ToString()
         $xml.Project.PropertyGroup.AdditionalDependentLibs = 'onecore.lib'
         $xml.Project.PropertyGroup.MinimalCoreWin = 'true'
+        
+        #Use onecore libcrypto binaries
+        $xml.Project.PropertyGroup."LibreSSL-x86-Path" = '$(SolutionDir)\LibreSSLSDK\onecore\x86\'
+        $xml.Project.PropertyGroup."LibreSSL-x64-Path" = '$(SolutionDir)\LibreSSLSDK\onecore\x64\'
+        $xml.Project.PropertyGroup."LibreSSL-arm-Path" = '$(SolutionDir)\LibreSSLSDK\onecore\arm\'
+        $xml.Project.PropertyGroup."LibreSSL-arm64-Path" = '$(SolutionDir)\LibreSSLSDK\onecore\arm64\'
+        
         $xml.Save($PathTargets)
     }
     
     $solutionFile = Get-SolutionFile -root $repositoryRoot.FullName
-    $cmdMsg = @("${solutionFile}", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/m", "/noconlog", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")    
-
-    if($NativeHostArch.ToLower().Startswith('arm'))
+    $cmdMsg = @("${solutionFile}", "/t:Rebuild", "/p:Platform=${NativeHostArch}", "/p:Configuration=${Configuration}", "/m", "/nologo", "/fl", "/flp:LogFile=${script:BuildLogFile}`;Append`;Verbosity=diagnostic")    
+    if($silent)
     {
-        $msbuildCmd = Get-VS2017BuildToolPath
+        $cmdMsg += "/noconlog"
     }
-    else
+    
+    $msbuildCmd = Get-VS2017BuildToolPath
+    if($msbuildCmd -eq $null)
     {
         $msbuildCmd = Get-VS2015BuildToolPath
     }

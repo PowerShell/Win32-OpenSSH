@@ -1565,7 +1565,7 @@
 #define _PATH_PASSWD_PROG "/usr/bin/passwd"
 
 /* Specify location of ssh.pid */
-#define _PATH_SSH_PIDDIR "."
+/* #undef _PATH_SSH_PIDDIR */
 
 /* Define if we don't have struct __res_state in resolv.h */
 #define __res_state state
@@ -1693,6 +1693,7 @@
 
 #define _PATH_PRIVSEP_CHROOT_DIR "."
 #define SSHDIR "__PROGRAMDATA__\\ssh"
+#define _PATH_SSH_PIDDIR SSHDIR
 #define _PATH_SFTP_SERVER "sftp-server.exe"
 #define _PATH_SSH_PROGRAM "ssh.exe"
 #define _PATH_LS			"dir"

@@ -17,42 +17,22 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $null = New-Item $testDir -ItemType directory -Force -ErrorAction SilentlyContinue
         }
 
-        $fileName = "test.txt"
-        $logName = "sshdlog.txt"
+        $sshLogName = "test.txt"
+        $sshdLogName = "sshdlog.txt"
         $server = $OpenSSHTestInfo["Target"]
         $port = 47003
         $ssouser = $OpenSSHTestInfo["SSOUser"]
         $PwdUser = $OpenSSHTestInfo["PasswdUser"]
         $ssouserProfile = $OpenSSHTestInfo["SSOUserProfile"]
-        Remove-Item -Path (Join-Path $testDir "*$fileName") -Force -ErrorAction SilentlyContinue
+        $opensshbinpath = $OpenSSHTestInfo['OpenSSHBinPath']
+        Remove-Item -Path (Join-Path $testDir "*$sshLogName") -Force -ErrorAction SilentlyContinue        
         $platform = Get-Platform
         $skip = ($platform -eq [PlatformType]::Windows) -and ($PSVersionTable.PSVersion.Major -le 2)
         if(($platform -eq [PlatformType]::Windows) -and ($psversiontable.BuildVersion.Major -le 6))
         {
             #suppress the firewall blocking dialogue on win7
             netsh advfirewall firewall add rule name="sshd" program="$($OpenSSHTestInfo['OpenSSHBinPath'])\sshd.exe" protocol=any action=allow dir=in
-        }
-
-        $Taskfolder = "\OpenSSHTestTasks\"
-        $Taskname = "StartTestDaemon"
-        
-        function Start-SSHD-TestDaemon
-        {
-            param([string] $Arguments)
-            $opensshbinpath = $OpenSSHTestInfo['OpenSSHBinPath']
-
-            $ac = New-ScheduledTaskAction -Execute (join-path $opensshbinpath "sshd") -WorkingDirectory $opensshbinpath -Argument $Arguments
-            $task = Register-ScheduledTask -TaskName $Taskname -User system -Action $ac -TaskPath $Taskfolder -Force
-            Start-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname
-        }
-
-        function Stop-SSHD-TestDaemon
-        {
-            Stop-ScheduledTask -TaskPath $Taskfolder -TaskName $Taskname
-            #stop-scheduledTask does not wait for worker process to end. Kill it if still running. Logic below assume sshd service is running
-            $svcpid = ((tasklist /svc | select-string -Pattern ".+sshd").ToString() -split "\s+")[1]
-            (gps sshd).id | foreach { if ((-not($_ -eq $svcpid))) {Stop-Process $_ -Force} }
-        }
+        }        
     }
 
     AfterEach { $tI++ }
@@ -78,11 +58,13 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             $authorizedkeyPath = Join-Path $ssouserProfile .testssh\authorized_keys
             $Source = Join-Path $ssouserProfile .ssh\authorized_keys
             $testknownhosts = Join-path $PSScriptRoot testdata\test_known_hosts
-            Copy-Item $Source $ssouserSSHProfilePath -Force -ErrorAction Stop
-
+            Copy-Item $Source $ssouserSSHProfilePath -Force -ErrorAction Stop            
             Repair-AuthorizedKeyPermission -Filepath $authorizedkeyPath -confirm:$false
-
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
+            if(-not $skip)
+            {
+                Stop-SSHDTestDaemon
+            }
+                        
             #add wrong password so ssh does not prompt password if failed with authorized keys
             Add-PasswordSetting -Pass "WrongPass"
             $tI=1
@@ -102,73 +84,73 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
         }
 
         BeforeEach {
-            $filePath = Join-Path $testDir "$tC.$tI.$fileName"            
-            $logPath = Join-Path $testDir "$tC.$tI.$logName"
-            Get-Process -Name sshd  -ErrorAction SilentlyContinue | Where-Object {$_.SessionID -ne 0} | Stop-process -force -ErrorAction SilentlyContinue
+            $sshlog = Join-Path $testDir "$tC.$tI.$sshLogName"
+            $sshdlog = Join-Path $testDir "$tC.$tI.$sshdLogName"
+            if(-not $skip)
+            {
+                Stop-SSHDTestDaemon
+            }
         }       
 
-        It "$tC.$tI-authorized_keys-positive(pwd user is the owner and running process can access to the file)" {
+        It "$tC.$tI-authorized_keys-positive(pwd user is the owner and running process can access to the file)" -skip:$skip {
             #setup to have ssouser as owner and grant ssouser read and write, admins group, and local system full control            
             Repair-FilePermission -Filepath $authorizedkeyPath -Owners $objUserSid -FullAccessNeeded  $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
-            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
+            Start-SSHDTestDaemon -WorkDir $opensshbinpath -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $sshdlog"
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts" echo 1234
-            Stop-SSHD-TestDaemon
+            Stop-SSHDTestDaemon
             $o | Should Be "1234"
-            
         }
 
-        It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by local system)" {
+        It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by local system)"  -skip:$skip {
             #setup to have system as owner and grant it full control            
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $systemSid -FullAccessNeeded  $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
-            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
+            Start-SSHDTestDaemon -WorkDir $opensshbinpath -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $sshdlog"
             
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts"  echo 1234
-            Stop-SSHD-TestDaemon
+            Stop-SSHDTestDaemon
             $o | Should Be "1234"
-            
         }
 
-        It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd does not have explict ACE)" {
+        It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd does not have explict ACE)"  -skip:$skip {
             #setup to have admin group as owner and grant it full control            
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $adminsSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
-            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
+            Start-SSHDTestDaemon -WorkDir $opensshbinpath -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $sshdlog"
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts"  echo 1234
-            Stop-SSHD-TestDaemon
+            Stop-SSHDTestDaemon
             $o | Should Be "1234"
-            
         }
 
-        It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd have explict ACE)" {
+        It "$tC.$tI-authorized_keys-positive(authorized_keys is owned by admins group and pwd have explict ACE)"  -skip:$skip {
             #setup to have admin group as owner and grant it full control
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $adminsSid -FullAccessNeeded $adminsSid,$systemSid,$objUserSid -confirm:$false
 
             #Run
-            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
+            Start-SSHDTestDaemon -WorkDir $opensshbinpath -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $sshdlog"
             $o = ssh -p $port $ssouser@$server -o "UserKnownHostsFile $testknownhosts"  echo 1234
-            Stop-SSHD-TestDaemon
-            $o | Should Be "1234"
-            
+            Stop-SSHDTestDaemon
+            $o | Should Be "1234"          
         }
 
-        It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other admin user)" {
+        It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other admin user)"  -skip:$skip {
             #setup to have current user (admin user) as owner and grant it full control
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $currentUserSid -FullAccessNeeded $adminsSid,$systemSid -confirm:$false
 
             #Run
-            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
-            ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
+            Start-SSHDTestDaemon -WorkDir $opensshbinpath -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $sshdlog"
+            ssh -p $port -E $sshlog -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            Stop-SSHD-TestDaemon
-            $logPath | Should Contain "Authentication refused."
+            Stop-SSHDTestDaemon                  
+            $sshlog | Should Contain "Permission denied"
+            $sshdlog | Should Contain "Authentication refused."            
         }
 
-        It "$tC.$tI-authorized_keys-negative(other account can access private key file)" {
+        It "$tC.$tI-authorized_keys-negative(other account can access private key file)"  -skip:$skip {
             #setup to have current user as owner and grant it full control            
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $objUserSid -FullAccessNeeded $adminsSid,$systemSid,$objUserSid -confirm:$false
 
@@ -177,24 +159,26 @@ Describe "Tests for authorized_keys file permission" -Tags "CI" {
             Set-FilePermission -FilePath $authorizedkeyPath -User $objPwdUserSid -Perm "Read"
 
             #Run
-            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
-            ssh -p $port -E $filePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
-            $LASTEXITCODE | Should Not Be 0
-            Stop-SSHD-TestDaemon
-            $logPath | Should Contain "Authentication refused."
+            Start-SSHDTestDaemon -workDir $opensshbinpath -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $sshdlog"
+            ssh -p $port -E $sshlog -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
+            $LASTEXITCODE | Should Not Be 0            
+            Stop-SSHDTestDaemon
+            $sshlog | Should Contain "Permission denied"
+            $sshdlog | Should Contain "Authentication refused."
         }
 
-        It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other non-admin user)" {
+        It "$tC.$tI-authorized_keys-negative(authorized_keys is owned by other non-admin user)"  -skip:$skip {
             #setup to have PwdUser as owner and grant it full control            
             $objPwdUserSid = Get-UserSid -User $PwdUser
             Repair-FilePermission -Filepath $authorizedkeyPath -Owner $objPwdUserSid -FullAccessNeeded $adminsSid,$systemSid,$objPwdUser -confirm:$false
 
             #Run
-            Start-SSHD-TestDaemon -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $logPath"
-            ssh -p $port -E $FilePath -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
+            Start-SSHDTestDaemon -WorkDir $opensshbinpath -Arguments "-d -p $port -o `"AuthorizedKeysFile .testssh/authorized_keys`" -E $sshdlog"
+            ssh -p $port -E $sshlog -o "UserKnownHostsFile $testknownhosts" $ssouser@$server echo 1234
             $LASTEXITCODE | Should Not Be 0
-            Stop-SSHD-TestDaemon
-            $logPath | Should Contain "Authentication refused."            
+            Stop-SSHDTestDaemon
+            $sshlog | Should Contain "Permission denied"
+            $sshdlog | Should Contain "Authentication refused."            
         }
     }
 }

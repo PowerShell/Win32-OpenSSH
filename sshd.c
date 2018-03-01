@@ -742,7 +742,9 @@ privsep_preauth(Authctxt *authctxt)
 
 #ifdef FORK_NOT_SUPPORTED
 	if (privsep_auth_child) {
-		authctxt->pw = w32_getpwuid(1);
+		struct passwd* me = getpwuid(geteuid());
+		/* this re-does the user specific config */
+		authctxt->pw = getpwnamallow(xstrdup(me->pw_name));
 		authctxt->valid = 1;
 		return 1;
 	}
@@ -774,7 +776,7 @@ privsep_preauth(Authctxt *authctxt)
 		else {
 			char** argv = privsep_child_cmdline(0);
 			if (__posix_spawn_asuser(&pid, argv[0], &actions, NULL, argv, NULL, SSH_PRIVSEP_USER) != 0)
-				error("posix_spawn failed");
+				error("%s, posix_spawn failed", __func__);
 			posix_spawn_file_actions_destroy(&actions);
 		}
 		close(pmonitor->m_recvfd);
@@ -880,7 +882,7 @@ privsep_postauth(Authctxt *authctxt)
 		else {
 			char** argv = privsep_child_cmdline(1);
 			if (__posix_spawn_asuser(&pmonitor->m_pid, argv[0], &actions, NULL, argv, NULL, authctxt->pw->pw_name) != 0)
-				error("posix_spawn failed");
+				error("%s, posix_spawn failed", __func__);
 			posix_spawn_file_actions_destroy(&actions);
 		}
 		
@@ -1545,7 +1547,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					error("posix_spawn initialization failed");
 				else {
 					if (posix_spawn(&pid, rexec_argv[0], &actions, &attributes, rexec_argv, NULL) != 0)
-						error("posix_spawn failed");
+						error("%s, posix_spawn failed", __func__);
 					posix_spawn_file_actions_destroy(&actions);
 					posix_spawnattr_destroy(&attributes);
 				}

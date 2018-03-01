@@ -199,10 +199,6 @@ static int
 ssh_proxy_connect(struct ssh *ssh, const char *host, u_short port,
     const char *proxy_command)
 {
-#ifdef WINDOWS
-        fatal("Proxy connect is not supported in Windows yet");
-        return 0;
-#else /* !WINDOWS */
 	char *command_string;
 	int pin[2], pout[2];
 	pid_t pid;
@@ -220,6 +216,28 @@ ssh_proxy_connect(struct ssh *ssh, const char *host, u_short port,
 	    host, port);
 	debug("Executing proxy command: %.500s", command_string);
 
+
+#ifdef FORK_NOT_SUPPORTED
+	{
+		posix_spawn_file_actions_t actions;
+		char* spawn_argv[2];
+		/* 
+		 * expand_proxy_command prefixes cmdline with "exec " 
+		 */
+		spawn_argv[0] = command_string + 5;
+		spawn_argv[1] = NULL;
+		pid = -1;
+
+		if (posix_spawn_file_actions_init(&actions) != 0 ||
+			posix_spawn_file_actions_adddup2(&actions, pin[0], STDIN_FILENO) != 0 ||
+			posix_spawn_file_actions_adddup2(&actions, pout[1], STDOUT_FILENO) != 0)
+			fatal("posix_spawn initialization failed");
+		else if (posix_spawn(&pid, spawn_argv[0], &actions, NULL, spawn_argv, NULL) != 0)
+			fatal("posix_spawn: %s", strerror(errno));
+
+		posix_spawn_file_actions_destroy(&actions);
+	}
+#else 
 	/* Fork and execute the proxy command. */
 	if ((pid = fork()) == 0) {
 		char *argv[10];
@@ -254,6 +272,7 @@ ssh_proxy_connect(struct ssh *ssh, const char *host, u_short port,
 		perror(argv[0]);
 		exit(1);
 	}
+#endif
 	/* Parent. */
 	if (pid < 0)
 		fatal("fork failed: %.100s", strerror(errno));
@@ -272,7 +291,6 @@ ssh_proxy_connect(struct ssh *ssh, const char *host, u_short port,
 		return -1; /* ssh_packet_set_connection logs error */
 
 	return 0;
-#endif /* !WINDOWS */
 }
 
 void

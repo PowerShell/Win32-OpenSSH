@@ -397,7 +397,7 @@ make_absolute(char *p, const char *pwd)
 	* Need to follow up with community if this makes sense in common code
 	*/
 	char *s1, *s2;
-	if (p && p[0] != '/' && (p[0] == '\0' || p[1] != ':')) {
+	if (!is_absolute_path(p)) {
 		abs_str = path_append(pwd, p);
 		free(p);
 		p = abs_str;

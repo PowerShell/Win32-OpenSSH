@@ -37,6 +37,7 @@
 #include "inc\fcntl.h"
 #include "inc\sys\un.h"
 #include "inc\utf.h"
+#include "inc\stdio.h"
 
 #include "w32fd.h"
 #include "signal_internal.h"
@@ -953,16 +954,14 @@ spawn_child_internal(char* cmd, char *const argv[], HANDLE in, HANDLE out, HANDL
 	int add_module_path = 0, ret = -1;
 
 	/* should module path be added */
-	do {
-		if (!cmd)
-			break;
-		t = cmd;
-		if (*t == '\"')
-			t++;
-		if (t[0] == '\0' || t[0] == '\\' || t[0] == '.' || t[1] == ':')
-			break;
+	if (!cmd) {
+		error("%s invalid argument cmd:%s", __func__, cmd);
+		return -1;
+	}
+
+	t = cmd;
+	if (!is_absolute_path(t))
 		add_module_path = 1;
-	} while (0);
 
 	/* compute total cmdline len*/
 	if (add_module_path)
@@ -1040,6 +1039,7 @@ spawn_child_internal(char* cmd, char *const argv[], HANDLE in, HANDLE out, HANDL
 	}
 	else {
 		errno = GetLastError();
+		error("%s failed error:%d", (as_user?"CreateProcessAsUserW":"CreateProcessW"), GetLastError());
 		goto cleanup;
 	}
 
