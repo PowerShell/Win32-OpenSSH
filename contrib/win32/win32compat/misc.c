@@ -489,6 +489,10 @@ strmode(mode_t mode, char *p)
 	case _S_IFIFO:			/* fifo */
 		*p++ = 'p';
 		break;
+	case _S_IFLNK | S_IFDIR:	/* link */
+	case _S_IFLNK:			
+		*p++ = 'l';
+		break;			
 	default:			/* unknown */
 		*p++ = '?';
 		break;
