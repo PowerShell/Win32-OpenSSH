@@ -28,7 +28,9 @@ int w32_fstat(int fd, struct w32_stat *buf);
 
 int w32_stat(const char *path, struct w32_stat *buf);
 #define stat w32_stat
-#define lstat w32_stat
+
+int w32_lstat(const char *path, struct w32_stat *buf);
+#define lstat w32_lstat
 
 int w32_mkdir(const char *pathname, unsigned short mode);
 #define mkdir w32_mkdir

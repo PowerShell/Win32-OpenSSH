@@ -481,6 +481,9 @@ strmode(mode_t mode, char *p)
 	case S_IFREG:			/* regular */
 		*p++ = '-';
 		break;
+	case S_IFLNK:			/* symbolic link */
+		*p++ = 'l';
+		break;			
 #ifdef S_IFSOCK
 	case S_IFSOCK:			/* socket */
 		*p++ = 's';
@@ -830,13 +833,17 @@ w32_stat(const char *input_path, struct w32_stat *buf)
 	return fileio_stat(resolved_path(input_path), (struct _stat64*)buf);
 }
 
+int
+w32_lstat(const char *input_path, struct w32_stat *buf)
+{
+	return fileio_lstat(resolved_path(input_path), (struct _stat64*)buf);
+}
+
 /* if file is symbolic link, copy its link into "link" */
 int
 readlink(const char *path, char *link, int linklen)
 {
-	if(strcpy_s(link, linklen, resolved_path(path)))
-		return -1;
-	return 0;
+	return fileio_readlink(resolved_path(path), link, linklen);
 }
 
 /* convert forward slash to back slash */
