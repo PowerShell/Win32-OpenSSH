@@ -750,12 +750,13 @@ fileio_fstat(struct w32_io* pio, struct _stat64 *buf)
 }
 
 int
-fileio_stat(const char *path, struct _stat64 *buf)
+fileio_stat_wrapper(const char *path, struct _stat64 *buf, int do_lstat)
 {
+	HANDLE file = INVALID_HANDLE_VALUE;
 	wchar_t* wpath = NULL;
-	WIN32_FILE_ATTRIBUTE_DATA attributes = { 0 };
+	BY_HANDLE_FILE_INFORMATION attributes = { 0 };
 	int ret = -1, len = 0;	
-
+	
 	memset(buf, 0, sizeof(struct _stat64));
 
 	/* Detect root dir */
@@ -771,12 +772,20 @@ fileio_stat(const char *path, struct _stat64 *buf)
 		return -1;
 	}
 
-	if (GetFileAttributesExW(wpath, GetFileExInfoStandard, &attributes) == FALSE) {
+	file = CreateFileW(wpath, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, 0, OPEN_EXISTING, 
+		FILE_FLAG_BACKUP_SEMANTICS | ((do_lstat) ? FILE_FLAG_OPEN_REPARSE_POINT : 0), 0);
+	if (file == INVALID_HANDLE_VALUE)
+	{
 		errno = errno_from_Win32LastError();
-		debug3("GetFileAttributesExW with last error %d", GetLastError());
 		goto cleanup;
 	}
-	
+
+	if (GetFileInformationByHandle(file, &attributes) == 0)
+	{
+		errno = errno_from_Win32LastError();
+		goto cleanup;
+	}
+
 	len = (int)wcslen(wpath);
 
 	buf->st_ino = 0; /* Has no meaning in the FAT, HPFS, or NTFS file systems*/
@@ -799,6 +808,8 @@ fileio_stat(const char *path, struct _stat64 *buf)
 		if (handle != INVALID_HANDLE_VALUE) {
 			if ((findbuf.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
 				(findbuf.dwReserved0 == IO_REPARSE_TAG_SYMLINK)) {
+				/* link type supercedes other file type bits */
+				buf->st_mode &= ~S_IFMT;
 				buf->st_mode |= S_IFLNK;
 			}
 			FindClose(handle);
@@ -806,9 +817,22 @@ fileio_stat(const char *path, struct _stat64 *buf)
 	}	
 	ret = 0;
 cleanup:
+	if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
 	if (wpath)
 		free(wpath);	
 	return ret;
+}
+
+int
+fileio_stat(const char *path, struct _stat64 *buf)
+{
+	return fileio_stat_wrapper(path, buf, 0);
+}
+
+int
+fileio_lstat(const char *path, struct _stat64 *buf)
+{
+	return fileio_stat_wrapper(path, buf, 1);
 }
 
 long
@@ -944,4 +968,41 @@ fileio_is_io_available(struct w32_io* pio, BOOL rd)
 	} else { /* write */
 		return (pio->write_details.pending == FALSE) ? TRUE : FALSE;
 	}
+}
+
+ssize_t fileio_readlink(const char *path, char *buf, size_t bufsiz)
+{
+	debug4("readlink - io:%p", pio);
+
+	/* establish a file handle to the destination file */
+	HANDLE file = CreateFileA(
+		path, FILE_READ_ATTRIBUTES,
+		FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, 0);
+	if (file == INVALID_HANDLE_VALUE)
+	{
+		errno = errno_from_Win32LastError();
+		return -1;
+	}
+
+	/* lookup the resultant file handle name */
+	DWORD result = GetFinalPathNameByHandleA(file, buf, 
+		(DWORD) bufsiz, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+	CloseHandle(file); 
+	if (result == 0)
+	{
+		errno = errno_from_Win32LastError();
+		return -1;
+	}
+
+	/* convert local extended path back to familiar path */
+	char prefix[] = "\\\\?\\";
+	if (strstr(buf, prefix) != NULL)
+	{
+		memmove(buf, buf + sizeof(prefix) - 2,
+			strlen(buf + sizeof(prefix) - 2) + 1);
+	}
+
+	/* convert to forward slashes for consistency*/
+	convertToForwardslash(buf);
+	return (ssize_t) strlen(buf);
 }
