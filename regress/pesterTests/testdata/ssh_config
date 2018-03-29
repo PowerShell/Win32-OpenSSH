@@ -1,4 +1,0 @@
-#	test usage of ssh_config
-
-PubkeyAcceptedKeyTypes ssh-ed25519*
-

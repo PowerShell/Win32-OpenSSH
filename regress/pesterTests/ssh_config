@@ -1,5 +1,0 @@
-﻿# host alias for OpenSSH E2E tests
-Host test_target
-    HostName localhost
-    Port 47002
-    User sshtest_ssouser
