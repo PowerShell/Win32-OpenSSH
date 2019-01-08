@@ -1,7 +1,11 @@
-Please answer the following
+**Troubleshooting steps**
+https://github.com/PowerShell/Win32-OpenSSH/wiki/Troubleshooting-Steps
 
-**If it is a terminal issue then please go through wiki
-https://github.com/PowerShell/Win32-OpenSSH/wiki/TTY-PTY-support-in-Windows-OpenSSH**
+
+**Terminal issue? please go through wiki**
+https://github.com/PowerShell/Win32-OpenSSH/wiki/TTY-PTY-support-in-Windows-OpenSSH
+
+Please answer the following
 
 **"OpenSSH for Windows" version**
  `((Get-Item (Get-Command sshd).Source).VersionInfo.FileVersion)`
