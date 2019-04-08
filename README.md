@@ -1,0 +1,10 @@
+As of Nov 1st 2016, active development on "Windows for OpenSSH" is being done in https://github.com/PowerShell/openssh-portable.
+
+This repo (https://github.com/PowerShell/Win32-OpenSSH) is being maintained to keep track of releases and issues.
+
+### Release History
+
+| Date | Version | Release with source |
+|---|---|---|
+| 7/26/2018 | 7.7.2.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v7.7.2.0 |
+| 1/11/2019 | 7.9.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v7.9.0.0 |
