@@ -1,7 +1,8 @@
 As of Nov 1st 2016, active development on "Windows for OpenSSH" is being done in https://github.com/PowerShell/openssh-portable.
 
-This repo (https://github.com/PowerShell/Win32-OpenSSH) is being maintained to keep track of releases and issues. The
-[Documentation](https://github.com/PowerShell/Win32-OpenSSH/wiki) for the project is also maintained here in the wiki.
+This repo (https://github.com/PowerShell/Win32-OpenSSH) is being maintained to keep track of releases and issues
+and because it contains the [wiki](https://github.com/PowerShell/Win32-OpenSSH/wiki)
+which has instructions for [building](https://github.com/PowerShell/Win32-OpenSSH/wiki/Building-OpenSSH-for-Windows-(using-LibreSSL-crypto)).
 
 ### Release History
 
