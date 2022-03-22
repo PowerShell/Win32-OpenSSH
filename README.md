@@ -14,3 +14,4 @@ which has instructions for [building](https://github.com/PowerShell/Win32-OpenSS
 | 12/17/2019 | 8.1.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v8.1.0.0 |
 | 05/26/2021 | 8.6.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v8.6.0.0 |
 | 03/17/2022 | 8.9.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v8.9.0.0 |
+| 03/22/2022 | 8.9.1.0 | https://github.com/PowerShell/openssh-portable/releases/tag/V8.9.1.0 |
