@@ -41,7 +41,7 @@ jobs:
 
     - run: |
         # Download and install C++ Runtime framework package.
-        Import-Module Appx
+        Import-Module Appx -UseWindowsPowerShell
         iwr https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx -OutFile vcLibsBundle.appx
         Add-AppxPackage vcLibsBundle.appx
 
