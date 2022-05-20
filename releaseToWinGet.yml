@@ -1,0 +1,56 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the BSD license.
+
+name: Release to WinGet
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  PACKAGE_URLS: ""
+
+jobs:
+  release-to-winget:
+    runs-on: windows-latest
+    
+    steps:
+    - run: |
+        $repo = "powershell/win32-openssh"
+        $releases = "https://api.github.com/repos/$repo/releases"
+        $releaseInfo = (Invoke-WebRequest $releases | ConvertFrom-Json)[0]
+        $tag = $releaseInfo.tagname
+        forEach ($filename in $releaseInfo.assets.name) {
+          if ($filename.split(".")[-1] -contains "msi") {
+            if ($filename.split("-")[1] -contains "Win32") {
+              $msi_x86 = $filename
+            }
+            if ($filename.split("-")[1] -contains "Win64") {
+              $msi_x64 = $filename
+            }
+          }
+        }
+        $urls = "https://github.com/$repo/releases/download/$tag/$msi_x64, https://github.com/$repo/releases/download/$tag/$msi_x86"
+        echo "PACKAGE_URLS=$urls" >> $GITHUB_ENV
+      name: Get Release URLs
+
+    - run: |
+        # Download and install C++ Runtime framework package.
+        iwr https://aka.ms/Microsoft.VCLibs.x64.14.00.Desktop.appx -OutFile vcLibsBundle.appx
+        Add-AppxPackage vcLibsBundle.appx
+
+        # Download Winget-Create msixbundle, install, and execute update.
+        iwr https://aka.ms/wingetcreate/latest/msixbundle -OutFile winGetBundle.appx
+        Add-AppxPackage winGetBundle.appx
+      name: Download WinGet Requirements
+
+    - run: |
+        echo "wingetcreate update Microsoft.OpenSSH -u ${PACKAGE_URLS} -o ${GITHUB_WORKSPACE}"
+        wingetcreate update Microsoft.OpenSSH -u ${PACKAGE_URLS} -o ${GITHUB_WORKSPACE}
+        # wingetcreate update Microsoft.OpenSSH -u ${PACKAGE_URLS} -t ${{ secrets.GITHUB_TOKEN }} --submit
+      name: WinGet Update 
