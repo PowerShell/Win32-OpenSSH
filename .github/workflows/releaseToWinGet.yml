@@ -36,7 +36,7 @@ jobs:
           }
         }
         $urls = "https://github.com/$repo/releases/download/$tag/$msi_x64, https://github.com/$repo/releases/download/$tag/$msi_x86"
-        echo "PACKAGE_URLS=$urls" >> $GITHUB_ENV
+        echo "PACKAGE_URLS=$urls" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
       name: Get Release URLs
 
     - run: |
@@ -51,7 +51,7 @@ jobs:
       name: Download WinGet Requirements
 
     - run: |
-        echo "wingetcreate update Microsoft.OpenSSH -u ${{ env.PACKAGE_URLS }} -o ${{ env.GITHUB_WORKSPACE }}"
-        wingetcreate update Microsoft.OpenSSH -u ${{ env.PACKAGE_URLS }} -o ${{ env.GITHUB_WORKSPACE }}
-        # wingetcreate update Microsoft.OpenSSH -u ${PACKAGE_URLS} -t ${{ secrets.GITHUB_TOKEN }} --submit
+        echo "wingetcreate update Microsoft.OpenSSH -u $env:PACKAGE_URLS -o $env:GITHUB_WORKSPACE"
+        wingetcreate update Microsoft.OpenSSH -u $env:PACKAGE_URLS -o $env:GITHUB_WORKSPACE
+        # wingetcreate update Microsoft.OpenSSH -u $env:PACKAGE_URLS -t ${{ secrets.GITHUB_TOKEN }} --submit
       name: WinGet Update 
