@@ -51,6 +51,6 @@ jobs:
       name: Download WinGet Requirements
 
     - run: |
-        # wingetcreate update Microsoft.OpenSSH -u @($env:URL_X86, $env:URL_X64)  -o $env:GITHUB_WORKSPACE
-        wingetcreate update Microsoft.OpenSSH -u @($env:URL_X86, $env:URL_X64) -t ${{ secrets.PAT }} --submit
+        # wingetcreate update Microsoft.OpenSSH.Beta -u @($env:URL_X86, $env:URL_X64)  -o $env:GITHUB_WORKSPACE
+        wingetcreate update Microsoft.OpenSSH.Beta -u @($env:URL_X86, $env:URL_X64) -t ${{ secrets.PAT }} --submit
       name: WinGet Update 
