@@ -52,5 +52,5 @@ jobs:
 
     - run: |
         # wingetcreate update Microsoft.OpenSSH.Beta -u @($env:URL_X86, $env:URL_X64)  -o $env:GITHUB_WORKSPACE
-        wingetcreate update Microsoft.OpenSSH.Beta -u @($env:URL_X86, $env:URL_X64) -t ${{ secrets.PAT }} --submit
+        wingetcreate update Microsoft.OpenSSH.Beta -u @($env:URL_X86, $env:URL_X64) -t ${{ secrets.WINGETTOKEN }} --submit
       name: WinGet Update 
