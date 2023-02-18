@@ -1,0 +1,20 @@
+name: Publish to WinGet
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  publish:
+    runs-on: windows-latest # Action can only be run on windows
+    steps:
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          $version = [regex]::Match("${{ github.event.release.tag_name }}", "(?<=v)[\d.]+").Value
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+      - uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: Microsoft.OpenSSH.Beta
+          version: ${{ steps.extract_version.outputs.version }}
+          token: ${{ secrets.WINGET_TOKEN }}
