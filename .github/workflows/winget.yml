@@ -13,7 +13,7 @@ jobs:
         run: |
           $version = [regex]::Match("${{ github.event.release.tag_name }}", "(?<=v)[\d.]+").Value
           Write-Output "version=$version" >> $env:GITHUB_OUTPUT
-      - uses: vedantmgoyal2009/winget-releaser@v2
+      - uses: vedantmgoyal2009/winget-releaser@b32a29562747ae19703978bbddbcff90b4c2869c
         with:
           identifier: Microsoft.OpenSSH.Beta
           version: ${{ steps.extract_version.outputs.version }}
