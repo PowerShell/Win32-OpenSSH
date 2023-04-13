@@ -18,3 +18,4 @@ jobs:
           identifier: Microsoft.OpenSSH.Beta
           version: ${{ steps.extract_version.outputs.version }}
           token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: pwshBot
