@@ -6,14 +6,15 @@ on:
 
 jobs:
   publish:
-    runs-on: windows-latest # Action can only be run on windows
+    runs-on: ubuntu-latest
+
     steps:
       - name: Extract version from tag
         id: extract_version
         run: |
-          $version = [regex]::Match("${{ github.event.release.tag_name }}", "(?<=v)[\d.]+").Value
-          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
-      - uses: vedantmgoyal2009/winget-releaser@44e43128f96fe5b4505d6e1f726ebb78ed228654
+          version=$(echo "${{ github.event.release.tag_name }}" | grep -oP "(?<=v)[\d.]+")
+          echo "version=$version" >> $GITHUB_OUTPUT
+      - uses: vedantmgoyal2009/winget-releaser@22fcaf202ea4df1e621b6fc0c88be192ede74c92
         with:
           identifier: Microsoft.OpenSSH.Beta
           version: ${{ steps.extract_version.outputs.version }}
