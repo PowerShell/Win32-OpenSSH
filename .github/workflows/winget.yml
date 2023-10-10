@@ -3,10 +3,11 @@ name: Publish to WinGet
 on:
   release:
     types: [released]
+  workflow_dispatch:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Extract version from tag
