@@ -8,6 +8,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions: read-all
 
     steps:
       - name: Extract version from tag
