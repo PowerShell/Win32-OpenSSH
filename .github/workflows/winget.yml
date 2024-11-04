@@ -16,7 +16,7 @@ jobs:
         run: |
           version=$(echo "${{ github.event.release.tag_name }}" | grep -oP "(?<=v)[\d.]+")
           echo "version=$version" >> $GITHUB_OUTPUT
-      - uses: vedantmgoyal9/winget-releaser@b87a066d9e624db1394edcd947f8c4e5a7e30cd7
+      - uses: vedantmgoyal9/winget-releaser@a2ac6c7691dd063a6f6e782fdd11090f5ab45525
         with:
           identifier: Microsoft.OpenSSH.Preview
           version: ${{ steps.extract_version.outputs.version }}
