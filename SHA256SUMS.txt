@@ -1,0 +1,10 @@
+1a11e398791c30b6f7fc7045996f6e52c607468125b74e212aa931639ca09253  docs/pqc-ssh/sshd_config.fallback.example
+2c5c39da3100f0bb135b1a4d8b5bcc41872ee622f9dc97a6dc2f5e41f4f8df8b  docs/pqc-ssh/ssh_config.pqc.mlkem.example
+36f0b0143223af2bfd2c9c148a06b4543094aeb6fff3a91a726d95ff04763036  docs/pqc-ssh/setup-pqc-ssh.ps1
+41db075d0c879e32a4140302bc3d66ff34c33489901adf447cfff69f144d73b4  docs/pqc-ssh/ssh_config.fallback.example
+4497e943c57494cd21929d20713e19e2f67c65031300d3bdf171de7c16127f8e  docs/pqc-ssh/sshd_config.pqc.sntrup.example
+54a0466136f2736ecfe40fabcec0e159819e6bbe9cb5fc6f6d193b5eb9b39961  docs/pqc-ssh/smoke-test.sh
+6b0727fd8d7a5dcce260ccbea46ac530e06c5256b262b3751d59d382d9ce71d8  docs/pqc-ssh/sshd_config.pqc.mlkem.example
+9a67e6938b79802069c439b2f280a2b52b512face8abc5dc46c42e4ac7b5f477  docs/pqc-ssh/smoke-test.ps1
+b9b9f2842b4de75c7d13e31d27c3f232c7d0ba4845930f74b45d7741c31a6656  docs/pqc-ssh/auto-pqc-proof.ps1
+c24eaef0cc6c3fd75fd7e838befbad17e24192923b0468042eb96c7431f83a8e  docs/pqc-ssh/ssh_config.pqc.sntrup.example

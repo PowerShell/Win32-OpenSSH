@@ -1,0 +1,51 @@
+name: PQC Proof (Windows & Ubuntu)
+
+on:
+  schedule:
+    - cron: "17 2 * * *"  # daily
+  workflow_dispatch:
+
+jobs:
+  windows-proof:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run auto proof
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy -Scope Process Bypass -Force
+          cd .\docs\pqc-ssh
+          .\auto-pqc-proof.ps1 -MarkdownOut ..\..\proof-latest.md -TextOut ..\..\proof-latest.txt
+      - name: Upload proof artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-windows
+          path: |
+            proof-latest.txt
+            proof-latest.md
+
+  ubuntu-proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenSSH server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          sudo systemctl enable ssh
+          sudo systemctl start ssh
+      - name: Show versions and KEX
+        run: |
+          ssh -V || true
+          ssh -Q kex || true
+      - name: Localhost proof (best-effort)
+        run: |
+          set -e
+          ./docs/pqc-ssh/smoke-test.sh localhost || true
+      - name: Upload ubuntu artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: proof-ubuntu
+          path: |
+            ./docs/pqc-ssh/smoke-test.sh
+

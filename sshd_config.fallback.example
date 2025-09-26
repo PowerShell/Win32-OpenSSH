@@ -1,0 +1,21 @@
+# Win32-OpenSSH: Fallback server config (works on Windows OpenSSH 9.5p2 today)
+Port 22
+Protocol 2
+HostKey      C:/ProgramData/ssh/ssh_host_ed25519_key
+HostKey      C:/ProgramData/ssh/ssh_host_rsa_key
+PubkeyAuthentication yes
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+PermitRootLogin prohibit-password
+UseDNS no
+AllowTcpForwarding yes
+X11Forwarding no
+AllowAgentForwarding yes
+Subsystem sftp sftp-server.exe
+
+# Curve25519-only; compatible with current Windows builds
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org
+
+Ciphers chacha20-ietf-poly1305@openssh.com,aes256-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+LogLevel VERBOSE

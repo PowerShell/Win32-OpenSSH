@@ -1,34 +1,45 @@
-As of Nov 1st 2016, active development on "Windows for OpenSSH" is being done in https://github.com/PowerShell/openssh-portable.
+# Post-Quantum / Hybrid SSH on Windows (Win32-OpenSSH) — Auto Switch
+**Author (contributor): Anurag Dongare — Sept 2025**
 
-This repo (https://github.com/PowerShell/Win32-OpenSSH) is being maintained to keep track of releases and issues
-and because it contains the [wiki](https://github.com/PowerShell/Win32-OpenSSH/wiki)
-which has instructions for [building](https://github.com/PowerShell/Win32-OpenSSH/wiki/Building-OpenSSH-for-Windows-(using-LibreSSL-crypto)).
+This contribution provides **drop-in SSH configs**, **smoke tests**, and a **one‑shot setup script**
+that **auto‑switches** between:
+- **Fallback (today on Windows 9.5p2)** → curve25519-only KEX
+- **PQC hybrid (future-ready)** → `sntrup761x25519-sha512@openssh.com`
+- **PQC hybrid (OpenSSH ≥10.0 default)** → `mlkem768x25519-sha256`
 
-### Release History
+The script detects supported algorithms via `ssh -Q kex` and installs the best available config.
 
-| Date | Version | Release with source |
-|---|---|---|
-| 7/26/2018 | 7.7.2.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v7.7.2.0 |
-| 1/11/2019 | 7.9.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v7.9.0.0 |
-| 6/23/2019 | 8.0.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v8.0.0.0 |
-| 12/17/2019 | 8.1.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v8.1.0.0 |
-| 05/26/2021 | 8.6.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v8.6.0.0 |
-| 03/17/2022 | 8.9.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v8.9.0.0 |
-| 03/22/2022 | 8.9.1.0 | https://github.com/PowerShell/openssh-portable/releases/tag/V8.9.1.0 |
-| 12/13/2022 | 9.1.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.1.0.0 |
-| 02/21/2023 | 9.2.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.2.0.0 |
-| 04/17/2023 | 9.2.2.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.2.2.0 |
-| 10/10/2023 | 9.4.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.4.0.0 |
-| 12/18/2023 | 9.5.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.5.0.0 |
-| 10/08/2024 | 9.8.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.8.0.0 |
-| 10/10/2024 | 9.8.1.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.8.1.0 |
-| 04/08/2025 | 9.8.2.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.8.2.0 |
-| 04/18/2025 | 9.8.3.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.8.3.0 |
+> As of Windows OpenSSH **9.5p2**, `ssh -Q kex` typically does **not** include PQ KEX.
+> You will see **fallback** today and **auto-upgrade** to PQ once Win32-OpenSSH adds support.
 
-## Code of Conduct
+## Included
+- **Configs**
+  - `sshd_config.fallback.example` / `ssh_config.fallback.example`
+  - `sshd_config.pqc.sntrup.example` / `ssh_config.pqc.sntrup.example`
+  - `sshd_config.pqc.mlkem.example` / `ssh_config.pqc.mlkem.example`
+- **Automation**
+  - `setup-pqc-ssh.ps1` — auto-detect & apply best config; runs smoke test
+- **Smoke tests**
+  - `smoke-test.ps1` (PowerShell) and `smoke-test.sh` (bash/WSL)
+- **Docs & meta**
+  - `WINDOWS_BUILD_NOTES.md`, `LEGAL_NOTICE.md`, `OWNER.txt`, `PR_BODY.md`, `ISSUE_BODY.md`
 
-Please see our [Code of Conduct](.github/CODE_OF_CONDUCT.md) before participating in this project.
+## Quick run
+Open **PowerShell (Administrator)** in this folder and run:
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\setup-pqc-ssh.ps1
+```
+It will:
+1) backup `C:\ProgramData\ssh\sshd_config`,
+2) detect PQ support with `ssh -Q kex`,
+3) install the best server & client config,
+4) (re)start the `sshd` service,
+5) run `smoke-test.ps1 -Target localhost` and print the negotiated KEX.
 
-## Security Policy
+**Interpretation**
+- **PASS** → `mlkem768x25519-sha256` or `sntrup761x25519-sha512…`
+- **OK (fallback)** → `curve25519-sha256`
+- **WARN** → legacy/non-preferred algorithm
 
-For any security issues, please see our [Security Policy](.github/SECURITY.md).
+See `WINDOWS_BUILD_NOTES.md` for current Windows behavior.
