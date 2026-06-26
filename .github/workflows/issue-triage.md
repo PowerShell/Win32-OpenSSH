@@ -37,9 +37,10 @@ network: defaults
 safe-outputs:
   # Each output defaults to target: "triggering", so the agent can only act on the
   # issue that triggered the run — keep it that way for a tight blast radius.
-  # Restricted to this repository's existing taxonomy so the agent can't invent
-  # labels or apply ones that imply human verification ("Resolution - Fixed",
-  # "Resolution - Answered", "Resolution - By Design", "Verified"-style states, etc.).
+  # The full Resolution-* set is allowed so the labels are available for clear edge
+  # cases, but the instructions below keep triage conservative: on a fresh issue the
+  # agent actively applies only "Resolution - Duplicate". The rest imply human
+  # verification it shouldn't routinely perform.
   add-labels:
     allowed:
       - "Issue-Bug"
@@ -52,8 +53,7 @@ safe-outputs:
       - "Investigate"
       - "Waiting on Author"
       - "More info needed"
-      - "Resolution - Duplicate"
-      - "Resolution - External"
+      - "Resolution - *"
       - "Known-workaround"
     max: 5
   add-comment:
@@ -197,10 +197,12 @@ Windows-specific bugs, and enhancement requests (including upstream parity featu
     (pair it with `Issue-Enhancement`). **Never** add it to a bug — including a
     cross-platform bug.
 - Add one maintainer hand-off comment (see format below).
-- Do **not** close, and do **not** apply any `Resolution - *` label other than
-  `Resolution - Duplicate` — the rest (`Resolution - Fixed`, `Resolution - Answered`,
-  `Resolution - By Design`, `Resolution - No Repro`, `Resolution - External`,
-  `Resolution - Won't Fix`) reflect human verification you cannot perform on a fresh issue.
+- Do **not** close, and do **not** routinely apply any `Resolution - *` label other than
+  `Resolution - Duplicate`. The other resolutions (`Resolution - Fixed`,
+  `Resolution - Answered`, `Resolution - By Design`, `Resolution - No Repro`,
+  `Resolution - External`, `Resolution - Won't Fix`) reflect human verification you cannot
+  perform on a fresh issue — leave them for maintainers and reserve them for unmistakable
+  edge cases only.
 
 ### E. Genuine, general cross-platform OpenSSH bug → recommend upstream, no labels
 Use this when the report is a real bug but reproduces identically on Linux/macOS (not
