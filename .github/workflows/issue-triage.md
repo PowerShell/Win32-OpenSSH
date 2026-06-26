@@ -20,15 +20,17 @@ on:
   # `roles: [admin, maintainer, write]` cancels the run when the issue author
   # lacks push access — which is exactly who opens spam. Without `all`, triage
   # would never even see, let alone close, spam from non-collaborators. The
-  # agent stays read-only and all writes pass through safe-outputs + threat
-  # detection, so untrusted-author content is contained.
+  # agent stays read-only and its labels/comments/closures pass through
+  # safe-outputs + threat detection; the only direct workflow-side write is the
+  # 👍 acknowledgement reaction below, so untrusted-author content is contained.
   roles: all
 
 permissions:
   # copilot-requests: write lets the Copilot engine use GitHub Actions token-based
   # inference instead of a personal access token (COPILOT_GITHUB_TOKEN); requires
-  # centralized Copilot billing in the org. The agent itself stays read-only — all
-  # mutations go through safe-outputs below.
+  # centralized Copilot billing in the org. The agent itself stays read-only — its
+  # label/comment/close mutations all go through safe-outputs below. The only direct
+  # workflow-side write is the 👍 acknowledgement reaction (see `reaction` above).
   copilot-requests: write
   issues: read
 
