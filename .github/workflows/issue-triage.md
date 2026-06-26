@@ -151,7 +151,7 @@ and say so in your note rather than pushing the author upstream prematurely.
 ### A. Spam, abuse, or not a real issue → close as "not planned"
 Indicators: advertising, off-topic or unrelated content, AI/bot-generated filler,
 gibberish, a test post, or content with no connection to OpenSSH on Windows.
-- Call `close_issue` with one calm sentence explaining why (the configured close reason is
+- Call `close_issue` with one calm, polite sentence explaining why (the configured close reason is
   "not planned"). Do not add labels and do not engage further.
 - Reserve this for content that is **obviously** not a genuine report.
 
