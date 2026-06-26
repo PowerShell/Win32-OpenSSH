@@ -4,12 +4,13 @@ description: |
   opened or reopened issue it gathers context and takes exactly one action: close
   obvious spam as "not planned", close confirmed duplicates of an open issue (marked
   with "Resolution - Duplicate"), request author feedback when a real report is missing
-  information, or label genuine issues with "Investigate" plus the relevant area/type
-  labels and a short maintainer hand-off note. Because Win32-OpenSSH tracks issues here
-  while the Windows code lives in the PowerShell/openssh-portable fork — itself a
-  downstream fork of upstream openssh/openssh-portable — the agent also flags reports
-  that look like general (cross-platform) OpenSSH bugs with "Issue-Upstream Parity" and
-  recommends filing them upstream, without filing anything itself.
+  information, label genuine Windows-port issues with "Investigate" plus the relevant
+  area/type labels and a maintainer hand-off note, or — for a genuine bug that is general
+  (reproduces cross-platform) — leave it unlabeled with a comment recommending it be filed
+  upstream at openssh/openssh-portable. Win32-OpenSSH tracks issues here while the Windows
+  code lives in the PowerShell/openssh-portable fork (itself a downstream fork of upstream
+  openssh/openssh-portable). The "Issue-Upstream Parity" label is reserved for enhancement
+  requests where the Windows port lacks a feature that exists upstream — never for bugs.
 
 on:
   issues:
@@ -97,7 +98,8 @@ Triage issue #${{ github.event.issue.number }} and take **exactly one** of the a
 step 2. Closing an issue is a maintainer action — only close when the evidence is clear.
 When confidence is anything less than clear, label the issue for human triage rather than
 closing it. Your goal is to leave maintainers with a clean `Investigate` queue of real,
-actionable issues, each carrying whatever context you could gather.
+actionable issues whose fix lives in the Windows port — while routing general cross-platform
+OpenSSH bugs to upstream instead of into that queue.
 
 ## 1. Gather context first
 
@@ -118,19 +120,30 @@ title can be misleading; read the body and comments, and identify the real root 
 before deciding. A confusing or poorly written report from a sincere user is **not** spam.
 
 ### Windows-specific vs. upstream — assess this for every real report
-While gathering context, form a view on where a fix would have to live:
+While gathering context, form a view on where a fix would have to live. Two distinct
+upstream situations exist; keep them separate because they are handled differently:
 
-- **Windows-specific** — touches Windows-only behavior: the Windows service (`sshd`
+- **Windows-specific bug** — touches Windows-only behavior: the Windows service (`sshd`
   service), Windows ConPTY/terminal handling, Windows ACLs/file permissions, the Windows
   installer/MSI/`Install-sshd.ps1`, Windows registry, Win32 process/console APIs,
   Windows account/SID/SSP authentication, drive paths, or anything that only manifests on
-  Windows. These belong in **PowerShell/openssh-portable**.
-- **General OpenSSH** — protocol behavior, ciphers/KEX/MACs, config parsing
-  (`sshd_config`/`ssh_config` options), `authorized_keys`/known_hosts semantics, or `scp`/
-  `sftp` behavior that would reproduce identically on Linux/macOS. These are candidates to
-  be filed **upstream** at openssh/openssh-portable.
+  Windows. The fix lives in **PowerShell/openssh-portable**. Triage normally (outcome D).
+- **General (cross-platform) OpenSSH bug** — a genuine bug in protocol behavior,
+  ciphers/KEX/MACs, config parsing (`sshd_config`/`ssh_config` options),
+  `authorized_keys`/known_hosts semantics, or `scp`/`sftp` behavior that would reproduce
+  **identically on Linux/macOS**. The real fix belongs **upstream** at
+  openssh/openssh-portable, so this does **not** enter the Windows triage queue — handle it
+  with outcome E: add the upstream-filing recommendation comment and apply **no labels at
+  all** (no `Investigate`, no type, no area). Maintainers close it later once it's tracked
+  upstream.
+- **Missing upstream feature → `Issue-Upstream Parity`** — this is the *only* case for the
+  `Issue-Upstream Parity` label. Use it when the issue is a **feature/enhancement request**
+  for capability that already exists in **upstream OpenSSH** but is **not yet present in the
+  Windows port** (a parity gap), e.g. a config option, algorithm, or CLI flag that works on
+  Linux/macOS but is missing or unimplemented on Windows. It is **not** for bugs — never
+  apply it to a cross-platform *bug*.
 
-When the evidence is mixed or unclear, treat it as Windows-specific for routing purposes
+When the evidence is mixed or unclear, treat a bug as Windows-specific for routing purposes
 and say so in your note rather than pushing the author upstream prematurely.
 
 ## 2. Choose exactly one outcome
@@ -166,7 +179,10 @@ Then:
   above by name).
 - Do **not** add `Investigate` and do **not** close.
 
-### D. Genuine, actionable issue → label and hand off to maintainers
+### D. Genuine, actionable issue (Windows-specific, or a parity feature) → label and hand off
+Use this for issues whose fix would live in **PowerShell/openssh-portable** — i.e.
+Windows-specific bugs, and enhancement requests (including upstream parity features). Do
+**not** use outcome D for a general cross-platform bug; that is outcome E.
 - Add `Investigate` (maintainer attention needed — this repo's triage-queue marker), plus
   the applicable:
   - **Type**: `Issue-Bug`, `Issue-Enhancement`, `Issue-Question`, `Issue-Documentation`,
@@ -176,25 +192,34 @@ Then:
     `Area-SCP`, `Area-ssh-agent`, `Area-ssh-keygen`, `Area-Authentication`, `Area-Terminal`,
     `Area-Port Forwarding`, `Area-Logging/Diagnostics`, `Area-Install`, `Area-Setup`,
     `Area-Build`, `Area-Test Coverage`.
-  - **Upstream**: add `Issue-Upstream Parity` when your assessment in step 1 is that this
-    is a **general OpenSSH problem** rather than Windows-specific (see the upstream hand-off
-    note below).
+  - **Parity feature only**: add `Issue-Upstream Parity` **only** when this is an
+    **enhancement request** for an upstream OpenSSH feature the Windows port is missing
+    (pair it with `Issue-Enhancement`). **Never** add it to a bug — including a
+    cross-platform bug.
 - Add one maintainer hand-off comment (see format below).
 - Do **not** close, and do **not** apply any `Resolution - *` label other than
   `Resolution - Duplicate` — the rest (`Resolution - Fixed`, `Resolution - Answered`,
   `Resolution - By Design`, `Resolution - No Repro`, `Resolution - External`,
   `Resolution - Won't Fix`) reflect human verification you cannot perform on a fresh issue.
 
-## 3. Maintainer hand-off comment (outcomes C and D)
+### E. Genuine, general cross-platform OpenSSH bug → recommend upstream, no labels
+Use this when the report is a real bug but reproduces identically on Linux/macOS (not
+Windows-specific), so the fix belongs **upstream** at openssh/openssh-portable.
+- Apply **no labels at all** — not `Investigate`, not a type, not an area, not
+  `Issue-Upstream Parity` (which is for missing *features*, never bugs).
+- Add a single comment containing the **upstream-filing recommendation** (see below).
+- Do **not** close. Leave it open; maintainers will close it once it's tracked upstream.
+
+## 3. Maintainer hand-off comment (outcomes C, D, and E)
 
 Lead with a one-line summary, then keep details in collapsed `<details>` sections so the
-thread stays tidy. For an actionable issue (outcome D), include a **"For maintainers"**
-section with your assessment:
+thread stays tidy. For an actionable Windows/parity issue (outcome D), include a
+**"For maintainers"** section with your assessment:
 
-- **Windows-specific vs. upstream** — State whether this looks Windows-specific (fix lives
-  in **PowerShell/openssh-portable**) or like a general OpenSSH problem that affects every
-  platform, with your reasoning and confidence. When it looks general/cross-platform, also
-  add the **upstream hand-off note** below.
+- **Windows-specific vs. parity** — Confirm this belongs in **PowerShell/openssh-portable**
+  (Windows-specific bug, or a missing upstream feature flagged `Issue-Upstream Parity`),
+  with your reasoning and confidence. (A general cross-platform *bug* would have been
+  outcome E instead — recommend upstream there rather than triaging it here.)
 - **Reproducibility** — Can this be reproduced *from the report as written*? Call out
   whether it includes clear steps, the OpenSSH-for-Windows version, server/client OS, and a
   minimal sample, and give your confidence. (You are judging whether the report contains
@@ -203,16 +228,16 @@ section with your assessment:
   coding agent** (working in PowerShell/openssh-portable)? Recommend yes/maybe/no with a
   one-line reason: good candidates are well-scoped, localized changes with clear expected
   behavior and low design risk; poor candidates need product/design decisions, broad
-  refactors, deep protocol work, or belong upstream. Do **not** assign it yourself — this is
-  a recommendation for the maintainers.
+  refactors, or deep protocol work. Do **not** assign it yourself — this is a recommendation
+  for the maintainers.
 - **Likely area** — The affected component / area and your reasoning, with any pointers you
   can infer.
 
 Then, as useful: inferable reproduction steps (D) or the exact information still needed (C);
 related issues (`#number`); and docs or wiki links.
 
-### Upstream hand-off note (when the report looks like a general OpenSSH bug)
-When you label `Issue-Upstream Parity`, add a short, friendly paragraph in the comment that:
+### Upstream-filing recommendation (outcome E)
+For outcome E, the comment is short and author-facing — a friendly paragraph that:
 - explains that the behavior is not Windows-specific and so is best addressed in **upstream
   OpenSSH**, which the Windows port tracks;
 - points the author to upstream's bug-reporting process: non-security bugs go to the OpenSSH
@@ -222,14 +247,17 @@ When you label `Issue-Upstream Parity`, add a short, friendly paragraph in the c
 - **important:** notes that **security-sensitive** bugs must NOT be filed in public Bugzilla
   and should instead be emailed to openssh@openssh.com;
 - makes clear this is a recommendation — you are **not** filing anything upstream on their
-  behalf, and the issue stays open here so maintainers can track parity.
+  behalf, and the issue stays open here for now so maintainers can track it.
 
 Be factual, never promise fixes or timelines, and keep the wording neutral. gh-aw appends an
 automated attribution footer, so do not add your own.
 
 ## Guardrails
 
-- Take exactly one of A–D, and act only on issue #${{ github.event.issue.number }}.
+- Take exactly one of A–E, and act only on issue #${{ github.event.issue.number }}.
+- A general cross-platform bug is outcome E: recommend upstream and apply **no labels** —
+  do not put it in the `Investigate` queue. `Issue-Upstream Parity` is for missing upstream
+  *features* only, never for bugs.
 - Apply at most 5 labels, only from the allowed taxonomy, spelled exactly as they exist.
 - When confidence is less than clear, prefer labeling for human triage over closing.
 - Never file, or claim to file, an issue upstream or in any other repository — only
