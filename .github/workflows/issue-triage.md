@@ -15,7 +15,7 @@ description: |
 on:
   issues:
     types: [opened, reopened]
-  reaction: eyes
+  reaction: "+1"
   # Process issues from EVERYONE, not just collaborators. gh-aw's default
   # `roles: [admin, maintainer, write]` cancels the run when the issue author
   # lacks push access — which is exactly who opens spam. Without `all`, triage
