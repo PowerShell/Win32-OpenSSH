@@ -40,14 +40,21 @@ function Invoke-Checked {
     if ($WorkingDirectory) {
         Push-Location $WorkingDirectory
     }
+    $previousErrorActionPreference = $ErrorActionPreference
     try {
+        # Windows PowerShell 5.1 wraps native stderr as error records. Capture
+        # diagnostics without treating warnings as failures; the exit code is
+        # authoritative for these tools.
+        $ErrorActionPreference = 'Continue'
         $output = @(& $FilePath @ArgumentList 2>&1 | ForEach-Object { $_.ToString() })
-        if ($LASTEXITCODE -ne 0) {
-            throw "'$FilePath $($ArgumentList -join ' ')' failed with exit code $LASTEXITCODE.`n$($output -join [Environment]::NewLine)"
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            throw "'$FilePath $($ArgumentList -join ' ')' failed with exit code $exitCode.`n$($output -join [Environment]::NewLine)"
         }
         return $output
     }
     finally {
+        $ErrorActionPreference = $previousErrorActionPreference
         if ($WorkingDirectory) {
             Pop-Location
         }
