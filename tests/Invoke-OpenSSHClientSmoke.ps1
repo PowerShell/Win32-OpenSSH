@@ -152,18 +152,24 @@ try {
         Invoke-Checked -FilePath 'sc.exe' -ArgumentList @(
             'config',
             'sshd',
-            "binPath= `"$sshd`" -f `"$sshdConfig`" -E `"$sshdLog`"",
-            'start= demand',
-            'obj= LocalSystem'
+            'binPath=',
+            "`"$sshd`" -f `"$sshdConfig`" -E `"$sshdLog`"",
+            'start=',
+            'demand',
+            'obj=',
+            'LocalSystem'
         )
     }
     else {
         Invoke-Checked -FilePath 'sc.exe' -ArgumentList @(
             'create',
             'sshd',
-            "binPath= `"$sshd`" -f `"$sshdConfig`" -E `"$sshdLog`"",
-            'start= demand',
-            'obj= LocalSystem'
+            'binPath=',
+            "`"$sshd`" -f `"$sshdConfig`" -E `"$sshdLog`"",
+            'start=',
+            'demand',
+            'obj=',
+            'LocalSystem'
         )
         $sshdServiceCreated = $true
     }
@@ -272,10 +278,24 @@ try {
         $agentServiceStartMode = $agentService.StartMode
         $agentServiceWasRunning = $agentService.State -eq 'Running'
         Stop-Service -Name ssh-agent -Force -ErrorAction SilentlyContinue
-        Invoke-Checked -FilePath 'sc.exe' -ArgumentList @('config', 'ssh-agent', "binPath= `"$sshAgent`"", 'start= demand')
+        Invoke-Checked -FilePath 'sc.exe' -ArgumentList @(
+            'config',
+            'ssh-agent',
+            'binPath=',
+            "`"$sshAgent`"",
+            'start=',
+            'demand'
+        )
     }
     else {
-        Invoke-Checked -FilePath 'sc.exe' -ArgumentList @('create', 'ssh-agent', "binPath= `"$sshAgent`"", 'start= demand')
+        Invoke-Checked -FilePath 'sc.exe' -ArgumentList @(
+            'create',
+            'ssh-agent',
+            'binPath=',
+            "`"$sshAgent`"",
+            'start=',
+            'demand'
+        )
         $agentServiceCreated = $true
     }
     Start-Service -Name ssh-agent
@@ -326,11 +346,11 @@ finally {
         & sc.exe delete ssh-agent | Out-Null
     }
     elseif ($agentService) {
-        & sc.exe config ssh-agent "binPath= $agentServicePath" | Out-Null
+        & sc.exe config ssh-agent 'binPath=' $agentServicePath | Out-Null
         switch ($agentServiceStartMode) {
-            'Auto' { & sc.exe config ssh-agent 'start= auto' | Out-Null }
-            'Manual' { & sc.exe config ssh-agent 'start= demand' | Out-Null }
-            'Disabled' { & sc.exe config ssh-agent 'start= disabled' | Out-Null }
+            'Auto' { & sc.exe config ssh-agent 'start=' 'auto' | Out-Null }
+            'Manual' { & sc.exe config ssh-agent 'start=' 'demand' | Out-Null }
+            'Disabled' { & sc.exe config ssh-agent 'start=' 'disabled' | Out-Null }
         }
         if ($agentServiceWasRunning) {
             Start-Service -Name ssh-agent
@@ -342,11 +362,11 @@ finally {
         & sc.exe delete sshd | Out-Null
     }
     elseif ($sshdService) {
-        & sc.exe config sshd "binPath= $sshdServicePath" "obj= $sshdServiceStartName" | Out-Null
+        & sc.exe config sshd 'binPath=' $sshdServicePath 'obj=' $sshdServiceStartName | Out-Null
         switch ($sshdServiceStartMode) {
-            'Auto' { & sc.exe config sshd 'start= auto' | Out-Null }
-            'Manual' { & sc.exe config sshd 'start= demand' | Out-Null }
-            'Disabled' { & sc.exe config sshd 'start= disabled' | Out-Null }
+            'Auto' { & sc.exe config sshd 'start=' 'auto' | Out-Null }
+            'Manual' { & sc.exe config sshd 'start=' 'demand' | Out-Null }
+            'Disabled' { & sc.exe config sshd 'start=' 'disabled' | Out-Null }
         }
         $serviceRegistryPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\sshd'
         if ($sshdPrivilegesExisted) {
