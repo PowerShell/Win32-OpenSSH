@@ -122,6 +122,9 @@ $sshdServiceWasRunning = $false
 $sshdPrivilegesExisted = $false
 $sshdRequiredPrivileges = $null
 $sshdLog = $null
+$openSshRegistryKeyExisted = $false
+$defaultShellExisted = $false
+$defaultShell = $null
 $succeeded = $false
 $oldGitSsh = $env:GIT_SSH
 $oldGitSshVariant = $env:GIT_SSH_VARIANT
@@ -177,6 +180,16 @@ try {
     ) | Set-Content -Path $sshdConfig -Encoding ascii
 
     Invoke-Checked -FilePath $sshd -ArgumentList @('-t', '-f', $sshdConfig)
+    $openSshRegistryPath = 'HKLM:\SOFTWARE\OpenSSH'
+    $openSshRegistryKeyExisted = Test-Path $openSshRegistryPath
+    $null = New-Item -Path $openSshRegistryPath -Force
+    $openSshRegistry = Get-ItemProperty -Path $openSshRegistryPath
+    if ($openSshRegistry.PSObject.Properties.Name -contains 'DefaultShell') {
+        $defaultShellExisted = $true
+        $defaultShell = $openSshRegistry.DefaultShell
+    }
+    Set-ItemProperty -Path $openSshRegistryPath -Name DefaultShell -Value (Join-Path $PSHOME 'powershell.exe')
+
     $sshdService = Get-CimInstance Win32_Service -Filter "Name='sshd'" -ErrorAction SilentlyContinue
     if ($sshdService) {
         $sshdServicePath = $sshdService.PathName
@@ -428,6 +441,17 @@ finally {
         if ($sshdServiceWasRunning) {
             Start-Service -Name sshd
         }
+    }
+
+    $openSshRegistryPath = 'HKLM:\SOFTWARE\OpenSSH'
+    if ($defaultShellExisted) {
+        Set-ItemProperty -Path $openSshRegistryPath -Name DefaultShell -Value $defaultShell
+    }
+    else {
+        Remove-ItemProperty -Path $openSshRegistryPath -Name DefaultShell -ErrorAction SilentlyContinue
+    }
+    if (-not $openSshRegistryKeyExisted) {
+        Remove-Item -Path $openSshRegistryPath -Force -ErrorAction SilentlyContinue
     }
 
     if (-not $succeeded -and $sshdLog -and (Test-Path $sshdLog) -and $env:GITHUB_WORKSPACE) {
