@@ -35,19 +35,19 @@ jobs:
 
     steps:
       - name: Check out release automation
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           path: release-repo
 
       - name: Check out exact OpenSSH source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: PowerShell/openssh-portable
           ref: ${{ env.OPENSSH_SOURCE_REVISION }}
           path: openssh-portable
 
       - name: Check out dependency registry
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: microsoft/vcpkg
           ref: ${{ env.VCPKG_BASELINE }}
@@ -132,7 +132,7 @@ jobs:
             -PackageDirectory "$env:GITHUB_WORKSPACE\OpenSSH-ARM64-Client"
 
       - name: Upload traceable client artifact
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: OpenSSH-ARM64-Client-v10.0.0.0
           path: OpenSSH-ARM64-Client
@@ -142,7 +142,7 @@ jobs:
 
       - name: Upload build logs on failure
         if: failure()
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: OpenSSH-ARM64-build-logs
           path: |

@@ -70,6 +70,32 @@ function Convert-ToSshPath {
     return ([System.IO.Path]::GetFullPath($Path)).Replace('\', '/')
 }
 
+function Set-PrivateKeyAcl {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path,
+
+        [Parameter(Mandatory)]
+        [System.Security.Principal.SecurityIdentifier] $Owner,
+
+        [Parameter(Mandatory)]
+        [System.Security.Principal.SecurityIdentifier[]] $FullControl
+    )
+
+    $acl = [System.Security.AccessControl.FileSecurity]::new()
+    $acl.SetOwner($Owner)
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($identity in $FullControl) {
+        $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+            $identity,
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )
+        $null = $acl.AddAccessRule($rule)
+    }
+    Set-Acl -Path $Path -AclObject $acl
+}
+
 $tempBase = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
 $testRoot = Join-Path $tempBase "openssh-arm64-client-$PID"
 $profileSshDirectory = Join-Path $env:USERPROFILE '.ssh'
@@ -112,21 +138,12 @@ try {
     Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'rsa', '-b', '3072', '-N', '""', '-f', $rsaKey)
     Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-lf', "$rsaKey.pub")
 
-    Invoke-Checked -FilePath 'icacls.exe' -ArgumentList @(
-        $hostKey,
-        '/inheritance:r',
-        '/grant:r',
-        '*S-1-5-18:(F)',
-        '*S-1-5-32-544:(F)'
-    )
-    $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $systemSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-18')
+    $administratorsSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
+    $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    Set-PrivateKeyAcl -Path $hostKey -Owner $administratorsSid -FullControl @($systemSid, $administratorsSid)
     foreach ($privateKey in @($clientKey, $rsaKey)) {
-        Invoke-Checked -FilePath 'icacls.exe' -ArgumentList @(
-            $privateKey,
-            '/inheritance:r',
-            '/grant:r',
-            "*${userSid}:(F)"
-        )
+        Set-PrivateKeyAcl -Path $privateKey -Owner $userSid -FullControl @($userSid)
     }
 
     $authorizedKeys = Join-Path $testRoot 'authorized_keys'
