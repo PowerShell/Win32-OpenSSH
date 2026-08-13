@@ -184,7 +184,7 @@ try {
     $openSshRegistryKeyExisted = Test-Path $openSshRegistryPath
     $null = New-Item -Path $openSshRegistryPath -Force
     $openSshRegistry = Get-ItemProperty -Path $openSshRegistryPath
-    if ($openSshRegistry.PSObject.Properties.Name -contains 'DefaultShell') {
+    if ($null -ne $openSshRegistry.PSObject.Properties['DefaultShell']) {
         $defaultShellExisted = $true
         $defaultShell = $openSshRegistry.DefaultShell
     }
@@ -198,7 +198,7 @@ try {
         $sshdServiceWasRunning = $sshdService.State -eq 'Running'
         $serviceRegistryPath = 'HKLM:\SYSTEM\CurrentControlSet\Services\sshd'
         $serviceRegistry = Get-ItemProperty -Path $serviceRegistryPath
-        if ($serviceRegistry.PSObject.Properties.Name -contains 'RequiredPrivileges') {
+        if ($null -ne $serviceRegistry.PSObject.Properties['RequiredPrivileges']) {
             $sshdPrivilegesExisted = $true
             $sshdRequiredPrivileges = @($serviceRegistry.RequiredPrivileges)
         }
