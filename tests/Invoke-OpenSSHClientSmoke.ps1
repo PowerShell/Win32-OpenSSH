@@ -286,14 +286,18 @@ try {
     if (-not ($noPtyOutput -match 'no-pty-ok')) {
         throw 'Non-PTY SSH command did not return expected output.'
     }
-    $ptyMarker = Join-Path $testRoot 'pty-marker.txt'
     $ptyOutput = Invoke-Checked -FilePath $ssh -ArgumentList @(
         '-tt',
         'arm64-local',
-        "cmd /c echo pty-ok > `"$ptyMarker`""
+        'cmd /c echo pty-ok'
     )
-    if (-not (Test-Path $ptyMarker) -or (Get-Content $ptyMarker -Raw).Trim() -ne 'pty-ok') {
-        throw "Forced-PTY SSH command did not create the expected marker.`n$($ptyOutput -join [Environment]::NewLine)"
+    $ptyDeadline = (Get-Date).AddSeconds(5)
+    do {
+        Start-Sleep -Milliseconds 100
+        $sshdLogContent = Get-Content $sshdLog -Raw -ErrorAction SilentlyContinue
+    } while ($sshdLogContent -notmatch 'Starting session: command on windows-pty' -and (Get-Date) -lt $ptyDeadline)
+    if ($sshdLogContent -notmatch 'Starting session: command on windows-pty') {
+        throw "sshd did not record a forced Windows PTY session.`n$($ptyOutput -join [Environment]::NewLine)"
     }
 
     $copySource = Join-Path $testRoot 'scp-source.txt'
