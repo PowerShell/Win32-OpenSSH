@@ -286,9 +286,14 @@ try {
     if (-not ($noPtyOutput -match 'no-pty-ok')) {
         throw 'Non-PTY SSH command did not return expected output.'
     }
-    $ptyOutput = Invoke-Checked -FilePath $ssh -ArgumentList @('-tt', 'arm64-local', 'cmd /c echo pty-ok')
-    if (-not ($ptyOutput -match 'pty-ok')) {
-        throw 'Forced-PTY SSH command did not return expected output.'
+    $ptyMarker = Join-Path $testRoot 'pty-marker.txt'
+    $ptyOutput = Invoke-Checked -FilePath $ssh -ArgumentList @(
+        '-tt',
+        'arm64-local',
+        "cmd /c echo pty-ok > `"$ptyMarker`""
+    )
+    if (-not (Test-Path $ptyMarker) -or (Get-Content $ptyMarker -Raw).Trim() -ne 'pty-ok') {
+        throw "Forced-PTY SSH command did not create the expected marker.`n$($ptyOutput -join [Environment]::NewLine)"
     }
 
     $copySource = Join-Path $testRoot 'scp-source.txt'
