@@ -105,9 +105,11 @@ try {
     $hostKey = Join-Path $testRoot 'ssh_host_ed25519_key'
     $clientKey = Join-Path $testRoot 'id_ed25519'
     $rsaKey = Join-Path $testRoot 'id_rsa'
-    Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'ed25519', '-N', '', '-f', $hostKey)
-    Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'ed25519', '-N', '', '-f', $clientKey)
-    Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'rsa', '-b', '3072', '-N', '', '-f', $rsaKey)
+    # Windows PowerShell 5.1 drops empty native arguments, so preserve the
+    # explicit empty passphrase through CommandLineToArgvW.
+    Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'ed25519', '-N', '""', '-f', $hostKey)
+    Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'ed25519', '-N', '""', '-f', $clientKey)
+    Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'rsa', '-b', '3072', '-N', '""', '-f', $rsaKey)
     Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-lf', "$rsaKey.pub")
 
     $authorizedKeys = Join-Path $testRoot 'authorized_keys'
