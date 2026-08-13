@@ -112,6 +112,23 @@ try {
     Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-q', '-t', 'rsa', '-b', '3072', '-N', '""', '-f', $rsaKey)
     Invoke-Checked -FilePath $sshKeygen -ArgumentList @('-lf', "$rsaKey.pub")
 
+    Invoke-Checked -FilePath 'icacls.exe' -ArgumentList @(
+        $hostKey,
+        '/inheritance:r',
+        '/grant:r',
+        '*S-1-5-18:(F)',
+        '*S-1-5-32-544:(F)'
+    )
+    $userSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    foreach ($privateKey in @($clientKey, $rsaKey)) {
+        Invoke-Checked -FilePath 'icacls.exe' -ArgumentList @(
+            $privateKey,
+            '/inheritance:r',
+            '/grant:r',
+            "*${userSid}:(F)"
+        )
+    }
+
     $authorizedKeys = Join-Path $testRoot 'authorized_keys'
     Copy-Item "$clientKey.pub" $authorizedKeys -Force
     $knownHosts = Join-Path $profileSshDirectory 'known_hosts-arm64-client'
