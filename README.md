@@ -4,6 +4,20 @@ This repo (https://github.com/PowerShell/Win32-OpenSSH) is being maintained to k
 and because it contains the [wiki](https://github.com/PowerShell/Win32-OpenSSH/wiki)
 which has instructions for [building](https://github.com/PowerShell/Win32-OpenSSH/wiki/Building-OpenSSH-for-Windows-(using-LibreSSL-crypto)).
 
+### ARM64 client artifact
+
+The `ARM64 client artifact` workflow rebuilds the `v10.0.0.0` source tag on a native
+Windows ARM64 runner, runs the upstream unit tests and client integration smoke
+tests, verifies every packaged PE has machine type `0xAA64`, and publishes a
+client-only payload laid out for Git for Windows.
+
+The artifact manifest records the exact OpenSSH source commit, vcpkg baseline,
+workflow commit, per-file SHA-256 hashes, and the disposition of all 11 existing
+Git for Windows OpenSSH paths. Ten paths receive native replacements.
+`usr/lib/ssh/ssh-keysign.exe` is removed because Win32 OpenSSH does not build it
+and does not support host-based authentication. Server daemons, service scripts,
+server configuration, and shell-host files are excluded from the artifact.
+
 ### Release History
 
 | Date | Version | Release with source |

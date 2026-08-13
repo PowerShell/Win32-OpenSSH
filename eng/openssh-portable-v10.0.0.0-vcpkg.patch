@@ -1,0 +1,11 @@
+diff --git a/contrib/win32/openssh/vcpkg.json b/contrib/win32/openssh/vcpkg.json
+index 825f19c08..9808b7e93 100644
+--- a/contrib/win32/openssh/vcpkg.json
++++ b/contrib/win32/openssh/vcpkg.json
+@@ -23,5 +23,5 @@
+       "version": "0.13.0"
+     }
+   ],
+-  "builtin-baseline": "a345bbdc68cdfda65603e24413b21afb28f110fb"
++  "builtin-baseline": "16fa044f80dd984c24deff5b7d0457e64c85a1e0"
+ }

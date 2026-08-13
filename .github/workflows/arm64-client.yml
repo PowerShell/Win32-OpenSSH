@@ -1,0 +1,153 @@
+name: ARM64 client artifact
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/arm64-client.yml
+      - eng/openssh-portable-v10.0.0.0-vcpkg.patch
+      - scripts/New-OpenSSHClientPackage.ps1
+      - tests/Invoke-OpenSSHClientSmoke.ps1
+      - tests/Invoke-OpenSSHUnitTests.ps1
+      - tests/Test-OpenSSHClientPackage.ps1
+  push:
+    paths:
+      - .github/workflows/arm64-client.yml
+      - eng/openssh-portable-v10.0.0.0-vcpkg.patch
+      - scripts/New-OpenSSHClientPackage.ps1
+      - tests/Invoke-OpenSSHClientSmoke.ps1
+      - tests/Invoke-OpenSSHUnitTests.ps1
+      - tests/Test-OpenSSHClientPackage.ps1
+
+permissions:
+  contents: read
+
+env:
+  OPENSSH_SOURCE_REVISION: b8c08ef9da9450a94a9c5ef717d96a7bd83f3332
+  OPENSSH_SOURCE_REF: v10.0.0.0
+  VCPKG_BASELINE: 16fa044f80dd984c24deff5b7d0457e64c85a1e0
+
+jobs:
+  build-test-package:
+    name: Build, test, and package native ARM64 client
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out release automation
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          path: release-repo
+
+      - name: Check out exact OpenSSH source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: PowerShell/openssh-portable
+          ref: ${{ env.OPENSSH_SOURCE_REVISION }}
+          path: openssh-portable
+
+      - name: Check out dependency registry
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ env.VCPKG_BASELINE }}
+          path: vcpkg
+
+      - name: Verify ARM64 build prerequisites
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $visualStudio = & $vswhere -products * -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 -property installationPath
+          if (-not $visualStudio) {
+            throw 'Visual Studio ARM64 C++ tools are not installed on the runner.'
+          }
+          $spectre = & $vswhere -products * -requires Microsoft.VisualStudio.Component.VC.Runtimes.ARM64.Spectre -property installationPath
+          if (-not $spectre) {
+            throw 'The v143 ARM64 Spectre libraries required by arm64-custom.cmake are not installed on the runner.'
+          }
+          Write-Host "Using Visual Studio at $visualStudio"
+
+      - name: Apply reproducible dependency lock
+        shell: pwsh
+        run: |
+          git -C openssh-portable apply "$env:GITHUB_WORKSPACE\release-repo\eng\openssh-portable-v10.0.0.0-vcpkg.patch"
+          if ($LASTEXITCODE -ne 0) {
+            throw 'The dependency servicing patch no longer applies to the pinned OpenSSH source.'
+          }
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) {
+            throw "vcpkg bootstrap failed with exit code $LASTEXITCODE."
+          }
+          & "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe" integrate install
+          if ($LASTEXITCODE -ne 0) {
+            throw "vcpkg MSBuild integration failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Build OpenSSH from source
+        shell: powershell
+        run: |
+          & "$env:GITHUB_WORKSPACE\openssh-portable\contrib\win32\openssh\OpenSSH-build.ps1" `
+            -repolocation "$env:GITHUB_WORKSPACE\openssh-portable" `
+            -destination "$env:GITHUB_WORKSPACE\source-packages" `
+            -NativeHostArch arm64 `
+            -Configuration Release `
+            -Verbose
+          if ($LASTEXITCODE -ne 0) {
+            throw "OpenSSH ARM64 build failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Run upstream unit tests
+        shell: powershell
+        run: |
+          & "$env:GITHUB_WORKSPACE\release-repo\tests\Invoke-OpenSSHUnitTests.ps1" `
+            -BuildDirectory "$env:GITHUB_WORKSPACE\openssh-portable\bin\arm64\Release"
+
+      - name: Exercise native client behavior
+        shell: powershell
+        run: |
+          & "$env:GITHUB_WORKSPACE\release-repo\tests\Invoke-OpenSSHClientSmoke.ps1" `
+            -BuildDirectory "$env:GITHUB_WORKSPACE\openssh-portable\bin\arm64\Release"
+
+      - name: Create Git for Windows client payload
+        shell: powershell
+        run: |
+          & "$env:GITHUB_WORKSPACE\release-repo\scripts\New-OpenSSHClientPackage.ps1" `
+            -BuildDirectory "$env:GITHUB_WORKSPACE\openssh-portable\bin\arm64\Release" `
+            -DestinationDirectory "$env:GITHUB_WORKSPACE\OpenSSH-ARM64-Client" `
+            -SourceRevision "$env:OPENSSH_SOURCE_REVISION" `
+            -SourceRef "$env:OPENSSH_SOURCE_REF" `
+            -VcpkgBaseline "$env:VCPKG_BASELINE" `
+            -BuildRepository "$env:GITHUB_REPOSITORY" `
+            -BuildRevision "$env:GITHUB_SHA" `
+            -BuildRun "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+
+      - name: Verify client-only artifact
+        shell: powershell
+        run: |
+          & "$env:GITHUB_WORKSPACE\release-repo\tests\Test-OpenSSHClientPackage.ps1" `
+            -PackageDirectory "$env:GITHUB_WORKSPACE\OpenSSH-ARM64-Client"
+
+      - name: Upload traceable client artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        with:
+          name: OpenSSH-ARM64-Client-v10.0.0.0
+          path: OpenSSH-ARM64-Client
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        with:
+          name: OpenSSH-ARM64-build-logs
+          path: |
+            openssh-portable/contrib/win32/openssh/OpenSSHReleasearm64.log
+            openssh-portable/contrib/win32/openssh/vcpkg_installed/arm64-custom/vcpkg/issue_body.md
+            smoke-logs/sshd.log
+          if-no-files-found: ignore
+          retention-days: 7
