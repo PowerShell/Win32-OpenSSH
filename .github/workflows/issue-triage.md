@@ -37,6 +37,7 @@ permissions:
 network: defaults
 
 safe-outputs:
+  report-failure-as-issue: false
   # Each output defaults to target: "triggering", so the agent can only act on the
   # issue that triggered the run — keep it that way for a tight blast radius.
   # The full Resolution-* set is allowed so the labels are available for clear edge
