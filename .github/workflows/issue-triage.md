@@ -37,6 +37,7 @@ permissions:
 network: defaults
 
 safe-outputs:
+  report-failure-as-issue: false
   # Each output defaults to target: "triggering", so the agent can only act on the
   # issue that triggered the run — keep it that way for a tight blast radius.
   # The full Resolution-* set is allowed so the labels are available for clear edge
@@ -80,7 +81,7 @@ timeout-minutes: 10
 source: githubnext/agentics/workflows/issue-triage.md@2f03fdaafb8c1ae62dfde7e0be762a822a201aeb
 engine:
   id: copilot
-  model: gpt-5.5
+  model: gpt-5.6-sol
 ---
 
 # Agentic Issue Triage
