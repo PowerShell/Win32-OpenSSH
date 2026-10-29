@@ -68,7 +68,7 @@ safe-outputs:
     max: 1
 
 tools:
-  web-fetch:
+  bash: ["cat", "ls", "find", "grep", "head", "tail", "wc"]
   github:
     toolsets: [issues, labels]
     # This is a public repository, so triage must be able to see issues from
@@ -115,10 +115,11 @@ OpenSSH bugs to upstream instead of into that queue.
   each match whether it is currently **open** or already **closed**.
 - Use the labels tools to fetch this repository's current labels. Only ever apply labels
   that already exist, spelled exactly.
-- If a verdict depends on a linked doc, wiki page, or external page, you may `web-fetch`
-  it. The repo's [Troubleshooting Steps](https://github.com/PowerShell/Win32-OpenSSH/wiki/Troubleshooting-Steps)
+- Web fetching is unavailable, so don't base a verdict on the contents of a linked doc,
+  wiki page, or external page you cannot read. The repo's
+  [Troubleshooting Steps](https://github.com/PowerShell/Win32-OpenSSH/wiki/Troubleshooting-Steps)
   and [TTY/PTY](https://github.com/PowerShell/Win32-OpenSSH/wiki/TTY-PTY-support-in-Windows-OpenSSH)
-  wiki pages are useful references.
+  wiki pages are still useful links to point authors to.
 
 Ground every verdict in evidence you actually gathered — never in the title alone. The
 title can be misleading; read the body and comments, and identify the real root cause
