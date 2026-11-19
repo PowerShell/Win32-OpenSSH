@@ -8,7 +8,7 @@ which has instructions for [building](https://github.com/PowerShell/Win32-OpenSS
 
 | Date | Version | Release with source |
 |---|---|---|
-| 2026-10-20 | 10.4.0.0 | https://github.com/PowerShell/openssh-portable/tree/v10.4.0.0 |
+| 2026-10-20 | 10.4.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v10.4.0.0 |
 | 2025-10-27 | 10.0.0.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v10.0.0.0 |
 | 2025-04-18 | 9.8.3.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.8.3.0 |
 | 2025-04-08 | 9.8.2.0 | https://github.com/PowerShell/openssh-portable/releases/tag/v9.8.2.0 |
